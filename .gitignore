@@ -83,6 +83,7 @@ local.properties
 .loadpath
 .project
 .cproject
+*.log
 
 
 # ==================
@@ -96,3 +97,4 @@ local.properties
 #  !modules/yourmodule
 #
 # ==================
+!modules/mod-transmog
