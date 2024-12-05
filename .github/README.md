@@ -1,3 +1,23 @@
+# ArenaCraft 
+
+## Development
+
+Dependencies:
+- [Docker](https://www.docker.com/)
+- [VSCode](https://code.visualstudio.com/)
+  * [VSCode DevContainer Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+
+Steps:
+- `git clone --recurse-submodules https://github.com/dawidcxx/arenacraft`
+- `code arenacraft`
+- `cmd+shift+p: reopen in container`
+- drop games files into `$PROJECT_DIR/.devcontainer/game`
+- create new terminal in vscode 
+- run `init_data.sh`
+- configure CMake project using VSCode: `cmd+shift+p: CMake: Configure`
+- `cd build && sudo make -j $(nproc) install`
+- spawn 2 extra terminals, run `authserver` and `worldserver` in each
+
 # ![logo](https://raw.githubusercontent.com/azerothcore/azerothcore.github.io/master/images/logo-github.png) AzerothCore
 
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
