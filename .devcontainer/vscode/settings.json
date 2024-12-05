@@ -30,6 +30,7 @@
         "variant": "cpp",
         "*.inc": "cpp",
         "iosfwd": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "optional": "cpp"
     }
 }

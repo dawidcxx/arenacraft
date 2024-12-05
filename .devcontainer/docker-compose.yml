@@ -17,6 +17,8 @@ services:
       MYSQL_ROOT_PASSWORD: acore
     volumes:
       - mysql-data:/var/lib/mysql
+    ports:
+      - 3306:3306
   
   adminer:
     image: adminer

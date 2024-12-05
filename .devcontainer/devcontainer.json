@@ -31,6 +31,10 @@
 
 		"source=${localWorkspaceFolder}/.devcontainer/server/etc/authserver.conf,target=/usr/local/etc/authserver.conf,type=bind",
 		"source=${localWorkspaceFolder}/.devcontainer/server/etc/worldserver.conf,target=/usr/local/etc/worldserver.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/duelreset.conf,target=/usr/local/etc/duelreset.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/arena_3v3_solo_queue.conf,target=/usr/local/etc/arena_3v3_solo_queue.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/transmog.conf,target=/usr/local/etc/transmog.conf,type=bind",
+		
 		"source=${localWorkspaceFolder}/.devcontainer/tools,target=/usr/local/tools,type=bind",
 
 		// Persist data between container restarts
@@ -42,7 +46,7 @@
 		// VScode config file 
 		// Keeping them in .devcontainer to not pollute source root
 		"source=${localWorkspaceFolder}/.devcontainer/vscode/launch.json,target=/workspaces/${localWorkspaceFolderBasename}/.vscode/launch.json,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/vscode/settings.json,target=/workspaces/${localWorkspaceFolderBasename}/.vscode/settings.json,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/vscode/settings.json,target=/workspaces/${localWorkspaceFolderBasename}/.vscode/settings.json,type=bind"
 		
 	],
 	"forwardPorts": [8085, 3724]
