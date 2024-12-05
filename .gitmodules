@@ -1,0 +1,21 @@
+[submodule "modules/mod-arena-3v3-solo-queue"]
+	path = modules/mod-arena-3v3-solo-queue
+	url = https://github.com/azerothcore/mod-arena-3v3-solo-queue.git
+[submodule "modules/mod-duel-reset"]
+	path = modules/mod-duel-reset
+	url = https://github.com/azerothcore/mod-duel-reset
+[submodule "modules/mod-learn-highest-talent"]
+	path = modules/mod-learn-highest-talent
+	url = https://github.com/azerothcore/mod-learn-highest-talent
+[submodule "modules/mod-learn-spells"]
+	path = modules/mod-learn-spells
+	url = https://github.com/azerothcore/mod-learn-spells
+[submodule "modules/mod-npc-enchanter"]
+	path = modules/mod-npc-enchanter
+	url = https://github.com/azerothcore/mod-npc-enchanter
+[submodule "modules/mod-npc-services"]
+	path = modules/mod-npc-services
+	url = https://github.com/azerothcore/mod-npc-services
+[submodule "modules/mod-transmog"]
+	path = modules/mod-transmog
+	url = https://github.com/azerothcore/mod-transmog
