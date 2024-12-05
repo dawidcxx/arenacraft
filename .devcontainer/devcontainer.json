@@ -31,9 +31,12 @@
 
 		"source=${localWorkspaceFolder}/.devcontainer/server/etc/authserver.conf,target=/usr/local/etc/authserver.conf,type=bind",
 		"source=${localWorkspaceFolder}/.devcontainer/server/etc/worldserver.conf,target=/usr/local/etc/worldserver.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/duelreset.conf,target=/usr/local/etc/duelreset.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/arena_3v3_solo_queue.conf,target=/usr/local/etc/arena_3v3_solo_queue.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/transmog.conf,target=/usr/local/etc/transmog.conf,type=bind",
+
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/duelreset.conf,target=/usr/local/etc/modules/duelreset.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/arena_3v3_solo_queue.conf,target=/usr/local/etc/modules/arena_3v3_solo_queue.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/transmog.conf,target=/usr/local/etc/modules/transmog.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/mod_learnspells.conf,target=/usr/local/etc/modules/mod_learnspells.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/npc_enchanter.conf,target=/usr/local/etc/modules/npc_enchanter.conf,type=bind",
 		
 		"source=${localWorkspaceFolder}/.devcontainer/tools,target=/usr/local/tools,type=bind",
 

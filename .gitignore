@@ -101,3 +101,7 @@ local.properties
 !modules/mod-arena-3v3-solo-queue
 !modules/mod-arenacraft
 !modules/mod-duel-reset
+!modules/mod-learn-spells
+!modules/mod-learn-highest-talent
+!modules/mod-npc-services
+!modules/mod-npc-enchanter
