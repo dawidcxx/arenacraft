@@ -31,6 +31,8 @@
         "*.inc": "cpp",
         "iosfwd": "cpp",
         "sstream": "cpp",
-        "optional": "cpp"
+        "optional": "cpp",
+        "bitset": "cpp",
+        "initializer_list": "cpp"
     }
 }
