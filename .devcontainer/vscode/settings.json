@@ -4,6 +4,7 @@
     "cmake.configureArgs": [
         "-DTOOLS_BUILD=all",
         "-DCMAKE_BUILD_TYPE=Debug",
+        "-DCMAKE_INSTALL_PREFIX=/usr/local/server",
         "-DSCRIPTS=static",
         "-DMODULES=static",
         // "-DCMAKE_C_LINKER=mold",

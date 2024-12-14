@@ -18,30 +18,31 @@
 		}
 	},
 	"remoteEnv": {
-		"PATH": "${containerEnv:PATH}:/workspaces/server/bin"
+		"PATH": "${containerEnv:PATH}:/usr/local/server/bin"
 	},
 	"features": {
 		"ghcr.io/devcontainers-contrib/features/zsh-plugins:0": {
 			"plugins": "git",
 			"omzPlugins": "https://github.com/zsh-users/zsh-autosuggestions.git"
-		}
+		},
+		"ghcr.io/shyim/devcontainers-features/bun:0": {}
 	},
 	"mounts": [
 		"source=${localWorkspaceFolder}/.devcontainer/.zshrc,target=/home/vscode/.zshrc,type=bind",
 
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/authserver.conf,target=/usr/local/etc/authserver.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/worldserver.conf,target=/usr/local/etc/worldserver.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/authserver.conf,target=/usr/local/server/etc/authserver.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/worldserver.conf,target=/usr/local/server/etc/worldserver.conf,type=bind",
 
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/duelreset.conf,target=/usr/local/etc/modules/duelreset.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/arena_3v3_solo_queue.conf,target=/usr/local/etc/modules/arena_3v3_solo_queue.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/transmog.conf,target=/usr/local/etc/modules/transmog.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/mod_learnspells.conf,target=/usr/local/etc/modules/mod_learnspells.conf,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/server/etc/npc_enchanter.conf,target=/usr/local/etc/modules/npc_enchanter.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/duelreset.conf,target=/usr/local/server/etc/modules/duelreset.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/arena_3v3_solo_queue.conf,target=/usr/local/server/etc/modules/arena_3v3_solo_queue.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/transmog.conf,target=/usr/local/server/etc/modules/transmog.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/mod_learnspells.conf,target=/usr/local/server/etc/modules/mod_learnspells.conf,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/etc/npc_enchanter.conf,target=/usr/local/server/etc/modules/npc_enchanter.conf,type=bind",
 		
-		"source=${localWorkspaceFolder}/.devcontainer/tools,target=/usr/local/tools,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/tools,target=/usr/local/server/tools,type=bind",
 
 		// Persist data between container restarts
-		"source=${localWorkspaceFolder}/.devcontainer/server/data,target=/usr/local/data,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/data,target=/usr/local/server/data,type=bind",
 		
 		// Mount game files for scripts to easily access them
 		"source=${localWorkspaceFolder}/.devcontainer/game,target=/opt/game,type=bind",

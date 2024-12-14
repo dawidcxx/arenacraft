@@ -11,4 +11,4 @@ source $ZSH/oh-my-zsh.sh
 DISABLE_AUTO_UPDATE=true
 DISABLE_UPDATE_PROMPT=true
 
-export PATH=$PATH:/usr/local/bin:/usr/local/tools
+export PATH=$PATH:/usr/local/server/bin:/usr/local/server/tools
