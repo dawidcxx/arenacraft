@@ -43,7 +43,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DTOOLS_BUILD=all \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr/local/server \
+            -DCMAKE_INSTALL_PREFIX=$PWD/build/install \
             -DSCRIPTS=static \
             -DMODULES=static
 
@@ -60,7 +60,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: application
-          path: /usr/local/server
+          path: $PWD/build/install
 
   deploy:
     needs: build
@@ -79,7 +79,7 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
-          echo "${{ secrets.DEPLOY_KEY }}" > deploy_key
-          chmod 600 deploy_key
-          scp -i deploy_key -r /usr/local/server/bin $DEPLOY_USER@$DEPLOY_HOST:/usr/local/server/bin
-          ssh -i deploy_key $DEPLOY_USER@$DEPLOY_HOST "sudo systemctl restart your-service-name"
+          # echo "${{ secrets.DEPLOY_KEY }}" > deploy_key
+          # chmod 600 deploy_key
+          # scp -i deploy_key -r /usr/local/server/bin $DEPLOY_USER@$DEPLOY_HOST:/usr/local/server/bin
+          # ssh -i deploy_key $DEPLOY_USER@$DEPLOY_HOST "sudo systemctl restart your-service-name"
