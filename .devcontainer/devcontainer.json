@@ -42,16 +42,19 @@
 		"source=${localWorkspaceFolder}/.devcontainer/tools,target=/usr/local/server/tools,type=bind",
 
 		// Persist data between container restarts
-		"source=${localWorkspaceFolder}/.devcontainer/server/data,target=/usr/local/server/data,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/server/data,target=/usr/local/server/data,type=bind,consistency=cached",
 		
 		// Mount game files for scripts to easily access them
-		"source=${localWorkspaceFolder}/.devcontainer/game,target=/opt/game,type=bind",
+		"source=${localWorkspaceFolder}/.devcontainer/game,target=/opt/game,type=bind,consistency=cached",
 
 		// VScode config file 
 		// Keeping them in .devcontainer to not pollute source root
 		"source=${localWorkspaceFolder}/.devcontainer/vscode/launch.json,target=/workspaces/${localWorkspaceFolderBasename}/.vscode/launch.json,type=bind",
-		"source=${localWorkspaceFolder}/.devcontainer/vscode/settings.json,target=/workspaces/${localWorkspaceFolderBasename}/.vscode/settings.json,type=bind"
+		"source=${localWorkspaceFolder}/.devcontainer/vscode/settings.json,target=/workspaces/${localWorkspaceFolderBasename}/.vscode/settings.json,type=bind",
 		
+		// Mount local ssh config
+		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+
 	],
 	"forwardPorts": [8085, 3724]
 }
