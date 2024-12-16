@@ -84,7 +84,7 @@ if (config.extractMmaps) {
 }
 
 info("Copying data to server directory..");
-await $`cp -r dbc maps vmaps mmaps Cameras /usr/local/server/data`
+await $`cp -r dbc maps vmaps ${config.extractMmaps ? 'mmaps' : ''} Cameras /usr/local/server/data`
     .cwd(GAME_CWD)
     .quiet();
 
