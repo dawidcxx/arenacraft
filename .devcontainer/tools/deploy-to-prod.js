@@ -25,11 +25,19 @@ await $`
     sudo make install
 `.quiet();
 
+info('..Built app from source')
+
 info('Deploying to prod...')
-await $`rsync -avz /usr/local/server/ ${config.sshUrl}:/usr/local/server/ 2>&1`
-info('Deployed to prod')
 
+const directories = ['/usr/local/server/data', '/usr/local/server/bin']
+const uploadDirectory = (dir) => {
+    const parent = dir.split('/').slice(0, -1).join('/')
+    info(`Uploading '${dir}' to '${parent}'`)
+    return $`rsync -avz ${dir} ${config.sshUrl}:${parent} 2>&1`.quiet()
+}
+await Promise.all(directories.map(uploadDirectory))
 
+info('..Deployed to prod')
 
 
 //  
