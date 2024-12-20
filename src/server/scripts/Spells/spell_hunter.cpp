@@ -929,10 +929,7 @@ class spell_hun_disengage : public SpellScript
 
     SpellCastResult CheckCast()
     {
-        Unit* caster = GetCaster();
-        if (caster->IsPlayer() && !caster->IsInCombat())
-            return SPELL_FAILED_CANT_DO_THAT_RIGHT_NOW;
-
+        // arenacraft: allow also in out of combat state
         return SPELL_CAST_OK;
     }
 

@@ -660,6 +660,7 @@ class spell_sha_earthliving_weapon : public AuraScript
     {
         auto chance = 20;
         Unit* caster = eventInfo.GetActor();
+
         if (!caster || !eventInfo.GetProcTarget())
         {
             return false;
@@ -1141,6 +1142,25 @@ class spell_sha_t8_electrified : public AuraScript
     void Register() override
     {
         OnEffectProc += AuraEffectProcFn(spell_sha_t8_electrified::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+    }
+};
+
+// CUSTOM SPELL : 80869
+class spell_sha_acenstral_winds : public AuraScript
+{
+    PrepareAuraScript(spell_sha_acenstral_winds);
+
+    bool CheckProc(ProcEventInfo& eventInfo)
+    {
+        // Should not proc if windfury totem is not up!
+        
+        // use default dbc proc chance..
+        return true;
+    }
+
+    void Register() override
+    {
+        DoCheckProc += AuraCheckProcFn(spell_sha_acenstral_winds::CheckProc);
     }
 };
 

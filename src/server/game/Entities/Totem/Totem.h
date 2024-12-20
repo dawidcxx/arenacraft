@@ -36,6 +36,7 @@ enum class TotemSpellIds : uint32
 
 #define SENTRY_TOTEM_ENTRY    3968
 #define EARTHBIND_TOTEM_ENTRY 2630
+#define WINDFURY_TOTEM        6112
 
 enum TotemImmunitySpells
 {

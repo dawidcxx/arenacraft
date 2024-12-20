@@ -24,7 +24,7 @@
 #include "SpellMgr.h"
 #include "TotemPackets.h"
 
-Totem::Totem(SummonPropertiesEntry const* properties, ObjectGuid owner) : Minion(properties, owner, false)
+Totem::Totem(SummonPropertiesEntry const *properties, ObjectGuid owner) : Minion(properties, owner, false)
 {
     m_unitTypeMask |= UNIT_MASK_TOTEM;
     m_duration = 0;
@@ -33,10 +33,10 @@ Totem::Totem(SummonPropertiesEntry const* properties, ObjectGuid owner) : Minion
 
 void Totem::Update(uint32 time)
 {
-    Unit* owner = GetOwner();
+    Unit *owner = GetOwner();
     if (!owner || !owner->IsAlive() || !IsAlive() || m_duration <= time)
     {
-        UnSummon();                                         // remove self
+        UnSummon(); // remove self
         return;
     }
 
@@ -48,7 +48,7 @@ void Totem::InitStats(uint32 duration)
 {
     // client requires SMSG_TOTEM_CREATED to be sent before adding to world and before removing old totem
     // Xinef: Set level for Unit totems
-    if (Unit* owner = ObjectAccessor::GetUnit(*this, m_owner))
+    if (Unit *owner = ObjectAccessor::GetUnit(*this, m_owner))
     {
         uint32 slot = m_Properties->Slot;
         if (owner->IsPlayer() && slot >= SUMMON_SLOT_TOTEM && slot < MAX_TOTEM_SLOT)
@@ -70,8 +70,8 @@ void Totem::InitStats(uint32 duration)
     Minion::InitStats(duration);
 
     // Get spell cast by totem
-    if (SpellInfo const* totemSpell = sSpellMgr->GetSpellInfo(GetSpell()))
-        if (totemSpell->CalcCastTime())   // If spell has cast time -> its an active totem
+    if (SpellInfo const *totemSpell = sSpellMgr->GetSpellInfo(GetSpell()))
+        if (totemSpell->CalcCastTime()) // If spell has cast time -> its an active totem
             m_type = TOTEM_ACTIVE;
 
     m_duration = duration;
@@ -86,9 +86,7 @@ void Totem::InitSummon()
         if (TotemSpellIds(GetUInt32Value(UNIT_CREATED_BY_SPELL)) == TotemSpellIds::FireTotemSpell)
         {
             m_Events.AddEventAtOffset([this]()
-            {
-                CastSpell(this, GetSpell(), true);
-            }, 4s);
+                                      { CastSpell(this, GetSpell(), true); }, 4s);
         }
         else
         {
@@ -96,8 +94,17 @@ void Totem::InitSummon()
         }
     }
 
+    // dawid: Check for Ancestral Winds talent being activated
+    if (GetEntry() == WINDFURY_TOTEM)
+    {
+        if (GetOwner()->HasAura(80867))
+        {
+            CastSpell(this, GetSpell(1), true);
+        }
+    }
+
     // Some totems can have both instant effect and passive spell
-    if (GetSpell(1))
+    else if (GetSpell(1))
     {
         CastSpell(this, GetSpell(1), true);
     }
@@ -130,7 +137,7 @@ void Totem::UnSummon(uint32 msTime)
     CombatStop();
     RemoveAurasDueToSpell(GetSpell(), GetGUID());
 
-    if (Unit* owner = GetOwner())
+    if (Unit *owner = GetOwner())
     {
         // clear owner's totem slot
         for (uint8 i = SUMMON_SLOT_TOTEM; i < MAX_TOTEM_SLOT; ++i)
@@ -148,19 +155,19 @@ void Totem::UnSummon(uint32 msTime)
         if (GetEntry() == SENTRY_TOTEM_ENTRY)
             owner->RemoveAurasDueToSpell(static_cast<uint32>(TotemSpellIds::SentryTotemSpell));
 
-        //remove aura all party members too
-        if (Player* player = owner->ToPlayer())
+        // remove aura all party members too
+        if (Player *player = owner->ToPlayer())
         {
             player->SendAutoRepeatCancel(this);
 
-            if (SpellInfo const* spell = sSpellMgr->GetSpellInfo(GetUInt32Value(UNIT_CREATED_BY_SPELL)))
+            if (SpellInfo const *spell = sSpellMgr->GetSpellInfo(GetUInt32Value(UNIT_CREATED_BY_SPELL)))
                 player->SendCooldownEvent(spell, 0, nullptr, false);
 
-            if (Group* group = player->GetGroup())
+            if (Group *group = player->GetGroup())
             {
-                for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
+                for (GroupReference *itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
                 {
-                    Player* target = itr->GetSource();
+                    Player *target = itr->GetSource();
                     if (target && target->IsInMap(player) && group->SameSubGroup(player, target))
                         target->RemoveAurasDueToSpell(GetSpell(), GetGUID());
                 }
@@ -171,15 +178,15 @@ void Totem::UnSummon(uint32 msTime)
     AddObjectToRemoveList();
 }
 
-bool Totem::IsImmunedToSpellEffect(SpellInfo const* spellInfo, uint32 index) const
+bool Totem::IsImmunedToSpellEffect(SpellInfo const *spellInfo, uint32 index) const
 {
     // xinef: immune to all positive spells, except of stoneclaw totem absorb, sentry totem bind sight and intervene
     // totems positive spells have unit_caster target
     if (spellInfo->Effects[index].Effect != SPELL_EFFECT_DUMMY &&
-            spellInfo->Effects[index].Effect != SPELL_EFFECT_SCRIPT_EFFECT &&
-            spellInfo->IsPositive() && spellInfo->Effects[index].TargetA.GetTarget() != TARGET_UNIT_CASTER &&
-            spellInfo->Effects[index].TargetA.GetCheckType() != TARGET_CHECK_ENTRY &&
-            spellInfo->Id != SPELL_STONECLAW && spellInfo->Id != SPELL_BIND_SIGHT && spellInfo->Id != SPELL_INTERVENE)
+        spellInfo->Effects[index].Effect != SPELL_EFFECT_SCRIPT_EFFECT &&
+        spellInfo->IsPositive() && spellInfo->Effects[index].TargetA.GetTarget() != TARGET_UNIT_CASTER &&
+        spellInfo->Effects[index].TargetA.GetCheckType() != TARGET_CHECK_ENTRY &&
+        spellInfo->Id != SPELL_STONECLAW && spellInfo->Id != SPELL_BIND_SIGHT && spellInfo->Id != SPELL_INTERVENE)
         return true;
 
     // Cyclone shouldn't be casted on totems
@@ -190,15 +197,15 @@ bool Totem::IsImmunedToSpellEffect(SpellInfo const* spellInfo, uint32 index) con
 
     switch (spellInfo->Effects[index].ApplyAuraName)
     {
-        // i think its wrong (xinef)
-        //case SPELL_AURA_PERIODIC_LEECH:
-        case SPELL_AURA_PERIODIC_DAMAGE:
-        case SPELL_AURA_PERIODIC_DAMAGE_PERCENT:
-        case SPELL_AURA_MOD_FEAR:
-        case SPELL_AURA_TRANSFORM:
-            return true;
-        default:
-            break;
+    // i think its wrong (xinef)
+    // case SPELL_AURA_PERIODIC_LEECH:
+    case SPELL_AURA_PERIODIC_DAMAGE:
+    case SPELL_AURA_PERIODIC_DAMAGE_PERCENT:
+    case SPELL_AURA_MOD_FEAR:
+    case SPELL_AURA_TRANSFORM:
+        return true;
+    default:
+        break;
     }
 
     return Creature::IsImmunedToSpellEffect(spellInfo, index);
