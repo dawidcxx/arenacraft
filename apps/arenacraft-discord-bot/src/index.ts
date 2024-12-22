@@ -6,6 +6,7 @@ import { handleRegisterCmd } from "./handleRegisterCmd";
 import { describe } from "node:test";
 
 const config = getConfig();
+console.log('config', config);
 const discordBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 const discordRestClient = new REST().setToken(config.DISCORD_TOKEN);
 const db = await mysql.createConnection({ uri: config.AUTH_DB, namedPlaceholders: true });
