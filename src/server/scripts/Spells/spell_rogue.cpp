@@ -595,6 +595,24 @@ class spell_rog_shiv : public SpellScript
     }
 };
 
+// 90000 - Marked for Death
+class class_rog_marked_for_death : public SpellScript
+{
+    PrepareSpellScript(class_rog_marked_for_death);
+
+    void HandleDummy(SpellEffIndex /*effIndex*/)
+    {
+        Unit* caster = GetCaster();
+        if (Unit* unitTarget = GetHitUnit())
+            unitTarget->CastSpell(unitTarget, 90001, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHitTarget += SpellEffectFn(class_rog_marked_for_death::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
 // 57934 - Tricks of the Trade
 class spell_rog_tricks_of_the_trade : public AuraScript
 {
@@ -752,6 +770,7 @@ class spell_rog_vanish : public SpellScript
     }
 };
 
+
 void AddSC_rogue_spell_scripts()
 {
     RegisterSpellScript(spell_rog_savage_combat);
@@ -770,4 +789,5 @@ void AddSC_rogue_spell_scripts()
     RegisterSpellScript(spell_rog_pickpocket);
     RegisterSpellScript(spell_rog_vanish_purge);
     RegisterSpellScript(spell_rog_vanish);
+    RegisterSpellScript(class_rog_marked_for_death);
 }

@@ -1,18 +1,14 @@
+import 'dotenv/config'
 import { Client, GatewayIntentBits, REST, Routes } from "discord.js";
 import { z } from "zod";
-import {
-  uniqueNamesGenerator,
-  adjectives,
-  colors,
-  animals,
-} from "unique-names-generator";
-import { randomBytes } from "crypto";
 import mysql from "mysql2/promise";
+import { handleRegisterCmd } from "./handleRegisterCmd";
+import { describe } from "node:test";
 
 const config = getConfig();
 const discordBot = new Client({ intents: [GatewayIntentBits.Guilds] });
 const discordRestClient = new REST().setToken(config.DISCORD_TOKEN);
-const db = await mysql.createConnection(config.AUTH_DB);
+const db = await mysql.createConnection({ uri: config.AUTH_DB, namedPlaceholders: true });
 await db.connect();
 
 const commands = [
@@ -20,6 +16,10 @@ const commands = [
     name: "register",
     description: "Obtian a arenacraft login:password pair",
   },
+  {
+    name: 'ping',
+    describe: 'Check if the bot is alive'
+  }
 ];
 
 await discordRestClient.put(Routes.applicationCommands(config.CLIENT_ID), {
@@ -28,30 +28,23 @@ await discordRestClient.put(Routes.applicationCommands(config.CLIENT_ID), {
 
 discordBot.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
-
+  const start = +new Date();
   switch (interaction.commandName) {
     case "register": {
-      const randomUsername = uniqueNamesGenerator({
-        dictionaries: [adjectives, colors, animals],
-        separator: "",
-        length: 3,
-      });
-      const randomPassword = randomBytes(16).toString("hex");
-      interaction.user.send(`
-*Welcome onboard!* Your identity shalll be..
-
-**Username :** \`${randomUsername}\`
-**Password  :** \`${randomPassword}\`
-
-Use it when logging into your game client
-      `);
-      interaction.reply("Account registered");
-      return;
+      await handleRegisterCmd(db, interaction)
+      break;
+    }
+    case 'ping': {
+      interaction.user.send(`Ready at your command`)
     }
   }
+  await interaction.reply('Done. Check your DMs')
+  console.log(`Handleded slash command in ${(+new Date() - start)}ms`)
 });
 
 await discordBot.login(config.DISCORD_TOKEN);
+
+console.log('bot started');
 
 function getConfig() {
   try {
