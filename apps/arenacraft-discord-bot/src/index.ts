@@ -3,7 +3,6 @@ import { Client, GatewayIntentBits, REST, Routes } from "discord.js";
 import { z } from "zod";
 import mysql from "mysql2/promise";
 import { handleRegisterCmd } from "./handleRegisterCmd";
-import { describe } from "node:test";
 
 const config = getConfig();
 console.log('config', config);
@@ -19,7 +18,7 @@ const commands = [
   },
   {
     name: 'ping',
-    describe: 'Check if the bot is alive'
+    description: 'Check if the bot is alive'
   }
 ];
 
@@ -36,7 +35,7 @@ discordBot.on("interactionCreate", async (interaction) => {
       break;
     }
     case 'ping': {
-      interaction.user.send(`Ready at your command`)
+      await interaction.user.send(`Ready at your command`)
     }
   }
   await interaction.reply('Done. Check your DMs')
