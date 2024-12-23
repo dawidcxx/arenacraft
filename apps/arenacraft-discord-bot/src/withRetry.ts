@@ -2,7 +2,7 @@ import { RetryError, RetryOverflowError } from "./error";
 
 export async function withRetry<T>(
   asyncProducer: () => Promise<T>,
-  retryCount: number = 5,
+  retryCount: number = 10,
   lastErrorMessage: string | null = null,
 ) {
   try {
