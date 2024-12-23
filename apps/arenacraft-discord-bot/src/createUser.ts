@@ -1,38 +1,65 @@
-import type { Connection } from "mysql2/promise";
-import { createHash, randomBytes } from 'crypto'
-import { toBigIntLE } from 'bigint-buffer'
-import BigInteger from 'big-integer'
+import type { Connection, QueryResult } from "mysql2/promise";
+import { createHash, randomBytes } from "crypto";
+import { toBigIntLE } from "bigint-buffer";
+import BigInteger from "big-integer";
 import { requireNotNull } from "./utils";
-import { AlreadyRegistered } from "./error";
-
-
+import { AlreadyRegistered, RetryError } from "./error";
 
 /**
- * 
- * @param connection 
- * @param params 
+ *
+ * @param connection
+ * @param params
  */
-export async function createUser(connection: Connection, params: {
+export async function createUser(
+  connection: Connection,
+  params: {
     username: string;
     password: string;
     discordId: string;
-}) {
-    const [rows] = await connection.execute(`SELECT 1 from account where email = ?`, [params.discordId])
-    if (Array.isArray(rows) && rows.length > 0) {
-        throw new AlreadyRegistered();
-    }
-    const salt = randomBytes(32);
-    const verifier = getVerifier(params.username, params.password, salt);
-    const registration = {
-        username: params.username,
-        salt,
-        verifier,
-        email: params.discordId
-    }
-    await connection.execute(`INSERT into account (username, salt, verifier, email) values
-                                    (:username, :salt, :verifier, :email)`, registration);
-}
+  },
+): Promise<{ username: string; password: string }> {
+  const [discordRows] = await connection.execute(
+    `SELECT 1 from account where email = ?`,
+    [params.discordId],
+  );
+  if (checkHasRows(discordRows)) {
+    throw new AlreadyRegistered();
+  }
 
+  const [usernameRows] = await connection.execute(
+    `SELECT 1 from account where username = ?`,
+    [params.username],
+  );
+  if (checkHasRows(usernameRows)) {
+    // unlucky, somehow we've generated the same username
+    // this should be rare.. 
+    console.warn('Generated duplicate username', params.username)
+    throw new RetryError("Generated a already taken username");
+  }
+
+  const salt = randomBytes(32);
+  const verifier = getVerifier(params.username, params.password, salt);
+
+  if (isBufferZeroTerminated(verifier) || isBufferZeroTerminated(salt)) {
+    // workaround: azerothcore does not handle properly
+    // zero terminated buffers
+    throw new RetryError("Generated a zero terminated buffer");
+  }
+
+  const registration = {
+    username: params.username,
+    salt,
+    verifier,
+    email: params.discordId,
+  };
+  await connection.execute(
+    `INSERT into account (username, salt, verifier, email) values
+                                    (:username, :salt, :verifier, :email)`,
+    registration,
+  );
+
+  return { username: registration.username, password: params.password };
+}
 
 // taken from: https://github.com/trinity-flux/srp6/blob/main/src/utils/index.js
 //
@@ -51,26 +78,35 @@ export async function createUser(connection: Connection, params: {
 // This is your verifier - you're done!
 // Content
 export function getVerifier(
-    username: string,
-    password: string,
-    salt: Buffer
+  username: string,
+  password: string,
+  salt: Buffer,
 ): Buffer {
-    const firstHash = createHash('sha1')
-        .update(`${username.toUpperCase()}:${password.toUpperCase()}`)
-        .digest();
-    const secondHash = createHash('sha1')
-        .update(salt)
-        .update(firstHash)
-        .digest();
-    const littleEndianInteger = toBigIntLE(secondHash);
-    const littleEndianIntegerPow = BigInteger(g).modPow(littleEndianInteger, N);
-    const littleEndianIntegerOrder = littleEndianIntegerPow.toString(16).match(/.{2}/g)?.reverse().join('');
-    requireNotNull(littleEndianIntegerOrder);
-    const verifier = Buffer.from(littleEndianIntegerOrder, 'hex');
-    return verifier;
+  const firstHash = createHash("sha1")
+    .update(`${username.toUpperCase()}:${password.toUpperCase()}`)
+    .digest();
+  const secondHash = createHash("sha1").update(salt).update(firstHash).digest();
+  const littleEndianInteger = toBigIntLE(secondHash);
+  const littleEndianIntegerPow = BigInteger(g).modPow(littleEndianInteger, N);
+  const littleEndianIntegerOrder = littleEndianIntegerPow
+    .toString(16)
+    .match(/.{2}/g)
+    ?.reverse()
+    .join("");
+  requireNotNull(littleEndianIntegerOrder);
+  const verifier = Buffer.from(littleEndianIntegerOrder, "hex");
+  return verifier;
 }
 
 const g = BigInt(7);
 const N = BigInt(
-    "0x894B645E89E1535BBDAD5B8B290650530801B18EBFBF5E8FAB3C82872A3E9BB7"
+  "0x894B645E89E1535BBDAD5B8B290650530801B18EBFBF5E8FAB3C82872A3E9BB7",
 );
+
+export function isBufferZeroTerminated(buf: Buffer) {
+  return buf[buf.length - 1] === 0;
+}
+
+function checkHasRows(queryRes: QueryResult) {
+  return Array.isArray(queryRes) && queryRes.length > 0;
+}
