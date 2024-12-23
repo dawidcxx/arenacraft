@@ -628,7 +628,7 @@ struct SpellProcEventEntry;                                 // used only private
 
 class Unit : public WorldObject
 {
-public:
+public:    
     typedef std::unordered_set<Unit*> AttackerSet;
     typedef std::set<Unit*> ControlSet;
 
@@ -967,6 +967,8 @@ public:
     void AddComboPointHolder(Unit* unit) { m_ComboPointHolders.insert(unit); }
     void RemoveComboPointHolder(Unit* unit) { m_ComboPointHolders.erase(unit); }
     void ClearComboPointHolders();
+
+    void SetMarkedToDeathBy(Unit* unit) { m_markedToDeathBy = unit; }
 
     // PvP
     void SetContestedPvP(Player* attackedPlayer = nullptr, bool lookForNearContestedGuards = true);
@@ -2110,6 +2112,8 @@ private:
     Unit* m_comboTarget;
     int8 m_comboPoints;
     std::unordered_set<Unit*> m_ComboPointHolders;
+    Unit* m_markedToDeathBy;
+
 
     RedirectThreatInfo _redirectThreatInfo;
 

@@ -603,13 +603,39 @@ class class_rog_marked_for_death : public SpellScript
     void HandleDummy(SpellEffIndex /*effIndex*/)
     {
         Unit* caster = GetCaster();
-        if (Unit* unitTarget = GetHitUnit())
+        if (Unit *unitTarget = GetHitUnit())
+        {
             unitTarget->CastSpell(unitTarget, 90001, true);
+            unitTarget->SetMarkedToDeathBy(caster);
+            caster->AddComboPoints(unitTarget, 5);
+            
+        }
     }
 
     void Register() override
     {
         OnEffectHitTarget += SpellEffectFn(class_rog_marked_for_death::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
+class class_rog_marked_for_death_aura : public AuraScript
+{
+    PrepareAuraScript(class_rog_marked_for_death_aura);
+
+   void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+    {
+        if (Unit* caster = GetTarget())
+        {
+            if (!caster->isDying())
+            {
+                caster->SetMarkedToDeathBy(nullptr);
+            }
+        }
+    }
+
+    void Register() override
+    {
+        OnEffectRemove += AuraEffectRemoveFn(class_rog_marked_for_death_aura::OnRemove, EFFECT_FIRST_FOUND, SPELL_EFFECT_ANY, AURA_EFFECT_HANDLE_REAL);
     }
 };
 
@@ -747,7 +773,7 @@ class spell_rog_vanish : public SpellScript
     void HandleEffect(SpellEffIndex /*effIndex*/)
     {
         if (GetCaster())
-        {
+    {
             GetCaster()->RemoveAurasByType(SPELL_AURA_MOD_STALKED);
 
             if (!GetCaster()->HasAura(SPELL_STEALTH))
@@ -790,4 +816,5 @@ void AddSC_rogue_spell_scripts()
     RegisterSpellScript(spell_rog_vanish_purge);
     RegisterSpellScript(spell_rog_vanish);
     RegisterSpellScript(class_rog_marked_for_death);
+    RegisterSpellScript(class_rog_marked_for_death_aura);
 }

@@ -14599,6 +14599,12 @@ void Unit::setDeathState(DeathState s, bool despawn)
         // players in instance don't have ZoneScript, but they have InstanceScript
         if (ZoneScript* zoneScript = GetZoneScript() ? GetZoneScript() : (ZoneScript*)GetInstanceScript())
             zoneScript->OnUnitDeath(this);
+
+        // reset marked for death CD 
+        if (m_markedToDeathBy != nullptr) {
+            m_markedToDeathBy->ToPlayer()->RemoveSpellCooldown(90000, true);
+            this->SetMarkedToDeathBy(nullptr);
+        }
     }
     else if (s == DeathState::JustRespawned)
     {
