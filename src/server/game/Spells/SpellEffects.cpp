@@ -2577,8 +2577,8 @@ void Spell::EffectDispel(SpellEffIndex effIndex)
 
     DispelChargesList dispel_list;
     unitTarget->GetDispellableAuraList(m_caster, dispelMask, dispel_list, m_spellInfo);
-    if (dispel_list.empty())
-        return;
+    // if (dispel_list.empty())
+    //     return;
 
     // Ok if exist some buffs for dispel try dispel it
     uint32 failCount = 0;
@@ -2640,8 +2640,8 @@ void Spell::EffectDispel(SpellEffIndex effIndex)
     if (unitTarget->IsFriendlyTo(m_caster))
         unitTarget->getHostileRefMgr().threatAssist(m_caster, 0.0f, m_spellInfo);
 
-    if (success_list.empty())
-        return;
+    // if (success_list.empty())
+    //     return;
 
     WorldPacket dataSuccess(SMSG_SPELLDISPELLOG, 8 + 8 + 4 + 1 + 4 + success_list.size() * 5);
     // Send packet header
