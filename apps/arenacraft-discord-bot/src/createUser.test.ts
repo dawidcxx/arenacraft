@@ -14,15 +14,21 @@ describe("getVerifier", () => {
   });
 });
 
-describe('isBufferZeroTerminated', () => {
-  it('should properly report the result', () => {
-    expect(isValidSrp6SecurityBuffer(Buffer.from([1, 2, 2, 3]))).toBe(false) // too short
-    expect(isValidSrp6SecurityBuffer(Buffer.from([1, 2, 2, 3, 0]))).toBe(false) // terminated in zero & too short
+describe("isBufferZeroTerminated", () => {
+  it("should properly report the result", () => {
+    expect(isValidSrp6SecurityBuffer(Buffer.from([1, 2, 2, 3]))).toBe(false); // too short
+    expect(isValidSrp6SecurityBuffer(Buffer.from([1, 2, 2, 3, 0]))).toBe(false); // terminated in zero & too short
 
-    const bigBufTerminatedInZero = Buffer.from("99C530A14CFCD09F4FF3768F91C4D811BCE8A53E3DC0A637D55675ED41BAC500", "hex"); // termianted in zero
-    expect(isValidSrp6SecurityBuffer(bigBufTerminatedInZero)).toBe(false)
+    const bigBufTerminatedInZero = Buffer.from(
+      "99C530A14CFCD09F4FF3768F91C4D811BCE8A53E3DC0A637D55675ED41BAC500",
+      "hex",
+    ); // termianted in zero
+    expect(isValidSrp6SecurityBuffer(bigBufTerminatedInZero)).toBe(false);
 
-    const bigBufValid = Buffer.from("99C530A14CFCD09F4FF3768F91C4D811BCE8A53E3DC0A637D55675ED41BAC501", "hex");
-    expect(isValidSrp6SecurityBuffer(bigBufValid)).toBe(true)
-  })
-})
+    const bigBufValid = Buffer.from(
+      "99C530A14CFCD09F4FF3768F91C4D811BCE8A53E3DC0A637D55675ED41BAC501",
+      "hex",
+    );
+    expect(isValidSrp6SecurityBuffer(bigBufValid)).toBe(true);
+  });
+});

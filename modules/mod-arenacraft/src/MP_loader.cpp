@@ -4,6 +4,7 @@
 
 // From SC
 void AddMyPlayerScripts();
+void AddArenaNotificationServiceScripts();
 
 // Add all
 // cf. the naming convention https://github.com/azerothcore/azerothcore-wotlk/blob/master/doc/changelog/master.md#how-to-upgrade-4
@@ -11,5 +12,6 @@ void AddMyPlayerScripts();
 void Addmod_arenacraftScripts()
 {
     AddMyPlayerScripts();
+    AddArenaNotificationServiceScripts();
 }
 

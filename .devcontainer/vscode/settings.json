@@ -3,7 +3,7 @@
     "cmake.generator": "Unix Makefiles",
     "cmake.configureArgs": [
         "-DTOOLS_BUILD=all",
-        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
         "-DCMAKE_INSTALL_PREFIX=/usr/local/server",
         "-DSCRIPTS=static",
         "-DMODULES=static",

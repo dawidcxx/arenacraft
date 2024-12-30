@@ -647,6 +647,7 @@ public: /* ArenaScript */
     bool CanSaveToDB(ArenaTeam* team);
     bool OnBeforeArenaCheckWinConditions(Battleground* const bg);
     void OnArenaStart(Battleground* const bg);
+    void OnArenaEnd(Battleground* const bg);
 
 public: /* MiscScript */
 

@@ -10,6 +10,9 @@
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(HIREDIS REQUIRED hiredis)
+
 CollectSourceFiles(
   ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE_SOURCES
@@ -74,7 +77,12 @@ target_link_libraries(common
     threads
     jemalloc
     stdfs
-    fmt)
+    fmt
+)
+
+target_include_directories(common PRIVATE ${HIREDIS_INCLUDE_DIRS})
+target_link_libraries(common PRIVATE ${HIREDIS_LIBRARIES})
+
 
 if (BUILD_APPLICATION_WORLDSERVER OR BUILD_TOOLS_MAPS)
   target_link_libraries(common

@@ -929,6 +929,8 @@ void Battleground::EndBattleground(PvPTeamId winnerTeamId)
         SpiritOfCompetitionEvent(winnerTeamId);
 
     sScriptMgr->OnBattlegroundEnd(this, GetTeamId(winnerTeamId));
+    if (isArena())
+        sScriptMgr->OnArenaEnd(this);
 }
 
 void Battleground::SpiritOfCompetitionEvent(PvPTeamId winnerTeamId) const

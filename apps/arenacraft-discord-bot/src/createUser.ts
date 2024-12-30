@@ -32,15 +32,17 @@ export async function createUser(
   );
   if (checkHasRows(usernameRows)) {
     // unlucky, somehow we've generated the same username
-    // this should be rare.. 
-    console.warn('Generated duplicate username', params.username)
+    // this should be rare..
+    console.warn("Generated duplicate username", params.username);
     throw new RetryError("Generated a already taken username");
   }
 
   const salt = randomBytes(32);
   const verifier = getVerifier(params.username, params.password, salt);
 
-  if (!(isValidSrp6SecurityBuffer(verifier) && isValidSrp6SecurityBuffer(salt))) {
+  if (
+    !(isValidSrp6SecurityBuffer(verifier) && isValidSrp6SecurityBuffer(salt))
+  ) {
     throw new RetryError("Generated invalid buffers, retrying");
   }
 
@@ -104,7 +106,7 @@ const N = BigInt(
 // WORKAROUND: Azerothcore doens't like zero terminated buffers
 // and mysql2 falsely padds with zeros if it's not desired byte length
 export function isValidSrp6SecurityBuffer(buf: Buffer) {
-  return buf.byteLength === 32 && buf.at(buf.byteLength - 1) !== 0
+  return buf.byteLength === 32 && buf.at(buf.byteLength - 1) !== 0;
 }
 
 function checkHasRows(queryRes: QueryResult) {

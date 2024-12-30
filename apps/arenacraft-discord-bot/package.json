@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "bun run ./src/index.ts",
-    "compile": "bun build ./src/index.ts --compile --outfile arenacraft-discord-bot"
+    "compile": "bun build ./src/index.ts --compile --outfile arenacraft-discord-bot",
+    "format": "bunx prettier --write ./src/**/*.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -18,7 +19,8 @@
     "bigint-buffer": "^1.1.5",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.7",
-    "mysql2": "^3.11.5",
+    "ioredis": "^5.4.2",
+    "s2": "^3.11.5",
     "unique-names-generator": "^4.7.1",
     "zod": "^3.24.1"
   }

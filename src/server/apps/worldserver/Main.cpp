@@ -76,6 +76,7 @@ int m_ServiceStatus = -1;
 #include <boost/dll/shared_library.hpp>
 #include <timeapi.h>
 #endif
+#include <RedisConn.h>
 
 #ifndef _ACORE_CORE_CONFIG
 #define _ACORE_CORE_CONFIG "worldserver.conf"
@@ -270,6 +271,9 @@ int main(int argc, char** argv)
         sScriptMgr->Unload();
         //sScriptReloadMgr->Unload();
     });
+
+    LOG_INFO("server.", "Connecting to Redis");
+    sRedisConn.init();
 
     LOG_INFO("server.loading", "Initializing Scripts...");
     sScriptMgr->Initialize();
