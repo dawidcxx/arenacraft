@@ -119,7 +119,6 @@ public: /* Initialization */
     void Initialize();
     void LoadDatabase();
     void FillSpellSummary();
-    void CheckIfScriptsInDatabaseExist();
 
     std::string_view ScriptsVersion() const { return "Integrated Azeroth Scripts"; }
 

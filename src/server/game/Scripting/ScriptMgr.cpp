@@ -180,57 +180,12 @@ void ScriptMgr::LoadDatabase()
 
     FillSpellSummary();
 
-    CheckIfScriptsInDatabaseExist();
 
     LOG_INFO("server.loading", ">> Loaded {} C++ scripts in {} ms", GetScriptCount(), GetMSTimeDiffToNow(oldMSTime));
     LOG_INFO("server.loading", " ");
 }
 
-void ScriptMgr::CheckIfScriptsInDatabaseExist()
-{
-    for (auto const& scriptName : sObjectMgr->GetScriptNames())
-    {
-        if (uint32 sid = sObjectMgr->GetScriptId(scriptName))
-        {
-            if (!ScriptRegistry<SpellScriptLoader>::GetScriptById(sid) &&
-                !ScriptRegistry<ServerScript>::GetScriptById(sid) &&
-                !ScriptRegistry<WorldScript>::GetScriptById(sid) &&
-                !ScriptRegistry<FormulaScript>::GetScriptById(sid) &&
-                !ScriptRegistry<WorldMapScript>::GetScriptById(sid) &&
-                !ScriptRegistry<InstanceMapScript>::GetScriptById(sid) &&
-                !ScriptRegistry<BattlegroundMapScript>::GetScriptById(sid) &&
-                !ScriptRegistry<ItemScript>::GetScriptById(sid) &&
-                !ScriptRegistry<CreatureScript>::GetScriptById(sid) &&
-                !ScriptRegistry<GameObjectScript>::GetScriptById(sid) &&
-                !ScriptRegistry<AreaTriggerScript>::GetScriptById(sid) &&
-                !ScriptRegistry<BattlegroundScript>::GetScriptById(sid) &&
-                !ScriptRegistry<OutdoorPvPScript>::GetScriptById(sid) &&
-                !ScriptRegistry<CommandScript>::GetScriptById(sid) &&
-                !ScriptRegistry<WeatherScript>::GetScriptById(sid) &&
-                !ScriptRegistry<AuctionHouseScript>::GetScriptById(sid) &&
-                !ScriptRegistry<ConditionScript>::GetScriptById(sid) &&
-                !ScriptRegistry<VehicleScript>::GetScriptById(sid) &&
-                !ScriptRegistry<DynamicObjectScript>::GetScriptById(sid) &&
-                !ScriptRegistry<TransportScript>::GetScriptById(sid) &&
-                !ScriptRegistry<AchievementCriteriaScript>::GetScriptById(sid) &&
-                !ScriptRegistry<PlayerScript>::GetScriptById(sid) &&
-                !ScriptRegistry<GuildScript>::GetScriptById(sid) &&
-                !ScriptRegistry<BGScript>::GetScriptById(sid) &&
-                !ScriptRegistry<AchievementScript>::GetScriptById(sid) &&
-                !ScriptRegistry<ArenaTeamScript>::GetScriptById(sid) &&
-                !ScriptRegistry<SpellSC>::GetScriptById(sid) &&
-                !ScriptRegistry<MiscScript>::GetScriptById(sid) &&
-                !ScriptRegistry<PetScript>::GetScriptById(sid) &&
-                !ScriptRegistry<CommandSC>::GetScriptById(sid) &&
-                !ScriptRegistry<ArenaScript>::GetScriptById(sid) &&
-                !ScriptRegistry<GroupScript>::GetScriptById(sid) &&
-                !ScriptRegistry<DatabaseScript>::GetScriptById(sid))
-                {
-                    LOG_ERROR("sql.sql", "Script named '{}' is assigned in the database, but has no code!", scriptName);
-                }
-        }
-    }
-}
+
 
 void ScriptMgr::FillSpellSummary()
 {
