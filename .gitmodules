@@ -1,6 +1,6 @@
 [submodule "modules/mod-arena-3v3-solo-queue"]
 	path = modules/mod-arena-3v3-solo-queue
-	url = https://github.com/azerothcore/mod-arena-3v3-solo-queue.git
+	url = https://github.com/dawidcxx/mod-arena-3v3-solo-queue
 [submodule "modules/mod-duel-reset"]
 	path = modules/mod-duel-reset
 	url = https://github.com/azerothcore/mod-duel-reset
