@@ -30,6 +30,7 @@ enum ArenaHook
     ARENAHOOK_ON_BEFORE_CHECK_WIN_CONDITION,
     ARENAHOOK_ON_ARENA_START,
     ARENAHOOK_ON_ARENA_END,
+    ARENAHOOK_ON_ARENA_INVITES_SENT,
     ARENAHOOK_END
 };
 
@@ -50,7 +51,8 @@ public:
     [[nodiscard]] virtual bool OnBeforeArenaCheckWinConditions(Battleground* const /* bg */) { return true; }
 
     [[nodiscard]] virtual bool CanSaveToDB(ArenaTeam* /*team*/) { return true; }
-
+    
+    virtual void OnArenaInvitesSent(Battleground* /* bg */) { };
     virtual void OnArenaStart(Battleground* /* bg */) { };
     virtual void OnArenaEnd(Battleground* /* bg */) { };
 };

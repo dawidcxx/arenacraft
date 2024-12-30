@@ -49,6 +49,11 @@ void ScriptMgr::OnArenaEnd(Battleground* bg)
     CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_END, script->OnArenaEnd(bg));
 }
 
+void ScriptMgr::OnArenaInvitesSent(Battleground* bg)
+{
+    CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_INVITES_SENT, script->OnArenaInvitesSent(bg));
+}
+
 
 ArenaScript::ArenaScript(const char* name, std::vector<uint16> enabledHooks)
     : ScriptObject(name, ARENAHOOK_END)

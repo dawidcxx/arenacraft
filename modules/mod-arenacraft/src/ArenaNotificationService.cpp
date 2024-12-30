@@ -45,7 +45,7 @@ public:
         sRedisConn.publishMessage("arena-ended", ArenaEndedEventToJson(event).c_str());
     }
 
-    void OnArenaStart(Battleground *bg) override
+    void OnArenaInvitesSent(Battleground *bg) override
     {
         auto arenaTypeId = bg->GetArenaType();
         auto team1Id = bg->GetArenaTeamIdForTeam(TeamId::TEAM_ALLIANCE);
