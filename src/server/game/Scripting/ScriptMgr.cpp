@@ -18,7 +18,6 @@
 #include "ScriptMgr.h"
 #include "AllScriptsObjects.h"
 #include "InstanceScript.h"
-#include "LFGScripts.h"
 #include "ScriptSystem.h"
 #include "SmartAI.h"
 #include "SpellMgr.h"
@@ -65,9 +64,6 @@ void ScriptMgr::Initialize()
 
     AddSC_SmartScripts();
 
-    // LFGScripts
-    lfg::AddSC_LFGScripts();
-
     ASSERT(_script_loader_callback,
         "Script loader callback wasn't registered!");
 
@@ -81,7 +77,6 @@ void ScriptMgr::Initialize()
     ScriptRegistry<AchievementScript>::InitEnabledHooksIfNeeded(ACHIEVEMENTHOOK_END);
     ScriptRegistry<ArenaScript>::InitEnabledHooksIfNeeded(ARENAHOOK_END);
     ScriptRegistry<ArenaTeamScript>::InitEnabledHooksIfNeeded(ARENATEAMHOOK_END);
-    ScriptRegistry<AuctionHouseScript>::InitEnabledHooksIfNeeded(AUCTIONHOUSEHOOK_END);
     ScriptRegistry<BGScript>::InitEnabledHooksIfNeeded(ALLBATTLEGROUNDHOOK_END);
     ScriptRegistry<CommandSC>::InitEnabledHooksIfNeeded(ALLCOMMANDHOOK_END);
     ScriptRegistry<DatabaseScript>::InitEnabledHooksIfNeeded(DATABASEHOOK_END);
@@ -116,7 +111,6 @@ void ScriptMgr::Unload()
     SCR_CLEAR<AreaTriggerScript>();
     SCR_CLEAR<ArenaScript>();
     SCR_CLEAR<ArenaTeamScript>();
-    SCR_CLEAR<AuctionHouseScript>();
     SCR_CLEAR<BGScript>();
     SCR_CLEAR<BattlegroundMapScript>();
     SCR_CLEAR<BattlegroundScript>();

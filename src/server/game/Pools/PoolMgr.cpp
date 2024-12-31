@@ -22,6 +22,7 @@
 #include "ObjectMgr.h"
 #include "QueryResult.h"
 #include "Transport.h"
+#include <DBCStores.h>
 
 ////////////////////////////////////////////////////////////
 // template class ActivePoolData
@@ -405,6 +406,13 @@ void PoolGroup<GameObject>::Spawn1Object(PoolObject* obj)
         sObjectMgr->AddGameobjectToGrid(obj->guid, data);
         // Spawn if necessary (loaded grids only)
         // this base map checked as non-instanced and then only existed
+        MapEntry const* entry = sMapStore.LookupEntry(data->mapid);
+        ASSERT(entry);
+
+        if (!entry->IsArenacraftWhitelistedMap()) {
+            return;
+        }
+
         Map* map = sMapMgr->CreateBaseMap(data->mapid);
         // We use current coords to unspawn, not spawn coords since creature can have changed grid
         if (!map->Instanceable() && map->IsGridLoaded(data->posX, data->posY))
@@ -634,7 +642,6 @@ void PoolMgr::LoadFromDB()
                 CreatureData const* data = sObjectMgr->GetCreatureData(guid);
                 if (!data)
                 {
-                    LOG_ERROR("sql.sql", "`pool_creature` has a non existing creature spawn (GUID: {}) defined for pool id ({}), skipped.", guid, pool_id);
                     continue;
                 }
                 auto it = mPoolTemplate.find(pool_id);

@@ -725,12 +725,6 @@ void OpcodeTable::Initialize()
     /*0x252*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_RESURRECT_FAILED,                                   STATUS_NEVER);
     /*0x253*/ DEFINE_HANDLER(CMSG_TOGGLE_PVP,                                                       STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleTogglePvP                          );
     /*0x254*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_ZONE_UNDER_ATTACK,                                  STATUS_NEVER);
-    /*0x255*/ DEFINE_HANDLER(MSG_AUCTION_HELLO,                                                     STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleAuctionHelloOpcode                 );
-    /*0x256*/ DEFINE_HANDLER(CMSG_AUCTION_SELL_ITEM,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleAuctionSellItem                    );
-    /*0x257*/ DEFINE_HANDLER(CMSG_AUCTION_REMOVE_ITEM,                                              STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleAuctionRemoveItem                  );
-    /*0x258*/ DEFINE_HANDLER(CMSG_AUCTION_LIST_ITEMS,                                               STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleAuctionListItems                   );
-    /*0x259*/ DEFINE_HANDLER(CMSG_AUCTION_LIST_OWNER_ITEMS,                                         STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleAuctionListOwnerItems              );
-    /*0x25A*/ DEFINE_HANDLER(CMSG_AUCTION_PLACE_BID,                                                STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleAuctionPlaceBid                    );
     /*0x25B*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_AUCTION_COMMAND_RESULT,                             STATUS_NEVER);
     /*0x25C*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_AUCTION_LIST_RESULT,                                STATUS_NEVER);
     /*0x25D*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_AUCTION_OWNER_LIST_RESULT,                          STATUS_NEVER);
@@ -740,7 +734,6 @@ void OpcodeTable::Initialize()
     /*0x261*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_COMBAT_EVENT_FAILED,                                STATUS_NEVER);
     /*0x262*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_DISPEL_FAILED,                                      STATUS_NEVER);
     /*0x263*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SPELLORDAMAGE_IMMUNE,                               STATUS_NEVER);
-    /*0x264*/ DEFINE_HANDLER(CMSG_AUCTION_LIST_BIDDER_ITEMS,                                        STATUS_LOGGEDIN,   PROCESS_THREADSAFE,     &WorldSession::HandleAuctionListBidderItems             );
     /*0x265*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_AUCTION_BIDDER_LIST_RESULT,                         STATUS_NEVER);
     /*0x266*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_FLAT_SPELL_MODIFIER,                            STATUS_NEVER);
     /*0x267*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_SET_PCT_SPELL_MODIFIER,                             STATUS_NEVER);
@@ -1295,7 +1288,6 @@ void OpcodeTable::Initialize()
     /*0x48C*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_DUMP_OBJECTS_DATA,                                  STATUS_NEVER);
     /*0x48D*/ DEFINE_HANDLER(CMSG_DISMISS_CRITTER,                                                  STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleDismissCritter                     );
     /*0x48E*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_NOTIFY_DEST_LOC_SPELL_CAST,                         STATUS_NEVER);
-    /*0x48F*/ DEFINE_HANDLER(CMSG_AUCTION_LIST_PENDING_SALES,                                       STATUS_LOGGEDIN,   PROCESS_THREADUNSAFE,   &WorldSession::HandleAuctionListPendingSales            );
     /*0x490*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_AUCTION_LIST_PENDING_SALES,                         STATUS_NEVER);
     /*0x491*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_MODIFY_COOLDOWN,                                    STATUS_NEVER);
     /*0x492*/ DEFINE_SERVER_OPCODE_HANDLER(SMSG_PET_UPDATE_COMBO_POINTS,                            STATUS_NEVER);

@@ -1356,6 +1356,7 @@ struct MapEntry
     [[nodiscard]] bool IsBattleground() const { return map_type == MAP_BATTLEGROUND; }
     [[nodiscard]] bool IsBattleArena() const { return map_type == MAP_ARENA; }
     [[nodiscard]] bool IsBattlegroundOrArena() const { return map_type == MAP_BATTLEGROUND || map_type == MAP_ARENA; }
+    [[nodiscard]] bool IsArenacraftWhitelistedMap() const { return map_type == MAP_BATTLEGROUND || map_type == MAP_ARENA || MapID == 571; }
     [[nodiscard]] bool IsWorldMap() const { return map_type == MAP_COMMON; }
 
     bool GetEntrancePos(int32& mapid, float& x, float& y) const

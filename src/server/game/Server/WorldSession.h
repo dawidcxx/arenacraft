@@ -464,11 +464,6 @@ public:
             m_TutorialsChanged = true;
         }
     }
-    //auction
-    void SendAuctionHello(ObjectGuid guid, Creature* unit);
-    void SendAuctionCommandResult(uint32 auctionId, uint32 Action, uint32 ErrorCode, uint32 bidError = 0);
-    void SendAuctionBidderNotification(uint32 location, uint32 auctionId, ObjectGuid bidder, uint32 bidSum, uint32 diff, uint32 item_template);
-    void SendAuctionOwnerNotification(AuctionEntry* auction);
 
     //Item Enchantment
     void SendEnchantmentLog(ObjectGuid target, ObjectGuid caster, uint32 itemId, uint32 enchantId);
@@ -756,15 +751,6 @@ public:                                                 // opcodes handlers
     void HandleSetTradeItemOpcode(WorldPacket& recvPacket);
     void HandleUnacceptTradeOpcode(WorldPacket& recvPacket);
 
-    void HandleAuctionHelloOpcode(WorldPacket& recvPacket);
-    void HandleAuctionListItems(WorldPacket& recvData);
-    void HandleAuctionListBidderItems(WorldPacket& recvData);
-    void HandleAuctionSellItem(WorldPacket& recvData);
-    void HandleAuctionRemoveItem(WorldPacket& recvData);
-    void HandleAuctionListOwnerItems(WorldPacket& recvData);
-    void HandleAuctionListOwnerItemsEvent(ObjectGuid creatureGuid);
-    void HandleAuctionPlaceBid(WorldPacket& recvData);
-    void HandleAuctionListPendingSales(WorldPacket& recvData);
 
     // Bank
     void HandleBankerActivateOpcode(WorldPacket& recvData);

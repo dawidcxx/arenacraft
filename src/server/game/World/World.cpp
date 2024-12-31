@@ -24,8 +24,6 @@
 #include "AchievementMgr.h"
 #include "AddonMgr.h"
 #include "ArenaTeamMgr.h"
-#include "AsyncAuctionListing.h"
-#include "AuctionHouseMgr.h"
 #include "AutobroadcastMgr.h"
 #include "BattlefieldMgr.h"
 #include "BattlegroundMgr.h"
@@ -1640,24 +1638,24 @@ void World::SetInitialWorldSettings()
     sObjectMgr->LoadBroadcastTexts();
     sObjectMgr->LoadBroadcastTextLocales();
 
-    LOG_INFO("server.loading", "Loading Localization Strings...");
-    uint32 oldMSTime = getMSTime();
-    sObjectMgr->LoadCreatureLocales();
-    sObjectMgr->LoadGameObjectLocales();
-    sObjectMgr->LoadItemLocales();
-    sObjectMgr->LoadItemSetNameLocales();
-    sObjectMgr->LoadQuestLocales();
-    sObjectMgr->LoadQuestOfferRewardLocale();
-    sObjectMgr->LoadQuestRequestItemsLocale();
-    sObjectMgr->LoadNpcTextLocales();
-    sObjectMgr->LoadPageTextLocales();
-    sObjectMgr->LoadGossipMenuItemsLocales();
-    sObjectMgr->LoadPointOfInterestLocales();
-    sObjectMgr->LoadPetNamesLocales();
+    // LOG_INFO("server.loading", "Loading Localization Strings...");
+    // uint32 oldMSTime = getMSTime();
+    // sObjectMgr->LoadCreatureLocales();
+    // sObjectMgr->LoadGameObjectLocales();
+    // sObjectMgr->LoadItemLocales();
+    // sObjectMgr->LoadItemSetNameLocales();
+    // sObjectMgr->LoadQuestLocales();
+    // sObjectMgr->LoadQuestOfferRewardLocale();
+    // sObjectMgr->LoadQuestRequestItemsLocale();
+    // sObjectMgr->LoadNpcTextLocales();
+    // sObjectMgr->LoadPageTextLocales();
+    // sObjectMgr->LoadGossipMenuItemsLocales();
+    // sObjectMgr->LoadPointOfInterestLocales();
+    // sObjectMgr->LoadPetNamesLocales();
 
-    sObjectMgr->SetDBCLocaleIndex(GetDefaultDbcLocale());        // Get once for all the locale index of DBC language (console/broadcasts)
-    LOG_INFO("server.loading", ">> Localization Strings loaded in {} ms", GetMSTimeDiffToNow(oldMSTime));
-    LOG_INFO("server.loading", " ");
+    // sObjectMgr->SetDBCLocaleIndex(GetDefaultDbcLocale());        // Get once for all the locale index of DBC language (console/broadcasts)
+    // LOG_INFO("server.loading", ">> Localization Strings loaded in {} ms", GetMSTimeDiffToNow(oldMSTime));
+    // LOG_INFO("server.loading", " ");
 
     LOG_INFO("server.loading", "Loading Page Texts...");
     sObjectMgr->LoadPageTexts();
@@ -1758,11 +1756,11 @@ void World::SetInitialWorldSettings()
     LOG_INFO("server.loading", "Loading Pet default Spells additional to Levelup Spells...");
     sSpellMgr->LoadPetDefaultSpells();
 
-    LOG_INFO("server.loading", "Loading Creature Addon Data...");
-    sObjectMgr->LoadCreatureAddons();                            // must be after LoadCreatureTemplates() and LoadCreatures()
+    // LOG_INFO("server.loading", "Loading Creature Addon Data...");
+    // sObjectMgr->LoadCreatureAddons();                            // must be after LoadCreatureTemplates() and LoadCreatures()
 
-    LOG_INFO("server.loading", "Loading Creature Movement Overrides...");
-    sObjectMgr->LoadCreatureMovementOverrides(); // must be after LoadCreatures()
+    // LOG_INFO("server.loading", "Loading Creature Movement Overrides...");
+    // sObjectMgr->LoadCreatureMovementOverrides(); // must be after LoadCreatures()
 
     LOG_INFO("server.loading", "Loading Gameobject Data...");
     sObjectMgr->LoadGameobjects();
@@ -1776,8 +1774,8 @@ void World::SetInitialWorldSettings()
     LOG_INFO("server.loading", "Loading Creature Quest Items...");
     sObjectMgr->LoadCreatureQuestItems();
 
-    LOG_INFO("server.loading", "Loading Creature Linked Respawn...");
-    sObjectMgr->LoadLinkedRespawn();                             // must be after LoadCreatures(), LoadGameObjects()
+    // LOG_INFO("server.loading", "Loading Creature Linked Respawn...");
+    // sObjectMgr->LoadLinkedRespawn();                             // must be after LoadCreatures(), LoadGameObjects()
 
     LOG_INFO("server.loading", "Loading Weather Data...");
     WeatherMgr::LoadWeatherData();
@@ -1829,9 +1827,6 @@ void World::SetInitialWorldSettings()
 
     LOG_INFO("server.loading", "Loading Area Trigger Teleport Definitions...");
     sObjectMgr->LoadAreaTriggerTeleports();
-
-    LOG_INFO("server.loading", "Loading Access Requirements...");
-    sObjectMgr->LoadAccessRequirements();                        // must be after item template load
 
     LOG_INFO("server.loading", "Loading Quest Area Triggers...");
     sObjectMgr->LoadQuestAreaTriggers();                         // must be after LoadQuests
@@ -1917,11 +1912,6 @@ void World::SetInitialWorldSettings()
     LOG_INFO("server.loading", "Loading Completed Achievements...");
     sAchievementMgr->LoadCompletedAchievements();
 
-    ///- Load dynamic data tables from the database
-    LOG_INFO("server.loading", "Loading Item Auctions...");
-    sAuctionMgr->LoadAuctionItems();
-    LOG_INFO("server.loading", "Loading Auctions...");
-    sAuctionMgr->LoadAuctions();
 
     sGuildMgr->LoadGuilds();
 
@@ -1960,20 +1950,20 @@ void World::SetInitialWorldSettings()
     LOG_INFO("server.loading", "Loading Trainers...");
     sObjectMgr->LoadTrainerSpell();                              // must be after load CreatureTemplate
 
-    LOG_INFO("server.loading", "Loading Waypoints...");
-    sWaypointMgr->Load();
+    // LOG_INFO("server.loading", "Loading Waypoints...");
+    // sWaypointMgr->Load();
 
-    LOG_INFO("server.loading", "Loading SmartAI Waypoints...");
-    sSmartWaypointMgr->LoadFromDB();
+    // LOG_INFO("server.loading", "Loading SmartAI Waypoints...");
+    // sSmartWaypointMgr->LoadFromDB();
 
-    LOG_INFO("server.loading", "Loading Creature Formations...");
-    sFormationMgr->LoadCreatureFormations();
+    // LOG_INFO("server.loading", "Loading Creature Formations...");
+    // sFormationMgr->LoadCreatureFormations();
 
     LOG_INFO("server.loading", "Loading World States...");              // must be loaded before battleground, outdoor PvP and conditions
     LoadWorldStates();
 
-    LOG_INFO("server.loading", "Loading Conditions...");
-    sConditionMgr->LoadConditions();
+    // LOG_INFO("server.loading", "Loading Conditions...");
+    // sConditionMgr->LoadConditions();
 
     LOG_INFO("server.loading", "Loading Faction Change Achievement Pairs...");
     sObjectMgr->LoadFactionChangeAchievements();
@@ -2025,7 +2015,7 @@ void World::SetInitialWorldSettings()
     ///- Load and initialize scripts
     sObjectMgr->LoadSpellScripts();                              // must be after load Creature/Gameobject(Template/Data)
     sObjectMgr->LoadEventScripts();                              // must be after load Creature/Gameobject(Template/Data)
-    sObjectMgr->LoadWaypointScripts();
+    // sObjectMgr->LoadWaypointScripts();
 
     LOG_INFO("server.loading", "Loading Spell Script Names...");
     sObjectMgr->LoadSpellScriptNames();
@@ -2042,8 +2032,8 @@ void World::SetInitialWorldSettings()
     LOG_INFO("server.loading", "Validating Spell Scripts...");
     sObjectMgr->ValidateSpellScripts();
 
-    LOG_INFO("server.loading", "Loading SmartAI Scripts...");
-    sSmartScriptMgr->LoadSmartAIFromDB();
+    // LOG_INFO("server.loading", "Loading SmartAI Scripts...");
+    // sSmartScriptMgr->LoadSmartAIFromDB();
 
     LOG_INFO("server.loading", "Loading Calendar Data...");
     sCalendarMgr->LoadFromDB();
@@ -2093,8 +2083,8 @@ void World::SetInitialWorldSettings()
 
     LOG_INFO("server.loading", "Starting Game Event system...");
     LOG_INFO("server.loading", " ");
-    uint32 nextGameEvent = sGameEventMgr->StartSystem();
-    _timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);    //depend on next event
+    // uint32 nextGameEvent = sGameEventMgr->StartSystem();
+    // _timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);    //depend on next event
 
     // Delete all characters which have been deleted X days before
     Player::DeleteOldCharacters();
@@ -2120,15 +2110,11 @@ void World::SetInitialWorldSettings()
     sBattlegroundMgr->InitAutomaticArenaPointDistribution();
 
     ///- Initialize outdoor pvp
-    LOG_INFO("server.loading", "Starting Outdoor PvP System");
-    sOutdoorPvPMgr->InitOutdoorPvP();
+    // LOG_INFO("server.loading", "Starting Outdoor PvP System");
+    // sOutdoorPvPMgr->InitOutdoorPvP();
 
-    ///- Initialize Battlefield
-    LOG_INFO("server.loading", "Starting Battlefield System");
-    sBattlefieldMgr->InitBattlefield();
-
-    LOG_INFO("server.loading", "Loading Transports...");
-    sTransportMgr->SpawnContinentTransports();
+    // LOG_INFO("server.loading", "Loading Transports...");
+    // sTransportMgr->SpawnContinentTransports();
 
     ///- Initialize Warden
     LOG_INFO("server.loading", "Loading Warden Checks..." );
@@ -2339,19 +2325,6 @@ void World::Update(uint32 diff)
         ResetGuildCap();
     }
 
-    // pussywizard: handle auctions when the timer has passed
-    if (_timers[WUPDATE_AUCTIONS].Passed())
-    {
-        METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update expired auctions"));
-
-        _timers[WUPDATE_AUCTIONS].Reset();
-
-        // pussywizard: handle expired auctions, auctions expired when realm was offline are also handled here (not during loading when many required things aren't loaded yet)
-        sAuctionMgr->Update();
-    }
-
-    AsyncAuctionListingMgr::Update(Milliseconds(diff));
-
     if (currentGameTime > _mail_expire_check_timer)
     {
         sObjectMgr->ReturnOrDeleteOldMails(true);
@@ -2385,11 +2358,6 @@ void World::Update(uint32 diff)
     }
 
     {
-        METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update LFG 0"));
-        sLFGMgr->Update(diff, 0); // pussywizard: remove obsolete stuff before finding compatibility during map update
-    }
-
-    {
         ///- Update objects when the timer has passed (maps, transport, creatures, ...)
         METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update maps"));
         sMapMgr->Update(diff);
@@ -2419,16 +2387,7 @@ void World::Update(uint32 diff)
         METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update worldstate"));
         sWorldState->Update(diff);
     }
-
-    {
-        METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update battlefields"));
-        sBattlefieldMgr->Update(diff);
-    }
-
-    {
-        METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update LFG 2"));
-        sLFGMgr->Update(diff, 2); // pussywizard: handle created proposals
-    }
+ 
 
     {
         METRIC_TIMER("world_update_time", METRIC_TAG("type", "Process query callbacks"));
@@ -2464,14 +2423,14 @@ void World::Update(uint32 diff)
     }
 
     ///- Process Game events when necessary
-    if (_timers[WUPDATE_EVENTS].Passed())
-    {
-        METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update game events"));
-        _timers[WUPDATE_EVENTS].Reset();                   // to give time for Update() to be processed
-        uint32 nextGameEvent = sGameEventMgr->Update();
-        _timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);
-        _timers[WUPDATE_EVENTS].Reset();
-    }
+    // if (_timers[WUPDATE_EVENTS].Passed())
+    // {
+    //     METRIC_TIMER("world_update_time", METRIC_TAG("type", "Update game events"));
+    //     _timers[WUPDATE_EVENTS].Reset();                   // to give time for Update() to be processed
+    //     uint32 nextGameEvent = sGameEventMgr->Update();
+    //     _timers[WUPDATE_EVENTS].SetInterval(nextGameEvent);
+    //     _timers[WUPDATE_EVENTS].Reset();
+    // }
 
     ///- Ping to keep MySQL connections alive
     if (_timers[WUPDATE_PINGDB].Passed())

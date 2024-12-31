@@ -16,7 +16,6 @@
  */
 
 #include "Mail.h"
-#include "AuctionHouseMgr.h"
 #include "BattlegroundMgr.h"
 #include "CalendarMgr.h"
 #include "CharacterCache.h"
@@ -62,10 +61,6 @@ MailSender::MailSender(CalendarEvent* sender)
 {
 }
 
-MailSender::MailSender(AuctionEntry* sender)
-    : m_messageType(MAIL_AUCTION), m_senderId(sender->GetHouseId()), m_stationery(MAIL_STATIONERY_AUCTION)
-{
-}
 
 MailSender::MailSender(Player* sender)
 {

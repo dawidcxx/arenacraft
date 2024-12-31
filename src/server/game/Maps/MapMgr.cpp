@@ -133,8 +133,8 @@ Map::EnterState MapMgr::PlayerCannotEnter(uint32 mapid, Player* player, bool log
     if (!entry)
         return Map::CANNOT_ENTER_NO_ENTRY;
 
-    if (!entry->IsDungeon())
-        return Map::CAN_ENTER;
+    if (!entry->IsArenacraftWhitelistedMap()) 
+          return Map::CANNOT_ENTER_NO_ENTRY;
 
     InstanceTemplate const* instance = sObjectMgr->GetInstanceTemplate(mapid);
     if (!instance)

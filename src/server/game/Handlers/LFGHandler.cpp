@@ -48,29 +48,7 @@ void BuildPartyLockDungeonBlock(WorldPacket& data, const lfg::LfgLockPartyMap& l
 
 void WorldSession::HandleLfgJoinOpcode(WorldPackets::LFG::LFGJoin& packet)
 {
-    if (!sLFGMgr->isOptionEnabled(lfg::LFG_OPTION_ENABLE_DUNGEON_FINDER | lfg::LFG_OPTION_ENABLE_RAID_BROWSER | lfg::LFG_OPTION_ENABLE_SEASONAL_BOSSES) ||
-        (GetPlayer()->GetGroup() && GetPlayer()->GetGroup()->GetLeaderGUID() != GetPlayer()->GetGUID() &&
-         (GetPlayer()->GetGroup()->GetMembersCount() == MAXGROUPSIZE || !GetPlayer()->GetGroup()->isLFGGroup())))
-        return;
-
-    if (packet.Slots.empty())
-    {
-        LOG_DEBUG("lfg", "CMSG_LFG_JOIN {} no dungeons selected", GetPlayerInfo());
-        return;
-    }
-
-    lfg::LfgDungeonSet newDungeons;
-    for (uint32 slot : packet.Slots)
-    {
-        uint32 dungeon = slot & 0x00FFFFFF;                             // remove the type from the dungeon entry
-        if (sLFGDungeonStore.LookupEntry(dungeon))
-            newDungeons.insert(dungeon);
-    }
-
-    LOG_DEBUG("network", "CMSG_LFG_JOIN [{}] roles: {}, Dungeons: {}, Comment: {}",
-                 GetPlayerInfo(), packet.Roles, newDungeons.size(), packet.Comment);
-
-    sLFGMgr->JoinLfg(GetPlayer(), uint8(packet.Roles), newDungeons, packet.Comment);
+    
 }
 
 void WorldSession::HandleLfgLeaveOpcode(WorldPackets::LFG::LFGLeave& /*packet*/)

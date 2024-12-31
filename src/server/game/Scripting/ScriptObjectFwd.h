@@ -25,7 +25,6 @@ class AchievementGlobalMgr;
 class AchievementMgr;
 class ArenaTeam;
 class AuctionEntry;
-class AuctionHouseMgr;
 class AuctionHouseObject;
 class Aura;
 class AuraApplication;

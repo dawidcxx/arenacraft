@@ -17,7 +17,6 @@
 
 #include "AccountMgr.h"
 #include "ArenaTeamMgr.h"
-#include "AuctionHouseMgr.h"
 #include "Battleground.h"
 #include "CalendarMgr.h"
 #include "CharacterCache.h"
@@ -2004,32 +2003,6 @@ void WorldSession::HandleCharFactionOrRaceChangeCallback(std::shared_ptr<Charact
         if (playerData->MailCount)
         {
             SendCharFactionChange(CHAR_CREATE_CHARACTER_DELETE_MAIL, factionChangeInfo.get());
-            return;
-        }
-
-        // check auctions, current packet is processed single-threaded way, so not a problem
-        bool has_auctions = false;
-
-        for (uint8 i = 0; i < 2; ++i) // check both neutral and faction-specific AH
-        {
-            AuctionHouseObject* auctionHouse = sAuctionMgr->GetAuctionsMap(i == 0 ? 0 : (((1 << (playerData->Race - 1)) & RACEMASK_ALLIANCE) ? 12 : 29));
-
-            for (auto const& [auID, Aentry] : auctionHouse->GetAuctions())
-            {
-                if (Aentry && (Aentry->owner == factionChangeInfo->Guid || Aentry->bidder == factionChangeInfo->Guid))
-                {
-                    has_auctions = true;
-                    break;
-                }
-            }
-
-            if (has_auctions)
-                break;
-        }
-
-        if (has_auctions)
-        {
-            SendCharFactionChange(CHAR_CREATE_ERROR, factionChangeInfo.get());
             return;
         }
     }

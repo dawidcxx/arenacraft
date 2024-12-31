@@ -23,7 +23,6 @@ Category: commandscripts
 EndScriptData */
 
 #include "AchievementMgr.h"
-#include "AuctionHouseMgr.h"
 #include "AutobroadcastMgr.h"
 #include "BattlegroundMgr.h"
 #include "Chat.h"
@@ -1189,8 +1188,6 @@ public:
     {
         ///- Reload dynamic data tables from the database
         LOG_INFO("server.loading", "Reloading Auctions...");
-        sAuctionMgr->LoadAuctionItems();
-        sAuctionMgr->LoadAuctions();
         handler->SendGlobalGMSysMessage("Auctions reloaded.");
         return true;
     }
