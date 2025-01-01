@@ -2055,9 +2055,7 @@ void World::SetInitialWorldSettings()
     stmt->SetData(2, GitRevision::GetFullVersion());
     LoginDatabase.Execute(stmt);
 
-    _timers[WUPDATE_WEATHERS].SetInterval(1 * IN_MILLISECONDS);
-    _timers[WUPDATE_AUCTIONS].SetInterval(MINUTE * IN_MILLISECONDS);
-    _timers[WUPDATE_AUCTIONS].SetCurrent(MINUTE * IN_MILLISECONDS);
+    _timers[WUPDATE_WEATHERS].SetInterval(100 * IN_MILLISECONDS);
     _timers[WUPDATE_UPTIME].SetInterval(_int_configs[CONFIG_UPTIME_UPDATE]*MINUTE * IN_MILLISECONDS);
     //Update "uptime" table based on configuration entry in minutes.
 
@@ -2072,7 +2070,7 @@ void World::SetInitialWorldSettings()
     // our speed up
     _timers[WUPDATE_5_SECS].SetInterval(5 * IN_MILLISECONDS);
 
-    _timers[WUPDATE_WHO_LIST].SetInterval(5 * IN_MILLISECONDS); // update who list cache every 5 seconds
+    _timers[WUPDATE_WHO_LIST].SetInterval(100 * IN_MILLISECONDS); // update who list cache every 5 seconds
 
     _mail_expire_check_timer = GameTime::GetGameTime() + 6h;
 
