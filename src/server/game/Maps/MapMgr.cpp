@@ -45,7 +45,7 @@ MapMgr::~MapMgr()
 {
 }
 
-MapMgr* MapMgr::instance()
+MapMgr *MapMgr::instance()
 {
     static MapMgr instance;
     return &instance;
@@ -66,9 +66,9 @@ void MapMgr::InitializeVisibilityDistanceInfo()
         (*iter).second->InitVisibilityDistance();
 }
 
-Map* MapMgr::CreateBaseMap(uint32 id)
+Map *MapMgr::CreateBaseMap(uint32 id)
 {
-    Map* map = FindBaseMap(id);
+    Map *map = FindBaseMap(id);
 
     if (!map)
     {
@@ -77,7 +77,7 @@ Map* MapMgr::CreateBaseMap(uint32 id)
         map = FindBaseMap(id);
         if (!map) // pussywizard: check again after acquiring mutex
         {
-            MapEntry const* entry = sMapStore.LookupEntry(id);
+            MapEntry const *entry = sMapStore.LookupEntry(id);
             ASSERT(entry);
 
             if (entry->Instanceable())
@@ -97,148 +97,48 @@ Map* MapMgr::CreateBaseMap(uint32 id)
     return map;
 }
 
-Map* MapMgr::FindBaseNonInstanceMap(uint32 mapId) const
+Map *MapMgr::FindBaseNonInstanceMap(uint32 mapId) const
 {
-    Map* map = FindBaseMap(mapId);
+    Map *map = FindBaseMap(mapId);
     if (map && map->Instanceable())
         return nullptr;
     return map;
 }
 
-Map* MapMgr::CreateMap(uint32 id, Player* player)
+Map *MapMgr::CreateMap(uint32 id, Player *player)
 {
-    Map* m = CreateBaseMap(id);
+    Map *m = CreateBaseMap(id);
 
     if (m && m->Instanceable())
-        m = ((MapInstanced*)m)->CreateInstanceForPlayer(id, player);
+        m = ((MapInstanced *)m)->CreateInstanceForPlayer(id, player);
 
     return m;
 }
 
-Map* MapMgr::FindMap(uint32 mapid, uint32 instanceId) const
+Map *MapMgr::FindMap(uint32 mapid, uint32 instanceId) const
 {
-    Map* map = FindBaseMap(mapid);
+    Map *map = FindBaseMap(mapid);
     if (!map)
         return nullptr;
 
     if (!map->Instanceable())
         return instanceId == 0 ? map : nullptr;
 
-    return ((MapInstanced*)map)->FindInstanceMap(instanceId);
+    return ((MapInstanced *)map)->FindInstanceMap(instanceId);
 }
 
-Map::EnterState MapMgr::PlayerCannotEnter(uint32 mapid, Player* player, bool loginCheck)
+Map::EnterState MapMgr::PlayerCannotEnter(uint32 mapid, Player *player, bool loginCheck)
 {
-    MapEntry const* entry = sMapStore.LookupEntry(mapid);
+    MapEntry const *entry = sMapStore.LookupEntry(mapid);
     if (!entry)
+    {
         return Map::CANNOT_ENTER_NO_ENTRY;
-
-    if (!entry->IsArenacraftWhitelistedMap()) 
-          return Map::CANNOT_ENTER_NO_ENTRY;
-
-    InstanceTemplate const* instance = sObjectMgr->GetInstanceTemplate(mapid);
-    if (!instance)
-        return Map::CANNOT_ENTER_UNINSTANCED_DUNGEON;
-
-    Difficulty targetDifficulty, requestedDifficulty;
-    targetDifficulty = requestedDifficulty = player->GetDifficulty(entry->IsRaid());
-    // Get the highest available difficulty if current setting is higher than the instance allows
-    MapDifficulty const* mapDiff = GetDownscaledMapDifficultyData(entry->MapID, targetDifficulty);
-    if (!mapDiff)
-    {
-        player->SendTransferAborted(mapid, TRANSFER_ABORT_DIFFICULTY, requestedDifficulty);
-        return Map::CANNOT_ENTER_DIFFICULTY_UNAVAILABLE;
     }
-
-    //Bypass checks for GMs
-    if (player->IsGameMaster())
+    if (entry->IsArenacraftWhitelistedMap())
+    {
         return Map::CAN_ENTER;
-
-    char const* mapName = entry->name[player->GetSession()->GetSessionDbcLocale()];
-
-    if (!sScriptMgr->CanEnterMap(player, entry, instance, mapDiff, loginCheck))
-        return Map::CANNOT_ENTER_UNSPECIFIED_REASON;
-
-    Group* group = player->GetGroup();
-    if (entry->IsRaid())
-    {
-        // can only enter in a raid group
-        if ((!group || !group->isRaidGroup()) && !sWorld->getBoolConfig(CONFIG_INSTANCE_IGNORE_RAID))
-        {
-            // probably there must be special opcode, because client has this string constant in GlobalStrings.lua
-            /// @todo: this is not a good place to send the message
-            player->GetSession()->SendAreaTriggerMessage(player->GetSession()->GetAcoreString(LANG_INSTANCE_RAID_GROUP_ONLY), mapName);
-            LOG_DEBUG("maps", "MAP: Player '{}' must be in a raid group to enter instance '{}'", player->GetName(), mapName);
-            return Map::CANNOT_ENTER_NOT_IN_RAID;
-        }
     }
-
-    // xinef: dont allow LFG Group to enter other instance that is selected
-    if (group)
-        if (group->isLFGGroup())
-            if (!sLFGMgr->inLfgDungeonMap(group->GetGUID(), mapid, targetDifficulty))
-            {
-                player->SendTransferAborted(mapid, TRANSFER_ABORT_MAP_NOT_ALLOWED);
-                return Map::CANNOT_ENTER_UNSPECIFIED_REASON;
-            }
-
-    if (!player->IsAlive())
-    {
-        if (player->HasCorpse())
-        {
-            // let enter in ghost mode in instance that connected to inner instance with corpse
-            uint32 corpseMap = player->GetCorpseLocation().GetMapId();
-            do
-            {
-                if (corpseMap == mapid)
-                    break;
-
-                InstanceTemplate const* corpseInstance = sObjectMgr->GetInstanceTemplate(corpseMap);
-                corpseMap = corpseInstance ? corpseInstance->Parent : 0;
-            } while (corpseMap);
-
-            if (!corpseMap)
-            {
-                WorldPacket data(SMSG_CORPSE_NOT_IN_INSTANCE, 0);
-                player->GetSession()->SendPacket(&data);
-                LOG_DEBUG("maps", "MAP: Player '{}' does not have a corpse in instance '{}' and cannot enter.", player->GetName(), mapName);
-                return Map::CANNOT_ENTER_CORPSE_IN_DIFFERENT_INSTANCE;
-            }
-            LOG_DEBUG("maps", "MAP: Player '{}' has corpse in instance '{}' and can enter.", player->GetName(), mapName);
-        }
-        else
-        {
-            LOG_DEBUG("maps", "Map::PlayerCannotEnter - player '{}' is dead but does not have a corpse!", player->GetName());
-        }
-    }
-
-    // if map exists - check for being full, etc.
-    if (!loginCheck) // for login this is done by the calling function
-    {
-        uint32 destInstId = sInstanceSaveMgr->PlayerGetDestinationInstanceId(player, mapid, targetDifficulty);
-        if (destInstId)
-            if (Map* boundMap = sMapMgr->FindMap(mapid, destInstId))
-                if (Map::EnterState denyReason = boundMap->CannotEnter(player, loginCheck))
-                    return denyReason;
-    }
-
-    // players are only allowed to enter 5 instances per hour
-    if (entry->IsNonRaidDungeon() && (!group || !group->isLFGGroup() || !group->IsLfgRandomInstance()))
-    {
-        uint32 instaceIdToCheck = 0;
-        if (InstanceSave* save = sInstanceSaveMgr->PlayerGetInstanceSave(player->GetGUID(), mapid, player->GetDifficulty(entry->IsRaid())))
-            instaceIdToCheck = save->GetInstanceId();
-
-        // instaceIdToCheck can be 0 if save not found - means no bind so the instance is new
-        if (!player->CheckInstanceCount(instaceIdToCheck))
-        {
-            player->SendTransferAborted(mapid, TRANSFER_ABORT_TOO_MANY_INSTANCES);
-            return Map::CANNOT_ENTER_TOO_MANY_INSTANCES;
-        }
-    }
-
-    //Other requirements
-    return player->Satisfy(sObjectMgr->GetAccessRequirement(mapid, targetDifficulty), mapid, true) ? Map::CAN_ENTER : Map::CANNOT_ENTER_UNSPECIFIED_REASON;
+    return Map::CANNOT_ENTER_NO_ENTRY;
 }
 
 void MapMgr::Update(uint32 diff)
@@ -295,7 +195,7 @@ bool MapMgr::ExistMapAndVMap(uint32 mapid, float x, float y)
 
 bool MapMgr::IsValidMAP(uint32 mapid, bool startUp)
 {
-    MapEntry const* mEntry = sMapStore.LookupEntry(mapid);
+    MapEntry const *mEntry = sMapStore.LookupEntry(mapid);
 
     if (startUp)
     {
@@ -322,43 +222,48 @@ void MapMgr::UnloadAll()
         m_updater.deactivate();
 }
 
-void MapMgr::GetNumInstances(uint32& dungeons, uint32& battlegrounds, uint32& arenas)
+void MapMgr::GetNumInstances(uint32 &dungeons, uint32 &battlegrounds, uint32 &arenas)
 {
     for (MapMapType::iterator itr = i_maps.begin(); itr != i_maps.end(); ++itr)
     {
-        Map* map = itr->second;
+        Map *map = itr->second;
         if (!map->Instanceable())
             continue;
-        MapInstanced::InstancedMaps& maps = ((MapInstanced*)map)->GetInstancedMaps();
+        MapInstanced::InstancedMaps &maps = ((MapInstanced *)map)->GetInstancedMaps();
         for (MapInstanced::InstancedMaps::iterator mitr = maps.begin(); mitr != maps.end(); ++mitr)
         {
-            if (mitr->second->IsDungeon()) dungeons++;
-            else if (mitr->second->IsBattleground()) battlegrounds++;
-            else if (mitr->second->IsBattleArena()) arenas++;
+            if (mitr->second->IsDungeon())
+                dungeons++;
+            else if (mitr->second->IsBattleground())
+                battlegrounds++;
+            else if (mitr->second->IsBattleArena())
+                arenas++;
         }
     }
 }
 
-void MapMgr::GetNumPlayersInInstances(uint32& dungeons, uint32& battlegrounds, uint32& arenas, uint32& spectators)
+void MapMgr::GetNumPlayersInInstances(uint32 &dungeons, uint32 &battlegrounds, uint32 &arenas, uint32 &spectators)
 {
     for (MapMapType::iterator itr = i_maps.begin(); itr != i_maps.end(); ++itr)
     {
-        Map* map = itr->second;
+        Map *map = itr->second;
         if (!map->Instanceable())
             continue;
-        MapInstanced::InstancedMaps& maps = ((MapInstanced*)map)->GetInstancedMaps();
+        MapInstanced::InstancedMaps &maps = ((MapInstanced *)map)->GetInstancedMaps();
         for (MapInstanced::InstancedMaps::iterator mitr = maps.begin(); mitr != maps.end(); ++mitr)
         {
-            if (mitr->second->IsDungeon()) dungeons += ((InstanceMap*)mitr->second)->GetPlayers().getSize();
-            else if (mitr->second->IsBattleground()) battlegrounds += ((InstanceMap*)mitr->second)->GetPlayers().getSize();
+            if (mitr->second->IsDungeon())
+                dungeons += ((InstanceMap *)mitr->second)->GetPlayers().getSize();
+            else if (mitr->second->IsBattleground())
+                battlegrounds += ((InstanceMap *)mitr->second)->GetPlayers().getSize();
             else if (mitr->second->IsBattleArena())
             {
                 uint32 spect = 0;
-                if (BattlegroundMap* bgmap = mitr->second->ToBattlegroundMap())
-                    if (Battleground* bg = bgmap->GetBG())
+                if (BattlegroundMap *bgmap = mitr->second->ToBattlegroundMap())
+                    if (Battleground *bg = bgmap->GetBG())
                         spect = bg->GetSpectators().size();
 
-                arenas += ((InstanceMap*)mitr->second)->GetPlayers().getSize() - spect;
+                arenas += ((InstanceMap *)mitr->second)->GetPlayers().getSize() - spect;
                 spectators += spect;
             }
         }
@@ -393,7 +298,8 @@ uint32 MapMgr::GenerateInstanceId()
     uint32 newInstanceId = _nextInstanceId;
 
     // find the lowest available id starting from the current _nextInstanceId
-    while (_nextInstanceId < 0xFFFFFFFF && ++_nextInstanceId < _instanceIds.size() && _instanceIds[_nextInstanceId]);
+    while (_nextInstanceId < 0xFFFFFFFF && ++_nextInstanceId < _instanceIds.size() && _instanceIds[_nextInstanceId])
+        ;
 
     if (_nextInstanceId == 0xFFFFFFFF)
     {
