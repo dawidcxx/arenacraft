@@ -19,6 +19,17 @@ namespace arenacraft
         uint32_t specIndex;
     };
 
+      std::ostream &operator<<(std::ostream &os, const SoloqPlayer &player)
+    {
+        os << "Player {";
+        os << "GUID: " << player.playerGUID << " ";
+        os << "Class: " << fns::GetClassName(player.classId) << " ";
+        os << "MMR: " << player.matchMakingRating << " ";
+        os << "Spec: " << player.specIndex << " ";
+        os << "}";
+        return os;
+    }
+
     struct QueuePopResult
     {
         std::vector<SoloqPlayer *> team1;
@@ -102,7 +113,22 @@ namespace arenacraft
             auto teamAvgMmr = team.GetAvgMmr();
             return avgMmr >= teamAvgMmr - 350 && avgMmr <= teamAvgMmr + 350;
         }
+
+        bool IsValidMatch(Team &team)
+        {
+            return IsWithinRange(team) && team.melee != melee && team.caster != caster && team.healer != healer;
+        }
     };
+
+    std::ostream &operator<<(std::ostream &os, const Team &team)
+    {
+        os << "Team {";
+        os << "Melee: " << *team.melee << " ";
+        os << "Caster: " << *team.caster << " ";
+        os << "Healer: " << *team.healer << " ";
+        os << "}";
+        return os;
+    }
 
     class MatchMaker
     {
@@ -130,6 +156,15 @@ namespace arenacraft
             playersByRoles = RoleLookupMap();
             playersByMmrBackRef = std::unordered_map<SoloqPlayer *, MMRLookupMap::iterator>();
             playersByRolesBackRef = std::unordered_map<SoloqPlayer *, RoleLookupMap::iterator>();
+        }
+
+        // kick all queue participants
+        void Clear()
+        {
+            playersByMmr.clear();
+            playersByRoles.clear();
+            playersByMmrBackRef.clear();
+            playersByRolesBackRef.clear();
         }
 
         void AddPlayer(SoloqPlayer &player)
@@ -174,6 +209,7 @@ namespace arenacraft
                         playersTaken.insert(team.caster);
                         playersTaken.insert(team.healer);
                         teams.insert(std::make_pair(team.GetAvgMmr(), team));
+                        std::cout << "Team assembled: " << team << std::endl;
                     }
                     else
                     {
@@ -185,13 +221,15 @@ namespace arenacraft
             for (auto teamIt = teams.begin(); teamIt != teams.end();)
             {
                 auto team = teamIt->second;
+                std::cout << team << std::endl;
                 auto mmr = team.GetAvgMmr();
                 auto teamsLower = teams.lower_bound(mmr);
                 auto teamsUpper = teams.upper_bound(mmr + 350);
 
                 for (auto it = teamsLower; it != teamsUpper; ++it)
                 {
-                    if (team.IsWithinRange(it->second))
+                    auto candidateTeam = it->second;
+                    if (team.IsValidMatch(candidateTeam))
                     {
                         QueuePopResult result;
                         for (auto player : {team.melee, team.caster, team.healer})
@@ -275,5 +313,22 @@ namespace arenacraft
             return false;
         }
     };
+
+  
+    std::ostream &operator<<(std::ostream &os, const QueuePopResult &result)
+    {
+        os << "Team 1: ";
+        for (auto player : result.team1)
+        {
+            os << *player << " ";
+        }
+        os << std::endl;
+        os << "Team 2: ";
+        for (auto player : result.team2)
+        {
+            os << *player << " ";
+        }
+        return os;
+    }
 
 } // namespace arenacraft
