@@ -51,6 +51,7 @@ namespace arenacraft::soloq
             }
         }
 
+
         void AddPlayer(SoloqPlayer player)
         {
             auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
@@ -128,7 +129,7 @@ namespace arenacraft::soloq
             // for example    (1734 / 100) * 100 = 1700
             uint32_t bracketBase = (player.matchMakingRating / m_mmrQuant) * m_mmrQuant;
 
-            std::vector<uint32_t> brackets(std::max((uint8_t) 1, player.waitedIterations));
+            std::vector<uint32_t> brackets(std::max((uint8_t)1, player.waitedIterations));
 
             uint32_t i = 0;
             do
@@ -140,7 +141,6 @@ namespace arenacraft::soloq
                 uint32_t bracketNormalized = std::min(std::max(bracket, SOLOQ_MIN_RATING), SOLOQ_MAX_RATING);
                 brackets[i] = bracketNormalized;
             } while (i < player.waitedIterations);
-
 
             return brackets;
         }

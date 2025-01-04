@@ -13,6 +13,23 @@ namespace arenacraft::soloq
         PlayerList healers;
         PlayerList casters;
         PlayerList melees;
+
+        void ForEachPlayer(std::function<void(SoloqPlayer &)> func)
+        {
+            for (auto &healer : healers)
+            {
+                func(healer);
+            }
+            for (auto &caster : casters)
+            {
+                func(caster);
+            }
+            for (auto &melee : melees)
+            {
+                func(melee);
+            }
+        }
+        
     };
 
     std::ostream &operator<<(std::ostream &os, const QueueList &queueList)

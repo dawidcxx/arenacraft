@@ -13,11 +13,11 @@ namespace arenacraft::soloq
         std::vector<SoloqPlayer> team2;
 
         // avoid class stacking
-        std::unordered_set<ClassId> _team1ClassIds;
-        std::unordered_set<ClassId> _team2ClassIds;
+        std::unordered_set<ClassId> _team1ClassIds = {};
+        std::unordered_set<ClassId> _team2ClassIds = {};
 
         // avoid player stacking
-        std::unordered_set<uint64_t> _playersTakenGuids;
+        std::unordered_set<uint64_t> _playersTakenGuids = {};
 
         bool IsComplete()
         {
@@ -50,7 +50,9 @@ namespace arenacraft::soloq
                 }
                 _playersTakenGuids.insert(player.playerGUID);
                 _team1ClassIds.insert(player.classId);
+
                 team1.push_back(player);
+
                 break;
             }
 
@@ -66,7 +68,9 @@ namespace arenacraft::soloq
                 }
                 _playersTakenGuids.insert(player.playerGUID);
                 _team2ClassIds.insert(player.classId);
+                
                 team2.push_back(player);
+
                 break;
             }
 
@@ -76,20 +80,20 @@ namespace arenacraft::soloq
     std::ostream &
     operator<<(std::ostream &os, const QueuePopMatchup &matchup)
     {
-        os << "QueuePopMatchup {";
+        os << "QueuePopMatchup {\n";
         os << "team1: [";
         for (auto player : matchup.team1)
         {
             os << player << ", ";
         }
         os << "] ";
-        os << "team2: [";
+        os << "\nteam2: [";
         for (auto player : matchup.team2)
         {
             os << player << ", ";
         }
         os << "] ";
-        os << "}";
+        os << "}\n";
         return os;
     };
 
