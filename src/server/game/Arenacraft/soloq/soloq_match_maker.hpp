@@ -108,6 +108,12 @@ namespace arenacraft::soloq
 
         void AddPlayer(SoloqPlayer player)
         {
+            // Prevent from accidently adding the same player twice
+            if (m_playerWaitTimes.find(player) != m_playerWaitTimes.end())
+            {
+                return;
+            }
+
             auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
 
             m_playerWaitTimes[player] = m_elapsed_seconds;
@@ -148,6 +154,26 @@ namespace arenacraft::soloq
             }
             return info;
         };
+
+        // override ostream for debugging
+        friend std::ostream &operator<<(std::ostream &os, const MatchMaker &matchMaker)
+        {
+            os << "MatchMaker {";
+            os << "MMR Quant: " << matchMaker.m_mmrQuant << " " << std::endl;
+            os << "Elapsed Seconds: " << matchMaker.m_elapsed_seconds << " " << std::endl;
+            os << "Player Wait Times: " << matchMaker.m_playerWaitTimes.size() << " " << std::endl;
+            os << "Class To Players: " << matchMaker.m_classToPlayers.size() << " " << std::endl;
+            os << "Role To Players: " << matchMaker.m_roleToPlayers.size() << " " << std::endl;
+            
+            os << "MMR To Queue List: " << std::endl;
+            for (auto &[mmrBracket, queueList] : matchMaker.m_mmrToQueueList)
+            {
+                os << "  Bracket [ " << mmrBracket << " ] => Queue List: " << queueList << std::endl;
+            }
+
+            os << "}";
+            return os;
+        }
 
     private:
         bool QueueHasEnoughPlayers(QueueList &queueList)

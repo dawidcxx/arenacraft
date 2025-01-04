@@ -5,8 +5,11 @@
 #include "soloq/soloq_match_maker.hpp"
 #include <algorithm>
 
+// #define BENCHMARK 1
+
 TEST_CASE("MatchMaker scenario test suite")
 {
+#ifndef BENCHMARK
     SUBCASE("The most basic example should generate a valid match")
     {
         arenacraft::soloq::MatchMaker matchmaker(100);
@@ -185,4 +188,56 @@ TEST_CASE("MatchMaker scenario test suite")
 
         CHECK_MESSAGE(matchups.size() == 1, "Expected 1 matchup, got " << matchups.size());
     }
+
+#endif
+
+#if BENCHMARK
+    // small benchmark
+    SUBCASE("Benchmark")
+    {
+        arenacraft::soloq::MatchMaker matchmaker(300);
+        std::cout << std::endl;
+
+        srand(1337);
+        for (int i = 0; i < 10000; i++)
+        {
+            arenacraft::soloq::SoloqPlayer player;
+            player.playerGUID = i;
+            player.classId = arenacraft::ClassId((arenacraft::ClassId)(i % 10));
+            player.specIndex = random() % 3;
+            player.matchMakingRating = random() % 3500;
+            matchmaker.AddPlayer(player);
+        }
+
+        auto totalPlayers = matchmaker.GetInfo().GetTotalPlayerCount();
+
+        std::cout << "There are " << totalPlayers << " players in queue" << std::endl;
+        std::cout << "Melee count: " << matchmaker.GetInfo().meleeCount << std::endl;
+        std::cout << "Caster count: " << matchmaker.GetInfo().casterCount << std::endl;
+        std::cout << "Healer count: " << matchmaker.GetInfo().healerCount << std::endl;
+
+        auto now = std::chrono::high_resolution_clock::now();
+
+        uint64_t totalMatchups = 0;
+        // 10 matchmaking rounds
+        for (int i = 0; i < 10; i++)
+        {
+            auto matchups = matchmaker.PopMatchups();
+            totalMatchups += matchups.size();
+            matchmaker.Update(60000); // 60 seconds passed, trigger mmr extension
+        }
+
+        auto matchups = matchmaker.PopMatchups();
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - now);
+        std::cout << "Matchmaking " << totalPlayers << " players took "
+                  << duration.count() << "ms. "
+                  << "Found " << matchups.size() << " matchups"
+                  << std::endl;
+
+        // std::cout << "Matchmaker after benchmark: " << matchmaker << std::endl;
+    }
+
+#endif
 }
