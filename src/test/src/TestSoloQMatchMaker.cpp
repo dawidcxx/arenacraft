@@ -29,6 +29,7 @@ TEST_CASE("MatchMaker scenario test suite")
         CHECK_MESSAGE(
             matchmaker.GetInfo().GetTotalPlayerCount() == 6,
             "There should be 6 players in Queue, got " << matchmaker.GetInfo().GetTotalPlayerCount());
+        CHECK_MESSAGE(matchmaker.GetInfo().classToCount[arenacraft::CLASS_WARRIOR] == 1, "There should be a arenacraft::CLASS_WARRIOR in queue");
 
         auto matchups = matchmaker.PopMatchups();
         std::cout << "Matchups count: " << matchups.size() << std::endl;
@@ -52,5 +53,38 @@ TEST_CASE("MatchMaker scenario test suite")
         CHECK_MESSAGE(std::find(team2.begin(), team2.end(), player6) != team2.end(), "Player6 not found in team2");
 
         CHECK_MESSAGE(matchmaker.GetInfo().GetTotalPlayerCount() == 0, "Queue needs to be cleared after calling .PopMatchups()");
+        CHECK_MESSAGE(matchmaker.GetInfo().classToCount[arenacraft::CLASS_WARRIOR] == 0, "arenacraft::CLASS_WARRIOR should be removed from queue");
     }
+
+    SUBCASE("Non MCH queues should not pop")
+    {
+        arenacraft::soloq::MatchMaker matchmaker(100);
+
+        arenacraft::soloq::SoloqPlayer player1{1, arenacraft::CLASS_WARRIOR, 1001, 0};      // arms warrior - melee
+        arenacraft::soloq::SoloqPlayer player3{2, arenacraft::CLASS_ROGUE, 1080, 0};        // rogue assasination - melee
+        arenacraft::soloq::SoloqPlayer player2{3, arenacraft::CLASS_PALADIN, 1020, 0};      // holy paladin - healera
+        arenacraft::soloq::SoloqPlayer player4{4, arenacraft::CLASS_DEATH_KNIGHT, 1010, 2}; // unholy dk - melee
+        arenacraft::soloq::SoloqPlayer player6{5, arenacraft::CLASS_SHAMAN, 1002, 0};       // elemental shaman - caster
+        arenacraft::soloq::SoloqPlayer player5{6, arenacraft::CLASS_PRIEST, 1090, 1};       // holy priest - healer
+
+        matchmaker.AddPlayer(player1);
+        matchmaker.AddPlayer(player2);
+        matchmaker.AddPlayer(player3);
+        matchmaker.AddPlayer(player4);
+        matchmaker.AddPlayer(player5);
+        matchmaker.AddPlayer(player6);
+
+        CHECK_MESSAGE(
+            matchmaker.GetInfo().GetTotalPlayerCount() == 6,
+            "There should be 6 players in Queue, got " << matchmaker.GetInfo().GetTotalPlayerCount());
+        CHECK_MESSAGE(matchmaker.GetInfo().meleeCount == 3, "There should be 3 melee in queue");
+
+        auto matchups = matchmaker.PopMatchups();
+
+        CHECK_MESSAGE(
+            matchmaker.GetInfo().GetTotalPlayerCount() == 6,
+            "Queue should not be cleared if there are no MCH matchups");
+        CHECK_MESSAGE(matchups.size() == 0, "Expected 0 matchups, got " << matchups.size());
+    }
+
 }

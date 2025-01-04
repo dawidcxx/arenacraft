@@ -2,6 +2,8 @@
 #pragma once
 
 #include "Arenacraft.hpp"
+#include <chrono>
+#include <stdint.h>
 
 namespace arenacraft::soloq
 {
@@ -11,13 +13,25 @@ namespace arenacraft::soloq
         ClassId classId;
         uint32_t matchMakingRating;
         uint32_t specIndex;
-    };
     
+        uint8_t waitedIterations = 0;
+
+    };
+
     // Player Eq
     bool operator==(const SoloqPlayer &lhs, const SoloqPlayer &rhs)
     {
         return lhs.playerGUID == rhs.playerGUID;
     }
+
+    // Player Hash
+    struct SoloqPlayerHash
+    {
+        std::size_t operator()(const SoloqPlayer &player) const
+        {
+            return std::hash<uint64_t>{}(player.playerGUID);
+        }
+    };
 
     std::ostream &operator<<(std::ostream &os, const SoloqPlayer &player)
     {
