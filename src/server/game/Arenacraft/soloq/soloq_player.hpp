@@ -13,9 +13,6 @@ namespace arenacraft::soloq
         ClassId classId;
         uint32_t matchMakingRating;
         uint32_t specIndex;
-    
-        uint8_t waitedIterations = 0;
-
     };
 
     // Player Eq

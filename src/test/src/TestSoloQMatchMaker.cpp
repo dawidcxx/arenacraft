@@ -38,7 +38,7 @@ TEST_CASE("MatchMaker scenario test suite")
             std::cout << "Basic example Matchup: " << matchup << std::endl;
         }
         CHECK_MESSAGE(matchups.size() == 1, "Expected 1 matchup, got " << matchups.size());
-       
+
         auto matchup = matchups[0];
         auto team1 = matchup.team1;
         auto team2 = matchup.team2;
@@ -130,5 +130,59 @@ TEST_CASE("MatchMaker scenario test suite")
             matchmaker.GetInfo().GetTotalPlayerCount() == 6,
             "Queue should not be cleared if there are no MCH matchups");
         CHECK_MESSAGE(matchups.size() == 0, "Expected 0 matchups, got " << matchups.size());
+    }
+
+    SUBCASE("Queue player mmr extension should work properly")
+    {
+        arenacraft::soloq::MatchMaker matchmaker(100);
+
+        arenacraft::soloq::SoloqPlayer player1{1, arenacraft::CLASS_WARRIOR, 1001, 0};      // arms warrior       - melee
+        arenacraft::soloq::SoloqPlayer player3{2, arenacraft::CLASS_WARLOCK, 1080, 0};      // affliction warlock - caster
+        arenacraft::soloq::SoloqPlayer player2{3, arenacraft::CLASS_PALADIN, 1400, 0};      // holy paladin       - healer  <= High rated player
+        arenacraft::soloq::SoloqPlayer player4{4, arenacraft::CLASS_DEATH_KNIGHT, 1010, 2}; // unholy dk          - melee
+        arenacraft::soloq::SoloqPlayer player6{5, arenacraft::CLASS_SHAMAN, 1002, 0};       // elemental shaman   - caster
+        arenacraft::soloq::SoloqPlayer player5{6, arenacraft::CLASS_PRIEST, 1090, 1};       // holy priest        - healer
+
+        matchmaker.AddPlayer(player1);
+        matchmaker.AddPlayer(player2);
+        matchmaker.AddPlayer(player3);
+        matchmaker.AddPlayer(player4);
+        matchmaker.AddPlayer(player5);
+        matchmaker.AddPlayer(player6);
+
+        CHECK_MESSAGE(
+            matchmaker.GetInfo().GetTotalPlayerCount() == 6,
+            "There should be 6 players in Queue, got " << matchmaker.GetInfo().GetTotalPlayerCount());
+
+        auto attemptedMatchups = matchmaker.PopMatchups();
+
+        for (auto matchup : attemptedMatchups)
+        {
+            std::cout << "Attempted MMR extension Matchup: " << matchup << std::endl;
+        }
+
+        // should be unable to form a matchup
+        // even though players are matching one is too high rated to be matched yet
+        CHECK_MESSAGE(attemptedMatchups.size() == 0, "Expected 0 matchups, got " << attemptedMatchups.size());
+        matchmaker.Update(30000); // 30 seconds passed
+
+        auto attemptedMatchups2 = matchmaker.PopMatchups();
+        for (auto matchup : attemptedMatchups2)
+        {
+            std::cout << "Attempted MMR extension Matchup: " << matchup << std::endl;
+        }
+
+        // MMR gap should be still too large
+        CHECK_MESSAGE(attemptedMatchups2.size() == 0, "Expected 0 matchups, got " << attemptedMatchups.size());
+        matchmaker.Update(60 * 60 * 1000); // 1 hour passed
+
+        // ok now enough time should have passed...
+        auto matchups = matchmaker.PopMatchups();
+        for (auto matchup : matchups)
+        {
+            std::cout << "MMR extension Matchup: " << matchup << std::endl;
+        }
+
+        CHECK_MESSAGE(matchups.size() == 1, "Expected 1 matchup, got " << matchups.size());
     }
 }
