@@ -1,334 +1,166 @@
 #pragma once
 
 #include "Arenacraft.hpp"
+#include "soloq/soloq_player.hpp"
+#include "soloq/soloq_matchup.hpp"
+#include "soloq/soloq_queue_list.hpp"
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <cstdint>
 #include <cassert>
+#include <queue>
 #include <optional>
+#include <list>
+#include <algorithm>
 
-namespace arenacraft
+#define SOLOQ_MIN_RATING (uint32_t) 0
+#define SOLOQ_MAX_RATING (uint32_t) 3500
+
+namespace arenacraft::soloq
 {
-
-    struct SoloqPlayer
-    {
-        uint64_t playerGUID;
-        ClassId classId;
-        uint32_t matchMakingRating;
-        uint32_t specIndex;
-    };
-
-      std::ostream &operator<<(std::ostream &os, const SoloqPlayer &player)
-    {
-        os << "Player {";
-        os << "GUID: " << player.playerGUID << " ";
-        os << "Class: " << fns::GetClassName(player.classId) << " ";
-        os << "MMR: " << player.matchMakingRating << " ";
-        os << "Spec: " << player.specIndex << " ";
-        os << "}";
-        return os;
-    }
-
-    struct QueuePopResult
-    {
-        std::vector<SoloqPlayer *> team1;
-        std::vector<SoloqPlayer *> team2;
-    };
-
-    struct Team
-    {
-        std::unordered_set<ClassId> classes;
-        SoloqPlayer *melee = nullptr;
-        SoloqPlayer *caster = nullptr;
-        SoloqPlayer *healer = nullptr;
-
-        bool Assembled()
-        {
-            return melee != nullptr && caster != nullptr && healer != nullptr;
-        }
-
-        bool NeedsMelee()
-        {
-            return melee == nullptr;
-        }
-
-        bool NeedsCaster()
-        {
-            return caster == nullptr;
-        }
-
-        bool NeedsHealer()
-        {
-            return healer == nullptr;
-        }
-
-        bool TryAppend(SoloqPlayer *player)
-        {
-            // Avoid class stacking
-            if (classes.contains(player->classId))
-            {
-                return false;
-            }
-
-            auto classId = player->classId;
-            auto specIndex = player->specIndex;
-
-            switch (fns::GetRoleForClassAndSpec(classId, specIndex))
-            {
-            case PlayerRole::ROLE_MELEE:
-                if (NeedsMelee())
-                {
-                    melee = player;
-                    return true;
-                }
-                return false;
-            case PlayerRole::ROLE_CASTER:
-                if (NeedsCaster())
-                {
-                    caster = player;
-                    return true;
-                }
-                return false;
-            case PlayerRole::ROLE_HEALER:
-                if (NeedsHealer())
-                {
-                    healer = player;
-                    return true;
-                }
-                return false;
-            default:
-                assert(false);
-            }
-        }
-
-        uint32_t GetAvgMmr()
-        {
-            return (melee->matchMakingRating + caster->matchMakingRating + healer->matchMakingRating) / 3;
-        }
-
-        bool IsWithinRange(Team &team)
-        {
-            auto avgMmr = GetAvgMmr();
-            auto teamAvgMmr = team.GetAvgMmr();
-            return avgMmr >= teamAvgMmr - 350 && avgMmr <= teamAvgMmr + 350;
-        }
-
-        bool IsValidMatch(Team &team)
-        {
-            return IsWithinRange(team) && team.melee != melee && team.caster != caster && team.healer != healer;
-        }
-    };
-
-    std::ostream &operator<<(std::ostream &os, const Team &team)
-    {
-        os << "Team {";
-        os << "Melee: " << *team.melee << " ";
-        os << "Caster: " << *team.caster << " ";
-        os << "Healer: " << *team.healer << " ";
-        os << "}";
-        return os;
-    }
-
     class MatchMaker
     {
     private:
-        using MMRLookupMap = std::multimap<uint32_t, SoloqPlayer *>;
-        using RoleLookupMap = std::unordered_multimap<PlayerRole, SoloqPlayer *>;
-
-        MMRLookupMap playersByMmr;
-        RoleLookupMap playersByRoles;
-
-        // back references to enable quick removal from queue
-        std::unordered_map<SoloqPlayer *, MMRLookupMap::iterator> playersByMmrBackRef;
-        std::unordered_map<SoloqPlayer *, RoleLookupMap::iterator> playersByRolesBackRef;
+        uint32_t m_mmrQuant;
+        std::map<uint32_t, QueueList> m_mmrToQueueList;
 
     public:
         static MatchMaker &Instance()
         {
-            static MatchMaker instance;
+            static MatchMaker instance(100);
             return instance;
         }
 
-        MatchMaker()
+        MatchMaker(uint32_t mmrQuant)
         {
-            playersByMmr = MMRLookupMap();
-            playersByRoles = RoleLookupMap();
-            playersByMmrBackRef = std::unordered_map<SoloqPlayer *, MMRLookupMap::iterator>();
-            playersByRolesBackRef = std::unordered_map<SoloqPlayer *, RoleLookupMap::iterator>();
-        }
-
-        // kick all queue participants
-        void Clear()
-        {
-            playersByMmr.clear();
-            playersByRoles.clear();
-            playersByMmrBackRef.clear();
-            playersByRolesBackRef.clear();
+            uint32_t brackets = SOLOQ_MAX_RATING / mmrQuant;
+            m_mmrToQueueList = std::map<uint32_t, QueueList>();
+            for (uint32_t i = 0; i < brackets; i++)
+            {
+                m_mmrToQueueList.insert(std::make_pair(mmrQuant * i, QueueList()));
+            }
+            m_mmrQuant = mmrQuant;
         }
 
         void AddPlayer(SoloqPlayer &player)
         {
-
-            auto mmrEntry = playersByMmr.insert(std::make_pair(player.matchMakingRating, &player));
-            playersByMmrBackRef.insert(std::make_pair(&player, mmrEntry));
-
+            auto bracket = GetPlayerBracket(player);
+            auto &queueList = m_mmrToQueueList[bracket];
             auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
-            auto roleEntry = playersByRoles.insert(std::make_pair(role, &player));
-            playersByRolesBackRef.insert(std::make_pair(&player, roleEntry));
+            AddToQueueList(player, queueList);
         }
 
         void RemovePlayer(SoloqPlayer &player)
         {
-            playersByMmr.erase(playersByMmrBackRef[&player]);
-            playersByRoles.erase(playersByRolesBackRef[&player]);
-            playersByMmrBackRef.erase(&player);
-            playersByRolesBackRef.erase(&player);
+            auto bracket = GetPlayerBracket(player);
+            auto &queueList = m_mmrToQueueList[bracket];
+            auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
+            RemoveFromQueueList(player, queueList);
         }
 
-        std::optional<QueuePopResult> TryPopQueue()
+        std::vector<QueuePopMatchup> GetMatchups()
         {
-            if (CanSkipQueueProcessing())
+            std::vector<QueuePopMatchup> matchups;
+            for (auto &[mmrBracket, queueList] : m_mmrToQueueList)
             {
-                return std::nullopt;
-            }
-
-            std::unordered_set<SoloqPlayer *> playersTaken;
-            std::map<uint32_t, Team> teams;
-
-            for (auto playersByMmmrIt = playersByMmr.begin(); playersByMmmrIt != playersByMmr.end();)
-            {
-                while (playersByMmmrIt != playersByMmr.end())
+                std::cout << "Bracket: " << mmrBracket << std::endl;
+                std::cout << "QueueList: " << queueList << std::endl;
+                if (QueueHasEnoughPlayers(queueList))
                 {
-                    auto leaderPlayer = playersByMmmrIt->second;
+                    std::cout << "Queue has enough players" << std::endl;
+                    QueuePopMatchup matchup;
+                    matchup.team1.push_back(queueList.healers.front());
+                    RemovePlayer(*queueList.healers.front());
 
-                    if (auto teamOp = TryAssembleTeam(leaderPlayer, playersTaken))
-                    {
-                        auto &team = *teamOp;
-                        playersTaken.insert(team.melee);
-                        playersTaken.insert(team.caster);
-                        playersTaken.insert(team.healer);
-                        teams.insert(std::make_pair(team.GetAvgMmr(), team));
-                        std::cout << "Team assembled: " << team << std::endl;
-                    }
-                    else
-                    {
-                        ++playersByMmmrIt;
-                    }
+                    matchup.team1.push_back(queueList.casters.front());
+                    RemovePlayer(*queueList.casters.front());
+
+                    matchup.team1.push_back(queueList.melees.front());
+                    RemovePlayer(*queueList.melees.front());
+
+                    matchup.team2.push_back(queueList.healers.front());
+                    RemovePlayer(*queueList.healers.front());
+
+                    matchup.team2.push_back(queueList.casters.front());
+                    RemovePlayer(*queueList.casters.front());
+
+                    matchup.team2.push_back(queueList.melees.front());
+                    RemovePlayer(*queueList.melees.front());
+
+                    matchups.push_back(matchup);
                 }
             }
-
-            for (auto teamIt = teams.begin(); teamIt != teams.end();)
-            {
-                auto team = teamIt->second;
-                std::cout << team << std::endl;
-                auto mmr = team.GetAvgMmr();
-                auto teamsLower = teams.lower_bound(mmr);
-                auto teamsUpper = teams.upper_bound(mmr + 350);
-
-                for (auto it = teamsLower; it != teamsUpper; ++it)
-                {
-                    auto candidateTeam = it->second;
-                    if (team.IsValidMatch(candidateTeam))
-                    {
-                        QueuePopResult result;
-                        for (auto player : {team.melee, team.caster, team.healer})
-                        {
-                            result.team1.push_back(player);
-                        }
-                        for (auto player : {it->second.melee, it->second.caster, it->second.healer})
-                        {
-                            result.team2.push_back(player);
-                        }
-                        return result;
-                    }
-                }
-
-                teamIt++;
-            }
-
-            return std::nullopt;
+            return matchups;
         }
+
 
     private:
-        std::optional<Team> TryAssembleTeam(SoloqPlayer *initPlayer,
-                                            std::unordered_set<SoloqPlayer *> allPlayersTaken)
+
+        bool QueueHasEnoughPlayers(QueueList &queueList)
         {
-            uint32_t mmr = initPlayer->matchMakingRating;
+            return queueList.healers.size() >= 2 && queueList.casters.size() >= 2 && queueList.melees.size() >= 2;
+        }
 
-            std::unordered_set<SoloqPlayer *> playersTaken = allPlayersTaken;
-            auto lower_mmr_it = playersByMmr.lower_bound(mmr - 350);
-            auto upper_mmr_it = playersByMmr.upper_bound(mmr + 350);
+        uint32_t GetPlayerBracket(SoloqPlayer &player)
+        {
+            // for example    (1734 / 100) * 100 = 1700
+            uint32_t mmrBracket = (player.matchMakingRating / m_mmrQuant) * m_mmrQuant;
+            // make sure it's within <SOLOQ_MIN_RATING, SOLOQ_MAX_RATING> range
+            return std::min(std::max(mmrBracket, SOLOQ_MIN_RATING), SOLOQ_MAX_RATING);
+        }
 
-            Team team;
-            assert(team.TryAppend(initPlayer));
-            playersTaken.insert(initPlayer);
-
-            for (auto it = lower_mmr_it; it != upper_mmr_it; ++it)
+        void AddToQueueList(SoloqPlayer &player, QueueList &queueList)
+        {
+            auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
+            switch (role)
             {
-                if (team.Assembled())
-                {
-                    break;
-                }
-                auto candidate = it->second;
-                if (!playersTaken.contains(candidate) && team.TryAppend(candidate))
-                {
-                    playersTaken.insert(candidate);
-                }
+            case PlayerRole::ROLE_HEALER:
+            {
+                queueList.healers.push_back(&player);
+                break;
             }
-
-            if (team.Assembled())
+            case PlayerRole::ROLE_CASTER:
             {
-                return team;
+                queueList.casters.push_back(&player);
+                break;
             }
-            else
+            case PlayerRole::ROLE_MELEE:
             {
-                return std::nullopt;
+                queueList.melees.push_back(&player);
+                break;
+            }
+            default:
+                throw new std::out_of_range("Invalid role");
             }
         }
 
-        // No point to even start processing the queue
-        // if these conditions aren't met
-        bool CanSkipQueueProcessing()
+        void RemoveFromQueueList(SoloqPlayer &player, QueueList &queueList)
         {
-            if (playersByMmr.size() < 6)
+            auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
+            switch (role)
             {
-                return true;
-            }
-            auto healersCount = playersByRoles.count(PlayerRole::ROLE_HEALER);
-            if (healersCount < 2)
+            case PlayerRole::ROLE_HEALER:
             {
-                return true;
+                queueList.healers.remove(&player);
+                break;
             }
-            auto meleeCount = playersByRoles.count(PlayerRole::ROLE_MELEE);
-            if (meleeCount < 2)
+            case PlayerRole::ROLE_CASTER:
             {
-                return true;
+                queueList.casters.remove(&player);
+                break;
             }
-            auto castersCount = playersByRoles.count(PlayerRole::ROLE_CASTER);
-            if (castersCount < 2)
+            case PlayerRole::ROLE_MELEE:
             {
-                return true;
+                queueList.melees.remove(&player);
+                break;
             }
-            return false;
+            default:
+                throw new std::out_of_range("Invalid role");
+            }
         }
     };
 
-  
-    std::ostream &operator<<(std::ostream &os, const QueuePopResult &result)
-    {
-        os << "Team 1: ";
-        for (auto player : result.team1)
-        {
-            os << *player << " ";
-        }
-        os << std::endl;
-        os << "Team 2: ";
-        for (auto player : result.team2)
-        {
-            os << *player << " ";
-        }
-        return os;
-    }
+   
 
 } // namespace arenacraft
