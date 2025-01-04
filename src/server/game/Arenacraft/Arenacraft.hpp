@@ -1,6 +1,10 @@
-#pragma once 
+#pragma once
 
 #include <stdexcept>
+#include <unordered_map>
+#include <functional>
+#include <random>
+#include <algorithm>
 
 namespace arenacraft
 {
@@ -122,6 +126,29 @@ namespace arenacraft
             }
         }
 
+    }
+
+    namespace algorythm
+    {
+        template <typename K, typename V>
+        void random_walk(const std::unordered_map<K, V> &map, std::function<void(const K &, const V &)> callback)
+        {
+            // Collect keys into a vector
+            std::vector<K> keys;
+            for (const auto &pair : map)
+            {
+                keys.push_back(pair.first);
+            }
+
+            std::mt19937 g(keys.size());
+            std::shuffle(keys.begin(), keys.end(), g);
+
+            // Iterate over the keys in random order and call the callback
+            for (const K &key : keys)
+            {
+                callback(key, map.at(key));
+            }
+        }
     }
 
 };

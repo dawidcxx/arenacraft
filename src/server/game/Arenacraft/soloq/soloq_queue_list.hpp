@@ -6,7 +6,7 @@
 
 namespace arenacraft::soloq
 {
-    using PlayerList = std::list<SoloqPlayer *>;
+    using PlayerList = std::list<SoloqPlayer>;
 
     struct QueueList
     {
@@ -21,19 +21,19 @@ namespace arenacraft::soloq
         os << "healers: [";
         for (auto healer : queueList.healers)
         {
-            os << *healer << ", ";
+            os << healer << ", ";
         }
         os << "] ";
         os << "casters: [";
         for (auto caster : queueList.casters)
         {
-            os << *caster << ", ";
+            os << caster << ", ";
         }
         os << "] ";
         os << "melees: [";
         for (auto melee : queueList.melees)
         {
-            os << *melee << ", ";
+            os << melee << ", ";
         }
         os << "] ";
         os << "}";

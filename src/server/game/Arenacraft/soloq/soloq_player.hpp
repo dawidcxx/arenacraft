@@ -12,7 +12,13 @@ namespace arenacraft::soloq
         uint32_t matchMakingRating;
         uint32_t specIndex;
     };
-   
+    
+    // Player Eq
+    bool operator==(const SoloqPlayer &lhs, const SoloqPlayer &rhs)
+    {
+        return lhs.playerGUID == rhs.playerGUID;
+    }
+
     std::ostream &operator<<(std::ostream &os, const SoloqPlayer &player)
     {
         os << "Player {";
