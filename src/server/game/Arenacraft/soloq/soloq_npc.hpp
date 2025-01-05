@@ -8,16 +8,12 @@
 #include <unordered_map>
 
 #include "Arenacraft.hpp"
+#include "soloq/soloq_io.hpp"
 
 #include "CreatureScript.h"
 #include "ScriptedGossip.h"
 #include "GossipDef.h"
 #include "Player.h"
-#include "ArenaTeam.h"
-#include "ArenaTeamMgr.h"
-#include "BattlegroundQueue.h"
-#include "BattlegroundQueue.h"
-#include "Battleground.h"
 
 constexpr uint32 PLAYER_TAUNT_NPC_TEXT_ID = 5215;
 
@@ -47,6 +43,7 @@ namespace arenacraft::soloq
 
         bool OnGossipSelect(Player *player, Creature *creature, uint32 /*sender*/, uint32 action) override
         {
+            CloseGossipMenuFor(player);
             switch (action)
             {
             case NpcSoloqAction::QUEUE:
@@ -59,46 +56,37 @@ namespace arenacraft::soloq
 
     private:
         bool AddPlayerToSoloQueue(Player *player)
-        {   
-            BattlegroundQueue& bgQueue = sBattlegroundMgr->GetBattlegroundQueue(BattlegroundQueueTypeId::BATTLEGROUND_QUEUE_5v5);
-            bgQueue.AddGroup(player, nullptr, 0, STATUS_WAIT_QUEUE, ARENA_TYPE_5v5, true, false, 0, 0, 0, 0);
+        {
+            if (!arenacraft::soloq::io::HasSoloTeam(player))
+            {
+                ChatHandler(player->GetSession()).SendSysMessage("You need to create a team first!");
+                return false;
+            }
+
+            if (!arenacraft::soloq::io::AddPlayerToSoloQueue(player))
+            {
+                ChatHandler(player->GetSession()).SendSysMessage("Failed to add player to solo queue!");
+                return false;
+            }
             return true;
         }
 
         bool CreateSoloTeam(Player *player, Creature *creature)
         {
-            auto priorTeam = sArenaTeamMgr->GetArenaTeamByCaptain(player->GetGUID(), ARENA_TYPE_5v5);
-            if (priorTeam != nullptr)
+            if (arenacraft::soloq::io::HasSoloTeam(player))
             {
                 player->GetSession()->SendArenaTeamCommandResult(ArenaTeamCommandTypes::ERR_ARENA_TEAM_CREATE_S, player->GetName(), "", ERR_ALREADY_IN_ARENA_TEAM);
                 return false;
             }
 
-            ArenaTeam *arenaTeam = new ArenaTeam();
-            std::ostringstream teamNameBuilder;
-            teamNameBuilder << player->GetName();
-            teamNameBuilder << "'s 3v3 SoloQ Team";
-
-            if (arenaTeam->Create(
-                    player->GetGUID(),
-                    ARENA_TYPE_5v5,
-                    teamNameBuilder.str(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0))
+            if (!arenacraft::soloq::io::CreateSoloqTeam(player))
             {
-                sArenaTeamMgr->AddArenaTeam(arenaTeam);
-                ChatHandler(player->GetSession()).SendSysMessage("Arena team successful created!");
-                return true;
-            }
-            else
-            {
-                delete arenaTeam;
                 ChatHandler(player->GetSession()).SendSysMessage("Failed to create arena team!");
                 return false;
             }
+
+            ChatHandler(player->GetSession()).SendSysMessage("Arena team successful created!");
+            return true;
         }
     };
 }
