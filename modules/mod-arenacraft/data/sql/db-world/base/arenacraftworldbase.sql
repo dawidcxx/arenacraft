@@ -11,4 +11,4 @@ insert into spell_script_names (spell_id, `ScriptName`) values (90001, 'class_ro
 
 INSERT IGNORE INTO creature_template_spell (`CreatureID`, `Index`, `Spell`, `VerifiedBuild`) values (6112, 1, 80869, null);
 
-delete from creature;
+delete from creature where map != 571 and `zoneId` != 394 and `areaId` != 395;
