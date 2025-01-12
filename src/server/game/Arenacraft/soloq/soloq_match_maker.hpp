@@ -62,8 +62,6 @@ namespace arenacraft::soloq
             {
                 if (QueueHasEnoughPlayers(queueList))
                 {
-                    // std::cout << "Bracket [ " << mmrBracket << " ] => Queue List: " << queueList << std::endl;    
-
                     QueuePopMatchup matchup;
 
                     matchup.Append(queueList.melees);
@@ -178,7 +176,8 @@ namespace arenacraft::soloq
     private:
         bool QueueHasEnoughPlayers(QueueList &queueList)
         {
-            return queueList.healers.size() >= 2 && queueList.casters.size() >= 2 && queueList.melees.size() >= 2;
+            return true;
+            // return queueList.healers.size() >= 2 && queueList.casters.size() >= 2 && queueList.melees.size() >= 2;
         }
 
         std::vector<uint32_t> CalculatePlayerBrackets(const SoloqPlayer &player, double elapsed_seconds)

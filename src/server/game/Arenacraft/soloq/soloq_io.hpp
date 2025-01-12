@@ -1,7 +1,10 @@
 
 #pragma once
 
+
 #include "Arenacraft.hpp"
+#include "soloq/soloq_matchup.hpp"
+
 #include "BattlegroundQueue.h"
 #include "BattlegroundMgr.h"
 #include "Battleground.h"
@@ -9,18 +12,35 @@
 #include "soloq/soloq_constants.hpp"
 #include "ArenaTeam.h"
 #include "ArenaTeamMgr.h"
+#include "Player.h"
+#include "ObjectAccessor.h"
+#include "ObjectGuid.h"
 
 #include <iostream>
 
 namespace arenacraft::soloq::io
 {
+    void CreateGame(arenacraft::soloq::QueuePopMatchup matchup)
+    {
+        auto arenaInstance = sBattlegroundMgr->CreateNewBattleground(
+            BATTLEGROUND_AA,
+            constants::SOLOQ_DIFFICULTY_ENTRY,
+            ArenaType::ARENA_TYPE_5v5,
+            true);
+        ASSERT(arenaInstance);
+
+        matchup.ForEachPlayer([&](const arenacraft::soloq::SoloqPlayer &player) {
+        
+        });
+        
+    }
 
     bool CreateSoloqTeam(Player *player)
     {
         ArenaTeam *arenaTeam = new ArenaTeam();
         std::ostringstream teamNameBuilder;
         teamNameBuilder << player->GetName();
-        teamNameBuilder << "'s 3v3 SoloQ Team";
+        teamNameBuilder << "'s SoloQ";
 
         if (arenaTeam->Create(
                 player->GetGUID(), ARENA_TYPE_5v5, teamNameBuilder.str(),
@@ -40,13 +60,12 @@ namespace arenacraft::soloq::io
     bool AddPlayerToSoloQueue(Player *player)
     {
         BattlegroundQueue &bgQueue = sBattlegroundMgr->GetBattlegroundQueue(BattlegroundQueueTypeId::BATTLEGROUND_QUEUE_5v5);
-        PvPDifficultyEntry pvpDifficultyEntry(0, soloq::constants::BRACKET_ID, 80, 80, 0);
 
         GroupQueueInfo *ginfo = bgQueue.AddGroup(
             player,
-            nullptr, // group
+            nullptr, // no group
             BattlegroundTypeId::BATTLEGROUND_AA,
-            &pvpDifficultyEntry,
+            constants::SOLOQ_DIFFICULTY_ENTRY,
             ARENA_TYPE_5v5,
             true, // isRated
             false,
@@ -80,10 +99,14 @@ namespace arenacraft::soloq::io
         return true;
     }
 
+    ArenaTeam *GetArenaTeam(Player *player)
+    {
+        return sArenaTeamMgr->GetArenaTeamByCaptain(player->GetGUID(), ARENA_TYPE_5v5);
+    }
 
     bool HasSoloTeam(Player *player)
     {
-        auto team = sArenaTeamMgr->GetArenaTeamByCaptain(player->GetGUID(), ARENA_TYPE_5v5);
-        return team != nullptr;
+        return GetArenaTeam(player) != nullptr;
     }
+
 }

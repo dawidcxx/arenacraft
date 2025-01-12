@@ -16,12 +16,13 @@ namespace arenacraft::soloq
         std::unordered_set<ClassId> _team1ClassIds = {};
         std::unordered_set<ClassId> _team2ClassIds = {};
 
+
         // avoid player stacking
         std::unordered_set<uint64_t> _playersTakenGuids = {};
 
         bool IsComplete()
         {
-            return team1.size() == 3 && team2.size() == 3;
+            return team1.size() == 1 && team2.size() == 1;
         };
 
         void ForEachPlayer(std::function<void(SoloqPlayer &)> func)

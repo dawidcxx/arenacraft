@@ -1,7 +1,7 @@
-#include "soloq/soloq_npc.hpp"
-
+#include "soloq/soloq_scripts.hpp"
 
 void AddArenacraftScripts()
 {
+    new arenacraft::soloq::SoloQueueScript();
     new arenacraft::soloq::NpcSoloq();  
 }

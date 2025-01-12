@@ -31,6 +31,34 @@ namespace arenacraft
 
     namespace fns
     {
+        ClassId ClassIdFromChrClassesDbcIndex(uint8_t index)
+        {
+            switch (index)
+            {
+            case 1:
+                return CLASS_WARRIOR;
+            case 2:
+                return CLASS_PALADIN;
+            case 3:
+                return CLASS_HUNTER;
+            case 4:
+                return CLASS_ROGUE;
+            case 5:
+                return CLASS_PRIEST;
+            case 6:
+                return CLASS_DEATH_KNIGHT;
+            case 7:
+                return CLASS_SHAMAN;
+            case 8:
+                return CLASS_MAGE;
+            case 9:
+                return CLASS_WARLOCK;
+            case 11:
+                return CLASS_DRUID;
+            default:
+                throw new std::out_of_range("Invalid class index");
+            }
+        }
 
         const char *GetClassName(ClassId classId)
         {
