@@ -84,8 +84,7 @@ local.properties
 .project
 .cproject
 *.log
-.vscode/*
-.vscode
+
 
 # ==================
 #

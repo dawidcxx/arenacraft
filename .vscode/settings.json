@@ -1,0 +1,9 @@
+{
+    "cmake.configureOnOpen": false,
+    "cmake.generator": "Ninja",
+    "cmake.configureArgs": [
+        "-DTOOLS_BUILD=all",
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+        "-DCMAKE_INSTALL_PREFIX=~/.local/arenacraft"
+    ]
+}

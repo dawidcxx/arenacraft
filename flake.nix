@@ -24,8 +24,12 @@
               pkg-config
               bzip2
               hiredis
+              bun
             ];
             MYSQL_INCLUDE_DIR = pkgs.mysql80 + "/include/mysql";
+            shellHook = ''
+              export PATH=$PATH:~/.local/arenacraft/bin
+            '';
           };
         };
       });
