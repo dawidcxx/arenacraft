@@ -2,7 +2,7 @@
 
 import { $, ShellError } from 'bun'
 import { formatElapsedTime, info, requireProgram, requireProjectDir } from './shared'
-import { fstat, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 
 const DEST = realpathSync(`${process.env.HOME}/.local/arenacraft`)
 
