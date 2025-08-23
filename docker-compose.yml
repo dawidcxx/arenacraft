@@ -28,13 +28,13 @@ services:
     volumes:
       - redis-insight:/data
 
-    
+
 
   adminer:
     image: adminer
     ports:
-      - 8081:8080
-      
+      - 6664:8080
+
 
 volumes:
   mysql-data:
