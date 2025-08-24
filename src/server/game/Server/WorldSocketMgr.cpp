@@ -25,102 +25,103 @@
 class WorldSocketThread : public NetworkThread<WorldSocket>
 {
 public:
-    void SocketAdded(std::shared_ptr<WorldSocket> sock) override
-    {
-        sock->SetSendBufferSize(sWorldSocketMgr.GetApplicationSendBufferSize());
-        sScriptMgr->OnSocketOpen(sock);
-    }
+  void SocketAdded(std::shared_ptr<WorldSocket> sock) override
+  {
+    sock->SetSendBufferSize(sWorldSocketMgr.GetApplicationSendBufferSize());
+    sScriptMgr->OnSocketOpen(sock);
+  }
 
-    void SocketRemoved(std::shared_ptr<WorldSocket> sock) override
-    {
-        sScriptMgr->OnSocketClose(sock);
-    }
+  void SocketRemoved(std::shared_ptr<WorldSocket> sock) override { sScriptMgr->OnSocketClose(sock); }
 };
 
-WorldSocketMgr::WorldSocketMgr() :
-    BaseSocketMgr(), _socketSystemSendBufferSize(-1), _socketApplicationSendBufferSize(4096), _tcpNoDelay(true)
+WorldSocketMgr::WorldSocketMgr()
+    : BaseSocketMgr(), _socketSystemSendBufferSize(-1), _socketApplicationSendBufferSize(4096), _tcpNoDelay(true)
 {
 }
 
 WorldSocketMgr& WorldSocketMgr::Instance()
 {
-    static WorldSocketMgr instance;
-    return instance;
+  static WorldSocketMgr instance;
+  return instance;
 }
 
-bool WorldSocketMgr::StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, int threadCount)
+bool WorldSocketMgr::StartWorldNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port,
+                                       int threadCount)
 {
-    _tcpNoDelay = sConfigMgr->GetOption<bool>("Network.TcpNodelay", true);
+  _tcpNoDelay = sConfigMgr->GetOption<bool>("Network.TcpNodelay", true);
 
-    int const max_connections = ACORE_MAX_LISTEN_CONNECTIONS;
-    LOG_DEBUG("network", "Max allowed socket connections {}", max_connections);
+  int const max_connections = ACORE_MAX_LISTEN_CONNECTIONS;
+  LOG_DEBUG("network", "Max allowed socket connections {}", max_connections);
 
-    // -1 means use default
-    _socketSystemSendBufferSize = sConfigMgr->GetOption<int32>("Network.OutKBuff", -1);
-    _socketApplicationSendBufferSize = sConfigMgr->GetOption<int32>("Network.OutUBuff", 4096);
+  // -1 means use default
+  _socketSystemSendBufferSize      = sConfigMgr->GetOption<int32>("Network.OutKBuff", -1);
+  _socketApplicationSendBufferSize = sConfigMgr->GetOption<int32>("Network.OutUBuff", 4096);
 
-    if (_socketApplicationSendBufferSize <= 0)
-    {
-        LOG_ERROR("network", "Network.OutUBuff is wrong in your config file");
-        return false;
-    }
+  if (_socketApplicationSendBufferSize <= 0)
+  {
+    LOG_ERROR("network", "Network.OutUBuff is wrong in your config file");
+    return false;
+  }
 
-    if (!BaseSocketMgr::StartNetwork(ioContext, bindIp, port, threadCount))
-        return false;
+  if (!BaseSocketMgr::StartNetwork(ioContext, bindIp, port, threadCount))
+    return false;
 
-    _acceptor->AsyncAcceptWithCallback<&WorldSocketMgr::OnSocketAccept>();
+  _acceptor->AsyncAcceptWithCallback<&WorldSocketMgr::OnSocketAccept>();
 
-    sScriptMgr->OnNetworkStart();
-    return true;
+  sScriptMgr->OnNetworkStart();
+  return true;
 }
 
 void WorldSocketMgr::StopNetwork()
 {
-    BaseSocketMgr::StopNetwork();
+  BaseSocketMgr::StopNetwork();
 
-    sScriptMgr->OnNetworkStop();
+  sScriptMgr->OnNetworkStop();
 }
 
 void WorldSocketMgr::OnSocketOpen(tcp::socket&& sock, uint32 threadIndex)
 {
-    // set some options here
-    if (_socketSystemSendBufferSize >= 0)
+  // set some options here
+  if (_socketSystemSendBufferSize >= 0)
+  {
+    boost::system::error_code err;
+    sock.set_option(boost::asio::socket_base::send_buffer_size(_socketSystemSendBufferSize), err);
+
+    if (err && err != boost::system::errc::not_supported)
     {
-        boost::system::error_code err;
-        sock.set_option(boost::asio::socket_base::send_buffer_size(_socketSystemSendBufferSize), err);
-
-        if (err && err != boost::system::errc::not_supported)
-        {
-            LOG_ERROR("network", "WorldSocketMgr::OnSocketOpen sock.set_option(boost::asio::socket_base::send_buffer_size) err = {}", err.message());
-            return;
-        }
+      LOG_ERROR("network",
+                "WorldSocketMgr::OnSocketOpen sock.set_option(boost::asio::socket_base::send_buffer_size) err = {}",
+                err.message());
+      return;
     }
+  }
 
-    // Set TCP_NODELAY.
-    if (_tcpNoDelay)
+  // Set TCP_NODELAY.
+  if (_tcpNoDelay)
+  {
+    boost::system::error_code err;
+    sock.set_option(boost::asio::ip::tcp::no_delay(true), err);
+
+    if (err)
     {
-        boost::system::error_code err;
-        sock.set_option(boost::asio::ip::tcp::no_delay(true), err);
-
-        if (err)
-        {
-            LOG_ERROR("network", "WorldSocketMgr::OnSocketOpen sock.set_option(boost::asio::ip::tcp::no_delay) err = {}", err.message());
-            return;
-        }
+      LOG_ERROR("network", "WorldSocketMgr::OnSocketOpen sock.set_option(boost::asio::ip::tcp::no_delay) err = {}",
+                err.message());
+      return;
     }
+  }
 
-    BaseSocketMgr::OnSocketOpen(std::forward<tcp::socket>(sock), threadIndex);
+  BaseSocketMgr::OnSocketOpen(std::forward<tcp::socket>(sock), threadIndex);
 }
 
 NetworkThread<WorldSocket>* WorldSocketMgr::CreateThreads() const
 {
 
-    NetworkThread<WorldSocket>* threads = new WorldSocketThread[GetNetworkThreadCount()];
+  NetworkThread<WorldSocket>* threads = new WorldSocketThread[GetNetworkThreadCount()];
 
-    bool proxyProtocolEnabled = sConfigMgr->GetOption<bool>("Network.EnableProxyProtocol", false, true);
-    if (proxyProtocolEnabled)
-        for (int i = 0; i < GetNetworkThreadCount(); i++)
-            threads[i].EnableProxyProtocol();
+  bool proxyProtocolEnabled = sConfigMgr->GetOption<bool>("Network.EnableProxyProtocol", false, true);
+  if (proxyProtocolEnabled)
+    for (int i = 0; i < GetNetworkThreadCount(); i++)
+      threads[i].EnableProxyProtocol();
 
-    return threads;
+  return threads;
 }

@@ -21,38 +21,28 @@
 
 void ScriptMgr::OnGameObjectAddWorld(GameObject* go)
 {
-    ASSERT(go);
+  ASSERT(go);
 
-    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
-    {
-        script->OnGameObjectAddWorld(go);
-    });
+  ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script) { script->OnGameObjectAddWorld(go); });
 }
 
 void ScriptMgr::OnGameObjectRemoveWorld(GameObject* go)
 {
-    ASSERT(go);
+  ASSERT(go);
 
-    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
-    {
-        script->OnGameObjectRemoveWorld(go);
-    });
+  ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script) { script->OnGameObjectRemoveWorld(go); });
 }
 
 void ScriptMgr::OnGameObjectSaveToDB(GameObject* go)
 {
-    ASSERT(go);
+  ASSERT(go);
 
-    ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script)
-    {
-        script->OnGameObjectSaveToDB(go);
-    });
+  ExecuteScript<AllGameObjectScript>([&](AllGameObjectScript* script) { script->OnGameObjectSaveToDB(go); });
 }
 
-AllGameObjectScript::AllGameObjectScript(const char* name) :
-    ScriptObject(name)
+AllGameObjectScript::AllGameObjectScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<AllGameObjectScript>::AddScript(this);
+  ScriptRegistry<AllGameObjectScript>::AddScript(this);
 }
 
 template class AC_GAME_API ScriptRegistry<AllGameObjectScript>;

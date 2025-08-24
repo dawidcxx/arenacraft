@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -30,45 +31,46 @@ class SpellInfo;
 class HostileRefMgr : public RefMgr<Unit, ThreatMgr>
 {
 private:
-    Unit* iOwner;
+  Unit* iOwner;
+
 public:
-    explicit HostileRefMgr(Unit* owner) { iOwner = owner; }
-    ~HostileRefMgr() override;
+  explicit HostileRefMgr(Unit* owner) { iOwner = owner; }
+  ~HostileRefMgr() override;
 
-    Unit* GetOwner() { return iOwner; }
+  Unit* GetOwner() { return iOwner; }
 
-    // send threat to all my hateres for the victim
-    // The victim is hated than by them as well
-    // use for buffs and healing threat functionality
-    void threatAssist(Unit* victim, float baseThreat, SpellInfo const* threatSpell = nullptr);
+  // send threat to all my hateres for the victim
+  // The victim is hated than by them as well
+  // use for buffs and healing threat functionality
+  void threatAssist(Unit* victim, float baseThreat, SpellInfo const* threatSpell = nullptr);
 
-    void addTempThreat(float threat, bool apply);
+  void addTempThreat(float threat, bool apply);
 
-    void addThreatPercent(int32 percent);
+  void addThreatPercent(int32 percent);
 
-    // The references are not needed anymore
-    // tell the source to remove them from the list and free the mem
-    void deleteReferences(bool removeFromMap = false);
+  // The references are not needed anymore
+  // tell the source to remove them from the list and free the mem
+  void deleteReferences(bool removeFromMap = false);
 
-    // Remove specific faction references
-    void deleteReferencesForFaction(uint32 faction);
+  // Remove specific faction references
+  void deleteReferencesForFaction(uint32 faction);
 
-    // pussywizard: for combat bugs
-    void deleteReferencesOutOfRange(float range);
+  // pussywizard: for combat bugs
+  void deleteReferencesOutOfRange(float range);
 
-    HostileReference* getFirst() { return ((HostileReference*) RefMgr<Unit, ThreatMgr>::getFirst()); }
+  HostileReference* getFirst() { return ((HostileReference*)RefMgr<Unit, ThreatMgr>::getFirst()); }
 
-    void updateThreatTables();
+  void updateThreatTables();
 
-    void setOnlineOfflineState(bool isOnline);
+  void setOnlineOfflineState(bool isOnline);
 
-    // set state for one reference, defined by Unit
-    void setOnlineOfflineState(Unit* creature, bool isOnline);
+  // set state for one reference, defined by Unit
+  void setOnlineOfflineState(Unit* creature, bool isOnline);
 
-    // delete one reference, defined by Unit
-    void deleteReference(Unit* creature);
+  // delete one reference, defined by Unit
+  void deleteReference(Unit* creature);
 
-    void UpdateVisibility(bool checkThreat);
+  void UpdateVisibility(bool checkThreat);
 };
 //=================================================
 #endif

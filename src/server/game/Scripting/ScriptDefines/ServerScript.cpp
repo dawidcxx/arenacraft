@@ -21,59 +21,58 @@
 
 void ScriptMgr::OnNetworkStart()
 {
-    CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_NETWORK_START, script->OnNetworkStart());
+  CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_NETWORK_START, script->OnNetworkStart());
 }
 
 void ScriptMgr::OnNetworkStop()
 {
-    CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_NETWORK_STOP, script->OnNetworkStop());
+  CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_NETWORK_STOP, script->OnNetworkStop());
 }
 
 void ScriptMgr::OnSocketOpen(std::shared_ptr<WorldSocket> socket)
 {
-    ASSERT(socket);
+  ASSERT(socket);
 
-    CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_SOCKET_OPEN, script->OnSocketOpen(socket));
+  CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_SOCKET_OPEN, script->OnSocketOpen(socket));
 }
 
 void ScriptMgr::OnSocketClose(std::shared_ptr<WorldSocket> socket)
 {
-    ASSERT(socket);
+  ASSERT(socket);
 
-    CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_SOCKET_CLOSE, script->OnSocketClose(socket));
+  CALL_ENABLED_HOOKS(ServerScript, SERVERHOOK_ON_SOCKET_CLOSE, script->OnSocketClose(socket));
 }
 
 bool ScriptMgr::CanPacketSend(WorldSession* session, WorldPacket const& packet)
 {
-    ASSERT(session);
+  ASSERT(session);
 
-    if (ScriptRegistry<ServerScript>::ScriptPointerList.empty())
-        return true;
+  if (ScriptRegistry<ServerScript>::ScriptPointerList.empty())
+    return true;
 
-    WorldPacket copy(packet);
+  WorldPacket copy(packet);
 
-    CALL_ENABLED_BOOLEAN_HOOKS(ServerScript, SERVERHOOK_CAN_PACKET_SEND, !script->CanPacketSend(session, copy));
+  CALL_ENABLED_BOOLEAN_HOOKS(ServerScript, SERVERHOOK_CAN_PACKET_SEND, !script->CanPacketSend(session, copy));
 }
 
 bool ScriptMgr::CanPacketReceive(WorldSession* session, WorldPacket const& packet)
 {
-    if (ScriptRegistry<ServerScript>::ScriptPointerList.empty())
-        return true;
+  if (ScriptRegistry<ServerScript>::ScriptPointerList.empty())
+    return true;
 
-    WorldPacket copy(packet);
+  WorldPacket copy(packet);
 
-    CALL_ENABLED_BOOLEAN_HOOKS(ServerScript, SERVERHOOK_CAN_PACKET_RECEIVE, !script->CanPacketReceive(session, copy));
+  CALL_ENABLED_BOOLEAN_HOOKS(ServerScript, SERVERHOOK_CAN_PACKET_RECEIVE, !script->CanPacketReceive(session, copy));
 }
 
-ServerScript::ServerScript(const char* name, std::vector<uint16> enabledHooks)
-    : ScriptObject(name, SERVERHOOK_END)
+ServerScript::ServerScript(const char* name, std::vector<uint16> enabledHooks) : ScriptObject(name, SERVERHOOK_END)
 {
-    // If empty - enable all available hooks.
-    if (enabledHooks.empty())
-        for (uint16 i = 0; i < SERVERHOOK_END; ++i)
-            enabledHooks.emplace_back(i);
+  // If empty - enable all available hooks.
+  if (enabledHooks.empty())
+    for (uint16 i = 0; i < SERVERHOOK_END; ++i)
+      enabledHooks.emplace_back(i);
 
-    ScriptRegistry<ServerScript>::AddScript(this, std::move(enabledHooks));
+  ScriptRegistry<ServerScript>::AddScript(this, std::move(enabledHooks));
 }
 
 template class AC_GAME_API ScriptRegistry<ServerScript>;

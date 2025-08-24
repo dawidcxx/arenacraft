@@ -20,26 +20,25 @@
 
 InstanceScript* ScriptMgr::CreateInstanceScript(InstanceMap* map)
 {
-    ASSERT(map);
+  ASSERT(map);
 
-    auto tempScript = ScriptRegistry<InstanceMapScript>::GetScriptById(map->GetScriptId());
-    return tempScript ? tempScript->GetInstanceScript(map) : nullptr;
+  auto tempScript = ScriptRegistry<InstanceMapScript>::GetScriptById(map->GetScriptId());
+  return tempScript ? tempScript->GetInstanceScript(map) : nullptr;
 }
 
-InstanceMapScript::InstanceMapScript(const char* name, uint32 mapId) :
-    ScriptObject(name), MapScript<InstanceMap>(mapId)
+InstanceMapScript::InstanceMapScript(const char* name, uint32 mapId) : ScriptObject(name), MapScript<InstanceMap>(mapId)
 {
-    ScriptRegistry<InstanceMapScript>::AddScript(this);
+  ScriptRegistry<InstanceMapScript>::AddScript(this);
 }
 
 void InstanceMapScript::checkValidity()
 {
-    checkMap();
+  checkMap();
 
-    if (GetEntry() && !GetEntry()->IsDungeon())
-    {
-        LOG_ERROR("maps.script", "InstanceMapScript for map {} is invalid.", GetEntry()->MapID);
-    }
+  if (GetEntry() && !GetEntry()->IsDungeon())
+  {
+    LOG_ERROR("maps.script", "InstanceMapScript for map {} is invalid.", GetEntry()->MapID);
+  }
 }
 
 template class AC_GAME_API ScriptRegistry<InstanceMapScript>;

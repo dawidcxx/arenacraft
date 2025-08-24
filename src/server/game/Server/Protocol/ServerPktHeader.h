@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -24,37 +25,34 @@
 
 struct ServerPktHeader
 {
-    /**
-     * size is the length of the payload _plus_ the length of the opcode
-     */
-    ServerPktHeader(uint32 size, uint16 cmd) : size(size)
+  /**
+   * size is the length of the payload _plus_ the length of the opcode
+   */
+  ServerPktHeader(uint32 size, uint16 cmd) : size(size)
+  {
+    uint8 headerIndex = 0;
+    if (isLargePacket())
     {
-        uint8 headerIndex=0;
-        if (isLargePacket())
-        {
-            LOG_DEBUG("network", "initializing large server to client packet. Size: {}, cmd: {}", size, cmd);
-            header[headerIndex++] = 0x80 | (0xFF & (size >> 16));
-        }
-        header[headerIndex++] = 0xFF &(size >> 8);
-        header[headerIndex++] = 0xFF & size;
-
-        header[headerIndex++] = 0xFF & cmd;
-        header[headerIndex++] = 0xFF & (cmd >> 8);
+      LOG_DEBUG("network", "initializing large server to client packet. Size: {}, cmd: {}", size, cmd);
+      header[headerIndex++] = 0x80 | (0xFF & (size >> 16));
     }
+    header[headerIndex++] = 0xFF & (size >> 8);
+    header[headerIndex++] = 0xFF & size;
 
-    uint8 getHeaderLength()
-    {
-        // cmd = 2 bytes, size= 2||3bytes
-        return 2 + (isLargePacket() ? 3 : 2);
-    }
+    header[headerIndex++] = 0xFF & cmd;
+    header[headerIndex++] = 0xFF & (cmd >> 8);
+  }
 
-    bool isLargePacket() const
-    {
-        return size > 0x7FFF;
-    }
+  uint8 getHeaderLength()
+  {
+    // cmd = 2 bytes, size= 2||3bytes
+    return 2 + (isLargePacket() ? 3 : 2);
+  }
 
-    const uint32 size;
-    uint8 header[5];
+  bool isLargePacket() const { return size > 0x7FFF; }
+
+  const uint32 size;
+  uint8        header[5];
 };
 
 #pragma pack(pop)

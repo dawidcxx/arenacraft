@@ -18,9 +18,6 @@
 #include "ElunaScript.h"
 #include "ScriptMgr.h"
 
-ElunaScript::ElunaScript(const char* name) : ScriptObject(name)
-{
-    ScriptRegistry<ElunaScript>::AddScript(this);
-}
+ElunaScript::ElunaScript(const char* name) : ScriptObject(name) { ScriptRegistry<ElunaScript>::AddScript(this); }
 
 template class AC_GAME_API ScriptRegistry<ElunaScript>;

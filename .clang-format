@@ -1,0 +1,19 @@
+BasedOnStyle: LLVM
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+# Other common settings
+AccessModifierOffset: -2
+AlignAfterOpenBracket: Align
+BreakBeforeBraces: Allman
+ColumnLimit: 120
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+
+# Enable alignment of consecutive assignments
+AlignConsecutiveAssignments: true
+
+# Optional: Related alignment settings
+AlignConsecutiveDeclarations: true
+AlignConsecutiveMacros: true

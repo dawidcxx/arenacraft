@@ -20,51 +20,33 @@
 
 namespace GameTime
 {
-    using namespace std::chrono;
+using namespace std::chrono;
 
-    Seconds const StartTime = GetEpochTime();
+Seconds const StartTime = GetEpochTime();
 
-    Seconds GameTime = GetEpochTime();
-    Milliseconds GameMSTime = 0ms;
+Seconds      GameTime   = GetEpochTime();
+Milliseconds GameMSTime = 0ms;
 
-    SystemTimePoint GameTimeSystemPoint = SystemTimePoint::min();
-    TimePoint GameTimeSteadyPoint = TimePoint::min();
+SystemTimePoint GameTimeSystemPoint = SystemTimePoint::min();
+TimePoint       GameTimeSteadyPoint = TimePoint::min();
 
-    Seconds GetStartTime()
-    {
-        return StartTime;
-    }
+Seconds GetStartTime() { return StartTime; }
 
-    Seconds GetGameTime()
-    {
-        return GameTime;
-    }
+Seconds GetGameTime() { return GameTime; }
 
-    Milliseconds GetGameTimeMS()
-    {
-        return GameMSTime;
-    }
+Milliseconds GetGameTimeMS() { return GameMSTime; }
 
-    SystemTimePoint GetSystemTime()
-    {
-        return GameTimeSystemPoint;
-    }
+SystemTimePoint GetSystemTime() { return GameTimeSystemPoint; }
 
-    TimePoint Now()
-    {
-        return GameTimeSteadyPoint;
-    }
+TimePoint Now() { return GameTimeSteadyPoint; }
 
-    Seconds GetUptime()
-    {
-        return GameTime - StartTime;
-    }
+Seconds GetUptime() { return GameTime - StartTime; }
 
-    void UpdateGameTimers()
-    {
-        GameTime = GetEpochTime();
-        GameMSTime = GetTimeMS();
-        GameTimeSystemPoint = system_clock::now();
-        GameTimeSteadyPoint = steady_clock::now();
-    }
+void UpdateGameTimers()
+{
+  GameTime            = GetEpochTime();
+  GameMSTime          = GetTimeMS();
+  GameTimeSystemPoint = system_clock::now();
+  GameTimeSteadyPoint = steady_clock::now();
 }
+} // namespace GameTime

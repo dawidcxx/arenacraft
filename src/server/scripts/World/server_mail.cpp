@@ -24,58 +24,45 @@
 class ServerMailReward : public PlayerScript
 {
 public:
-    ServerMailReward() : PlayerScript("ServerMailReward", {PLAYERHOOK_ON_LOGIN}) { }
+  ServerMailReward() : PlayerScript("ServerMailReward", {PLAYERHOOK_ON_LOGIN}) {}
 
-    // CHARACTER_LOGIN = 8
-    void OnLogin(Player* player) override
+  // CHARACTER_LOGIN = 8
+  void OnLogin(Player* player) override
+  {
+    // Retrieve all server mail records and session only once
+    auto const&   serverMailStore = sObjectMgr->GetAllServerMailStore();
+    WorldSession* session         = player->GetSession();
+    // We should always have a session, just incase
+    if (!session)
+      return;
+
+    uint32 playerGUID = player->GetGUID().GetCounter();
+
+    for (auto const& [mailId, servMail] : serverMailStore)
     {
-        // Retrieve all server mail records and session only once
-        auto const& serverMailStore = sObjectMgr->GetAllServerMailStore();
-        WorldSession* session = player->GetSession();
-        // We should always have a session, just incase
-        if (!session)
-            return;
+      CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_MAIL_SERVER_CHARACTER);
+      stmt->SetData(0, playerGUID);
+      stmt->SetData(1, mailId);
 
-        uint32 playerGUID = player->GetGUID().GetCounter();
+      // Capture servMail by value
+      auto callback =
+          [session, servMailWrapper = std::reference_wrapper<ServerMail const>(servMail)](PreparedQueryResult result)
+      {
+        ServerMail const& servMail = servMailWrapper.get(); // Dereference the wrapper to get the original object
 
-        for (auto const& [mailId, servMail] : serverMailStore)
+        if (!result)
         {
-            CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_MAIL_SERVER_CHARACTER);
-            stmt->SetData(0, playerGUID);
-            stmt->SetData(1, mailId);
-
-            // Capture servMail by value
-            auto callback = [session, servMailWrapper = std::reference_wrapper<ServerMail const>(servMail)](PreparedQueryResult result)
-                {
-                     ServerMail const& servMail = servMailWrapper.get();  // Dereference the wrapper to get the original object
-
-                    if (!result)
-                    {
-                        sObjectMgr->SendServerMail(
-                            session->GetPlayer(),
-                            servMail.id,
-                            servMail.reqLevel,
-                            servMail.reqPlayTime,
-                            servMail.moneyA,
-                            servMail.moneyH,
-                            servMail.itemA,
-                            servMail.itemCountA,
-                            servMail.itemH,
-                            servMail.itemCountH,
-                            servMail.subject,
-                            servMail.body,
-                            servMail.active
-                        );
-                    }
-                };
-
-            // Execute the query asynchronously and add the callback
-            session->GetQueryProcessor().AddCallback(CharacterDatabase.AsyncQuery(stmt).WithPreparedCallback(callback));
+          sObjectMgr->SendServerMail(session->GetPlayer(), servMail.id, servMail.reqLevel, servMail.reqPlayTime,
+                                     servMail.moneyA, servMail.moneyH, servMail.itemA, servMail.itemCountA,
+                                     servMail.itemH, servMail.itemCountH, servMail.subject, servMail.body,
+                                     servMail.active);
         }
+      };
+
+      // Execute the query asynchronously and add the callback
+      session->GetQueryProcessor().AddCallback(CharacterDatabase.AsyncQuery(stmt).WithPreparedCallback(callback));
     }
+  }
 };
 
-void AddSC_server_mail()
-{
-    new ServerMailReward();
-}
+void AddSC_server_mail() { new ServerMailReward(); }

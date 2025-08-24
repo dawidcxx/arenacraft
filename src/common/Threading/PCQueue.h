@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -21,99 +22,99 @@
 #include <condition_variable>
 #include <queue>
 
-template <typename T>
-class ProducerConsumerQueue
+template <typename T> class ProducerConsumerQueue
 {
 private:
-    std::mutex _queueLock;
-    std::queue<T> _queue;
-    std::condition_variable _condition;
-    std::atomic<bool> _shutdown;
+  std::mutex              _queueLock;
+  std::queue<T>           _queue;
+  std::condition_variable _condition;
+  std::atomic<bool>       _shutdown;
 
 public:
-    ProducerConsumerQueue() : _shutdown(false) { }
+  ProducerConsumerQueue() : _shutdown(false) {}
 
-    void Push(const T& value)
+  void Push(const T& value)
+  {
+    std::lock_guard<std::mutex> lock(_queueLock);
+    _queue.push(std::move(value));
+
+    _condition.notify_one();
+  }
+
+  bool Empty()
+  {
+    std::lock_guard<std::mutex> lock(_queueLock);
+
+    return _queue.empty();
+  }
+
+  [[nodiscard]] std::size_t Size() const { return _queue.size(); }
+
+  bool Pop(T& value)
+  {
+    std::lock_guard<std::mutex> lock(_queueLock);
+
+    if (_queue.empty() || _shutdown)
     {
-        std::lock_guard<std::mutex> lock(_queueLock);
-        _queue.push(std::move(value));
-
-        _condition.notify_one();
+      return false;
     }
 
-    bool Empty()
-    {
-        std::lock_guard<std::mutex> lock(_queueLock);
+    value = _queue.front();
 
-        return _queue.empty();
+    _queue.pop();
+
+    return true;
+  }
+
+  void WaitAndPop(T& value)
+  {
+    std::unique_lock<std::mutex> lock(_queueLock);
+
+    // we could be using .wait(lock, predicate) overload here but it is broken
+    // https://connect.microsoft.com/VisualStudio/feedback/details/1098841
+    while (_queue.empty() && !_shutdown)
+    {
+      _condition.wait(lock);
     }
 
-    [[nodiscard]] std::size_t Size() const
+    if (_queue.empty() || _shutdown)
     {
-        return _queue.size();
+      return;
     }
 
-    bool Pop(T& value)
+    value = _queue.front();
+
+    _queue.pop();
+  }
+
+  void Cancel()
+  {
+    std::unique_lock<std::mutex> lock(_queueLock);
+
+    while (!_queue.empty())
     {
-        std::lock_guard<std::mutex> lock(_queueLock);
+      T& value = _queue.front();
 
-        if (_queue.empty() || _shutdown)
-        {
-            return false;
-        }
+      DeleteQueuedObject(value);
 
-        value = _queue.front();
-
-        _queue.pop();
-
-        return true;
+      _queue.pop();
     }
 
-    void WaitAndPop(T& value)
-    {
-        std::unique_lock<std::mutex> lock(_queueLock);
+    _shutdown = true;
 
-        // we could be using .wait(lock, predicate) overload here but it is broken
-        // https://connect.microsoft.com/VisualStudio/feedback/details/1098841
-        while (_queue.empty() && !_shutdown)
-        {
-            _condition.wait(lock);
-        }
-
-        if (_queue.empty() || _shutdown)
-        {
-            return;
-        }
-
-        value = _queue.front();
-
-        _queue.pop();
-    }
-
-    void Cancel()
-    {
-        std::unique_lock<std::mutex> lock(_queueLock);
-
-        while (!_queue.empty())
-        {
-            T& value = _queue.front();
-
-            DeleteQueuedObject(value);
-
-            _queue.pop();
-        }
-
-        _shutdown = true;
-
-        _condition.notify_all();
-    }
+    _condition.notify_all();
+  }
 
 private:
-    template<typename E = T>
-    typename std::enable_if<std::is_pointer<E>::value>::type DeleteQueuedObject(E& obj) { delete obj; }
+  template <typename E = T> typename std::enable_if<std::is_pointer<E>::value>::type DeleteQueuedObject(E& obj)
+  {
+    delete obj;
+  }
 
-    template<typename E = T>
-    typename std::enable_if<!std::is_pointer<E>::value>::type DeleteQueuedObject(E const& /*packet*/) { }
+  template <typename E = T>
+  typename std::enable_if<!std::is_pointer<E>::value>::type DeleteQueuedObject(E const& /*packet*/)
+  {
+  }
 };
 
 #endif

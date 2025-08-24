@@ -1,261 +1,259 @@
 #pragma once
 
 #include "Arenacraft.hpp"
-#include "soloq/soloq_player.hpp"
-#include "soloq/soloq_matchup.hpp"
-#include "soloq/soloq_queue_list.hpp"
-#include "soloq/soloq_match_maker.hpp"
 #include "soloq/soloq_info.hpp"
+#include "soloq/soloq_match_maker.hpp"
+#include "soloq/soloq_matchup.hpp"
+#include "soloq/soloq_player.hpp"
+#include "soloq/soloq_queue_list.hpp"
 
+#include <algorithm>
+#include <cassert>
+#include <chrono>
+#include <cstdint>
+#include <ctime>
+#include <list>
 #include <map>
+#include <optional>
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
-#include <cstdint>
-#include <cassert>
-#include <queue>
-#include <optional>
-#include <list>
-#include <algorithm>
-#include <chrono>
-#include <ctime>
 
 #define SOLOQ_MIN_RATING (uint32_t)0
 #define SOLOQ_MAX_RATING (uint32_t)3500
 
 namespace arenacraft::soloq
 {
-    class MatchMaker
+class MatchMaker
+{
+private:
+  uint32_t                                                 m_mmrQuant;
+  std::unordered_map<uint32_t, QueueList>                  m_mmrToQueueList;
+  std::unordered_map<SoloqPlayer, double, SoloqPlayerHash> m_playerWaitTimes;
+  double                                                   m_elapsed_seconds = 0;
+
+  // quick lookup to players by class
+  std::unordered_map<ClassId, std::unordered_set<SoloqPlayer, SoloqPlayerHash>> m_classToPlayers;
+  // quick lookup to players by role
+  std::unordered_map<PlayerRole, std::unordered_set<SoloqPlayer, SoloqPlayerHash>> m_roleToPlayers;
+
+public:
+  static MatchMaker& Instance()
+  {
+    static MatchMaker instance(100);
+    return instance;
+  };
+
+  MatchMaker(uint32_t mmrQuant)
+  {
+    m_mmrQuant        = mmrQuant;
+    uint32_t brackets = SOLOQ_MAX_RATING / m_mmrQuant;
+    for (uint32_t i = 0; i < brackets; i++)
     {
-    private:
-        uint32_t m_mmrQuant;
-        std::unordered_map<uint32_t, QueueList> m_mmrToQueueList;
-        std::unordered_map<SoloqPlayer, double, SoloqPlayerHash> m_playerWaitTimes;
-        double m_elapsed_seconds = 0;
+      m_mmrToQueueList.insert(std::make_pair(mmrQuant * i, QueueList()));
+    }
+  };
 
-        // quick lookup to players by class
-        std::unordered_map<ClassId, std::unordered_set<SoloqPlayer, SoloqPlayerHash>> m_classToPlayers;
-        // quick lookup to players by role
-        std::unordered_map<PlayerRole, std::unordered_set<SoloqPlayer, SoloqPlayerHash>> m_roleToPlayers;
+  std::vector<QueuePopMatchup> PopMatchups()
+  {
+    std::vector<QueuePopMatchup> matchups;
 
-    public:
-        static MatchMaker &Instance()
+    for (auto& [mmrBracket, queueList] : m_mmrToQueueList)
+    {
+      if (QueueHasEnoughPlayers(queueList))
+      {
+        QueuePopMatchup matchup;
+
+        matchup.Append(queueList.melees);
+        matchup.Append(queueList.casters);
+        matchup.Append(queueList.healers);
+
+        if (matchup.IsComplete())
         {
-            static MatchMaker instance(100);
-            return instance;
-        };
-
-        MatchMaker(uint32_t mmrQuant)
-        {
-            m_mmrQuant = mmrQuant;
-            uint32_t brackets = SOLOQ_MAX_RATING / m_mmrQuant;
-            for (uint32_t i = 0; i < brackets; i++)
-            {
-                m_mmrToQueueList.insert(std::make_pair(mmrQuant * i, QueueList()));
-            }
-        };
-
-        std::vector<QueuePopMatchup> PopMatchups()
-        {
-            std::vector<QueuePopMatchup> matchups;
-
-            for (auto &[mmrBracket, queueList] : m_mmrToQueueList)
-            {
-                if (QueueHasEnoughPlayers(queueList))
-                {
-                    QueuePopMatchup matchup;
-
-                    matchup.Append(queueList.melees);
-                    matchup.Append(queueList.casters);
-                    matchup.Append(queueList.healers);
-
-                    if (matchup.IsComplete())
-                    {
-                        matchups.push_back(matchup);
-                        matchup.ForEachPlayer([&](SoloqPlayer &player)
-                                              { RemovePlayer(player); });
-                    }
-                }
-            }
-            return matchups;
-        };
-
-        void Update(uint32_t diffInMs)
-        {
-            double prior = m_elapsed_seconds;
-            m_elapsed_seconds += diffInMs / 1000.0;
-
-            // Extend MMR brackets for players
-            for (auto &[player, _] : m_playerWaitTimes)
-            {
-                auto bracketsPrior = CalculatePlayerBrackets(player, prior);
-                auto bracketsAfter = CalculatePlayerBrackets(player, m_elapsed_seconds);
-                auto bracketsAdded = std::vector<uint32_t>();
-
-                std::set_difference(bracketsAfter.begin(), bracketsAfter.end(),
-                                    bracketsPrior.begin(), bracketsPrior.end(),
-                                    std::inserter(bracketsAdded, bracketsAdded.begin()));
-
-                for (auto bracket : bracketsAdded)
-                {
-                    auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
-                    auto &queueList = m_mmrToQueueList[bracket];
-                    AddToQueueList(player, role, queueList);
-                }
-            }
+          matchups.push_back(matchup);
+          matchup.ForEachPlayer([&](SoloqPlayer& player) { RemovePlayer(player); });
         }
+      }
+    }
+    return matchups;
+  };
 
-        void AddPlayer(SoloqPlayer player)
-        {
-            // Prevent from accidently adding the same player twice
-            if (m_playerWaitTimes.find(player) != m_playerWaitTimes.end())
-            {
-                return;
-            }
+  void Update(uint32_t diffInMs)
+  {
+    double prior = m_elapsed_seconds;
+    m_elapsed_seconds += diffInMs / 1000.0;
 
-            auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
+    // Extend MMR brackets for players
+    for (auto& [player, _] : m_playerWaitTimes)
+    {
+      auto bracketsPrior = CalculatePlayerBrackets(player, prior);
+      auto bracketsAfter = CalculatePlayerBrackets(player, m_elapsed_seconds);
+      auto bracketsAdded = std::vector<uint32_t>();
 
-            m_playerWaitTimes[player] = m_elapsed_seconds;
-            m_classToPlayers[player.classId].insert(player);
-            m_roleToPlayers[role].insert(player);
+      std::set_difference(bracketsAfter.begin(), bracketsAfter.end(), bracketsPrior.begin(), bracketsPrior.end(),
+                          std::inserter(bracketsAdded, bracketsAdded.begin()));
 
-            for (uint32_t bracket : CalculatePlayerBrackets(player, m_elapsed_seconds))
-            {
-                auto &queueList = m_mmrToQueueList[bracket];
-                AddToQueueList(player, role, queueList);
-            }
-        }
+      for (auto bracket : bracketsAdded)
+      {
+        auto  role      = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
+        auto& queueList = m_mmrToQueueList[bracket];
+        AddToQueueList(player, role, queueList);
+      }
+    }
+  }
 
-        void RemovePlayer(SoloqPlayer player)
-        {
-            auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
+  void AddPlayer(SoloqPlayer player)
+  {
+    // Prevent from accidently adding the same player twice
+    if (m_playerWaitTimes.find(player) != m_playerWaitTimes.end())
+    {
+      return;
+    }
 
-            m_classToPlayers[player.classId].erase(player);
-            m_roleToPlayers[role].erase(player);
-            m_playerWaitTimes.erase(player);
+    auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
 
-            for (uint32_t bracket : CalculatePlayerBrackets(player, m_elapsed_seconds))
-            {
-                auto &queueList = m_mmrToQueueList[bracket];
-                RemoveFromQueueList(player, role, queueList);
-            }
-        }
+    m_playerWaitTimes[player] = m_elapsed_seconds;
+    m_classToPlayers[player.classId].insert(player);
+    m_roleToPlayers[role].insert(player);
 
-        SoloqInfo GetInfo()
-        {
-            SoloqInfo info;
-            info.healerCount = m_roleToPlayers[PlayerRole::ROLE_HEALER].size();
-            info.meleeCount = m_roleToPlayers[PlayerRole::ROLE_MELEE].size();
-            info.casterCount = m_roleToPlayers[PlayerRole::ROLE_CASTER].size();
-            for (auto &[classId, players] : m_classToPlayers)
-            {
-                info.classToCount[classId] = players.size();
-            }
-            return info;
-        };
+    for (uint32_t bracket : CalculatePlayerBrackets(player, m_elapsed_seconds))
+    {
+      auto& queueList = m_mmrToQueueList[bracket];
+      AddToQueueList(player, role, queueList);
+    }
+  }
 
-        // override ostream for debugging
-        friend std::ostream &operator<<(std::ostream &os, const MatchMaker &matchMaker)
-        {
-            os << "MatchMaker {";
-            os << "MMR Quant: " << matchMaker.m_mmrQuant << " " << std::endl;
-            os << "Elapsed Seconds: " << matchMaker.m_elapsed_seconds << " " << std::endl;
-            os << "Player Wait Times: " << matchMaker.m_playerWaitTimes.size() << " " << std::endl;
-            os << "Class To Players: " << matchMaker.m_classToPlayers.size() << " " << std::endl;
-            os << "Role To Players: " << matchMaker.m_roleToPlayers.size() << " " << std::endl;
-            
-            os << "MMR To Queue List: " << std::endl;
-            for (auto &[mmrBracket, queueList] : matchMaker.m_mmrToQueueList)
-            {
-                os << "  Bracket [ " << mmrBracket << " ] => Queue List: " << queueList << std::endl;
-            }
+  void RemovePlayer(SoloqPlayer player)
+  {
+    auto role = fns::GetRoleForClassAndSpec(player.classId, player.specIndex);
 
-            os << "}";
-            return os;
-        }
+    m_classToPlayers[player.classId].erase(player);
+    m_roleToPlayers[role].erase(player);
+    m_playerWaitTimes.erase(player);
 
-    private:
-        bool QueueHasEnoughPlayers(QueueList &queueList)
-        {
-            return true;
-            // return queueList.healers.size() >= 2 && queueList.casters.size() >= 2 && queueList.melees.size() >= 2;
-        }
+    for (uint32_t bracket : CalculatePlayerBrackets(player, m_elapsed_seconds))
+    {
+      auto& queueList = m_mmrToQueueList[bracket];
+      RemoveFromQueueList(player, role, queueList);
+    }
+  }
 
-        std::vector<uint32_t> CalculatePlayerBrackets(const SoloqPlayer &player, double elapsed_seconds)
-        {
-            // for example    (1734 / 100) * 100 = 1700
-            uint32_t bracketBase = (player.matchMakingRating / m_mmrQuant) * m_mmrQuant;
+  SoloqInfo GetInfo()
+  {
+    SoloqInfo info;
+    info.healerCount = m_roleToPlayers[PlayerRole::ROLE_HEALER].size();
+    info.meleeCount  = m_roleToPlayers[PlayerRole::ROLE_MELEE].size();
+    info.casterCount = m_roleToPlayers[PlayerRole::ROLE_CASTER].size();
+    for (auto& [classId, players] : m_classToPlayers)
+    {
+      info.classToCount[classId] = players.size();
+    }
+    return info;
+  };
 
-            // every 30 seconds in queue players grants one more bracket extension
-            // up to 10 times
-            uint8_t bracketExtensions = std::min(static_cast<uint8_t>(10), static_cast<uint8_t>((elapsed_seconds - m_playerWaitTimes[player]) / 30));
+  // override ostream for debugging
+  friend std::ostream& operator<<(std::ostream& os, const MatchMaker& matchMaker)
+  {
+    os << "MatchMaker {";
+    os << "MMR Quant: " << matchMaker.m_mmrQuant << " " << std::endl;
+    os << "Elapsed Seconds: " << matchMaker.m_elapsed_seconds << " " << std::endl;
+    os << "Player Wait Times: " << matchMaker.m_playerWaitTimes.size() << " " << std::endl;
+    os << "Class To Players: " << matchMaker.m_classToPlayers.size() << " " << std::endl;
+    os << "Role To Players: " << matchMaker.m_roleToPlayers.size() << " " << std::endl;
 
-            // output list
-            // example [1700, 1600, 1500]
-            std::vector<uint32_t>
-                brackets(std::max((uint8_t)1, bracketExtensions));
+    os << "MMR To Queue List: " << std::endl;
+    for (auto& [mmrBracket, queueList] : matchMaker.m_mmrToQueueList)
+    {
+      os << "  Bracket [ " << mmrBracket << " ] => Queue List: " << queueList << std::endl;
+    }
 
-            uint32_t i = 0;
-            do
-            {
-                // for example     1700    -    0  * 100 = 1700
-                //                 1700    -    1  * 100 = 1600
-                uint32_t bracket = bracketBase - i * m_mmrQuant;
-                // make sure it's within <SOLOQ_MIN_RATING, SOLOQ_MAX_RATING> range
-                uint32_t bracketNormalized = std::min(std::max(bracket, SOLOQ_MIN_RATING), SOLOQ_MAX_RATING);
-                brackets[i] = bracketNormalized;
-                i += 1;
-            } while (i < bracketExtensions);
+    os << "}";
+    return os;
+  }
 
-            return brackets;
-        }
+private:
+  bool QueueHasEnoughPlayers(QueueList& queueList)
+  {
+    return true;
+    // return queueList.healers.size() >= 2 && queueList.casters.size() >= 2 && queueList.melees.size() >= 2;
+  }
 
-        void AddToQueueList(SoloqPlayer player, PlayerRole role, QueueList &queueList)
-        {
-            switch (role)
-            {
-            case PlayerRole::ROLE_HEALER:
-            {
-                queueList.healers.push_back(player);
-                break;
-            }
-            case PlayerRole::ROLE_CASTER:
-            {
-                queueList.casters.push_back(player);
-                break;
-            }
-            case PlayerRole::ROLE_MELEE:
-            {
-                queueList.melees.push_back(player);
-                break;
-            }
-            default:
-                throw new std::out_of_range("Invalid role");
-            }
-        }
+  std::vector<uint32_t> CalculatePlayerBrackets(const SoloqPlayer& player, double elapsed_seconds)
+  {
+    // for example    (1734 / 100) * 100 = 1700
+    uint32_t bracketBase = (player.matchMakingRating / m_mmrQuant) * m_mmrQuant;
 
-        void RemoveFromQueueList(SoloqPlayer player, PlayerRole role, QueueList &queueList)
-        {
-            switch (role)
-            {
-            case PlayerRole::ROLE_HEALER:
-            {
-                queueList.healers.remove(player);
-                break;
-            }
-            case PlayerRole::ROLE_CASTER:
-            {
-                queueList.casters.remove(player);
-                break;
-            }
-            case PlayerRole::ROLE_MELEE:
-            {
-                queueList.melees.remove(player);
-                break;
-            }
-            default:
-                throw new std::out_of_range("Invalid role");
-            }
-        }
-    };
+    // every 30 seconds in queue players grants one more bracket extension
+    // up to 10 times
+    uint8_t bracketExtensions =
+        std::min(static_cast<uint8_t>(10), static_cast<uint8_t>((elapsed_seconds - m_playerWaitTimes[player]) / 30));
 
-} // namespace arenacraft
+    // output list
+    // example [1700, 1600, 1500]
+    std::vector<uint32_t> brackets(std::max((uint8_t)1, bracketExtensions));
+
+    uint32_t i = 0;
+    do
+    {
+      // for example     1700    -    0  * 100 = 1700
+      //                 1700    -    1  * 100 = 1600
+      uint32_t bracket = bracketBase - i * m_mmrQuant;
+      // make sure it's within <SOLOQ_MIN_RATING, SOLOQ_MAX_RATING> range
+      uint32_t bracketNormalized = std::min(std::max(bracket, SOLOQ_MIN_RATING), SOLOQ_MAX_RATING);
+      brackets[i]                = bracketNormalized;
+      i += 1;
+    } while (i < bracketExtensions);
+
+    return brackets;
+  }
+
+  void AddToQueueList(SoloqPlayer player, PlayerRole role, QueueList& queueList)
+  {
+    switch (role)
+    {
+    case PlayerRole::ROLE_HEALER:
+    {
+      queueList.healers.push_back(player);
+      break;
+    }
+    case PlayerRole::ROLE_CASTER:
+    {
+      queueList.casters.push_back(player);
+      break;
+    }
+    case PlayerRole::ROLE_MELEE:
+    {
+      queueList.melees.push_back(player);
+      break;
+    }
+    default:
+      throw new std::out_of_range("Invalid role");
+    }
+  }
+
+  void RemoveFromQueueList(SoloqPlayer player, PlayerRole role, QueueList& queueList)
+  {
+    switch (role)
+    {
+    case PlayerRole::ROLE_HEALER:
+    {
+      queueList.healers.remove(player);
+      break;
+    }
+    case PlayerRole::ROLE_CASTER:
+    {
+      queueList.casters.remove(player);
+      break;
+    }
+    case PlayerRole::ROLE_MELEE:
+    {
+      queueList.melees.remove(player);
+      break;
+    }
+    default:
+      throw new std::out_of_range("Invalid role");
+    }
+  }
+};
+
+} // namespace arenacraft::soloq

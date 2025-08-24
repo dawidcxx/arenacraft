@@ -24,52 +24,52 @@
 
 void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
 {
-    Player* player = GetPlayer();
-    if (!player->duel || player == player->duel->Initiator || player->duel->State != DUEL_STATE_CHALLENGED)
-        return;
+  Player* player = GetPlayer();
+  if (!player->duel || player == player->duel->Initiator || player->duel->State != DUEL_STATE_CHALLENGED)
+    return;
 
-    ObjectGuid guid;
-    recvPacket >> guid;
+  ObjectGuid guid;
+  recvPacket >> guid;
 
-    Player* target = player->duel->Opponent;
-    if (target->GetGuidValue(PLAYER_DUEL_ARBITER) != guid)
-        return;
+  Player* target = player->duel->Opponent;
+  if (target->GetGuidValue(PLAYER_DUEL_ARBITER) != guid)
+    return;
 
-    LOG_DEBUG("network.opcode", "Player 1 is: {} ({})", player->GetGUID().ToString(), player->GetName());
-    LOG_DEBUG("network.opcode", "Player 2 is: {} ({})", target->GetGUID().ToString(), target->GetName());
+  LOG_DEBUG("network.opcode", "Player 1 is: {} ({})", player->GetGUID().ToString(), player->GetName());
+  LOG_DEBUG("network.opcode", "Player 2 is: {} ({})", target->GetGUID().ToString(), target->GetName());
 
-    time_t now = GameTime::GetGameTime().count();
-    player->duel->StartTime = now + 3;
-    target->duel->StartTime = now + 3;
+  time_t now              = GameTime::GetGameTime().count();
+  player->duel->StartTime = now + 3;
+  target->duel->StartTime = now + 3;
 
-    player->duel->State = DUEL_STATE_COUNTDOWN;
-    target->duel->State = DUEL_STATE_COUNTDOWN;
+  player->duel->State = DUEL_STATE_COUNTDOWN;
+  target->duel->State = DUEL_STATE_COUNTDOWN;
 
-    player->SendDuelCountdown(3000);
-    target->SendDuelCountdown(3000);
+  player->SendDuelCountdown(3000);
+  target->SendDuelCountdown(3000);
 }
 
 void WorldSession::HandleDuelCancelledOpcode(WorldPacket& recvPacket)
 {
-    Player* player = GetPlayer();
+  Player* player = GetPlayer();
 
-    ObjectGuid guid;
-    recvPacket >> guid;
+  ObjectGuid guid;
+  recvPacket >> guid;
 
-    // no duel requested
-    if (!player->duel || player->duel->State == DUEL_STATE_COMPLETED)
-        return;
+  // no duel requested
+  if (!player->duel || player->duel->State == DUEL_STATE_COMPLETED)
+    return;
 
-    // player surrendered in a duel using /forfeit
-    if (GetPlayer()->duel->State == DUEL_STATE_IN_PROGRESS)
-    {
-        GetPlayer()->CombatStopWithPets(true);
-        GetPlayer()->duel->Opponent->CombatStopWithPets(true);
+  // player surrendered in a duel using /forfeit
+  if (GetPlayer()->duel->State == DUEL_STATE_IN_PROGRESS)
+  {
+    GetPlayer()->CombatStopWithPets(true);
+    GetPlayer()->duel->Opponent->CombatStopWithPets(true);
 
-        GetPlayer()->CastSpell(GetPlayer(), 7267, true);    // beg
-        GetPlayer()->DuelComplete(DUEL_WON);
-        return;
-    }
+    GetPlayer()->CastSpell(GetPlayer(), 7267, true); // beg
+    GetPlayer()->DuelComplete(DUEL_WON);
+    return;
+  }
 
-    GetPlayer()->DuelComplete(DUEL_INTERRUPTED);
+  GetPlayer()->DuelComplete(DUEL_INTERRUPTED);
 }

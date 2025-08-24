@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -24,40 +25,41 @@
 
 class AuthSocketMgr : public SocketMgr<AuthSession>
 {
-    typedef SocketMgr<AuthSession> BaseSocketMgr;
+  typedef SocketMgr<AuthSession> BaseSocketMgr;
 
 public:
-    static AuthSocketMgr& Instance()
-    {
-        static AuthSocketMgr instance;
-        return instance;
-    }
+  static AuthSocketMgr& Instance()
+  {
+    static AuthSocketMgr instance;
+    return instance;
+  }
 
-    bool StartNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port, int threadCount = 1) override
-    {
-        if (!BaseSocketMgr::StartNetwork(ioContext, bindIp, port, threadCount))
-            return false;
+  bool StartNetwork(Acore::Asio::IoContext& ioContext, std::string const& bindIp, uint16 port,
+                    int threadCount = 1) override
+  {
+    if (!BaseSocketMgr::StartNetwork(ioContext, bindIp, port, threadCount))
+      return false;
 
-        _acceptor->AsyncAcceptWithCallback<&AuthSocketMgr::OnSocketAccept>();
-        return true;
-    }
+    _acceptor->AsyncAcceptWithCallback<&AuthSocketMgr::OnSocketAccept>();
+    return true;
+  }
 
 protected:
-    NetworkThread<AuthSession>* CreateThreads() const override
-    {
-        NetworkThread<AuthSession>* threads = new NetworkThread<AuthSession>[1];
+  NetworkThread<AuthSession>* CreateThreads() const override
+  {
+    NetworkThread<AuthSession>* threads = new NetworkThread<AuthSession>[1];
 
-        bool proxyProtocolEnabled = sConfigMgr->GetOption<bool>("EnableProxyProtocol", false, true);
-        if (proxyProtocolEnabled)
-            threads[0].EnableProxyProtocol();
+    bool proxyProtocolEnabled = sConfigMgr->GetOption<bool>("EnableProxyProtocol", false, true);
+    if (proxyProtocolEnabled)
+      threads[0].EnableProxyProtocol();
 
-        return threads;
-    }
+    return threads;
+  }
 
-    static void OnSocketAccept(tcp::socket&& sock, uint32 threadIndex)
-    {
-        Instance().OnSocketOpen(std::forward<tcp::socket>(sock), threadIndex);
-    }
+  static void OnSocketAccept(tcp::socket&& sock, uint32 threadIndex)
+  {
+    Instance().OnSocketOpen(std::forward<tcp::socket>(sock), threadIndex);
+  }
 };
 
 #define sAuthSocketMgr AuthSocketMgr::Instance()

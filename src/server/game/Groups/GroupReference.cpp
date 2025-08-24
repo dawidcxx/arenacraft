@@ -20,16 +20,16 @@
 
 void GroupReference::targetObjectBuildLink()
 {
-    // called from link()
-    getTarget()->LinkMember(this);
+  // called from link()
+  getTarget()->LinkMember(this);
 }
 
 void GroupReference::targetObjectDestroyLink()
 {
-    // called from unlink()
+  // called from unlink()
 }
 
 void GroupReference::sourceObjectDestroyLink()
 {
-    // called from invalidate()
+  // called from invalidate()
 }

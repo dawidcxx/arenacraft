@@ -17,14 +17,8 @@
 
 #include "GameObjectAI.h"
 
-int32 GameObjectAI::Permissible(GameObject const* /*go*/)
-{
-    return PERMIT_BASE_NO;
-}
+int32 GameObjectAI::Permissible(GameObject const* /*go*/) { return PERMIT_BASE_NO; }
 
-NullGameObjectAI::NullGameObjectAI(GameObject* go) : GameObjectAI(go) { }
+NullGameObjectAI::NullGameObjectAI(GameObject* go) : GameObjectAI(go) {}
 
-int32 NullGameObjectAI::Permissible(GameObject const* /*go*/)
-{
-    return PERMIT_BASE_IDLE;
-}
+int32 NullGameObjectAI::Permissible(GameObject const* /*go*/) { return PERMIT_BASE_IDLE; }

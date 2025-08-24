@@ -23,40 +23,34 @@
 class trigger_periodic : public CreatureScript
 {
 public:
-    trigger_periodic() : CreatureScript("trigger_periodic") { }
+  trigger_periodic() : CreatureScript("trigger_periodic") {}
 
-    struct trigger_periodicAI : public NullCreatureAI
+  struct trigger_periodicAI : public NullCreatureAI
+  {
+    trigger_periodicAI(Creature* creature) : NullCreatureAI(creature)
     {
-        trigger_periodicAI(Creature* creature) : NullCreatureAI(creature)
-        {
-            spell = me->m_spells[0] ? sSpellMgr->GetSpellInfo(me->m_spells[0]) : nullptr;
-            interval = me->GetAttackTime(BASE_ATTACK);
-            timer = interval;
-        }
-
-        uint32 timer, interval;
-        SpellInfo const* spell;
-
-        void UpdateAI(uint32 diff) override
-        {
-            if (timer <= diff)
-            {
-                if (spell)
-                    me->CastSpell(me, spell, true);
-                timer = interval;
-            }
-            else
-                timer -= diff;
-        }
-    };
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new trigger_periodicAI(creature);
+      spell    = me->m_spells[0] ? sSpellMgr->GetSpellInfo(me->m_spells[0]) : nullptr;
+      interval = me->GetAttackTime(BASE_ATTACK);
+      timer    = interval;
     }
+
+    uint32           timer, interval;
+    SpellInfo const* spell;
+
+    void UpdateAI(uint32 diff) override
+    {
+      if (timer <= diff)
+      {
+        if (spell)
+          me->CastSpell(me, spell, true);
+        timer = interval;
+      }
+      else
+        timer -= diff;
+    }
+  };
+
+  CreatureAI* GetAI(Creature* creature) const override { return new trigger_periodicAI(creature); }
 };
 
-void AddSC_generic_creature()
-{
-    new trigger_periodic;
-}
+void AddSC_generic_creature() { new trigger_periodic; }

@@ -31,132 +31,124 @@ using namespace Acore::ChatCommands;
 class bf_commandscript : public CommandScript
 {
 public:
-    bf_commandscript() : CommandScript("bf_commandscript") { }
+  bf_commandscript() : CommandScript("bf_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable battlefieldcommandTable = {
+        {"start", HandleBattlefieldStart, SEC_ADMINISTRATOR, Console::No},
+        {"stop", HandleBattlefieldEnd, SEC_ADMINISTRATOR, Console::No},
+        {"switch", HandleBattlefieldSwitch, SEC_ADMINISTRATOR, Console::No},
+        {"timer", HandleBattlefieldTimer, SEC_ADMINISTRATOR, Console::No},
+        {"enable", HandleBattlefieldEnable, SEC_ADMINISTRATOR, Console::No}};
+    static ChatCommandTable commandTable = {{"bf", battlefieldcommandTable}};
+    return commandTable;
+  }
+
+  static bool HandleBattlefieldStart(ChatHandler* handler, uint32 battleId)
+  {
+    Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
+
+    if (!bf)
+      return false;
+
+    bf->StartBattle();
+
+    if (battleId == 1)
+      handler->SendGlobalGMSysMessage("Wintergrasp (Command start used)");
+
+    return true;
+  }
+
+  static bool HandleBattlefieldEnd(ChatHandler* handler, uint32 battleId)
+  {
+    Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
+
+    if (!bf)
+      return false;
+
+    bf->EndBattle(true);
+
+    if (battleId == 1)
+      handler->SendGlobalGMSysMessage("Wintergrasp (Command stop used)");
+
+    return true;
+  }
+
+  static bool HandleBattlefieldEnable(ChatHandler* handler, uint32 battleId)
+  {
+    Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
+
+    if (!bf)
+      return false;
+
+    if (bf->IsEnabled())
     {
-        static ChatCommandTable battlefieldcommandTable =
-        {
-            { "start",  HandleBattlefieldStart,  SEC_ADMINISTRATOR, Console::No },
-            { "stop",   HandleBattlefieldEnd,    SEC_ADMINISTRATOR, Console::No },
-            { "switch", HandleBattlefieldSwitch, SEC_ADMINISTRATOR, Console::No },
-            { "timer",  HandleBattlefieldTimer,  SEC_ADMINISTRATOR, Console::No },
-            { "enable", HandleBattlefieldEnable, SEC_ADMINISTRATOR, Console::No }
-        };
-        static ChatCommandTable commandTable =
-        {
-            { "bf", battlefieldcommandTable }
-        };
-        return commandTable;
+      bf->ToggleBattlefield(false);
+      if (battleId == 1)
+        handler->SendGlobalGMSysMessage("Wintergrasp is disabled");
+    }
+    else
+    {
+      bf->ToggleBattlefield(true);
+      if (battleId == 1)
+        handler->SendGlobalGMSysMessage("Wintergrasp is enabled");
     }
 
-    static bool HandleBattlefieldStart(ChatHandler* handler, uint32 battleId)
+    return true;
+  }
+
+  static bool HandleBattlefieldSwitch(ChatHandler* handler, uint32 battleId)
+  {
+    Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
+
+    if (!bf)
+      return false;
+
+    bf->EndBattle(false);
+    if (battleId == 1)
+      handler->SendGlobalGMSysMessage("Wintergrasp (Command switch used)");
+
+    return true;
+  }
+
+  static bool HandleBattlefieldTimer(ChatHandler* handler, uint32 battleId, std::string timeStr)
+  {
+    if (timeStr.empty())
     {
-        Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
-
-        if (!bf)
-            return false;
-
-        bf->StartBattle();
-
-        if (battleId == 1)
-            handler->SendGlobalGMSysMessage("Wintergrasp (Command start used)");
-
-        return true;
+      return false;
     }
 
-    static bool HandleBattlefieldEnd(ChatHandler* handler, uint32 battleId)
+    if (Acore::StringTo<int32>(timeStr).value_or(0) < 0)
     {
-        Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
-
-        if (!bf)
-            return false;
-
-        bf->EndBattle(true);
-
-        if (battleId == 1)
-            handler->SendGlobalGMSysMessage("Wintergrasp (Command stop used)");
-
-        return true;
+      handler->SendErrorMessage(LANG_BAD_VALUE);
+      return false;
     }
 
-    static bool HandleBattlefieldEnable(ChatHandler* handler, uint32 battleId)
+    int32 time = TimeStringToSecs(timeStr);
+    if (time <= 0)
     {
-        Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
-
-        if (!bf)
-            return false;
-
-        if (bf->IsEnabled())
-        {
-            bf->ToggleBattlefield(false);
-            if (battleId == 1)
-                handler->SendGlobalGMSysMessage("Wintergrasp is disabled");
-        }
-        else
-        {
-            bf->ToggleBattlefield(true);
-            if (battleId == 1)
-                handler->SendGlobalGMSysMessage("Wintergrasp is enabled");
-        }
-
-        return true;
+      time = Acore::StringTo<int32>(timeStr).value_or(0);
     }
 
-    static bool HandleBattlefieldSwitch(ChatHandler* handler, uint32 battleId)
+    if (time <= 0)
     {
-        Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
-
-        if (!bf)
-            return false;
-
-        bf->EndBattle(false);
-        if (battleId == 1)
-            handler->SendGlobalGMSysMessage("Wintergrasp (Command switch used)");
-
-        return true;
+      handler->SendErrorMessage(LANG_BAD_VALUE);
+      return false;
     }
 
-    static bool HandleBattlefieldTimer(ChatHandler* handler, uint32 battleId, std::string timeStr)
-    {
-        if (timeStr.empty())
-        {
-            return false;
-        }
+    Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
 
-        if (Acore::StringTo<int32>(timeStr).value_or(0) < 0)
-        {
-            handler->SendErrorMessage(LANG_BAD_VALUE);
-            return false;
-        }
+    if (!bf)
+      return false;
 
-        int32 time = TimeStringToSecs(timeStr);
-        if (time <= 0)
-        {
-            time = Acore::StringTo<int32>(timeStr).value_or(0);
-        }
+    bf->SetTimer(time * IN_MILLISECONDS);
+    bf->SendInitWorldStatesToAll();
+    if (battleId == 1)
+      handler->SendGlobalGMSysMessage("Wintergrasp (Command timer used)");
 
-        if (time <= 0)
-        {
-            handler->SendErrorMessage(LANG_BAD_VALUE);
-            return false;
-        }
-
-        Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
-
-        if (!bf)
-            return false;
-
-        bf->SetTimer(time * IN_MILLISECONDS);
-        bf->SendInitWorldStatesToAll();
-        if (battleId == 1)
-            handler->SendGlobalGMSysMessage("Wintergrasp (Command timer used)");
-
-        return true;
-    }
+    return true;
+  }
 };
 
-void AddSC_bf_commandscript()
-{
-    new bf_commandscript();
-}
+void AddSC_bf_commandscript() { new bf_commandscript(); }

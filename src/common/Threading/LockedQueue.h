@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -21,134 +22,125 @@
 #include <deque>
 #include <mutex>
 
-template <class T, typename StorageType = std::deque<T>>
-class LockedQueue
+template <class T, typename StorageType = std::deque<T>> class LockedQueue
 {
-    //! Lock access to the queue.
-    std::mutex _lock;
+  //! Lock access to the queue.
+  std::mutex _lock;
 
-    //! Storage backing the queue.
-    StorageType _queue;
+  //! Storage backing the queue.
+  StorageType _queue;
 
-    //! Cancellation flag.
-    volatile bool _canceled{false};
+  //! Cancellation flag.
+  volatile bool _canceled{false};
 
 public:
+  //! Create a LockedQueue.
+  LockedQueue() = default;
 
-    //! Create a LockedQueue.
-    LockedQueue() = default;
+  //! Destroy a LockedQueue.
+  virtual ~LockedQueue() = default;
 
-    //! Destroy a LockedQueue.
-    virtual ~LockedQueue() = default;
+  //! Adds an item to the queue.
+  void add(const T& item)
+  {
+    lock();
 
-    //! Adds an item to the queue.
-    void add(const T& item)
+    _queue.push_back(item);
+
+    unlock();
+  }
+
+  //! Adds items back to front of the queue
+  template <class Iterator> void readd(Iterator begin, Iterator end)
+  {
+    std::lock_guard<std::mutex> lock(_lock);
+    _queue.insert(_queue.begin(), begin, end);
+  }
+
+  //! Gets the next result in the queue, if any.
+  bool next(T& result)
+  {
+    std::lock_guard<std::mutex> lock(_lock);
+
+    if (_queue.empty())
     {
-        lock();
-
-        _queue.push_back(item);
-
-        unlock();
+      return false;
     }
 
-    //! Adds items back to front of the queue
-    template<class Iterator>
-    void readd(Iterator begin, Iterator end)
+    result = _queue.front();
+    _queue.pop_front();
+
+    return true;
+  }
+
+  template <class Checker> bool next(T& result, Checker& check)
+  {
+    std::lock_guard<std::mutex> lock(_lock);
+
+    if (_queue.empty())
     {
-        std::lock_guard<std::mutex> lock(_lock);
-        _queue.insert(_queue.begin(), begin, end);
+      return false;
     }
 
-    //! Gets the next result in the queue, if any.
-    bool next(T& result)
+    result = _queue.front();
+    if (!check.Process(result))
     {
-        std::lock_guard<std::mutex> lock(_lock);
-
-        if (_queue.empty())
-        {
-            return false;
-        }
-
-        result = _queue.front();
-        _queue.pop_front();
-
-        return true;
+      return false;
     }
 
-    template<class Checker>
-    bool next(T& result, Checker& check)
+    _queue.pop_front();
+    return true;
+  }
+
+  //! Peeks at the top of the queue. Check if the queue is empty before calling!
+  //! Remember to unlock after use if autoUnlock == false.
+  T& peek(bool autoUnlock = false)
+  {
+    lock();
+
+    T& result = _queue.front();
+
+    if (autoUnlock)
     {
-        std::lock_guard<std::mutex> lock(_lock);
-
-        if (_queue.empty())
-        {
-            return false;
-        }
-
-        result = _queue.front();
-        if (!check.Process(result))
-        {
-            return false;
-        }
-
-        _queue.pop_front();
-        return true;
+      unlock();
     }
 
-    //! Peeks at the top of the queue. Check if the queue is empty before calling! Remember to unlock after use if autoUnlock == false.
-    T& peek(bool autoUnlock = false)
-    {
-        lock();
+    return result;
+  }
 
-        T& result = _queue.front();
+  //! Cancels the queue.
+  void cancel()
+  {
+    std::lock_guard<std::mutex> lock(_lock);
 
-        if (autoUnlock)
-        {
-            unlock();
-        }
+    _canceled = true;
+  }
 
-        return result;
-    }
+  //! Checks if the queue is cancelled.
+  bool cancelled()
+  {
+    std::lock_guard<std::mutex> lock(_lock);
+    return _canceled;
+  }
 
-    //! Cancels the queue.
-    void cancel()
-    {
-        std::lock_guard<std::mutex> lock(_lock);
+  //! Locks the queue for access.
+  void lock() { this->_lock.lock(); }
 
-        _canceled = true;
-    }
+  //! Unlocks the queue.
+  void unlock() { this->_lock.unlock(); }
 
-    //! Checks if the queue is cancelled.
-    bool cancelled()
-    {
-        std::lock_guard<std::mutex> lock(_lock);
-        return _canceled;
-    }
+  ///! Calls pop_front of the queue
+  void pop_front()
+  {
+    std::lock_guard<std::mutex> lock(_lock);
+    _queue.pop_front();
+  }
 
-    //! Locks the queue for access.
-    void lock()
-    {
-        this->_lock.lock();
-    }
-
-    //! Unlocks the queue.
-    void unlock()
-    {
-        this->_lock.unlock();
-    }
-
-    ///! Calls pop_front of the queue
-    void pop_front()
-    {
-        std::lock_guard<std::mutex> lock(_lock);
-        _queue.pop_front();
-    }
-
-    ///! Checks if we're empty or not with locks held
-    bool empty()
-    {
-        std::lock_guard<std::mutex> lock(_lock);
-        return _queue.empty();
-    }
+  ///! Checks if we're empty or not with locks held
+  bool empty()
+  {
+    std::lock_guard<std::mutex> lock(_lock);
+    return _queue.empty();
+  }
 };
 #endif

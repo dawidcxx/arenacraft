@@ -28,44 +28,44 @@
 
 enum OnlyForFlight
 {
-    SPELL_ARCANE_CHARGES    = 45072
+  SPELL_ARCANE_CHARGES = 45072
 };
 
 class item_only_for_flight : public ItemScript
 {
 public:
-    item_only_for_flight() : ItemScript("item_only_for_flight") { }
+  item_only_for_flight() : ItemScript("item_only_for_flight") {}
 
-    bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+  bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+  {
+    uint32 itemId   = item->GetEntry();
+    bool   disabled = false;
+
+    // for special scripts
+    switch (itemId)
     {
-        uint32 itemId = item->GetEntry();
-        bool disabled = false;
-
-        //for special scripts
-        switch (itemId)
-        {
-            case 24538:
-                if (player->GetAreaId() != 3628)
-                    disabled = true;
-                break;
-            case 34489:
-                if (player->GetZoneId() != 4080)
-                    disabled = true;
-                break;
-            case 34475:
-                if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_ARCANE_CHARGES))
-                    Spell::SendCastResult(player, spellInfo, 1, SPELL_FAILED_NOT_ON_GROUND);
-                break;
-        }
-
-        // allow use in flight only
-        if (player->IsInFlight() && !disabled)
-            return false;
-
-        // error
-        player->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, nullptr);
-        return true;
+    case 24538:
+      if (player->GetAreaId() != 3628)
+        disabled = true;
+      break;
+    case 34489:
+      if (player->GetZoneId() != 4080)
+        disabled = true;
+      break;
+    case 34475:
+      if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_ARCANE_CHARGES))
+        Spell::SendCastResult(player, spellInfo, 1, SPELL_FAILED_NOT_ON_GROUND);
+      break;
     }
+
+    // allow use in flight only
+    if (player->IsInFlight() && !disabled)
+      return false;
+
+    // error
+    player->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, nullptr);
+    return true;
+  }
 };
 
 /*#####
@@ -75,18 +75,18 @@ public:
 class item_incendiary_explosives : public ItemScript
 {
 public:
-    item_incendiary_explosives() : ItemScript("item_incendiary_explosives") { }
+  item_incendiary_explosives() : ItemScript("item_incendiary_explosives") {}
 
-    bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+  bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+  {
+    if (player->FindNearestCreature(26248, 15) || player->FindNearestCreature(26249, 15))
+      return false;
+    else
     {
-        if (player->FindNearestCreature(26248, 15) || player->FindNearestCreature(26249, 15))
-            return false;
-        else
-        {
-            player->SendEquipError(EQUIP_ERR_OUT_OF_RANGE, item, nullptr);
-            return true;
-        }
+      player->SendEquipError(EQUIP_ERR_OUT_OF_RANGE, item, nullptr);
+      return true;
     }
+  }
 };
 
 /*#####
@@ -96,17 +96,17 @@ public:
 class item_mysterious_egg : public ItemScript
 {
 public:
-    item_mysterious_egg() : ItemScript("item_mysterious_egg") { }
+  item_mysterious_egg() : ItemScript("item_mysterious_egg") {}
 
-    bool OnExpire(Player* player, ItemTemplate const* /*pItemProto*/) override
-    {
-        ItemPosCountVec dest;
-        uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 39883, 1); // Cracked Egg
-        if (msg == EQUIP_ERR_OK)
-            player->StoreNewItem(dest, 39883, true);
+  bool OnExpire(Player* player, ItemTemplate const* /*pItemProto*/) override
+  {
+    ItemPosCountVec dest;
+    uint8           msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 39883, 1); // Cracked Egg
+    if (msg == EQUIP_ERR_OK)
+      player->StoreNewItem(dest, 39883, true);
 
-        return true;
-    }
+    return true;
+  }
 };
 
 /*#####
@@ -116,17 +116,17 @@ public:
 class item_disgusting_jar : public ItemScript
 {
 public:
-    item_disgusting_jar() : ItemScript("item_disgusting_jar") { }
+  item_disgusting_jar() : ItemScript("item_disgusting_jar") {}
 
-    bool OnExpire(Player* player, ItemTemplate const* /*pItemProto*/) override
-    {
-        ItemPosCountVec dest;
-        uint8 msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 44718, 1); // Ripe Disgusting Jar
-        if (msg == EQUIP_ERR_OK)
-            player->StoreNewItem(dest, 44718, true);
+  bool OnExpire(Player* player, ItemTemplate const* /*pItemProto*/) override
+  {
+    ItemPosCountVec dest;
+    uint8           msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, 44718, 1); // Ripe Disgusting Jar
+    if (msg == EQUIP_ERR_OK)
+      player->StoreNewItem(dest, 44718, true);
 
-        return true;
-    }
+    return true;
+  }
 };
 
 /*#####
@@ -135,59 +135,59 @@ public:
 
 enum PetrovClusterBombs
 {
-    SPELL_PETROV_BOMB           = 42406,
-    AREA_ID_SHATTERED_STRAITS   = 4064,
-    ZONE_ID_HOWLING             = 495
+  SPELL_PETROV_BOMB         = 42406,
+  AREA_ID_SHATTERED_STRAITS = 4064,
+  ZONE_ID_HOWLING           = 495
 };
 
 class item_petrov_cluster_bombs : public ItemScript
 {
 public:
-    item_petrov_cluster_bombs() : ItemScript("item_petrov_cluster_bombs") { }
+  item_petrov_cluster_bombs() : ItemScript("item_petrov_cluster_bombs") {}
 
-    bool OnUse(Player* player, Item* item, const SpellCastTargets& /*targets*/) override
+  bool OnUse(Player* player, Item* item, const SpellCastTargets& /*targets*/) override
+  {
+    if (player->GetZoneId() != ZONE_ID_HOWLING)
+      return false;
+
+    if (!player->GetTransport() || player->GetAreaId() != AREA_ID_SHATTERED_STRAITS)
     {
-        if (player->GetZoneId() != ZONE_ID_HOWLING)
-            return false;
+      player->SendEquipError(EQUIP_ERR_NONE, item, nullptr);
 
-        if (!player->GetTransport() || player->GetAreaId() != AREA_ID_SHATTERED_STRAITS)
-        {
-            player->SendEquipError(EQUIP_ERR_NONE, item, nullptr);
+      if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_PETROV_BOMB))
+        Spell::SendCastResult(player, spellInfo, 1, SPELL_FAILED_NOT_HERE);
 
-            if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_PETROV_BOMB))
-                Spell::SendCastResult(player, spellInfo, 1, SPELL_FAILED_NOT_HERE);
-
-            return true;
-        }
-
-        return false;
+      return true;
     }
+
+    return false;
+  }
 };
 
 enum CapturedFrog
 {
-    QUEST_THE_PERFECT_SPIES      = 25444,
-    NPC_VANIRAS_SENTRY_TOTEM     = 40187
+  QUEST_THE_PERFECT_SPIES  = 25444,
+  NPC_VANIRAS_SENTRY_TOTEM = 40187
 };
 
 class item_captured_frog : public ItemScript
 {
 public:
-    item_captured_frog() : ItemScript("item_captured_frog") { }
+  item_captured_frog() : ItemScript("item_captured_frog") {}
 
-    bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+  bool OnUse(Player* player, Item* item, SpellCastTargets const& /*targets*/) override
+  {
+    if (player->GetQuestStatus(QUEST_THE_PERFECT_SPIES) == QUEST_STATUS_INCOMPLETE)
     {
-        if (player->GetQuestStatus(QUEST_THE_PERFECT_SPIES) == QUEST_STATUS_INCOMPLETE)
-        {
-            if (player->FindNearestCreature(NPC_VANIRAS_SENTRY_TOTEM, 10.0f))
-                return false;
-            else
-                player->SendEquipError(EQUIP_ERR_OUT_OF_RANGE, item, nullptr);
-        }
-        else
-            player->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, nullptr);
-        return true;
+      if (player->FindNearestCreature(NPC_VANIRAS_SENTRY_TOTEM, 10.0f))
+        return false;
+      else
+        player->SendEquipError(EQUIP_ERR_OUT_OF_RANGE, item, nullptr);
     }
+    else
+      player->SendEquipError(EQUIP_ERR_CANT_DO_RIGHT_NOW, item, nullptr);
+    return true;
+  }
 };
 
 // Only used currently for
@@ -195,32 +195,32 @@ public:
 class item_generic_limit_chance_above_60 : public ItemScript
 {
 public:
-    item_generic_limit_chance_above_60() : ItemScript("item_generic_limit_chance_above_60") { }
+  item_generic_limit_chance_above_60() : ItemScript("item_generic_limit_chance_above_60") {}
 
-    bool OnCastItemCombatSpell(Player* /*player*/, Unit* victim, SpellInfo const* /*spellInfo*/, Item* /*item*/) override
+  bool OnCastItemCombatSpell(Player* /*player*/, Unit* victim, SpellInfo const* /*spellInfo*/, Item* /*item*/) override
+  {
+    // spell proc chance gets severely reduced on victims > 60 (formula unknown)
+    if (victim->GetLevel() > 60)
     {
-        // spell proc chance gets severely reduced on victims > 60 (formula unknown)
-        if (victim->GetLevel() > 60)
-        {
-            // gives ~0.1% proc chance at lvl 70
-            float const lvlPenaltyFactor = 9.93f;
-            float const failureChance = (victim->GetLevel() - 60) * lvlPenaltyFactor;
+      // gives ~0.1% proc chance at lvl 70
+      float const lvlPenaltyFactor = 9.93f;
+      float const failureChance    = (victim->GetLevel() - 60) * lvlPenaltyFactor;
 
-            // base ppm chance was already rolled, only roll success chance
-            return !roll_chance_f(failureChance);
-        }
-
-        return true;
+      // base ppm chance was already rolled, only roll success chance
+      return !roll_chance_f(failureChance);
     }
+
+    return true;
+  }
 };
 
 void AddSC_item_scripts()
 {
-    new item_only_for_flight();
-    new item_incendiary_explosives();
-    new item_mysterious_egg();
-    new item_disgusting_jar();
-    new item_petrov_cluster_bombs();
-    new item_captured_frog();
-    new item_generic_limit_chance_above_60();
+  new item_only_for_flight();
+  new item_incendiary_explosives();
+  new item_mysterious_egg();
+  new item_disgusting_jar();
+  new item_petrov_cluster_bombs();
+  new item_captured_frog();
+  new item_generic_limit_chance_above_60();
 }

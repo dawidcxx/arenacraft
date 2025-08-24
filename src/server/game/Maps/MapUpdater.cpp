@@ -24,137 +24,130 @@
 class UpdateRequest
 {
 public:
-    UpdateRequest() = default;
-    virtual ~UpdateRequest() = default;
+  UpdateRequest()          = default;
+  virtual ~UpdateRequest() = default;
 
-    virtual void call() = 0;
+  virtual void call() = 0;
 };
 
 class MapUpdateRequest : public UpdateRequest
 {
 public:
-    MapUpdateRequest(Map& m, MapUpdater& u, uint32 d, uint32 sd)
-        : m_map(m), m_updater(u), m_diff(d), s_diff(sd)
-    {
-    }
+  MapUpdateRequest(Map& m, MapUpdater& u, uint32 d, uint32 sd) : m_map(m), m_updater(u), m_diff(d), s_diff(sd) {}
 
-    void call() override
-    {
-        METRIC_TIMER("map_update_time_diff", METRIC_TAG("map_id", std::to_string(m_map.GetId())));
-        m_map.Update(m_diff, s_diff);
-        m_updater.update_finished();
-    }
+  void call() override
+  {
+    METRIC_TIMER("map_update_time_diff", METRIC_TAG("map_id", std::to_string(m_map.GetId())));
+    m_map.Update(m_diff, s_diff);
+    m_updater.update_finished();
+  }
 
 private:
-    Map& m_map;
-    MapUpdater& m_updater;
-    uint32 m_diff;
-    uint32 s_diff;
+  Map&        m_map;
+  MapUpdater& m_updater;
+  uint32      m_diff;
+  uint32      s_diff;
 };
 
 class LFGUpdateRequest : public UpdateRequest
 {
 public:
-    LFGUpdateRequest(MapUpdater& u, uint32 d) : m_updater(u), m_diff(d) {}
+  LFGUpdateRequest(MapUpdater& u, uint32 d) : m_updater(u), m_diff(d) {}
 
-    void call() override
-    {
-        sLFGMgr->Update(m_diff, 1);
-        m_updater.update_finished();
-    }
+  void call() override
+  {
+    sLFGMgr->Update(m_diff, 1);
+    m_updater.update_finished();
+  }
+
 private:
-    MapUpdater& m_updater;
-    uint32 m_diff;
+  MapUpdater& m_updater;
+  uint32      m_diff;
 };
 
-MapUpdater::MapUpdater(): pending_requests(0)
-{
-}
+MapUpdater::MapUpdater() : pending_requests(0) {}
 
 void MapUpdater::activate(std::size_t num_threads)
 {
-    _workerThreads.reserve(num_threads);
-    for (std::size_t i = 0; i < num_threads; ++i)
-    {
-        _workerThreads.push_back(std::thread(&MapUpdater::WorkerThread, this));
-    }
+  _workerThreads.reserve(num_threads);
+  for (std::size_t i = 0; i < num_threads; ++i)
+  {
+    _workerThreads.push_back(std::thread(&MapUpdater::WorkerThread, this));
+  }
 }
 
 void MapUpdater::deactivate()
 {
-    _cancelationToken = true;
+  _cancelationToken = true;
 
-    wait();
+  wait();
 
-    _queue.Cancel();
+  _queue.Cancel();
 
-    for (auto& thread : _workerThreads)
+  for (auto& thread : _workerThreads)
+  {
+    if (thread.joinable())
     {
-        if (thread.joinable())
-        {
-            thread.join();
-        }
+      thread.join();
     }
+  }
 }
 
 void MapUpdater::wait()
 {
-    std::unique_lock<std::mutex> guard(_lock);
+  std::unique_lock<std::mutex> guard(_lock);
 
-    while (pending_requests > 0)
-        _condition.wait(guard);
+  while (pending_requests > 0)
+    _condition.wait(guard);
 
-    guard.unlock();
+  guard.unlock();
 }
 
 void MapUpdater::schedule_update(Map& map, uint32 diff, uint32 s_diff)
 {
-    std::lock_guard<std::mutex> guard(_lock);
+  std::lock_guard<std::mutex> guard(_lock);
 
-    ++pending_requests;
+  ++pending_requests;
 
-    _queue.Push(new MapUpdateRequest(map, *this, diff, s_diff));
+  _queue.Push(new MapUpdateRequest(map, *this, diff, s_diff));
 }
 
 void MapUpdater::schedule_lfg_update(uint32 diff)
 {
-    std::lock_guard<std::mutex> guard(_lock);
+  std::lock_guard<std::mutex> guard(_lock);
 
-    ++pending_requests;
+  ++pending_requests;
 
-    _queue.Push(new LFGUpdateRequest(*this, diff));
+  _queue.Push(new LFGUpdateRequest(*this, diff));
 }
 
-bool MapUpdater::activated()
-{
-    return _workerThreads.size() > 0;
-}
+bool MapUpdater::activated() { return _workerThreads.size() > 0; }
 
 void MapUpdater::update_finished()
 {
-    std::lock_guard<std::mutex> lock(_lock);
+  std::lock_guard<std::mutex> lock(_lock);
 
-    --pending_requests;
+  --pending_requests;
 
-    _condition.notify_all();
+  _condition.notify_all();
 }
 
 void MapUpdater::WorkerThread()
 {
-    LoginDatabase.WarnAboutSyncQueries(true);
-    CharacterDatabase.WarnAboutSyncQueries(true);
-    WorldDatabase.WarnAboutSyncQueries(true);
+  LoginDatabase.WarnAboutSyncQueries(true);
+  CharacterDatabase.WarnAboutSyncQueries(true);
+  WorldDatabase.WarnAboutSyncQueries(true);
 
-    while (1)
-    {
-        UpdateRequest* request = nullptr;
+  while (1)
+  {
+    UpdateRequest* request = nullptr;
 
-        _queue.WaitAndPop(request);
-        if (_cancelationToken)
-            return;
+    _queue.WaitAndPop(request);
+    if (_cancelationToken)
+      return;
 
-        request->call();
+    request->call();
 
-        delete request;
-    }
+    delete request;
+  }
 }

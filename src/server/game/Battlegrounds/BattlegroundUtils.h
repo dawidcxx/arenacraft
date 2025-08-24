@@ -5,4 +5,4 @@
 
 uint32 GetMinPlayersPerTeam(Battleground* bg, PvPDifficultyEntry const* bracketEntry);
 
-#endif  // BATTLEGROUNDUTILS_H
+#endif // BATTLEGROUNDUTILS_H

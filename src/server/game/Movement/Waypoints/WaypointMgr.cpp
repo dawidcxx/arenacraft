@@ -21,144 +21,145 @@
 #include "Log.h"
 #include "QueryResult.h"
 
-WaypointMgr::WaypointMgr()
-{
-}
+WaypointMgr::WaypointMgr() {}
 
 WaypointMgr::~WaypointMgr()
 {
-    for (WaypointPathContainer::iterator itr = _waypointStore.begin(); itr != _waypointStore.end(); ++itr)
-    {
-        for (WaypointPath::const_iterator it = itr->second.begin(); it != itr->second.end(); ++it)
-            delete *it;
+  for (WaypointPathContainer::iterator itr = _waypointStore.begin(); itr != _waypointStore.end(); ++itr)
+  {
+    for (WaypointPath::const_iterator it = itr->second.begin(); it != itr->second.end(); ++it)
+      delete *it;
 
-        itr->second.clear();
-    }
+    itr->second.clear();
+  }
 
-    _waypointStore.clear();
+  _waypointStore.clear();
 }
 
 WaypointMgr* WaypointMgr::instance()
 {
-    static WaypointMgr instance;
-    return &instance;
+  static WaypointMgr instance;
+  return &instance;
 }
 
 void WaypointMgr::Load()
 {
-    uint32 oldMSTime = getMSTime();
+  uint32 oldMSTime = getMSTime();
 
-    //                                                0    1         2           3          4            5           6        7      8           9
-    QueryResult result = WorldDatabase.Query("SELECT id, point, position_x, position_y, position_z, orientation, move_type, delay, action, action_chance FROM waypoint_data ORDER BY id, point");
+  //                                                0    1         2           3          4            5           6 7
+  //                                                8           9
+  QueryResult result =
+      WorldDatabase.Query("SELECT id, point, position_x, position_y, position_z, orientation, move_type, delay, "
+                          "action, action_chance FROM waypoint_data ORDER BY id, point");
 
-    if (!result)
+  if (!result)
+  {
+    LOG_WARN("server.loading", ">> Loaded 0 waypoints. DB table `waypoint_data` is empty!");
+    LOG_INFO("server.loading", " ");
+    return;
+  }
+
+  uint32 count = 0;
+
+  do
+  {
+    Field*        fields = result->Fetch();
+    WaypointData* wp     = new WaypointData();
+
+    uint32        pathId = fields[0].Get<uint32>();
+    WaypointPath& path   = _waypointStore[pathId];
+
+    float                x = fields[2].Get<float>();
+    float                y = fields[3].Get<float>();
+    float                z = fields[4].Get<float>();
+    std::optional<float> o;
+    if (!fields[5].IsNull())
+      o = fields[5].Get<float>();
+
+    Acore::NormalizeMapCoord(x);
+    Acore::NormalizeMapCoord(y);
+
+    wp->id          = fields[1].Get<uint32>();
+    wp->x           = x;
+    wp->y           = y;
+    wp->z           = z;
+    wp->orientation = o;
+    wp->move_type   = fields[6].Get<uint32>();
+
+    if (wp->move_type >= WAYPOINT_MOVE_TYPE_MAX)
     {
-        LOG_WARN("server.loading", ">> Loaded 0 waypoints. DB table `waypoint_data` is empty!");
-        LOG_INFO("server.loading", " ");
-        return;
+      // LOG_ERROR("sql.sql", "Waypoint {} in waypoint_data has invalid move_type, ignoring", wp->id);
+      delete wp;
+      continue;
     }
 
-    uint32 count = 0;
+    wp->delay        = fields[7].Get<uint32>();
+    wp->event_id     = fields[8].Get<uint32>();
+    wp->event_chance = fields[9].Get<int16>();
 
-    do
-    {
-        Field* fields = result->Fetch();
-        WaypointData* wp = new WaypointData();
+    path.push_back(wp);
+    ++count;
+  } while (result->NextRow());
 
-        uint32 pathId = fields[0].Get<uint32>();
-        WaypointPath& path = _waypointStore[pathId];
-
-        float x = fields[2].Get<float>();
-        float y = fields[3].Get<float>();
-        float z = fields[4].Get<float>();
-        std::optional<float > o;
-        if (!fields[5].IsNull())
-            o = fields[5].Get<float>();
-
-        Acore::NormalizeMapCoord(x);
-        Acore::NormalizeMapCoord(y);
-
-        wp->id = fields[1].Get<uint32>();
-        wp->x = x;
-        wp->y = y;
-        wp->z = z;
-        wp->orientation = o;
-        wp->move_type = fields[6].Get<uint32>();
-
-        if (wp->move_type >= WAYPOINT_MOVE_TYPE_MAX)
-        {
-            //LOG_ERROR("sql.sql", "Waypoint {} in waypoint_data has invalid move_type, ignoring", wp->id);
-            delete wp;
-            continue;
-        }
-
-        wp->delay = fields[7].Get<uint32>();
-        wp->event_id = fields[8].Get<uint32>();
-        wp->event_chance = fields[9].Get<int16>();
-
-        path.push_back(wp);
-        ++count;
-    } while (result->NextRow());
-
-    LOG_INFO("server.loading", ">> Loaded {} waypoints in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
-    LOG_INFO("server.loading", " ");
+  LOG_INFO("server.loading", ">> Loaded {} waypoints in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
+  LOG_INFO("server.loading", " ");
 }
 
 void WaypointMgr::ReloadPath(uint32 id)
 {
-    WaypointPathContainer::iterator itr = _waypointStore.find(id);
-    if (itr != _waypointStore.end())
-    {
-        for (WaypointPath::const_iterator it = itr->second.begin(); it != itr->second.end(); ++it)
-            delete *it;
+  WaypointPathContainer::iterator itr = _waypointStore.find(id);
+  if (itr != _waypointStore.end())
+  {
+    for (WaypointPath::const_iterator it = itr->second.begin(); it != itr->second.end(); ++it)
+      delete *it;
 
-        _waypointStore.erase(itr);
+    _waypointStore.erase(itr);
+  }
+
+  WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_WAYPOINT_DATA_BY_ID);
+
+  stmt->SetData(0, id);
+
+  PreparedQueryResult result = WorldDatabase.Query(stmt);
+
+  if (!result)
+    return;
+
+  WaypointPath& path = _waypointStore[id];
+
+  do
+  {
+    Field*        fields = result->Fetch();
+    WaypointData* wp     = new WaypointData();
+
+    float                x = fields[1].Get<float>();
+    float                y = fields[2].Get<float>();
+    float                z = fields[3].Get<float>();
+    std::optional<float> o;
+    if (!fields[4].IsNull())
+      o = fields[4].Get<float>();
+
+    Acore::NormalizeMapCoord(x);
+    Acore::NormalizeMapCoord(y);
+
+    wp->id          = fields[0].Get<uint32>();
+    wp->x           = x;
+    wp->y           = y;
+    wp->z           = z;
+    wp->orientation = o;
+    wp->move_type   = fields[5].Get<uint32>();
+
+    if (wp->move_type >= WAYPOINT_MOVE_TYPE_MAX)
+    {
+      // LOG_ERROR("sql.sql", "Waypoint {} in waypoint_data has invalid move_type, ignoring", wp->id);
+      delete wp;
+      continue;
     }
 
-    WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_SEL_WAYPOINT_DATA_BY_ID);
+    wp->delay        = fields[6].Get<uint32>();
+    wp->event_id     = fields[7].Get<uint32>();
+    wp->event_chance = fields[8].Get<uint8>();
 
-    stmt->SetData(0, id);
-
-    PreparedQueryResult result = WorldDatabase.Query(stmt);
-
-    if (!result)
-        return;
-
-    WaypointPath& path = _waypointStore[id];
-
-    do
-    {
-        Field* fields = result->Fetch();
-        WaypointData* wp = new WaypointData();
-
-        float x = fields[1].Get<float>();
-        float y = fields[2].Get<float>();
-        float z = fields[3].Get<float>();
-        std::optional<float> o;
-        if (!fields[4].IsNull())
-            o = fields[4].Get<float>();
-
-        Acore::NormalizeMapCoord(x);
-        Acore::NormalizeMapCoord(y);
-
-        wp->id = fields[0].Get<uint32>();
-        wp->x = x;
-        wp->y = y;
-        wp->z = z;
-        wp->orientation = o;
-        wp->move_type = fields[5].Get<uint32>();
-
-        if (wp->move_type >= WAYPOINT_MOVE_TYPE_MAX)
-        {
-            //LOG_ERROR("sql.sql", "Waypoint {} in waypoint_data has invalid move_type, ignoring", wp->id);
-            delete wp;
-            continue;
-        }
-
-        wp->delay = fields[6].Get<uint32>();
-        wp->event_id = fields[7].Get<uint32>();
-        wp->event_chance = fields[8].Get<uint8>();
-
-        path.push_back(wp);
-    } while (result->NextRow());
+    path.push_back(wp);
+  } while (result->NextRow());
 }

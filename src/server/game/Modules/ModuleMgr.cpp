@@ -20,22 +20,19 @@
 
 namespace
 {
-    std::string_view _modulesList = {};
+std::string_view _modulesList = {};
 }
 
-void Acore::Module::SetEnableModulesList(std::string_view modulesList)
-{
-    _modulesList = modulesList;
-}
+void Acore::Module::SetEnableModulesList(std::string_view modulesList) { _modulesList = modulesList; }
 
 std::vector<std::string_view> Acore::Module::GetEnableModulesList()
 {
-    std::vector<std::string_view> _list;
+  std::vector<std::string_view> _list;
 
-    for (auto const& modName : Acore::Tokenize(_modulesList, ',', false))
-    {
-        _list.emplace_back(modName);
-    }
+  for (auto const& modName : Acore::Tokenize(_modulesList, ',', false))
+  {
+    _list.emplace_back(modName);
+  }
 
-    return _list;
+  return _list;
 }

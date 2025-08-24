@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -20,55 +21,56 @@
 
 #include "Define.h"
 
-template <class T>
-class DBCStorageIterator
+template <class T> class DBCStorageIterator
 {
 public:
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = T;
-    using difference_type = std::ptrdiff_t;
-    using pointer = T*;
-    using reference = T&;
+  using iterator_category = std::forward_iterator_tag;
+  using value_type        = T;
+  using difference_type   = std::ptrdiff_t;
+  using pointer           = T*;
+  using reference         = T&;
 
-    DBCStorageIterator() : _index(nullptr) { }
-    DBCStorageIterator(T** index, uint32 size, uint32 pos = 0) : _index(index), _pos(pos), _end(size)
+  DBCStorageIterator() : _index(nullptr) {}
+  DBCStorageIterator(T** index, uint32 size, uint32 pos = 0) : _index(index), _pos(pos), _end(size)
+  {
+    if (_pos < _end)
     {
-        if (_pos < _end)
-        {
-            while (_pos < _end && !_index[_pos])
-                ++_pos;
-        }
+      while (_pos < _end && !_index[_pos])
+        ++_pos;
+    }
+  }
+
+  T const* operator->() { return _index[_pos]; }
+  T const* operator*() { return _index[_pos]; }
+
+  bool operator==(DBCStorageIterator const& right) const { /*ASSERT(_index == right._index, "Iterator belongs to a
+                                                              different container")*/
+                                                           return _pos == right._pos; }
+  bool operator!=(DBCStorageIterator const& right) const { return !(*this == right); }
+
+  DBCStorageIterator& operator++()
+  {
+    if (_pos < _end)
+    {
+      do
+        ++_pos;
+      while (_pos < _end && !_index[_pos]);
     }
 
-    T const* operator->() { return _index[_pos]; }
-    T const* operator*() { return _index[_pos]; }
+    return *this;
+  }
 
-    bool operator==(DBCStorageIterator const& right) const { /*ASSERT(_index == right._index, "Iterator belongs to a different container")*/ return _pos == right._pos; }
-    bool operator!=(DBCStorageIterator const& right) const { return !(*this == right); }
-
-    DBCStorageIterator& operator++()
-    {
-        if (_pos < _end)
-        {
-            do
-                ++_pos;
-            while (_pos < _end && !_index[_pos]);
-        }
-
-        return *this;
-    }
-
-    DBCStorageIterator operator++(int)
-    {
-        DBCStorageIterator tmp = *this;
-        ++*this;
-        return tmp;
-    }
+  DBCStorageIterator operator++(int)
+  {
+    DBCStorageIterator tmp = *this;
+    ++*this;
+    return tmp;
+  }
 
 private:
-    T** _index;
-    uint32 _pos{0};
-    uint32 _end{0};
+  T**    _index;
+  uint32 _pos{0};
+  uint32 _end{0};
 };
 
 #endif // DBCStorageIterator_h__

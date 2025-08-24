@@ -17,7 +17,4 @@
 
 #include "CombatPackets.h"
 
-void WorldPackets::Combat::SetSheathed::Read()
-{
-    _worldPacket >> CurrentSheathState;
-}
+void WorldPackets::Combat::SetSheathed::Read() { _worldPacket >> CurrentSheathState; }

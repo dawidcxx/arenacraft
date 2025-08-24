@@ -21,49 +21,48 @@
 
 bool ScriptMgr::CanAddMember(ArenaTeam* team, ObjectGuid PlayerGuid)
 {
-    CALL_ENABLED_BOOLEAN_HOOKS(ArenaScript, ARENAHOOK_CAN_ADD_MEMBER, !script->CanAddMember(team, PlayerGuid));
+  CALL_ENABLED_BOOLEAN_HOOKS(ArenaScript, ARENAHOOK_CAN_ADD_MEMBER, !script->CanAddMember(team, PlayerGuid));
 }
 
 void ScriptMgr::OnGetPoints(ArenaTeam* team, uint32 memberRating, float& points)
 {
-    CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_GET_POINTS, script->OnGetPoints(team, memberRating, points));
+  CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_GET_POINTS, script->OnGetPoints(team, memberRating, points));
 }
 
 bool ScriptMgr::CanSaveToDB(ArenaTeam* team)
 {
-    CALL_ENABLED_BOOLEAN_HOOKS(ArenaScript, ARENAHOOK_CAN_SAVE_TO_DB, !script->CanSaveToDB(team));
+  CALL_ENABLED_BOOLEAN_HOOKS(ArenaScript, ARENAHOOK_CAN_SAVE_TO_DB, !script->CanSaveToDB(team));
 }
 
 bool ScriptMgr::OnBeforeArenaCheckWinConditions(Battleground* const bg)
 {
-    CALL_ENABLED_BOOLEAN_HOOKS(ArenaScript, ARENAHOOK_ON_BEFORE_CHECK_WIN_CONDITION, !script->OnBeforeArenaCheckWinConditions(bg));
+  CALL_ENABLED_BOOLEAN_HOOKS(ArenaScript, ARENAHOOK_ON_BEFORE_CHECK_WIN_CONDITION,
+                             !script->OnBeforeArenaCheckWinConditions(bg));
 }
 
 void ScriptMgr::OnArenaStart(Battleground* bg)
 {
-    CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_START, script->OnArenaStart(bg));
+  CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_START, script->OnArenaStart(bg));
 }
 
 void ScriptMgr::OnArenaEnd(Battleground* bg)
 {
-    CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_END, script->OnArenaEnd(bg));
+  CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_END, script->OnArenaEnd(bg));
 }
 
 void ScriptMgr::OnArenaInvitesSent(Battleground* bg)
 {
-    CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_INVITES_SENT, script->OnArenaInvitesSent(bg));
+  CALL_ENABLED_HOOKS(ArenaScript, ARENAHOOK_ON_ARENA_INVITES_SENT, script->OnArenaInvitesSent(bg));
 }
 
-
-ArenaScript::ArenaScript(const char* name, std::vector<uint16> enabledHooks)
-    : ScriptObject(name, ARENAHOOK_END)
+ArenaScript::ArenaScript(const char* name, std::vector<uint16> enabledHooks) : ScriptObject(name, ARENAHOOK_END)
 {
-    // If empty - enable all available hooks.
-    if (enabledHooks.empty())
-        for (uint16 i = 0; i < ARENAHOOK_END; ++i)
-            enabledHooks.emplace_back(i);
+  // If empty - enable all available hooks.
+  if (enabledHooks.empty())
+    for (uint16 i = 0; i < ARENAHOOK_END; ++i)
+      enabledHooks.emplace_back(i);
 
-    ScriptRegistry<ArenaScript>::AddScript(this, std::move(enabledHooks));
+  ScriptRegistry<ArenaScript>::AddScript(this, std::move(enabledHooks));
 }
 
 template class AC_GAME_API ScriptRegistry<ArenaScript>;

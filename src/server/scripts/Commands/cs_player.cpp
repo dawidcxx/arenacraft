@@ -23,47 +23,41 @@ using namespace Acore::ChatCommands;
 class player_commandscript : public CommandScript
 {
 public:
-    player_commandscript() : CommandScript("player_commandscript") { }
+  player_commandscript() : CommandScript("player_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
-    {
-        static ChatCommandTable playerCommandTable =
-        {
-            { "learn",   HandlePlayerLearnCommand,   SEC_GAMEMASTER, Console::Yes },
-            { "unlearn", HandlePlayerUnLearnCommand, SEC_GAMEMASTER, Console::Yes }
-        };
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable playerCommandTable = {
+        {"learn", HandlePlayerLearnCommand, SEC_GAMEMASTER, Console::Yes},
+        {"unlearn", HandlePlayerUnLearnCommand, SEC_GAMEMASTER, Console::Yes}};
 
-        static ChatCommandTable commandTable =
-        {
-            { "player", playerCommandTable }
-        };
-        return commandTable;
-    }
+    static ChatCommandTable commandTable = {{"player", playerCommandTable}};
+    return commandTable;
+  }
 
-    static bool HandlePlayerLearnCommand(ChatHandler* handler, Optional<PlayerIdentifier> player, SpellInfo const* spell, Optional<EXACT_SEQUENCE("all")> allRanks)
-    {
-        if (!player)
-            player = PlayerIdentifier::FromTargetOrSelf(handler);
-        if (!player || !player->IsConnected())
-            return false;
+  static bool HandlePlayerLearnCommand(ChatHandler* handler, Optional<PlayerIdentifier> player, SpellInfo const* spell,
+                                       Optional<EXACT_SEQUENCE("all")> allRanks)
+  {
+    if (!player)
+      player = PlayerIdentifier::FromTargetOrSelf(handler);
+    if (!player || !player->IsConnected())
+      return false;
 
-        Player* targetPlayer = player->GetConnectedPlayer();
-        return Acore::PlayerCommand::HandleLearnSpellCommand(handler, targetPlayer, spell, allRanks);
-    }
+    Player* targetPlayer = player->GetConnectedPlayer();
+    return Acore::PlayerCommand::HandleLearnSpellCommand(handler, targetPlayer, spell, allRanks);
+  }
 
-    static bool HandlePlayerUnLearnCommand(ChatHandler* handler, Optional<PlayerIdentifier> player, SpellInfo const* spell, Optional<EXACT_SEQUENCE("all")> allRanks)
-    {
-        if (!player)
-            player = PlayerIdentifier::FromTargetOrSelf(handler);
-        if (!player || !player->IsConnected())
-            return false;
+  static bool HandlePlayerUnLearnCommand(ChatHandler* handler, Optional<PlayerIdentifier> player,
+                                         SpellInfo const* spell, Optional<EXACT_SEQUENCE("all")> allRanks)
+  {
+    if (!player)
+      player = PlayerIdentifier::FromTargetOrSelf(handler);
+    if (!player || !player->IsConnected())
+      return false;
 
-        Player* targetPlayer = player->GetConnectedPlayer();
-        return Acore::PlayerCommand::HandleUnlearnSpellCommand(handler, targetPlayer, spell, allRanks);
-    }
+    Player* targetPlayer = player->GetConnectedPlayer();
+    return Acore::PlayerCommand::HandleUnlearnSpellCommand(handler, targetPlayer, spell, allRanks);
+  }
 };
 
-void AddSC_player_commandscript()
-{
-    new player_commandscript();
-}
+void AddSC_player_commandscript() { new player_commandscript(); }

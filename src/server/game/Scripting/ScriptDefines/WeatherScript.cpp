@@ -22,33 +22,26 @@
 
 void ScriptMgr::OnWeatherChange(Weather* weather, WeatherState state, float grade)
 {
-    ASSERT(weather);
+  ASSERT(weather);
 
-    ExecuteScript<ElunaScript>([&](ElunaScript* script)
-    {
-        script->OnWeatherChange(weather, state, grade);
-    });
+  ExecuteScript<ElunaScript>([&](ElunaScript* script) { script->OnWeatherChange(weather, state, grade); });
 
-    if (auto tempScript = ScriptRegistry<WeatherScript>::GetScriptById(weather->GetScriptId()))
-    {
-        tempScript->OnChange(weather, state, grade);
-    }
+  if (auto tempScript = ScriptRegistry<WeatherScript>::GetScriptById(weather->GetScriptId()))
+  {
+    tempScript->OnChange(weather, state, grade);
+  }
 }
 
 void ScriptMgr::OnWeatherUpdate(Weather* weather, uint32 diff)
 {
-    ASSERT(weather);
+  ASSERT(weather);
 
-    if (auto tempScript = ScriptRegistry<WeatherScript>::GetScriptById(weather->GetScriptId()))
-    {
-        tempScript->OnUpdate(weather, diff);
-    }
+  if (auto tempScript = ScriptRegistry<WeatherScript>::GetScriptById(weather->GetScriptId()))
+  {
+    tempScript->OnUpdate(weather, diff);
+  }
 }
 
-WeatherScript::WeatherScript(const char* name)
-    : ScriptObject(name)
-{
-    ScriptRegistry<WeatherScript>::AddScript(this);
-}
+WeatherScript::WeatherScript(const char* name) : ScriptObject(name) { ScriptRegistry<WeatherScript>::AddScript(this); }
 
 template class AC_GAME_API ScriptRegistry<WeatherScript>;

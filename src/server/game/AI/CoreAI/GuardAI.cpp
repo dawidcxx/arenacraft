@@ -20,48 +20,46 @@
 
 int32 GuardAI::Permissible(Creature const* creature)
 {
-    if (creature->IsGuard())
-        return PERMIT_BASE_PROACTIVE;
+  if (creature->IsGuard())
+    return PERMIT_BASE_PROACTIVE;
 
-    return PERMIT_BASE_NO;
+  return PERMIT_BASE_NO;
 }
 
-GuardAI::GuardAI(Creature* creature) : ScriptedAI(creature)
-{
-}
+GuardAI::GuardAI(Creature* creature) : ScriptedAI(creature) {}
 
 void GuardAI::Reset()
 {
-    ScriptedAI::Reset();
-    me->CastSpell(me, 18950 /*SPELL_INVISIBILITY_AND_STEALTH_DETECTION*/, true);
+  ScriptedAI::Reset();
+  me->CastSpell(me, 18950 /*SPELL_INVISIBILITY_AND_STEALTH_DETECTION*/, true);
 }
 
 void GuardAI::EnterEvadeMode(EvadeReason /*why*/)
 {
-    if (!me->IsAlive())
-    {
-        me->GetMotionMaster()->MoveIdle();
-        me->CombatStop(true);
-        me->GetThreatMgr().ClearAllThreat();
-        return;
-    }
-
-    LOG_DEBUG("entities.unit", "Guard entry: {} enters evade mode.", me->GetEntry());
-
-    me->RemoveAllAuras();
-    me->GetThreatMgr().ClearAllThreat();
+  if (!me->IsAlive())
+  {
+    me->GetMotionMaster()->MoveIdle();
     me->CombatStop(true);
+    me->GetThreatMgr().ClearAllThreat();
+    return;
+  }
 
-    // Remove ChaseMovementGenerator from MotionMaster stack list, and add HomeMovementGenerator instead
-    if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
-        me->GetMotionMaster()->MoveTargetedHome();
+  LOG_DEBUG("entities.unit", "Guard entry: {} enters evade mode.", me->GetEntry());
+
+  me->RemoveAllAuras();
+  me->GetThreatMgr().ClearAllThreat();
+  me->CombatStop(true);
+
+  // Remove ChaseMovementGenerator from MotionMaster stack list, and add HomeMovementGenerator instead
+  if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
+    me->GetMotionMaster()->MoveTargetedHome();
 }
 
 void GuardAI::JustDied(Unit* killer)
 {
-    if (!killer)
-        return;
+  if (!killer)
+    return;
 
-    if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
-        me->SendZoneUnderAttackMessage(player);
+  if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+    me->SendZoneUnderAttackMessage(player);
 }

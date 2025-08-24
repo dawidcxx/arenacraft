@@ -36,276 +36,277 @@
 
 MapMgr::MapMgr()
 {
-    i_timer[3].SetInterval(sWorld->getIntConfig(CONFIG_INTERVAL_MAPUPDATE));
-    mapUpdateStep = 0;
-    _nextInstanceId = 0;
+  i_timer[3].SetInterval(sWorld->getIntConfig(CONFIG_INTERVAL_MAPUPDATE));
+  mapUpdateStep   = 0;
+  _nextInstanceId = 0;
 }
 
-MapMgr::~MapMgr()
-{
-}
+MapMgr::~MapMgr() {}
 
-MapMgr *MapMgr::instance()
+MapMgr* MapMgr::instance()
 {
-    static MapMgr instance;
-    return &instance;
+  static MapMgr instance;
+  return &instance;
 }
 
 void MapMgr::Initialize()
 {
-    int num_threads(sWorld->getIntConfig(CONFIG_NUMTHREADS));
+  int num_threads(sWorld->getIntConfig(CONFIG_NUMTHREADS));
 
-    // Start mtmaps if needed
-    if (num_threads > 0)
-        m_updater.activate(num_threads);
+  // Start mtmaps if needed
+  if (num_threads > 0)
+    m_updater.activate(num_threads);
 }
 
 void MapMgr::InitializeVisibilityDistanceInfo()
 {
-    for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
-        (*iter).second->InitVisibilityDistance();
+  for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
+    (*iter).second->InitVisibilityDistance();
 }
 
-Map *MapMgr::CreateBaseMap(uint32 id)
+Map* MapMgr::CreateBaseMap(uint32 id)
 {
-    Map *map = FindBaseMap(id);
+  Map* map = FindBaseMap(id);
 
-    if (!map)
+  if (!map)
+  {
+    std::lock_guard<std::mutex> guard(Lock);
+
+    map = FindBaseMap(id);
+    if (!map) // pussywizard: check again after acquiring mutex
     {
-        std::lock_guard<std::mutex> guard(Lock);
+      MapEntry const* entry = sMapStore.LookupEntry(id);
+      ASSERT(entry);
 
-        map = FindBaseMap(id);
-        if (!map) // pussywizard: check again after acquiring mutex
-        {
-            MapEntry const *entry = sMapStore.LookupEntry(id);
-            ASSERT(entry);
+      if (entry->Instanceable())
+        map = new MapInstanced(id);
+      else
+      {
+        map = new Map(id, 0, REGULAR_DIFFICULTY);
+        map->LoadRespawnTimes();
+        map->LoadCorpseData();
+      }
 
-            if (entry->Instanceable())
-                map = new MapInstanced(id);
-            else
-            {
-                map = new Map(id, 0, REGULAR_DIFFICULTY);
-                map->LoadRespawnTimes();
-                map->LoadCorpseData();
-            }
-
-            i_maps[id] = map;
-        }
+      i_maps[id] = map;
     }
+  }
 
-    ASSERT(map);
-    return map;
+  ASSERT(map);
+  return map;
 }
 
-Map *MapMgr::FindBaseNonInstanceMap(uint32 mapId) const
+Map* MapMgr::FindBaseNonInstanceMap(uint32 mapId) const
 {
-    Map *map = FindBaseMap(mapId);
-    if (map && map->Instanceable())
-        return nullptr;
-    return map;
+  Map* map = FindBaseMap(mapId);
+  if (map && map->Instanceable())
+    return nullptr;
+  return map;
 }
 
-Map *MapMgr::CreateMap(uint32 id, Player *player)
+Map* MapMgr::CreateMap(uint32 id, Player* player)
 {
-    Map *m = CreateBaseMap(id);
+  Map* m = CreateBaseMap(id);
 
-    if (m && m->Instanceable())
-        m = ((MapInstanced *)m)->CreateInstanceForPlayer(id, player);
+  if (m && m->Instanceable())
+    m = ((MapInstanced*)m)->CreateInstanceForPlayer(id, player);
 
-    return m;
+  return m;
 }
 
-Map *MapMgr::FindMap(uint32 mapid, uint32 instanceId) const
+Map* MapMgr::FindMap(uint32 mapid, uint32 instanceId) const
 {
-    Map *map = FindBaseMap(mapid);
-    if (!map)
-        return nullptr;
+  Map* map = FindBaseMap(mapid);
+  if (!map)
+    return nullptr;
 
-    if (!map->Instanceable())
-        return instanceId == 0 ? map : nullptr;
+  if (!map->Instanceable())
+    return instanceId == 0 ? map : nullptr;
 
-    return ((MapInstanced *)map)->FindInstanceMap(instanceId);
+  return ((MapInstanced*)map)->FindInstanceMap(instanceId);
 }
 
-Map::EnterState MapMgr::PlayerCannotEnter(uint32 mapid, Player *player, bool loginCheck)
+Map::EnterState MapMgr::PlayerCannotEnter(uint32 mapid, Player* player, bool loginCheck)
 {
-    MapEntry const *entry = sMapStore.LookupEntry(mapid);
-    if (!entry)
-    {
-        return Map::CANNOT_ENTER_NO_ENTRY;
-    }
-    if (entry->IsArenacraftWhitelistedMap())
-    {
-        return Map::CAN_ENTER;
-    }
+  MapEntry const* entry = sMapStore.LookupEntry(mapid);
+  if (!entry)
+  {
     return Map::CANNOT_ENTER_NO_ENTRY;
+  }
+  if (entry->IsArenacraftWhitelistedMap())
+  {
+    return Map::CAN_ENTER;
+  }
+  return Map::CANNOT_ENTER_NO_ENTRY;
 }
 
 void MapMgr::Update(uint32 diff)
 {
-    for (uint8 i = 0; i < 4; ++i)
-        i_timer[i].Update(diff);
+  for (uint8 i = 0; i < 4; ++i)
+    i_timer[i].Update(diff);
 
-    MapMapType::iterator iter = i_maps.begin();
-    for (; iter != i_maps.end(); ++iter)
-    {
-        bool full = mapUpdateStep < 3 && ((mapUpdateStep == 0 && !iter->second->IsBattlegroundOrArena() && !iter->second->IsDungeon()) || (mapUpdateStep == 1 && iter->second->IsBattlegroundOrArena()) || (mapUpdateStep == 2 && iter->second->IsDungeon()));
-        if (m_updater.activated())
-            m_updater.schedule_update(*iter->second, uint32(full ? i_timer[mapUpdateStep].GetCurrent() : 0), diff);
-        else
-            iter->second->Update(uint32(full ? i_timer[mapUpdateStep].GetCurrent() : 0), diff);
-    }
-
+  MapMapType::iterator iter = i_maps.begin();
+  for (; iter != i_maps.end(); ++iter)
+  {
+    bool full = mapUpdateStep < 3 &&
+                ((mapUpdateStep == 0 && !iter->second->IsBattlegroundOrArena() && !iter->second->IsDungeon()) ||
+                 (mapUpdateStep == 1 && iter->second->IsBattlegroundOrArena()) ||
+                 (mapUpdateStep == 2 && iter->second->IsDungeon()));
     if (m_updater.activated())
-        m_updater.wait();
+      m_updater.schedule_update(*iter->second, uint32(full ? i_timer[mapUpdateStep].GetCurrent() : 0), diff);
+    else
+      iter->second->Update(uint32(full ? i_timer[mapUpdateStep].GetCurrent() : 0), diff);
+  }
 
-    if (mapUpdateStep < 3)
+  if (m_updater.activated())
+    m_updater.wait();
+
+  if (mapUpdateStep < 3)
+  {
+    for (iter = i_maps.begin(); iter != i_maps.end(); ++iter)
     {
-        for (iter = i_maps.begin(); iter != i_maps.end(); ++iter)
-        {
-            bool full = ((mapUpdateStep == 0 && !iter->second->IsBattlegroundOrArena() && !iter->second->IsDungeon()) || (mapUpdateStep == 1 && iter->second->IsBattlegroundOrArena()) || (mapUpdateStep == 2 && iter->second->IsDungeon()));
-            if (full)
-                iter->second->DelayedUpdate(uint32(i_timer[mapUpdateStep].GetCurrent()));
-        }
-
-        i_timer[mapUpdateStep].SetCurrent(0);
-        ++mapUpdateStep;
+      bool full = ((mapUpdateStep == 0 && !iter->second->IsBattlegroundOrArena() && !iter->second->IsDungeon()) ||
+                   (mapUpdateStep == 1 && iter->second->IsBattlegroundOrArena()) ||
+                   (mapUpdateStep == 2 && iter->second->IsDungeon()));
+      if (full)
+        iter->second->DelayedUpdate(uint32(i_timer[mapUpdateStep].GetCurrent()));
     }
 
-    if (mapUpdateStep == 3 && i_timer[3].Passed())
-    {
-        mapUpdateStep = 0;
-        i_timer[3].SetCurrent(0);
-    }
+    i_timer[mapUpdateStep].SetCurrent(0);
+    ++mapUpdateStep;
+  }
+
+  if (mapUpdateStep == 3 && i_timer[3].Passed())
+  {
+    mapUpdateStep = 0;
+    i_timer[3].SetCurrent(0);
+  }
 }
 
-void MapMgr::DoDelayedMovesAndRemoves()
-{
-}
+void MapMgr::DoDelayedMovesAndRemoves() {}
 
 bool MapMgr::ExistMapAndVMap(uint32 mapid, float x, float y)
 {
-    GridCoord p = Acore::ComputeGridCoord(x, y);
+  GridCoord p = Acore::ComputeGridCoord(x, y);
 
-    int gx = 63 - p.x_coord;
-    int gy = 63 - p.y_coord;
+  int gx = 63 - p.x_coord;
+  int gy = 63 - p.y_coord;
 
-    return Map::ExistMap(mapid, gx, gy) && Map::ExistVMap(mapid, gx, gy);
+  return Map::ExistMap(mapid, gx, gy) && Map::ExistVMap(mapid, gx, gy);
 }
 
 bool MapMgr::IsValidMAP(uint32 mapid, bool startUp)
 {
-    MapEntry const *mEntry = sMapStore.LookupEntry(mapid);
+  MapEntry const* mEntry = sMapStore.LookupEntry(mapid);
 
-    if (startUp)
-    {
-        return mEntry != nullptr;
-    }
-    else
-    {
-        return mEntry && (!mEntry->IsDungeon() || sObjectMgr->GetInstanceTemplate(mapid));
-    }
+  if (startUp)
+  {
+    return mEntry != nullptr;
+  }
+  else
+  {
+    return mEntry && (!mEntry->IsDungeon() || sObjectMgr->GetInstanceTemplate(mapid));
+  }
 
-    /// @todo: add check for battleground template
+  /// @todo: add check for battleground template
 }
 
 void MapMgr::UnloadAll()
 {
-    for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end();)
-    {
-        iter->second->UnloadAll();
-        delete iter->second;
-        i_maps.erase(iter++);
-    }
+  for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end();)
+  {
+    iter->second->UnloadAll();
+    delete iter->second;
+    i_maps.erase(iter++);
+  }
 
-    if (m_updater.activated())
-        m_updater.deactivate();
+  if (m_updater.activated())
+    m_updater.deactivate();
 }
 
-void MapMgr::GetNumInstances(uint32 &dungeons, uint32 &battlegrounds, uint32 &arenas)
+void MapMgr::GetNumInstances(uint32& dungeons, uint32& battlegrounds, uint32& arenas)
 {
-    for (MapMapType::iterator itr = i_maps.begin(); itr != i_maps.end(); ++itr)
+  for (MapMapType::iterator itr = i_maps.begin(); itr != i_maps.end(); ++itr)
+  {
+    Map* map = itr->second;
+    if (!map->Instanceable())
+      continue;
+    MapInstanced::InstancedMaps& maps = ((MapInstanced*)map)->GetInstancedMaps();
+    for (MapInstanced::InstancedMaps::iterator mitr = maps.begin(); mitr != maps.end(); ++mitr)
     {
-        Map *map = itr->second;
-        if (!map->Instanceable())
-            continue;
-        MapInstanced::InstancedMaps &maps = ((MapInstanced *)map)->GetInstancedMaps();
-        for (MapInstanced::InstancedMaps::iterator mitr = maps.begin(); mitr != maps.end(); ++mitr)
-        {
-            if (mitr->second->IsDungeon())
-                dungeons++;
-            else if (mitr->second->IsBattleground())
-                battlegrounds++;
-            else if (mitr->second->IsBattleArena())
-                arenas++;
-        }
+      if (mitr->second->IsDungeon())
+        dungeons++;
+      else if (mitr->second->IsBattleground())
+        battlegrounds++;
+      else if (mitr->second->IsBattleArena())
+        arenas++;
     }
+  }
 }
 
-void MapMgr::GetNumPlayersInInstances(uint32 &dungeons, uint32 &battlegrounds, uint32 &arenas, uint32 &spectators)
+void MapMgr::GetNumPlayersInInstances(uint32& dungeons, uint32& battlegrounds, uint32& arenas, uint32& spectators)
 {
-    for (MapMapType::iterator itr = i_maps.begin(); itr != i_maps.end(); ++itr)
+  for (MapMapType::iterator itr = i_maps.begin(); itr != i_maps.end(); ++itr)
+  {
+    Map* map = itr->second;
+    if (!map->Instanceable())
+      continue;
+    MapInstanced::InstancedMaps& maps = ((MapInstanced*)map)->GetInstancedMaps();
+    for (MapInstanced::InstancedMaps::iterator mitr = maps.begin(); mitr != maps.end(); ++mitr)
     {
-        Map *map = itr->second;
-        if (!map->Instanceable())
-            continue;
-        MapInstanced::InstancedMaps &maps = ((MapInstanced *)map)->GetInstancedMaps();
-        for (MapInstanced::InstancedMaps::iterator mitr = maps.begin(); mitr != maps.end(); ++mitr)
-        {
-            if (mitr->second->IsDungeon())
-                dungeons += ((InstanceMap *)mitr->second)->GetPlayers().getSize();
-            else if (mitr->second->IsBattleground())
-                battlegrounds += ((InstanceMap *)mitr->second)->GetPlayers().getSize();
-            else if (mitr->second->IsBattleArena())
-            {
-                uint32 spect = 0;
-                if (BattlegroundMap *bgmap = mitr->second->ToBattlegroundMap())
-                    if (Battleground *bg = bgmap->GetBG())
-                        spect = bg->GetSpectators().size();
+      if (mitr->second->IsDungeon())
+        dungeons += ((InstanceMap*)mitr->second)->GetPlayers().getSize();
+      else if (mitr->second->IsBattleground())
+        battlegrounds += ((InstanceMap*)mitr->second)->GetPlayers().getSize();
+      else if (mitr->second->IsBattleArena())
+      {
+        uint32 spect = 0;
+        if (BattlegroundMap* bgmap = mitr->second->ToBattlegroundMap())
+          if (Battleground* bg = bgmap->GetBG())
+            spect = bg->GetSpectators().size();
 
-                arenas += ((InstanceMap *)mitr->second)->GetPlayers().getSize() - spect;
-                spectators += spect;
-            }
-        }
+        arenas += ((InstanceMap*)mitr->second)->GetPlayers().getSize() - spect;
+        spectators += spect;
+      }
     }
+  }
 }
 
 void MapMgr::InitInstanceIds()
 {
-    _nextInstanceId = 1;
+  _nextInstanceId = 1;
 
-    QueryResult result = CharacterDatabase.Query("SELECT MAX(id) FROM instance");
-    if (result)
-    {
-        uint32 maxId = (*result)[0].Get<uint32>();
-        _instanceIds.resize(maxId + 1);
-    }
+  QueryResult result = CharacterDatabase.Query("SELECT MAX(id) FROM instance");
+  if (result)
+  {
+    uint32 maxId = (*result)[0].Get<uint32>();
+    _instanceIds.resize(maxId + 1);
+  }
 }
 
 void MapMgr::RegisterInstanceId(uint32 instanceId)
 {
-    // Allocation was done in InitInstanceIds()
-    _instanceIds[instanceId] = true;
+  // Allocation was done in InitInstanceIds()
+  _instanceIds[instanceId] = true;
 
-    // Instances are pulled in ascending order from db and _nextInstanceId is initialized with 1,
-    // so if the instance id is used, increment
-    if (_nextInstanceId == instanceId)
-        ++_nextInstanceId;
+  // Instances are pulled in ascending order from db and _nextInstanceId is initialized with 1,
+  // so if the instance id is used, increment
+  if (_nextInstanceId == instanceId)
+    ++_nextInstanceId;
 }
 
 uint32 MapMgr::GenerateInstanceId()
 {
-    uint32 newInstanceId = _nextInstanceId;
+  uint32 newInstanceId = _nextInstanceId;
 
-    // find the lowest available id starting from the current _nextInstanceId
-    while (_nextInstanceId < 0xFFFFFFFF && ++_nextInstanceId < _instanceIds.size() && _instanceIds[_nextInstanceId])
-        ;
+  // find the lowest available id starting from the current _nextInstanceId
+  while (_nextInstanceId < 0xFFFFFFFF && ++_nextInstanceId < _instanceIds.size() && _instanceIds[_nextInstanceId])
+    ;
 
-    if (_nextInstanceId == 0xFFFFFFFF)
-    {
-        LOG_ERROR("server.worldserver", "Instance ID overflow!! Can't continue, shutting down server. ");
-        World::StopNow(ERROR_EXIT_CODE);
-    }
+  if (_nextInstanceId == 0xFFFFFFFF)
+  {
+    LOG_ERROR("server.worldserver", "Instance ID overflow!! Can't continue, shutting down server. ");
+    World::StopNow(ERROR_EXIT_CODE);
+  }
 
-    return newInstanceId;
+  return newInstanceId;
 }

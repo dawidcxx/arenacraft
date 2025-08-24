@@ -26,240 +26,233 @@ using namespace Acore::ChatCommands;
 class group_commandscript : public CommandScript
 {
 public:
-    group_commandscript() : CommandScript("group_commandscript") { }
+  group_commandscript() : CommandScript("group_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable groupCommandTable = {{"list", HandleGroupListCommand, SEC_GAMEMASTER, Console::Yes},
+                                                 {"join", HandleGroupJoinCommand, SEC_GAMEMASTER, Console::No},
+                                                 {"remove", HandleGroupRemoveCommand, SEC_GAMEMASTER, Console::No},
+                                                 {"disband", HandleGroupDisbandCommand, SEC_GAMEMASTER, Console::No},
+                                                 {"leader", HandleGroupLeaderCommand, SEC_GAMEMASTER, Console::No}};
+
+    static ChatCommandTable commandTable = {{"group", groupCommandTable}};
+
+    return commandTable;
+  }
+
+  static bool HandleGroupLeaderCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
+  {
+    if (!target)
     {
-        static ChatCommandTable groupCommandTable =
-        {
-            { "list",    HandleGroupListCommand,    SEC_GAMEMASTER, Console::Yes },
-            { "join",    HandleGroupJoinCommand,    SEC_GAMEMASTER, Console::No },
-            { "remove",  HandleGroupRemoveCommand,  SEC_GAMEMASTER, Console::No },
-            { "disband", HandleGroupDisbandCommand, SEC_GAMEMASTER, Console::No },
-            { "leader",  HandleGroupLeaderCommand,  SEC_GAMEMASTER, Console::No }
-        };
-
-        static ChatCommandTable commandTable =
-        {
-            { "group",  groupCommandTable }
-        };
-
-        return commandTable;
+      target = PlayerIdentifier::FromTargetOrSelf(handler);
     }
 
-    static bool HandleGroupLeaderCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
+    if (!target)
     {
-        if (!target)
-        {
-            target = PlayerIdentifier::FromTargetOrSelf(handler);
-        }
-
-        if (!target)
-        {
-            return false;
-        }
-
-        Player* player = nullptr;
-        Group* group = nullptr;
-        ObjectGuid guid;
-
-        if (handler->GetPlayerGroupAndGUIDByName(target->GetName().c_str(), player, group, guid))
-        {
-            if (group && group->GetLeaderGUID() != guid)
-            {
-                group->ChangeLeader(guid);
-                group->SendUpdate();
-            }
-        }
-
-        return true;
+      return false;
     }
 
-    static bool HandleGroupDisbandCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
+    Player*    player = nullptr;
+    Group*     group  = nullptr;
+    ObjectGuid guid;
+
+    if (handler->GetPlayerGroupAndGUIDByName(target->GetName().c_str(), player, group, guid))
     {
-        if (!target)
-        {
-            target = PlayerIdentifier::FromTargetOrSelf(handler);
-        }
-
-        if (!target || !target->IsConnected())
-        {
-            return false;
-        }
-
-        Player* player = nullptr;
-        Group* group = nullptr;
-        ObjectGuid guid;
-
-        if (handler->GetPlayerGroupAndGUIDByName(target->GetName().c_str(), player, group, guid))
-        {
-            if (group)
-            {
-                group->Disband();
-            }
-        }
-
-        return true;
+      if (group && group->GetLeaderGUID() != guid)
+      {
+        group->ChangeLeader(guid);
+        group->SendUpdate();
+      }
     }
 
-    static bool HandleGroupRemoveCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
+    return true;
+  }
+
+  static bool HandleGroupDisbandCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
+  {
+    if (!target)
     {
-        if (!target)
-        {
-            target = PlayerIdentifier::FromTargetOrSelf(handler);
-        }
-
-        if (!target || !target->IsConnected())
-        {
-            return false;
-        }
-
-        Player* player = nullptr;
-        Group* group = nullptr;
-        ObjectGuid guid;
-
-        if (handler->GetPlayerGroupAndGUIDByName(target->GetName().c_str(), player, group, guid, true))
-        {
-            if (group)
-            {
-                group->RemoveMember(guid);
-            }
-        }
-
-        return true;
+      target = PlayerIdentifier::FromTargetOrSelf(handler);
     }
 
-    static bool HandleGroupJoinCommand(ChatHandler* handler, std::string const& playerInGroup, std::string const& playerName)
+    if (!target || !target->IsConnected())
     {
-        if (playerInGroup.empty() || playerName.empty())
-        {
-            return false;
-        }
+      return false;
+    }
 
-        Player* playerSource = nullptr;
-        Group* groupSource = nullptr;
-        ObjectGuid guidSource;
-        ObjectGuid guidTarget;
+    Player*    player = nullptr;
+    Group*     group  = nullptr;
+    ObjectGuid guid;
 
-        if (handler->GetPlayerGroupAndGUIDByName(playerInGroup.c_str(), playerSource, groupSource, guidSource, true))
+    if (handler->GetPlayerGroupAndGUIDByName(target->GetName().c_str(), player, group, guid))
+    {
+      if (group)
+      {
+        group->Disband();
+      }
+    }
+
+    return true;
+  }
+
+  static bool HandleGroupRemoveCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
+  {
+    if (!target)
+    {
+      target = PlayerIdentifier::FromTargetOrSelf(handler);
+    }
+
+    if (!target || !target->IsConnected())
+    {
+      return false;
+    }
+
+    Player*    player = nullptr;
+    Group*     group  = nullptr;
+    ObjectGuid guid;
+
+    if (handler->GetPlayerGroupAndGUIDByName(target->GetName().c_str(), player, group, guid, true))
+    {
+      if (group)
+      {
+        group->RemoveMember(guid);
+      }
+    }
+
+    return true;
+  }
+
+  static bool HandleGroupJoinCommand(ChatHandler* handler, std::string const& playerInGroup,
+                                     std::string const& playerName)
+  {
+    if (playerInGroup.empty() || playerName.empty())
+    {
+      return false;
+    }
+
+    Player*    playerSource = nullptr;
+    Group*     groupSource  = nullptr;
+    ObjectGuid guidSource;
+    ObjectGuid guidTarget;
+
+    if (handler->GetPlayerGroupAndGUIDByName(playerInGroup.c_str(), playerSource, groupSource, guidSource, true))
+    {
+      if (groupSource)
+      {
+        Group*  groupTarget  = nullptr;
+        Player* playerTarget = nullptr;
+
+        if (handler->GetPlayerGroupAndGUIDByName(playerName.c_str(), playerTarget, groupTarget, guidTarget, true))
         {
-            if (groupSource)
+          if (!groupTarget && playerTarget->GetGroup() != groupSource)
+          {
+            if (!groupSource->IsFull())
             {
-                Group* groupTarget = nullptr;
-                Player* playerTarget = nullptr;
-
-                if (handler->GetPlayerGroupAndGUIDByName(playerName.c_str(), playerTarget, groupTarget, guidTarget, true))
-                {
-                    if (!groupTarget && playerTarget->GetGroup() != groupSource)
-                    {
-                        if (!groupSource->IsFull())
-                        {
-                            groupSource->AddMember(playerTarget);
-                            groupSource->BroadcastGroupUpdate();
-                            handler->PSendSysMessage(LANG_GROUP_PLAYER_JOINED, playerTarget->GetName(), playerSource->GetName());
-                            return true;
-                        }
-                        else
-                        {
-                            // group is full
-                            handler->PSendSysMessage(LANG_GROUP_FULL);
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        // group is full or target player already in a group
-                        handler->PSendSysMessage(LANG_GROUP_ALREADY_IN_GROUP, playerTarget->GetName());
-                        return true;
-                    }
-                }
+              groupSource->AddMember(playerTarget);
+              groupSource->BroadcastGroupUpdate();
+              handler->PSendSysMessage(LANG_GROUP_PLAYER_JOINED, playerTarget->GetName(), playerSource->GetName());
+              return true;
             }
             else
             {
-                // specified source player is not in a group
-                handler->PSendSysMessage(LANG_GROUP_NOT_IN_GROUP, playerSource->GetName());
-                return true;
+              // group is full
+              handler->PSendSysMessage(LANG_GROUP_FULL);
+              return true;
             }
-        }
-
-        return true;
-    }
-
-    static bool HandleGroupListCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
-    {
-        if (!target)
-        {
-            target = PlayerIdentifier::FromTargetOrSelf(handler);
-        }
-
-        if (!target)
-        {
-            return false;
-        }
-
-        Group* groupTarget = nullptr;
-
-        if (target->IsConnected())
-        {
-            groupTarget = target->GetConnectedPlayer()->GetGroup();
-        }
-
-        if (!groupTarget)
-        {
-            if (ObjectGuid groupGUID = sCharacterCache->GetCharacterGroupGuidByGuid(target->GetGUID()))
-            {
-                groupTarget = sGroupMgr->GetGroupByGUID(groupGUID.GetCounter());
-            }
-        }
-
-        if (!groupTarget)
-        {
-            handler->PSendSysMessage(LANG_GROUP_NOT_IN_GROUP, target->GetName());
+          }
+          else
+          {
+            // group is full or target player already in a group
+            handler->PSendSysMessage(LANG_GROUP_ALREADY_IN_GROUP, playerTarget->GetName());
             return true;
+          }
         }
-
-        handler->PSendSysMessage(LANG_GROUP_TYPE, (groupTarget->isRaidGroup() ? "Raid" : "Party"), groupTarget->GetMembersCount());
-
-        for (auto const& slot : groupTarget->GetMemberSlots())
-        {
-            std::string flags;
-
-            if (slot.flags & MEMBER_FLAG_ASSISTANT)
-            {
-                flags = "Assistant";
-            }
-
-            if (slot.flags & MEMBER_FLAG_MAINTANK)
-            {
-                if (!flags.empty())
-                {
-                    flags.append(", ");
-                }
-
-                flags.append("MainTank");
-            }
-
-            if (slot.flags & MEMBER_FLAG_MAINASSIST)
-            {
-                if (!flags.empty())
-                {
-                    flags.append(", ");
-                }
-
-                flags.append("MainAssist");
-            }
-
-            if (flags.empty())
-            {
-                flags = "None";
-            }
-        }
-
+      }
+      else
+      {
+        // specified source player is not in a group
+        handler->PSendSysMessage(LANG_GROUP_NOT_IN_GROUP, playerSource->GetName());
         return true;
+      }
     }
+
+    return true;
+  }
+
+  static bool HandleGroupListCommand(ChatHandler* handler, Optional<PlayerIdentifier> target)
+  {
+    if (!target)
+    {
+      target = PlayerIdentifier::FromTargetOrSelf(handler);
+    }
+
+    if (!target)
+    {
+      return false;
+    }
+
+    Group* groupTarget = nullptr;
+
+    if (target->IsConnected())
+    {
+      groupTarget = target->GetConnectedPlayer()->GetGroup();
+    }
+
+    if (!groupTarget)
+    {
+      if (ObjectGuid groupGUID = sCharacterCache->GetCharacterGroupGuidByGuid(target->GetGUID()))
+      {
+        groupTarget = sGroupMgr->GetGroupByGUID(groupGUID.GetCounter());
+      }
+    }
+
+    if (!groupTarget)
+    {
+      handler->PSendSysMessage(LANG_GROUP_NOT_IN_GROUP, target->GetName());
+      return true;
+    }
+
+    handler->PSendSysMessage(LANG_GROUP_TYPE, (groupTarget->isRaidGroup() ? "Raid" : "Party"),
+                             groupTarget->GetMembersCount());
+
+    for (auto const& slot : groupTarget->GetMemberSlots())
+    {
+      std::string flags;
+
+      if (slot.flags & MEMBER_FLAG_ASSISTANT)
+      {
+        flags = "Assistant";
+      }
+
+      if (slot.flags & MEMBER_FLAG_MAINTANK)
+      {
+        if (!flags.empty())
+        {
+          flags.append(", ");
+        }
+
+        flags.append("MainTank");
+      }
+
+      if (slot.flags & MEMBER_FLAG_MAINASSIST)
+      {
+        if (!flags.empty())
+        {
+          flags.append(", ");
+        }
+
+        flags.append("MainAssist");
+      }
+
+      if (flags.empty())
+      {
+        flags = "None";
+      }
+    }
+
+    return true;
+  }
 };
 
-void AddSC_group_commandscript()
-{
-    new group_commandscript();
-}
+void AddSC_group_commandscript() { new group_commandscript(); }

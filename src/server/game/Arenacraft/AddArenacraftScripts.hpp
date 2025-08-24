@@ -2,6 +2,6 @@
 
 void AddArenacraftScripts()
 {
-    new arenacraft::soloq::SoloQueueScript();
-    new arenacraft::soloq::NpcSoloq();  
+  new arenacraft::soloq::SoloQueueScript();
+  new arenacraft::soloq::NpcSoloq();
 }

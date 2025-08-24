@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -23,26 +24,30 @@
 /// Ban function return codes
 enum BanReturn
 {
-    BAN_SUCCESS,
-    BAN_SYNTAX_ERROR,
-    BAN_NOTFOUND,
-    BAN_LONGER_EXISTS
+  BAN_SUCCESS,
+  BAN_SYNTAX_ERROR,
+  BAN_NOTFOUND,
+  BAN_LONGER_EXISTS
 };
 
 class BanMgr
 {
 public:
-    static BanMgr* instance();
+  static BanMgr* instance();
 
-    BanReturn BanAccount(std::string const& AccountName, std::string const& Duration, std::string const& Reason, std::string const& Author);
-    BanReturn BanAccountByPlayerName(std::string const& CharacterName, std::string const& Duration, std::string const& Reason, std::string const& Author);
-    BanReturn BanIP(std::string const& IP, std::string const& Duration, std::string const& Reason, std::string const& Author);
-    BanReturn BanCharacter(std::string const& CharacterName, std::string const& Duration, std::string const& Reason, std::string const& Author);
+  BanReturn BanAccount(std::string const& AccountName, std::string const& Duration, std::string const& Reason,
+                       std::string const& Author);
+  BanReturn BanAccountByPlayerName(std::string const& CharacterName, std::string const& Duration,
+                                   std::string const& Reason, std::string const& Author);
+  BanReturn BanIP(std::string const& IP, std::string const& Duration, std::string const& Reason,
+                  std::string const& Author);
+  BanReturn BanCharacter(std::string const& CharacterName, std::string const& Duration, std::string const& Reason,
+                         std::string const& Author);
 
-    bool RemoveBanAccount(std::string const& AccountName);
-    bool RemoveBanAccountByPlayerName(std::string const& CharacterName);
-    bool RemoveBanIP(std::string const& IP);
-    bool RemoveBanCharacter(std::string const& CharacterName);
+  bool RemoveBanAccount(std::string const& AccountName);
+  bool RemoveBanAccountByPlayerName(std::string const& CharacterName);
+  bool RemoveBanIP(std::string const& IP);
+  bool RemoveBanCharacter(std::string const& CharacterName);
 };
 
 #define sBan BanMgr::instance()

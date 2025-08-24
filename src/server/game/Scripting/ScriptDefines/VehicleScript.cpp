@@ -21,77 +21,73 @@
 
 void ScriptMgr::OnInstall(Vehicle* veh)
 {
-    ASSERT(veh);
-    ASSERT(veh->GetBase()->IsCreature());
+  ASSERT(veh);
+  ASSERT(veh->GetBase()->IsCreature());
 
-    if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
-    {
-        tempScript->OnInstall(veh);
-    }
+  if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
+  {
+    tempScript->OnInstall(veh);
+  }
 }
 
 void ScriptMgr::OnUninstall(Vehicle* veh)
 {
-    ASSERT(veh);
-    ASSERT(veh->GetBase()->IsCreature());
+  ASSERT(veh);
+  ASSERT(veh->GetBase()->IsCreature());
 
-    if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
-    {
-        tempScript->OnUninstall(veh);
-    }
+  if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
+  {
+    tempScript->OnUninstall(veh);
+  }
 }
 
 void ScriptMgr::OnReset(Vehicle* veh)
 {
-    ASSERT(veh);
-    ASSERT(veh->GetBase()->IsCreature());
+  ASSERT(veh);
+  ASSERT(veh->GetBase()->IsCreature());
 
-    if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
-    {
-        tempScript->OnReset(veh);
-    }
+  if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
+  {
+    tempScript->OnReset(veh);
+  }
 }
 
 void ScriptMgr::OnInstallAccessory(Vehicle* veh, Creature* accessory)
 {
-    ASSERT(veh);
-    ASSERT(veh->GetBase()->IsCreature());
-    ASSERT(accessory);
+  ASSERT(veh);
+  ASSERT(veh->GetBase()->IsCreature());
+  ASSERT(accessory);
 
-    if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
-    {
-        tempScript->OnInstallAccessory(veh, accessory);
-    }
+  if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
+  {
+    tempScript->OnInstallAccessory(veh, accessory);
+  }
 }
 
 void ScriptMgr::OnAddPassenger(Vehicle* veh, Unit* passenger, int8 seatId)
 {
-    ASSERT(veh);
-    ASSERT(veh->GetBase()->IsCreature());
-    ASSERT(passenger);
+  ASSERT(veh);
+  ASSERT(veh->GetBase()->IsCreature());
+  ASSERT(passenger);
 
-    if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
-    {
-        tempScript->OnAddPassenger(veh, passenger, seatId);
-    }
+  if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
+  {
+    tempScript->OnAddPassenger(veh, passenger, seatId);
+  }
 }
 
 void ScriptMgr::OnRemovePassenger(Vehicle* veh, Unit* passenger)
 {
-    ASSERT(veh);
-    ASSERT(veh->GetBase()->IsCreature());
-    ASSERT(passenger);
+  ASSERT(veh);
+  ASSERT(veh->GetBase()->IsCreature());
+  ASSERT(passenger);
 
-    if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
-    {
-        tempScript->OnRemovePassenger(veh, passenger);
-    }
+  if (auto tempScript = ScriptRegistry<VehicleScript>::GetScriptById(veh->GetBase()->ToCreature()->GetScriptId()))
+  {
+    tempScript->OnRemovePassenger(veh, passenger);
+  }
 }
 
-VehicleScript::VehicleScript(const char* name)
-    : ScriptObject(name)
-{
-    ScriptRegistry<VehicleScript>::AddScript(this);
-}
+VehicleScript::VehicleScript(const char* name) : ScriptObject(name) { ScriptRegistry<VehicleScript>::AddScript(this); }
 
 template class AC_GAME_API ScriptRegistry<VehicleScript>;

@@ -18,10 +18,6 @@
 #include "ModuleScript.h"
 #include "ScriptMgr.h"
 
-ModuleScript::ModuleScript(const char* name)
-    : ScriptObject(name)
-{
-    ScriptRegistry<ModuleScript>::AddScript(this);
-}
+ModuleScript::ModuleScript(const char* name) : ScriptObject(name) { ScriptRegistry<ModuleScript>::AddScript(this); }
 
 template class AC_GAME_API ScriptRegistry<ModuleScript>;

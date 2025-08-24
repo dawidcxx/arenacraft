@@ -17,33 +17,24 @@
 
 #include "CharacterPackets.h"
 
-void WorldPackets::Character::ShowingCloak::Read()
-{
-    _worldPacket >> ShowCloak;
-}
+void WorldPackets::Character::ShowingCloak::Read() { _worldPacket >> ShowCloak; }
 
-void WorldPackets::Character::ShowingHelm::Read()
-{
-    _worldPacket >> ShowHelm;
-}
+void WorldPackets::Character::ShowingHelm::Read() { _worldPacket >> ShowHelm; }
 
 WorldPacket const* WorldPackets::Character::LogoutResponse::Write()
 {
-    _worldPacket << uint32(LogoutResult);
-    _worldPacket << uint8(Instant);
-    return &_worldPacket;
+  _worldPacket << uint32(LogoutResult);
+  _worldPacket << uint8(Instant);
+  return &_worldPacket;
 }
 
-void WorldPackets::Character::PlayedTimeClient::Read()
-{
-    _worldPacket >> TriggerScriptEvent;
-}
+void WorldPackets::Character::PlayedTimeClient::Read() { _worldPacket >> TriggerScriptEvent; }
 
 WorldPacket const* WorldPackets::Character::PlayedTime::Write()
 {
-    _worldPacket << uint32(TotalTime);
-    _worldPacket << uint32(LevelTime);
-    _worldPacket << uint8(TriggerScriptEvent);
+  _worldPacket << uint32(TotalTime);
+  _worldPacket << uint32(LevelTime);
+  _worldPacket << uint8(TriggerScriptEvent);
 
-    return &_worldPacket;
+  return &_worldPacket;
 }

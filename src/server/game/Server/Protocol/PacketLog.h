@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -24,8 +25,8 @@
 
 enum Direction
 {
-    CLIENT_TO_SERVER,
-    SERVER_TO_CLIENT
+  CLIENT_TO_SERVER,
+  SERVER_TO_CLIENT
 };
 
 class WorldPacket;
@@ -33,20 +34,20 @@ class WorldPacket;
 class AC_GAME_API PacketLog
 {
 private:
-    PacketLog();
-    ~PacketLog();
-    std::mutex _logPacketLock;
-    std::once_flag _initializeFlag;
+  PacketLog();
+  ~PacketLog();
+  std::mutex     _logPacketLock;
+  std::once_flag _initializeFlag;
 
 public:
-    static PacketLog* instance();
+  static PacketLog* instance();
 
-    void Initialize();
-    bool CanLogPacket() const { return (_file != nullptr); }
-    void LogPacket(WorldPacket const& packet, Direction direction, boost::asio::ip::address const& addr, uint16 port);
+  void Initialize();
+  bool CanLogPacket() const { return (_file != nullptr); }
+  void LogPacket(WorldPacket const& packet, Direction direction, boost::asio::ip::address const& addr, uint16 port);
 
 private:
-    FILE* _file;
+  FILE* _file;
 };
 
 #define sPacketLog PacketLog::instance()

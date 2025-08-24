@@ -19,11 +19,11 @@
 
 WorldPacket const* WorldPackets::CombatLog::EnvironmentalDamageLog::Write()
 {
-    _worldPacket << Victim;
-    _worldPacket << uint8(Type);
-    _worldPacket << uint32(Amount);
-    _worldPacket << uint32(Resisted);
-    _worldPacket << uint32(Absorbed);
+  _worldPacket << Victim;
+  _worldPacket << uint8(Type);
+  _worldPacket << uint32(Amount);
+  _worldPacket << uint32(Resisted);
+  _worldPacket << uint32(Absorbed);
 
-    return &_worldPacket;
+  return &_worldPacket;
 }

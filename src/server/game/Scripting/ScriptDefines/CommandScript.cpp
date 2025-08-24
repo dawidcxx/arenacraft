@@ -21,21 +21,17 @@
 
 Acore::ChatCommands::ChatCommandTable ScriptMgr::GetChatCommands()
 {
-    Acore::ChatCommands::ChatCommandTable table;
+  Acore::ChatCommands::ChatCommandTable table;
 
-    for (auto const& [scriptID, script] : ScriptRegistry<CommandScript>::ScriptPointerList)
-    {
-        Acore::ChatCommands::ChatCommandTable cmds = script->GetCommands();
-        std::move(cmds.begin(), cmds.end(), std::back_inserter(table));
-    }
+  for (auto const& [scriptID, script] : ScriptRegistry<CommandScript>::ScriptPointerList)
+  {
+    Acore::ChatCommands::ChatCommandTable cmds = script->GetCommands();
+    std::move(cmds.begin(), cmds.end(), std::back_inserter(table));
+  }
 
-    return table;
+  return table;
 }
 
-CommandScript::CommandScript(const char* name)
-    : ScriptObject(name)
-{
-    ScriptRegistry<CommandScript>::AddScript(this);
-}
+CommandScript::CommandScript(const char* name) : ScriptObject(name) { ScriptRegistry<CommandScript>::AddScript(this); }
 
 template class AC_GAME_API ScriptRegistry<CommandScript>;

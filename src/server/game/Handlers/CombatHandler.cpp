@@ -27,69 +27,66 @@
 
 void WorldSession::HandleAttackSwingOpcode(WorldPacket& recvData)
 {
-    ObjectGuid guid;
-    recvData >> guid;
+  ObjectGuid guid;
+  recvData >> guid;
 
-    LOG_DEBUG("network", "WORLD: Recvd CMSG_ATTACKSWING: {}", guid.ToString());
+  LOG_DEBUG("network", "WORLD: Recvd CMSG_ATTACKSWING: {}", guid.ToString());
 
-    Unit* pEnemy = ObjectAccessor::GetUnit(*_player, guid);
+  Unit* pEnemy = ObjectAccessor::GetUnit(*_player, guid);
 
-    if (!pEnemy)
+  if (!pEnemy)
+  {
+    // stop attack state at client
+    SendAttackStop(nullptr);
+    return;
+  }
+
+  if (!_player->IsValidAttackTarget(pEnemy))
+  {
+    // stop attack state at client
+    SendAttackStop(pEnemy);
+    return;
+  }
+
+  //! Client explicitly checks the following before sending CMSG_ATTACKSWING packet,
+  //! so we'll place the same check here. Note that it might be possible to reuse this snippet
+  //! in other places as well.
+  if (Vehicle* vehicle = _player->GetVehicle())
+  {
+    VehicleSeatEntry const* seat = vehicle->GetSeatForPassenger(_player);
+    ASSERT(seat);
+    if (!(seat->m_flags & VEHICLE_SEAT_FLAG_CAN_ATTACK))
     {
-        // stop attack state at client
-        SendAttackStop(nullptr);
-        return;
+      SendAttackStop(pEnemy);
+      return;
     }
+  }
 
-    if (!_player->IsValidAttackTarget(pEnemy))
-    {
-        // stop attack state at client
-        SendAttackStop(pEnemy);
-        return;
-    }
-
-    //! Client explicitly checks the following before sending CMSG_ATTACKSWING packet,
-    //! so we'll place the same check here. Note that it might be possible to reuse this snippet
-    //! in other places as well.
-    if (Vehicle* vehicle = _player->GetVehicle())
-    {
-        VehicleSeatEntry const* seat = vehicle->GetSeatForPassenger(_player);
-        ASSERT(seat);
-        if (!(seat->m_flags & VEHICLE_SEAT_FLAG_CAN_ATTACK))
-        {
-            SendAttackStop(pEnemy);
-            return;
-        }
-    }
-
-    _player->Attack(pEnemy, true);
+  _player->Attack(pEnemy, true);
 }
 
-void WorldSession::HandleAttackStopOpcode(WorldPacket& /*recvData*/)
-{
-    GetPlayer()->AttackStop();
-}
+void WorldSession::HandleAttackStopOpcode(WorldPacket& /*recvData*/) { GetPlayer()->AttackStop(); }
 
 void WorldSession::HandleSetSheathedOpcode(WorldPackets::Combat::SetSheathed& packet)
 {
-    if (packet.CurrentSheathState >= MAX_SHEATH_STATE)
-    {
-        LOG_ERROR("network.opcode", "Unknown sheath state {} ??", packet.CurrentSheathState);
-        return;
-    }
+  if (packet.CurrentSheathState >= MAX_SHEATH_STATE)
+  {
+    LOG_ERROR("network.opcode", "Unknown sheath state {} ??", packet.CurrentSheathState);
+    return;
+  }
 
-    _player->SetSheath(SheathState(packet.CurrentSheathState));
+  _player->SetSheath(SheathState(packet.CurrentSheathState));
 }
 
 void WorldSession::SendAttackStop(Unit const* enemy)
 {
-    WorldPacket data(SMSG_ATTACKSTOP, (8 + 8 + 4)); // we guess size
-    data << GetPlayer()->GetPackGUID();
+  WorldPacket data(SMSG_ATTACKSTOP, (8 + 8 + 4)); // we guess size
+  data << GetPlayer()->GetPackGUID();
 
-    if (enemy)
-    {
-        data << enemy->GetPackGUID();               // must be packed guid
-        data << (uint32)enemy->isDead();
-    }
-    SendPacket(&data);
+  if (enemy)
+  {
+    data << enemy->GetPackGUID(); // must be packed guid
+    data << (uint32)enemy->isDead();
+  }
+  SendPacket(&data);
 }

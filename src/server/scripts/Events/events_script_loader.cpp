@@ -29,12 +29,12 @@ void AddSC_event_firework_show_scripts();
 // void Add${NameOfDirectory}Scripts()
 void AddEventsScripts()
 {
-    AddSC_event_brewfest_scripts();
-    AddSC_event_hallows_end_scripts();
-    AddSC_event_pilgrims_end_scripts();
-    AddSC_event_winter_veil_scripts();
-    AddSC_event_love_in_the_air();
-    AddSC_event_midsummer_scripts();
-    AddSC_event_childrens_week();
-    AddSC_event_firework_show_scripts();
+  AddSC_event_brewfest_scripts();
+  AddSC_event_hallows_end_scripts();
+  AddSC_event_pilgrims_end_scripts();
+  AddSC_event_winter_veil_scripts();
+  AddSC_event_love_in_the_air();
+  AddSC_event_midsummer_scripts();
+  AddSC_event_childrens_week();
+  AddSC_event_firework_show_scripts();
 }

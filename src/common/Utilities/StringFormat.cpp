@@ -18,49 +18,48 @@
 #include "StringFormat.h"
 #include "Define.h"
 
-template<class Str>
-AC_COMMON_API Str Acore::String::Trim(const Str& s, const std::locale& loc /*= std::locale()*/)
+template <class Str> AC_COMMON_API Str Acore::String::Trim(const Str& s, const std::locale& loc /*= std::locale()*/)
 {
-    typename Str::const_iterator first = s.begin();
-    typename Str::const_iterator end = s.end();
+  typename Str::const_iterator first = s.begin();
+  typename Str::const_iterator end   = s.end();
 
-    while (first != end && std::isspace(*first, loc))
-    {
-        ++first;
-    }
+  while (first != end && std::isspace(*first, loc))
+  {
+    ++first;
+  }
 
-    if (first == end)
-    {
-        return Str();
-    }
+  if (first == end)
+  {
+    return Str();
+  }
 
-    typename Str::const_iterator last = end;
+  typename Str::const_iterator last = end;
 
-    do
-    {
-        --last;
-    } while (std::isspace(*last, loc));
+  do
+  {
+    --last;
+  } while (std::isspace(*last, loc));
 
-    if (first != s.begin() || last + 1 != end)
-    {
-        return Str(first, last + 1);
-    }
+  if (first != s.begin() || last + 1 != end)
+  {
+    return Str(first, last + 1);
+  }
 
-    return s;
+  return s;
 }
 
 std::string Acore::String::TrimRightInPlace(std::string& str)
 {
-    int pos = int(str.size()) - 1;
+  int pos = int(str.size()) - 1;
 
-    while (pos >= 0 && std::isspace(str[pos]))
-    {
-        --pos;
-    }
+  while (pos >= 0 && std::isspace(str[pos]))
+  {
+    --pos;
+  }
 
-    str.resize(static_cast<std::basic_string<char, std::char_traits<char>, std::allocator<char>>::size_type>(pos) + 1);
+  str.resize(static_cast<std::basic_string<char, std::char_traits<char>, std::allocator<char>>::size_type>(pos) + 1);
 
-    return str;
+  return str;
 }
 
 /**
@@ -70,12 +69,14 @@ std::string Acore::String::TrimRightInPlace(std::string& str)
  * @param suffix Character to add at the end of the str
  * @return std::string Suffixed string
  */
-std::string Acore::String::AddSuffixIfNotExists(std::string str, const char suffix) {
-    if (str.empty() || (str.at(str.length() - 1) != suffix))
-        str.push_back(suffix);
+std::string Acore::String::AddSuffixIfNotExists(std::string str, const char suffix)
+{
+  if (str.empty() || (str.at(str.length() - 1) != suffix))
+    str.push_back(suffix);
 
-    return str;
+  return str;
 }
 
 // Template Trim
-template AC_COMMON_API std::string Acore::String::Trim<std::string>(const std::string& s, const std::locale& loc /*= std::locale()*/);
+template AC_COMMON_API std::string Acore::String::Trim<std::string>(const std::string& s,
+                                                                    const std::locale& loc /*= std::locale()*/);

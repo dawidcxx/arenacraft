@@ -31,66 +31,58 @@ using namespace Acore::ChatCommands;
 class achievement_commandscript : public CommandScript
 {
 public:
-    achievement_commandscript() : CommandScript("achievement_commandscript") { }
+  achievement_commandscript() : CommandScript("achievement_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable achievementCommandTable = {
+        {"add", HandleAchievementAddCommand, SEC_GAMEMASTER, Console::No},
+        {"checkall", HandleAchievementCheckAllCommand, SEC_ADMINISTRATOR, Console::Yes}};
+    static ChatCommandTable commandTable = {{"achievement", achievementCommandTable}};
+    return commandTable;
+  }
+
+  static bool HandleAchievementAddCommand(ChatHandler* handler, AchievementEntry const* achievementEntry)
+  {
+    Player* target = handler->getSelectedPlayer();
+    if (!target)
     {
-        static ChatCommandTable achievementCommandTable =
-        {
-            { "add",      HandleAchievementAddCommand,      SEC_GAMEMASTER,    Console::No },
-            { "checkall", HandleAchievementCheckAllCommand, SEC_ADMINISTRATOR, Console::Yes }
-        };
-        static ChatCommandTable commandTable =
-        {
-            { "achievement", achievementCommandTable }
-        };
-        return commandTable;
+      handler->SendErrorMessage(LANG_NO_CHAR_SELECTED);
+      return false;
+    }
+    target->CompletedAchievement(achievementEntry);
+
+    return true;
+  }
+
+  static bool HandleAchievementCheckAllCommand(ChatHandler* handler, Optional<PlayerIdentifier> player)
+  {
+    if (!player)
+    {
+      player = PlayerIdentifier::FromTarget(handler);
     }
 
-    static bool HandleAchievementAddCommand(ChatHandler* handler, AchievementEntry const* achievementEntry)
+    if (!player)
     {
-        Player* target = handler->getSelectedPlayer();
-        if (!target)
-        {
-            handler->SendErrorMessage(LANG_NO_CHAR_SELECTED);
-            return false;
-        }
-        target->CompletedAchievement(achievementEntry);
-
-        return true;
+      handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
+      return false;
     }
 
-    static bool HandleAchievementCheckAllCommand(ChatHandler* handler, Optional<PlayerIdentifier> player)
+    if (player->IsConnected())
     {
-        if (!player)
-        {
-            player = PlayerIdentifier::FromTarget(handler);
-        }
-
-        if (!player)
-        {
-            handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
-            return false;
-        }
-
-        if (player->IsConnected())
-        {
-            if (Player* target = player->GetConnectedPlayer())
-                target->CheckAllAchievementCriteria();
-        }
-        else
-        {
-            auto* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_AT_LOGIN_FLAG);
-            stmt->SetData(0, uint16(AT_LOGIN_CHECK_ACHIEVS));
-            stmt->SetData(1, player->GetGUID().GetCounter());
-            CharacterDatabase.Execute(stmt);
-        }
-
-        return true;
+      if (Player* target = player->GetConnectedPlayer())
+        target->CheckAllAchievementCriteria();
     }
+    else
+    {
+      auto* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_AT_LOGIN_FLAG);
+      stmt->SetData(0, uint16(AT_LOGIN_CHECK_ACHIEVS));
+      stmt->SetData(1, player->GetGUID().GetCounter());
+      CharacterDatabase.Execute(stmt);
+    }
+
+    return true;
+  }
 };
 
-void AddSC_achievement_commandscript()
-{
-    new achievement_commandscript();
-}
+void AddSC_achievement_commandscript() { new achievement_commandscript(); }

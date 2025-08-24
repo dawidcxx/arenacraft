@@ -19,31 +19,28 @@
 
 void WorldPackets::Bank::AutoBankItem::Read()
 {
-    _worldPacket >> Bag;
-    _worldPacket >> Slot;
+  _worldPacket >> Bag;
+  _worldPacket >> Slot;
 }
 
 void WorldPackets::Bank::AutoStoreBankItem::Read()
 {
-    _worldPacket >> Bag;
-    _worldPacket >> Slot;
+  _worldPacket >> Bag;
+  _worldPacket >> Slot;
 }
 
-void WorldPackets::Bank::BuyBankSlot::Read()
-{
-    _worldPacket >> Banker;
-}
+void WorldPackets::Bank::BuyBankSlot::Read() { _worldPacket >> Banker; }
 
 WorldPacket const* WorldPackets::Bank::BuyBankSlotResult::Write()
 {
-    _worldPacket << uint32(Result);
+  _worldPacket << uint32(Result);
 
-    return &_worldPacket;
+  return &_worldPacket;
 }
 
 WorldPacket const* WorldPackets::Bank::ShowBank::Write()
 {
-    _worldPacket << Banker;
+  _worldPacket << Banker;
 
-    return &_worldPacket;
+  return &_worldPacket;
 }

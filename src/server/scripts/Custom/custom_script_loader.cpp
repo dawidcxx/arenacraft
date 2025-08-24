@@ -23,7 +23,4 @@
 
 #include "Arenacraft/AddArenacraftScripts.hpp"
 
-void AddCustomScripts()
-{
-    AddArenacraftScripts();
-}
+void AddCustomScripts() { AddArenacraftScripts(); }

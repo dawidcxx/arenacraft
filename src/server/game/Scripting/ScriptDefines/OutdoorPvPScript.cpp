@@ -21,16 +21,15 @@
 
 OutdoorPvP* ScriptMgr::CreateOutdoorPvP(OutdoorPvPData const* data)
 {
-    ASSERT(data);
+  ASSERT(data);
 
-    auto tempScript = ScriptRegistry<OutdoorPvPScript>::GetScriptById(data->ScriptId);
-    return tempScript ? tempScript->GetOutdoorPvP() : nullptr;
+  auto tempScript = ScriptRegistry<OutdoorPvPScript>::GetScriptById(data->ScriptId);
+  return tempScript ? tempScript->GetOutdoorPvP() : nullptr;
 }
 
-OutdoorPvPScript::OutdoorPvPScript(const char* name)
-    : ScriptObject(name)
+OutdoorPvPScript::OutdoorPvPScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<OutdoorPvPScript>::AddScript(this);
+  ScriptRegistry<OutdoorPvPScript>::AddScript(this);
 }
 
 template class AC_GAME_API ScriptRegistry<OutdoorPvPScript>;

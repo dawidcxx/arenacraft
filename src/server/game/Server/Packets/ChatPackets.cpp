@@ -19,21 +19,18 @@
 
 WorldPacket const* WorldPackets::Chat::Emote::Write()
 {
-    _worldPacket << EmoteID;
-    _worldPacket << Guid;
+  _worldPacket << EmoteID;
+  _worldPacket << Guid;
 
-    return &_worldPacket;
+  return &_worldPacket;
 }
 
-void WorldPackets::Chat::EmoteClient::Read()
-{
-    _worldPacket >> EmoteID;
-}
+void WorldPackets::Chat::EmoteClient::Read() { _worldPacket >> EmoteID; }
 
 WorldPacket const* WorldPackets::Chat::ChatServerMessage::Write()
 {
-    _worldPacket << int32(MessageID);
-    _worldPacket << StringParam;
+  _worldPacket << int32(MessageID);
+  _worldPacket << StringParam;
 
-    return &_worldPacket;
+  return &_worldPacket;
 }

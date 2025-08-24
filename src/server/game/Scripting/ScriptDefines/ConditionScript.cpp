@@ -20,16 +20,15 @@
 
 bool ScriptMgr::OnConditionCheck(Condition* condition, ConditionSourceInfo& sourceInfo)
 {
-    ASSERT(condition);
+  ASSERT(condition);
 
-    auto tempScript = ScriptRegistry<ConditionScript>::GetScriptById(condition->ScriptId);
-    return tempScript ? tempScript->OnConditionCheck(condition, sourceInfo) : true;
+  auto tempScript = ScriptRegistry<ConditionScript>::GetScriptById(condition->ScriptId);
+  return tempScript ? tempScript->OnConditionCheck(condition, sourceInfo) : true;
 }
 
-ConditionScript::ConditionScript(const char* name)
-    : ScriptObject(name)
+ConditionScript::ConditionScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<ConditionScript>::AddScript(this);
+  ScriptRegistry<ConditionScript>::AddScript(this);
 }
 
 template class AC_GAME_API ScriptRegistry<ConditionScript>;

@@ -23,182 +23,164 @@
 
 bool ScriptMgr::OnGossipHello(Player* player, Creature* creature)
 {
-    ASSERT(player);
-    ASSERT(creature);
+  ASSERT(player);
+  ASSERT(creature);
 
-    auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        return script->CanCreatureGossipHello(player, creature);
-    });
+  auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
+                                                  { return script->CanCreatureGossipHello(player, creature); });
 
-    if (ret && *ret)
-    {
-        return true;
-    }
+  if (ret && *ret)
+  {
+    return true;
+  }
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    ClearGossipMenuFor(player);
-    return tempScript ? tempScript->OnGossipHello(player, creature) : false;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  ClearGossipMenuFor(player);
+  return tempScript ? tempScript->OnGossipHello(player, creature) : false;
 }
 
 bool ScriptMgr::OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
 {
-    ASSERT(player);
-    ASSERT(creature);
+  ASSERT(player);
+  ASSERT(creature);
 
-    auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        return script->CanCreatureGossipSelect(player, creature, sender, action);
-    });
+  auto ret = IsValidBoolScript<AllCreatureScript>(
+      [&](AllCreatureScript* script) { return script->CanCreatureGossipSelect(player, creature, sender, action); });
 
-    if (ret && *ret)
-    {
-        return true;
-    }
+  if (ret && *ret)
+  {
+    return true;
+  }
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    return tempScript ? tempScript->OnGossipSelect(player, creature, sender, action) : false;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  return tempScript ? tempScript->OnGossipSelect(player, creature, sender, action) : false;
 }
 
 bool ScriptMgr::OnGossipSelectCode(Player* player, Creature* creature, uint32 sender, uint32 action, const char* code)
 {
-    ASSERT(player);
-    ASSERT(creature);
-    ASSERT(code);
+  ASSERT(player);
+  ASSERT(creature);
+  ASSERT(code);
 
-    auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        return script->CanCreatureGossipSelectCode(player, creature, sender, action, code);
-    });
+  auto ret = IsValidBoolScript<AllCreatureScript>(
+      [&](AllCreatureScript* script)
+      { return script->CanCreatureGossipSelectCode(player, creature, sender, action, code); });
 
-    if (ret && *ret)
-    {
-        return true;
-    }
+  if (ret && *ret)
+  {
+    return true;
+  }
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    return tempScript ? tempScript->OnGossipSelectCode(player, creature, sender, action, code) : false;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  return tempScript ? tempScript->OnGossipSelectCode(player, creature, sender, action, code) : false;
 }
 
 bool ScriptMgr::OnQuestAccept(Player* player, Creature* creature, Quest const* quest)
 {
-    ASSERT(player);
-    ASSERT(creature);
-    ASSERT(quest);
+  ASSERT(player);
+  ASSERT(creature);
+  ASSERT(quest);
 
-    auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        return script->CanCreatureQuestAccept(player, creature, quest);
-    });
+  auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
+                                                  { return script->CanCreatureQuestAccept(player, creature, quest); });
 
-    if (ret && *ret)
-    {
-        return true;
-    }
+  if (ret && *ret)
+  {
+    return true;
+  }
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    ClearGossipMenuFor(player);
-    return tempScript ? tempScript->OnQuestAccept(player, creature, quest) : false;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  ClearGossipMenuFor(player);
+  return tempScript ? tempScript->OnQuestAccept(player, creature, quest) : false;
 }
 
 bool ScriptMgr::OnQuestSelect(Player* player, Creature* creature, Quest const* quest)
 {
-    ASSERT(player);
-    ASSERT(creature);
-    ASSERT(quest);
+  ASSERT(player);
+  ASSERT(creature);
+  ASSERT(quest);
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    ClearGossipMenuFor(player);
-    return tempScript ? tempScript->OnQuestSelect(player, creature, quest) : false;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  ClearGossipMenuFor(player);
+  return tempScript ? tempScript->OnQuestSelect(player, creature, quest) : false;
 }
 
 bool ScriptMgr::OnQuestComplete(Player* player, Creature* creature, Quest const* quest)
 {
-    ASSERT(player);
-    ASSERT(creature);
-    ASSERT(quest);
+  ASSERT(player);
+  ASSERT(creature);
+  ASSERT(quest);
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    ClearGossipMenuFor(player);
-    return tempScript ? tempScript->OnQuestComplete(player, creature, quest) : false;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  ClearGossipMenuFor(player);
+  return tempScript ? tempScript->OnQuestComplete(player, creature, quest) : false;
 }
 
 bool ScriptMgr::OnQuestReward(Player* player, Creature* creature, Quest const* quest, uint32 opt)
 {
-    ASSERT(player);
-    ASSERT(creature);
-    ASSERT(quest);
+  ASSERT(player);
+  ASSERT(creature);
+  ASSERT(quest);
 
-    auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        return script->CanCreatureQuestReward(player, creature, quest, opt);
-    });
+  auto ret = IsValidBoolScript<AllCreatureScript>(
+      [&](AllCreatureScript* script) { return script->CanCreatureQuestReward(player, creature, quest, opt); });
 
-    if (ret && *ret)
-    {
-        return false;
-    }
+  if (ret && *ret)
+  {
+    return false;
+  }
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    ClearGossipMenuFor(player);
-    return tempScript ? tempScript->OnQuestReward(player, creature, quest, opt) : false;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  ClearGossipMenuFor(player);
+  return tempScript ? tempScript->OnQuestReward(player, creature, quest, opt) : false;
 }
 
 uint32 ScriptMgr::GetDialogStatus(Player* player, Creature* creature)
 {
-    ASSERT(player);
-    ASSERT(creature);
+  ASSERT(player);
+  ASSERT(creature);
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    return tempScript ? tempScript->GetDialogStatus(player, creature) : DIALOG_STATUS_SCRIPTED_NO_STATUS;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  return tempScript ? tempScript->GetDialogStatus(player, creature) : DIALOG_STATUS_SCRIPTED_NO_STATUS;
 }
 
 CreatureAI* ScriptMgr::GetCreatureAI(Creature* creature)
 {
-    ASSERT(creature);
+  ASSERT(creature);
 
-    auto retAI = GetReturnAIScript<AllCreatureScript, CreatureAI>([creature](AllCreatureScript* script)
-    {
-        return script->GetCreatureAI(creature);
-    });
+  auto retAI = GetReturnAIScript<AllCreatureScript, CreatureAI>([creature](AllCreatureScript* script)
+                                                                { return script->GetCreatureAI(creature); });
 
-    if (retAI)
-    {
-        return retAI;
-    }
+  if (retAI)
+  {
+    return retAI;
+  }
 
-    auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
-    return tempScript ? tempScript->GetAI(creature) : nullptr;
+  auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId());
+  return tempScript ? tempScript->GetAI(creature) : nullptr;
 }
 
-//Fires whenever the UNIT_BYTE2_FLAG_FFA_PVP bit is Changed on the player
+// Fires whenever the UNIT_BYTE2_FLAG_FFA_PVP bit is Changed on the player
 void ScriptMgr::OnFfaPvpStateUpdate(Creature* creature, bool InPvp)
 {
-    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
-        {
-            script->OnFfaPvpStateUpdate(creature, InPvp);
-        });
+  ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script) { script->OnFfaPvpStateUpdate(creature, InPvp); });
 }
 
 void ScriptMgr::OnCreatureUpdate(Creature* creature, uint32 diff)
 {
-    ASSERT(creature);
+  ASSERT(creature);
 
-    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        script->OnAllCreatureUpdate(creature, diff);
-    });
+  ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script) { script->OnAllCreatureUpdate(creature, diff); });
 
-    if (auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId()))
-    {
-        tempScript->OnUpdate(creature, diff);
-    }
+  if (auto tempScript = ScriptRegistry<CreatureScript>::GetScriptById(creature->GetScriptId()))
+  {
+    tempScript->OnUpdate(creature, diff);
+  }
 }
 
-CreatureScript::CreatureScript(const char* name)
-    : ScriptObject(name)
+CreatureScript::CreatureScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<CreatureScript>::AddScript(this);
+  ScriptRegistry<CreatureScript>::AddScript(this);
 }
 
 template class AC_GAME_API ScriptRegistry<CreatureScript>;

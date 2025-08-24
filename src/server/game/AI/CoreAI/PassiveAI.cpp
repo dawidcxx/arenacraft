@@ -24,94 +24,91 @@ NullCreatureAI::NullCreatureAI(Creature* c) : CreatureAI(c) { me->SetReactState(
 
 int32 NullCreatureAI::Permissible(Creature const* creature)
 {
-    if (creature->HasNpcFlag(UNIT_NPC_FLAG_SPELLCLICK))
-        return PERMIT_BASE_PROACTIVE + 50;
+  if (creature->HasNpcFlag(UNIT_NPC_FLAG_SPELLCLICK))
+    return PERMIT_BASE_PROACTIVE + 50;
 
-    if (creature->IsTrigger())
-        return PERMIT_BASE_PROACTIVE;
+  if (creature->IsTrigger())
+    return PERMIT_BASE_PROACTIVE;
 
-    return PERMIT_BASE_IDLE;
+  return PERMIT_BASE_IDLE;
 }
 
 void PassiveAI::UpdateAI(uint32)
 {
-    if (me->IsInCombat() && me->getAttackers().empty())
-        EnterEvadeMode(EVADE_REASON_NO_HOSTILES);
+  if (me->IsInCombat() && me->getAttackers().empty())
+    EnterEvadeMode(EVADE_REASON_NO_HOSTILES);
 }
 
-void PossessedAI::AttackStart(Unit* target)
-{
-    me->Attack(target, true);
-}
+void PossessedAI::AttackStart(Unit* target) { me->Attack(target, true); }
 
 void PossessedAI::UpdateAI(uint32 /*diff*/)
 {
-    if (me->GetVictim())
-    {
-        if (!me->IsValidAttackTarget(me->GetVictim()))
-            me->AttackStop();
-        else
-            DoMeleeAttackIfReady();
-    }
+  if (me->GetVictim())
+  {
+    if (!me->IsValidAttackTarget(me->GetVictim()))
+      me->AttackStop();
+    else
+      DoMeleeAttackIfReady();
+  }
 }
 
 void PossessedAI::JustDied(Unit* /*u*/)
 {
-    // We died while possessed, disable our loot
-    me->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+  // We died while possessed, disable our loot
+  me->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
 }
 
-void PossessedAI::KilledUnit(Unit*  /*victim*/)
+void PossessedAI::KilledUnit(Unit* /*victim*/)
 {
-    // We killed a creature, disable victim's loot
-    //if (victim->IsCreature())
-    //    victim->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
+  // We killed a creature, disable victim's loot
+  // if (victim->IsCreature())
+  //    victim->RemoveDynamicFlag(UNIT_DYNFLAG_LOOTABLE);
 }
 
 void CritterAI::JustEngagedWith(Unit* who)
 {
-    if (!me->HasUnitState(UNIT_STATE_FLEEING))
-    {
-        me->SetControlled(true, UNIT_STATE_FLEEING, who);
-    }
+  if (!me->HasUnitState(UNIT_STATE_FLEEING))
+  {
+    me->SetControlled(true, UNIT_STATE_FLEEING, who);
+  }
 }
 
 void CritterAI::MovementInform(uint32 type, uint32 /*id*/)
 {
-    if (type == TIMED_FLEEING_MOTION_TYPE)
-    {
-        EnterEvadeMode(EVADE_REASON_OTHER);
-    }
+  if (type == TIMED_FLEEING_MOTION_TYPE)
+  {
+    EnterEvadeMode(EVADE_REASON_OTHER);
+  }
 }
 
 void CritterAI::EnterEvadeMode(EvadeReason why)
 {
-    if (me->HasUnitState(UNIT_STATE_FLEEING))
-    {
-        me->SetControlled(false, UNIT_STATE_FLEEING);
-    }
+  if (me->HasUnitState(UNIT_STATE_FLEEING))
+  {
+    me->SetControlled(false, UNIT_STATE_FLEEING);
+  }
 
-    CreatureAI::EnterEvadeMode(why);
+  CreatureAI::EnterEvadeMode(why);
 }
 
 int32 CritterAI::Permissible(Creature const* creature)
 {
-    if (creature->IsCritter() && !creature->HasUnitTypeMask(UNIT_MASK_GUARDIAN))
-        return PERMIT_BASE_PROACTIVE;
+  if (creature->IsCritter() && !creature->HasUnitTypeMask(UNIT_MASK_GUARDIAN))
+    return PERMIT_BASE_PROACTIVE;
 
-    return PERMIT_BASE_NO;
+  return PERMIT_BASE_NO;
 }
 
 void TriggerAI::IsSummonedBy(WorldObject* summoner)
 {
-    if (me->m_spells[0])
-        me->CastSpell(me, me->m_spells[0], false, 0, 0, summoner ? summoner->GetGUID() : ObjectGuid::Empty);
+  if (me->m_spells[0])
+    me->CastSpell(me, me->m_spells[0], false, 0, 0, summoner ? summoner->GetGUID() : ObjectGuid::Empty);
 }
 
 int32 TriggerAI::Permissible(Creature const* creature)
 {
-    if (creature->IsTrigger() && creature->m_spells[0])
-        return PERMIT_BASE_SPECIAL;
+  if (creature->IsTrigger() && creature->m_spells[0])
+    return PERMIT_BASE_SPECIAL;
 
-    return PERMIT_BASE_NO;
+  return PERMIT_BASE_NO;
 }

@@ -20,11 +20,11 @@
 
 void Acore::Impl::ChatCommands::SendErrorMessageToHandler(ChatHandler* handler, std::string_view str)
 {
-    handler->SendSysMessage(str);
-    handler->SetSentErrorMessage(true);
+  handler->SendSysMessage(str);
+  handler->SetSentErrorMessage(true);
 }
 
 char const* Acore::Impl::ChatCommands::GetAcoreString(ChatHandler const* handler, AcoreStrings which)
 {
-    return handler->GetAcoreString(which);
+  return handler->GetAcoreString(which);
 }

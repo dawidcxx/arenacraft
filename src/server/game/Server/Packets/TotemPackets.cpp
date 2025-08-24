@@ -17,17 +17,14 @@
 
 #include "TotemPackets.h"
 
-void WorldPackets::Totem::TotemDestroyed::Read()
-{
-    _worldPacket >> Slot;
-}
+void WorldPackets::Totem::TotemDestroyed::Read() { _worldPacket >> Slot; }
 
 WorldPacket const* WorldPackets::Totem::TotemCreated::Write()
 {
-    _worldPacket << Slot;
-    _worldPacket << Totem;
-    _worldPacket << Duration;
-    _worldPacket << SpellID;
+  _worldPacket << Slot;
+  _worldPacket << Totem;
+  _worldPacket << Duration;
+  _worldPacket << SpellID;
 
-    return &_worldPacket;
+  return &_worldPacket;
 }

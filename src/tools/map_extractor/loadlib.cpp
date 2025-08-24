@@ -23,60 +23,57 @@
 
 class MPQFile;
 
-u_map_fcc MverMagic = { {'R', 'E', 'V', 'M'} };
+u_map_fcc MverMagic = {{'R', 'E', 'V', 'M'}};
 
 FileLoader::FileLoader()
 {
-    data = nullptr;
-    data_size = 0;
-    version = nullptr;
+  data      = nullptr;
+  data_size = 0;
+  version   = nullptr;
 }
 
-FileLoader::~FileLoader()
-{
-    free();
-}
+FileLoader::~FileLoader() { free(); }
 
 bool FileLoader::loadFile(std::string const& fileName, bool log)
 {
-    free();
-    MPQFile mf(fileName.c_str());
-    if (mf.isEof())
-    {
-        if (log)
-            printf("No such file %s\n", fileName.c_str());
-        return false;
-    }
-
-    data_size = mf.getSize();
-
-    data = new uint8 [data_size];
-    mf.read(data, data_size);
-    mf.close();
-    if (prepareLoadedData())
-        return true;
-
-    printf("Error loading %s", fileName.c_str());
-    mf.close();
-    free();
+  free();
+  MPQFile mf(fileName.c_str());
+  if (mf.isEof())
+  {
+    if (log)
+      printf("No such file %s\n", fileName.c_str());
     return false;
+  }
+
+  data_size = mf.getSize();
+
+  data = new uint8[data_size];
+  mf.read(data, data_size);
+  mf.close();
+  if (prepareLoadedData())
+    return true;
+
+  printf("Error loading %s", fileName.c_str());
+  mf.close();
+  free();
+  return false;
 }
 
 bool FileLoader::prepareLoadedData()
 {
-    // Check version
-    version = (file_MVER*) data;
-    if (version->fcc != MverMagic.fcc)
-        return false;
-    if (version->ver != FILE_FORMAT_VERSION)
-        return false;
-    return true;
+  // Check version
+  version = (file_MVER*)data;
+  if (version->fcc != MverMagic.fcc)
+    return false;
+  if (version->ver != FILE_FORMAT_VERSION)
+    return false;
+  return true;
 }
 
 void FileLoader::free()
 {
-    delete[] data;
-    data = nullptr;
-    data_size = 0;
-    version = nullptr;
+  delete[] data;
+  data      = nullptr;
+  data_size = 0;
+  version   = nullptr;
 }

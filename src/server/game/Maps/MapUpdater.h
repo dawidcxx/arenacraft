@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -29,28 +30,28 @@ class UpdateRequest;
 class MapUpdater
 {
 public:
-    MapUpdater();
-    ~MapUpdater() = default;
+  MapUpdater();
+  ~MapUpdater() = default;
 
-    void schedule_update(Map& map, uint32 diff, uint32 s_diff);
-    void schedule_lfg_update(uint32 diff);
-    void wait();
-    void activate(std::size_t num_threads);
-    void deactivate();
-    bool activated();
-    void update_finished();
+  void schedule_update(Map& map, uint32 diff, uint32 s_diff);
+  void schedule_lfg_update(uint32 diff);
+  void wait();
+  void activate(std::size_t num_threads);
+  void deactivate();
+  bool activated();
+  void update_finished();
 
 private:
-    void WorkerThread();
+  void WorkerThread();
 
-    ProducerConsumerQueue<UpdateRequest*> _queue;
+  ProducerConsumerQueue<UpdateRequest*> _queue;
 
-    std::vector<std::thread> _workerThreads;
-    std::atomic<bool> _cancelationToken;
+  std::vector<std::thread> _workerThreads;
+  std::atomic<bool>        _cancelationToken;
 
-    std::mutex _lock;
-    std::condition_variable _condition;
-    std::size_t pending_requests;
+  std::mutex              _lock;
+  std::condition_variable _condition;
+  std::size_t             pending_requests;
 };
 
 #endif //_MAP_UPDATER_H_INCLUDED

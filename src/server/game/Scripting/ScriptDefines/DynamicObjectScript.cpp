@@ -20,18 +20,17 @@
 
 void ScriptMgr::OnDynamicObjectUpdate(DynamicObject* dynobj, uint32 diff)
 {
-    ASSERT(dynobj);
+  ASSERT(dynobj);
 
-    for (auto const& [scriptID, script] : ScriptRegistry<DynamicObjectScript>::ScriptPointerList)
-    {
-        script->OnUpdate(dynobj, diff);
-    }
+  for (auto const& [scriptID, script] : ScriptRegistry<DynamicObjectScript>::ScriptPointerList)
+  {
+    script->OnUpdate(dynobj, diff);
+  }
 }
 
-DynamicObjectScript::DynamicObjectScript(const char* name)
-    : ScriptObject(name)
+DynamicObjectScript::DynamicObjectScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<DynamicObjectScript>::AddScript(this);
+  ScriptRegistry<DynamicObjectScript>::AddScript(this);
 }
 
 template class AC_GAME_API ScriptRegistry<DynamicObjectScript>;

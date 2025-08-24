@@ -22,40 +22,40 @@
 
 WhoListCacheMgr* WhoListCacheMgr::instance()
 {
-    static WhoListCacheMgr instance;
-    return &instance;
+  static WhoListCacheMgr instance;
+  return &instance;
 }
 
 void WhoListCacheMgr::Update()
 {
-    // clear current list
-    _whoListStorage.clear();
-    _whoListStorage.reserve(sWorld->GetPlayerCount() + 1);
+  // clear current list
+  _whoListStorage.clear();
+  _whoListStorage.reserve(sWorld->GetPlayerCount() + 1);
 
-    for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
-    {
-        if (!player->FindMap() || player->GetSession()->PlayerLoading())
-            continue;
+  for (auto const& [guid, player] : ObjectAccessor::GetPlayers())
+  {
+    if (!player->FindMap() || player->GetSession()->PlayerLoading())
+      continue;
 
-        std::string playerName = player->GetName();
-        std::wstring widePlayerName;
+    std::string  playerName = player->GetName();
+    std::wstring widePlayerName;
 
-        if (!Utf8toWStr(playerName, widePlayerName))
-            continue;
+    if (!Utf8toWStr(playerName, widePlayerName))
+      continue;
 
-        wstrToLower(widePlayerName);
+    wstrToLower(widePlayerName);
 
-        std::string guildName = sGuildMgr->GetGuildNameById(player->GetGuildId());
-        std::wstring wideGuildName;
+    std::string  guildName = sGuildMgr->GetGuildNameById(player->GetGuildId());
+    std::wstring wideGuildName;
 
-        if (!Utf8toWStr(guildName, wideGuildName))
-            continue;
+    if (!Utf8toWStr(guildName, wideGuildName))
+      continue;
 
-        wstrToLower(wideGuildName);
+    wstrToLower(wideGuildName);
 
-        _whoListStorage.emplace_back(player->GetGUID(), player->GetTeamId(), player->GetSession()->GetSecurity(), player->GetLevel(),
-            player->getClass(), player->getRace(),
-            (player->IsSpectator() ? 4395 /*Dalaran*/ : player->GetZoneId()), player->getGender(), player->IsVisible(),
-            widePlayerName, wideGuildName, playerName, guildName);
-    }
+    _whoListStorage.emplace_back(player->GetGUID(), player->GetTeamId(), player->GetSession()->GetSecurity(),
+                                 player->GetLevel(), player->getClass(), player->getRace(),
+                                 (player->IsSpectator() ? 4395 /*Dalaran*/ : player->GetZoneId()), player->getGender(),
+                                 player->IsVisible(), widePlayerName, wideGuildName, playerName, guildName);
+  }
 }

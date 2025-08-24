@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -23,16 +24,16 @@
 
 enum UpdatefieldFlags
 {
-    UF_FLAG_NONE         = 0x000,
-    UF_FLAG_PUBLIC       = 0x001,
-    UF_FLAG_PRIVATE      = 0x002,
-    UF_FLAG_OWNER        = 0x004,
-    UF_FLAG_UNUSED1      = 0x008,
-    UF_FLAG_ITEM_OWNER   = 0x010,
-    UF_FLAG_SPECIAL_INFO = 0x020,
-    UF_FLAG_PARTY_MEMBER = 0x040,
-    UF_FLAG_UNUSED2      = 0x080,
-    UF_FLAG_DYNAMIC      = 0x100,
+  UF_FLAG_NONE         = 0x000,
+  UF_FLAG_PUBLIC       = 0x001,
+  UF_FLAG_PRIVATE      = 0x002,
+  UF_FLAG_OWNER        = 0x004,
+  UF_FLAG_UNUSED1      = 0x008,
+  UF_FLAG_ITEM_OWNER   = 0x010,
+  UF_FLAG_SPECIAL_INFO = 0x020,
+  UF_FLAG_PARTY_MEMBER = 0x040,
+  UF_FLAG_UNUSED2      = 0x080,
+  UF_FLAG_DYNAMIC      = 0x100,
 };
 
 extern uint32 ItemUpdateFieldFlags[CONTAINER_END];

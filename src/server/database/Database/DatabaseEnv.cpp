@@ -17,6 +17,6 @@
 
 #include "DatabaseEnv.h"
 
-DatabaseWorkerPool<WorldDatabaseConnection> WorldDatabase;
+DatabaseWorkerPool<WorldDatabaseConnection>     WorldDatabase;
 DatabaseWorkerPool<CharacterDatabaseConnection> CharacterDatabase;
-DatabaseWorkerPool<LoginDatabaseConnection> LoginDatabase;
+DatabaseWorkerPool<LoginDatabaseConnection>     LoginDatabase;

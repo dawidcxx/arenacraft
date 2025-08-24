@@ -19,28 +19,28 @@
 #include "GitRevision.h"
 #include "StringFormat.h"
 
-void Acore::Banner::Show(std::string_view applicationName, void(*log)(std::string_view text), void(*logExtraInfo)())
+void Acore::Banner::Show(std::string_view applicationName, void (*log)(std::string_view text), void (*logExtraInfo)())
 {
-    log(Acore::StringFormat("{} ({})", GitRevision::GetFullVersion(), applicationName));
-    log("<Ctrl-C> to stop.\n");
-    log("   █████╗ ███████╗███████╗██████╗  ██████╗ ████████╗██╗  ██╗");
-    log("  ██╔══██╗╚══███╔╝██╔════╝██╔══██╗██╔═══██╗╚══██╔══╝██║  ██║");
-    log("  ███████║  ███╔╝ █████╗  ██████╔╝██║   ██║   ██║   ███████║");
-    log("  ██╔══██║ ███╔╝  ██╔══╝  ██╔══██╗██║   ██║   ██║   ██╔══██║");
-    log("  ██║  ██║███████╗███████╗██║  ██║╚██████╔╝   ██║   ██║  ██║");
-    log("  ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═╝  ╚═╝");
-    log("                                 ██████╗ ██████╗ ██████╗ ███████╗");
-    log("                                ██╔════╝██╔═══██╗██╔══██╗██╔════╝");
-    log("                                ██║     ██║   ██║██████╔╝█████╗");
-    log("                                ██║     ██║   ██║██╔══██╗██╔══╝");
-    log("                                ╚██████╗╚██████╔╝██║  ██║███████╗");
-    log("                                 ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝\n");
-    log("     AzerothCore 3.3.5a  -  www.azerothcore.org\n");
+  log(Acore::StringFormat("{} ({})", GitRevision::GetFullVersion(), applicationName));
+  log("<Ctrl-C> to stop.\n");
+  log("   █████╗ ███████╗███████╗██████╗  ██████╗ ████████╗██╗  ██╗");
+  log("  ██╔══██╗╚══███╔╝██╔════╝██╔══██╗██╔═══██╗╚══██╔══╝██║  ██║");
+  log("  ███████║  ███╔╝ █████╗  ██████╔╝██║   ██║   ██║   ███████║");
+  log("  ██╔══██║ ███╔╝  ██╔══╝  ██╔══██╗██║   ██║   ██║   ██╔══██║");
+  log("  ██║  ██║███████╗███████╗██║  ██║╚██████╔╝   ██║   ██║  ██║");
+  log("  ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝ ╚═════╝    ╚═╝   ╚═╝  ╚═╝");
+  log("                                 ██████╗ ██████╗ ██████╗ ███████╗");
+  log("                                ██╔════╝██╔═══██╗██╔══██╗██╔════╝");
+  log("                                ██║     ██║   ██║██████╔╝█████╗");
+  log("                                ██║     ██║   ██║██╔══██╗██╔══╝");
+  log("                                ╚██████╗╚██████╔╝██║  ██║███████╗");
+  log("                                 ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝\n");
+  log("     AzerothCore 3.3.5a  -  www.azerothcore.org\n");
 
-    if (logExtraInfo)
-    {
-        logExtraInfo();
-    }
+  if (logExtraInfo)
+  {
+    logExtraInfo();
+  }
 
-    log(" ");
+  log(" ");
 }

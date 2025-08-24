@@ -19,23 +19,22 @@
 #include "DBCStores.h"
 #include "Log.h"
 
-//ScriptObject::ScriptObject(char const* name) : _name(name)
+// ScriptObject::ScriptObject(char const* name) : _name(name)
 //{
-//    sScriptMgr->IncreaseScriptCount();
-//}
+//     sScriptMgr->IncreaseScriptCount();
+// }
 //
-//ScriptObject::~ScriptObject()
+// ScriptObject::~ScriptObject()
 //{
-//    sScriptMgr->DecreaseScriptCount();
-//}
+//     sScriptMgr->DecreaseScriptCount();
+// }
 
-template<class TMap>
-void MapScript<TMap>::checkMap()
+template <class TMap> void MapScript<TMap>::checkMap()
 {
-    _mapEntry = sMapStore.LookupEntry(_mapId);
+  _mapEntry = sMapStore.LookupEntry(_mapId);
 
-    if (!_mapEntry)
-        LOG_ERROR("maps.script", "Invalid MapScript for {}; no such map ID.", _mapId);
+  if (!_mapEntry)
+    LOG_ERROR("maps.script", "Invalid MapScript for {}; no such map ID.", _mapId);
 }
 
 template class AC_GAME_API MapScript<Map>;

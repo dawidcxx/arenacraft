@@ -28,126 +28,128 @@
 
 void WorldSession::HandleContactListOpcode(WorldPacket& recv_data)
 {
-    uint32 flags;
-    recv_data >> flags;
+  uint32 flags;
+  recv_data >> flags;
 
-    _player->GetSocial()->SendSocialList(_player, flags);
+  _player->GetSocial()->SendSocialList(_player, flags);
 }
 
 void WorldSession::HandleAddFriendOpcode(WorldPacket& recv_data)
 {
-    std::string friendName = GetAcoreString(LANG_FRIEND_IGNORE_UNKNOWN);
-    std::string friendNote;
+  std::string friendName = GetAcoreString(LANG_FRIEND_IGNORE_UNKNOWN);
+  std::string friendNote;
 
-    recv_data >> friendName;
-    recv_data >> friendNote;
+  recv_data >> friendName;
+  recv_data >> friendNote;
 
-    if (!normalizePlayerName(friendName))
-        return;
+  if (!normalizePlayerName(friendName))
+    return;
 
-    ObjectGuid friendGuid = sCharacterCache->GetCharacterGuidByName(friendName);
-    if (!friendGuid)
-        return;
+  ObjectGuid friendGuid = sCharacterCache->GetCharacterGuidByName(friendName);
+  if (!friendGuid)
+    return;
 
-    CharacterCacheEntry const* playerData = sCharacterCache->GetCharacterCacheByGuid(friendGuid);
-    if (!playerData)
-        return;
+  CharacterCacheEntry const* playerData = sCharacterCache->GetCharacterCacheByGuid(friendGuid);
+  if (!playerData)
+    return;
 
-    uint32 friendAccountId = playerData->AccountId;
-    TeamId teamId = Player::TeamIdForRace(playerData->Race);
-    FriendsResult friendResult = FRIEND_NOT_FOUND;
+  uint32        friendAccountId = playerData->AccountId;
+  TeamId        teamId          = Player::TeamIdForRace(playerData->Race);
+  FriendsResult friendResult    = FRIEND_NOT_FOUND;
 
-    if (!AccountMgr::IsPlayerAccount(GetSecurity()) || sWorld->getBoolConfig(CONFIG_ALLOW_GM_FRIEND)|| AccountMgr::IsPlayerAccount(AccountMgr::GetSecurity(friendAccountId, realm.Id.Realm)))
+  if (!AccountMgr::IsPlayerAccount(GetSecurity()) || sWorld->getBoolConfig(CONFIG_ALLOW_GM_FRIEND) ||
+      AccountMgr::IsPlayerAccount(AccountMgr::GetSecurity(friendAccountId, realm.Id.Realm)))
+  {
+    if (friendGuid)
     {
-        if (friendGuid)
-        {
-            if (friendGuid == GetPlayer()->GetGUID())
-                friendResult = FRIEND_SELF;
-            else if (GetPlayer()->GetTeamId() != teamId && !sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_ADD_FRIEND)  && AccountMgr::IsPlayerAccount(GetSecurity()))
-                friendResult = FRIEND_ENEMY;
-            else if (GetPlayer()->GetSocial()->HasFriend(friendGuid))
-                friendResult = FRIEND_ALREADY;
-            else
-            {
-                Player* pFriend = ObjectAccessor::FindConnectedPlayer(friendGuid);
-                if (pFriend && pFriend->IsVisibleGloballyFor(GetPlayer()) && !pFriend->GetSession()->IsGMAccount())
-                    friendResult = FRIEND_ADDED_ONLINE;
-                else
-                    friendResult = FRIEND_ADDED_OFFLINE;
-                if (GetPlayer()->GetSocial()->AddToSocialList(friendGuid, SOCIAL_FLAG_FRIEND))
-                    GetPlayer()->GetSocial()->SetFriendNote(friendGuid, friendNote);
-                else
-                friendResult = FRIEND_LIST_FULL;
-            }
-            GetPlayer()->GetSocial()->SetFriendNote(friendGuid, friendNote);
-        }
+      if (friendGuid == GetPlayer()->GetGUID())
+        friendResult = FRIEND_SELF;
+      else if (GetPlayer()->GetTeamId() != teamId && !sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_ADD_FRIEND) &&
+               AccountMgr::IsPlayerAccount(GetSecurity()))
+        friendResult = FRIEND_ENEMY;
+      else if (GetPlayer()->GetSocial()->HasFriend(friendGuid))
+        friendResult = FRIEND_ALREADY;
+      else
+      {
+        Player* pFriend = ObjectAccessor::FindConnectedPlayer(friendGuid);
+        if (pFriend && pFriend->IsVisibleGloballyFor(GetPlayer()) && !pFriend->GetSession()->IsGMAccount())
+          friendResult = FRIEND_ADDED_ONLINE;
+        else
+          friendResult = FRIEND_ADDED_OFFLINE;
+        if (GetPlayer()->GetSocial()->AddToSocialList(friendGuid, SOCIAL_FLAG_FRIEND))
+          GetPlayer()->GetSocial()->SetFriendNote(friendGuid, friendNote);
+        else
+          friendResult = FRIEND_LIST_FULL;
+      }
+      GetPlayer()->GetSocial()->SetFriendNote(friendGuid, friendNote);
     }
+  }
 
-    sSocialMgr->SendFriendStatus(GetPlayer(), friendResult, friendGuid, false);
+  sSocialMgr->SendFriendStatus(GetPlayer(), friendResult, friendGuid, false);
 
-    LOG_DEBUG("network", "WORLD: Sent (SMSG_FRIEND_STATUS)");
+  LOG_DEBUG("network", "WORLD: Sent (SMSG_FRIEND_STATUS)");
 }
 
 void WorldSession::HandleDelFriendOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid FriendGUID;
-    recv_data >> FriendGUID;
+  ObjectGuid FriendGUID;
+  recv_data >> FriendGUID;
 
-    _player->GetSocial()->RemoveFromSocialList(FriendGUID, SOCIAL_FLAG_FRIEND);
+  _player->GetSocial()->RemoveFromSocialList(FriendGUID, SOCIAL_FLAG_FRIEND);
 
-    sSocialMgr->SendFriendStatus(GetPlayer(), FRIEND_REMOVED, FriendGUID, false);
+  sSocialMgr->SendFriendStatus(GetPlayer(), FRIEND_REMOVED, FriendGUID, false);
 
-    LOG_DEBUG("network", "WORLD: Sent motd (SMSG_FRIEND_STATUS)");
+  LOG_DEBUG("network", "WORLD: Sent motd (SMSG_FRIEND_STATUS)");
 }
 
 void WorldSession::HandleAddIgnoreOpcode(WorldPacket& recv_data)
 {
-    std::string ignoreName = GetAcoreString(LANG_FRIEND_IGNORE_UNKNOWN);
+  std::string ignoreName = GetAcoreString(LANG_FRIEND_IGNORE_UNKNOWN);
 
-    recv_data >> ignoreName;
+  recv_data >> ignoreName;
 
-    if (!normalizePlayerName(ignoreName))
-        return;
+  if (!normalizePlayerName(ignoreName))
+    return;
 
-    LOG_DEBUG("network", "WORLD: {} asked to Ignore: '{}'", GetPlayer()->GetName(), ignoreName);
+  LOG_DEBUG("network", "WORLD: {} asked to Ignore: '{}'", GetPlayer()->GetName(), ignoreName);
 
-    ObjectGuid ignoreGuid = sCharacterCache->GetCharacterGuidByName(ignoreName);
-    if (!ignoreGuid)
-        return;
+  ObjectGuid ignoreGuid = sCharacterCache->GetCharacterGuidByName(ignoreName);
+  if (!ignoreGuid)
+    return;
 
-    FriendsResult ignoreResult;
+  FriendsResult ignoreResult;
 
-    if (ignoreGuid == GetPlayer()->GetGUID())              //not add yourself
-        ignoreResult = FRIEND_IGNORE_SELF;
-    else if (GetPlayer()->GetSocial()->HasIgnore(ignoreGuid))
-        ignoreResult = FRIEND_IGNORE_ALREADY;
-    else
-    {
-        ignoreResult = FRIEND_IGNORE_ADDED;
+  if (ignoreGuid == GetPlayer()->GetGUID()) // not add yourself
+    ignoreResult = FRIEND_IGNORE_SELF;
+  else if (GetPlayer()->GetSocial()->HasIgnore(ignoreGuid))
+    ignoreResult = FRIEND_IGNORE_ALREADY;
+  else
+  {
+    ignoreResult = FRIEND_IGNORE_ADDED;
 
-        // ignore list full
-        if (!GetPlayer()->GetSocial()->AddToSocialList(ignoreGuid, SOCIAL_FLAG_IGNORED))
-            ignoreResult = FRIEND_IGNORE_FULL;
-    }
+    // ignore list full
+    if (!GetPlayer()->GetSocial()->AddToSocialList(ignoreGuid, SOCIAL_FLAG_IGNORED))
+      ignoreResult = FRIEND_IGNORE_FULL;
+  }
 
-    sSocialMgr->SendFriendStatus(GetPlayer(), ignoreResult, ignoreGuid, false);
+  sSocialMgr->SendFriendStatus(GetPlayer(), ignoreResult, ignoreGuid, false);
 
-    LOG_DEBUG("network", "WORLD: Sent (SMSG_FRIEND_STATUS)");
+  LOG_DEBUG("network", "WORLD: Sent (SMSG_FRIEND_STATUS)");
 }
 
 void WorldSession::HandleDelIgnoreOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid IgnoreGUID;
-    recv_data >> IgnoreGUID;
+  ObjectGuid IgnoreGUID;
+  recv_data >> IgnoreGUID;
 
-    _player->GetSocial()->RemoveFromSocialList(IgnoreGUID, SOCIAL_FLAG_IGNORED);
-    sSocialMgr->SendFriendStatus(GetPlayer(), FRIEND_IGNORE_REMOVED, IgnoreGUID, false);
+  _player->GetSocial()->RemoveFromSocialList(IgnoreGUID, SOCIAL_FLAG_IGNORED);
+  sSocialMgr->SendFriendStatus(GetPlayer(), FRIEND_IGNORE_REMOVED, IgnoreGUID, false);
 }
 
 void WorldSession::HandleSetContactNotesOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid guid;
-    std::string note;
-    recv_data >> guid >> note;
-    _player->GetSocial()->SetFriendNote(guid, note);
+  ObjectGuid  guid;
+  std::string note;
+  recv_data >> guid >> note;
+  _player->GetSocial()->SetFriendNote(guid, note);
 }

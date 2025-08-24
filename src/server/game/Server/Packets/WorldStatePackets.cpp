@@ -17,30 +17,30 @@
 
 #include "WorldStatePackets.h"
 
-WorldPackets::WorldState::InitWorldStates::InitWorldStates() : ServerPacket(SMSG_INIT_WORLD_STATES, 4 + 4 + 4 + 2) { }
+WorldPackets::WorldState::InitWorldStates::InitWorldStates() : ServerPacket(SMSG_INIT_WORLD_STATES, 4 + 4 + 4 + 2) {}
 
 WorldPacket const* WorldPackets::WorldState::InitWorldStates::Write()
 {
-    _worldPacket.reserve(4 + 4 + 4 + 2 + Worldstates.size() * 8);
+  _worldPacket.reserve(4 + 4 + 4 + 2 + Worldstates.size() * 8);
 
-    _worldPacket << int32(MapID);
-    _worldPacket << int32(ZoneID);
-    _worldPacket << int32(AreaID);
+  _worldPacket << int32(MapID);
+  _worldPacket << int32(ZoneID);
+  _worldPacket << int32(AreaID);
 
-    _worldPacket << uint16(Worldstates.size());
-    for (WorldStateInfo const& wsi : Worldstates)
-    {
-        _worldPacket << int32(wsi.VariableID);
-        _worldPacket << int32(wsi.Value);
-    }
+  _worldPacket << uint16(Worldstates.size());
+  for (WorldStateInfo const& wsi : Worldstates)
+  {
+    _worldPacket << int32(wsi.VariableID);
+    _worldPacket << int32(wsi.Value);
+  }
 
-    return &_worldPacket;
+  return &_worldPacket;
 }
 
 WorldPacket const* WorldPackets::WorldState::UpdateWorldState::Write()
 {
-    _worldPacket << int32(VariableID);
-    _worldPacket << int32(Value);
+  _worldPacket << int32(VariableID);
+  _worldPacket << int32(Value);
 
-    return &_worldPacket;
+  return &_worldPacket;
 }

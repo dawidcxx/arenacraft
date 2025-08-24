@@ -30,136 +30,127 @@ using namespace Acore::ChatCommands;
 class pet_commandscript : public CommandScript
 {
 public:
-    pet_commandscript() : CommandScript("pet_commandscript") { }
+  pet_commandscript() : CommandScript("pet_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable petCommandTable = {{"create", HandlePetCreateCommand, SEC_GAMEMASTER, Console::No},
+                                               {"learn", HandlePetLearnCommand, SEC_GAMEMASTER, Console::No},
+                                               {"unlearn", HandlePetUnlearnCommand, SEC_GAMEMASTER, Console::No}};
+
+    static ChatCommandTable commandTable = {{"pet", petCommandTable}};
+
+    return commandTable;
+  }
+
+  static bool HandlePetCreateCommand(ChatHandler* handler)
+  {
+    Player*   player         = handler->GetSession()->GetPlayer();
+    Creature* creatureTarget = handler->getSelectedCreature();
+
+    if (!creatureTarget || creatureTarget->IsPet() || creatureTarget->IsPlayer())
     {
-        static ChatCommandTable petCommandTable =
-        {
-            { "create",  HandlePetCreateCommand,  SEC_GAMEMASTER, Console::No },
-            { "learn",   HandlePetLearnCommand,   SEC_GAMEMASTER, Console::No },
-            { "unlearn", HandlePetUnlearnCommand, SEC_GAMEMASTER, Console::No }
-        };
-
-        static ChatCommandTable commandTable =
-        {
-            { "pet", petCommandTable }
-        };
-
-        return commandTable;
+      handler->SendErrorMessage(LANG_SELECT_CREATURE);
+      return false;
     }
 
-    static bool HandlePetCreateCommand(ChatHandler* handler)
+    CreatureTemplate const* creatrueTemplate = sObjectMgr->GetCreatureTemplate(creatureTarget->GetEntry());
+    // Creatures with family 0 crashes the server
+    if (!creatrueTemplate->family)
     {
-        Player* player = handler->GetSession()->GetPlayer();
-        Creature* creatureTarget = handler->getSelectedCreature();
-
-        if (!creatureTarget || creatureTarget->IsPet() || creatureTarget->IsPlayer())
-        {
-            handler->SendErrorMessage(LANG_SELECT_CREATURE);
-            return false;
-        }
-
-        CreatureTemplate const* creatrueTemplate = sObjectMgr->GetCreatureTemplate(creatureTarget->GetEntry());
-        // Creatures with family 0 crashes the server
-        if (!creatrueTemplate->family)
-        {
-            handler->SendErrorMessage(LANG_CREATURE_NON_TAMEABLE, creatrueTemplate->Entry);
-            return false;
-        }
-
-        if (player->IsExistPet())
-        {
-            handler->SendErrorMessage(LANG_YOU_ALREADY_HAVE_PET);
-            return false;
-        }
-
-        if (!player->CreatePet(creatureTarget))
-        {
-            handler->SendErrorMessage(LANG_CREATURE_NON_TAMEABLE, creatrueTemplate->Entry);
-            return false;
-        }
-
-        return true;
+      handler->SendErrorMessage(LANG_CREATURE_NON_TAMEABLE, creatrueTemplate->Entry);
+      return false;
     }
 
-    static bool HandlePetLearnCommand(ChatHandler* handler, SpellInfo const* spell)
+    if (player->IsExistPet())
     {
-        if (!spell)
-        {
-            handler->SendErrorMessage(LANG_COMMAND_NOSPELLFOUND);
-            return false;
-        }
-
-        if (!SpellMgr::IsSpellValid(spell))
-        {
-            handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
-            return false;
-        }
-
-        Pet* pet = handler->GetSession()->GetPlayer()->GetPet();
-        if (!pet)
-        {
-            handler->SendErrorMessage("You have no pet");
-            return false;
-        }
-
-        SpellScriptsBounds bounds = sObjectMgr->GetSpellScriptsBounds(spell->Id);
-        uint32 spellDifficultyId = sSpellMgr->GetSpellDifficultyId(spell->Id);
-        if (bounds.first != bounds.second || spellDifficultyId)
-        {
-            handler->SendErrorMessage("Spell {} cannot be learnt using a command!", spell->Id);
-            return false;
-        }
-
-        // Check if pet already has it
-        if (pet->HasSpell(spell->Id))
-        {
-            handler->SendErrorMessage("Pet already has spell: {}", spell->Id);
-            return false;
-        }
-
-        pet->learnSpell(spell->Id);
-        handler->PSendSysMessage("Pet has learned spell {}", spell->Id);
-
-        return true;
+      handler->SendErrorMessage(LANG_YOU_ALREADY_HAVE_PET);
+      return false;
     }
 
-    static bool HandlePetUnlearnCommand(ChatHandler* handler, SpellInfo const* spell)
+    if (!player->CreatePet(creatureTarget))
     {
-        if (!spell)
-        {
-            handler->SendErrorMessage(LANG_COMMAND_NOSPELLFOUND);
-            return false;
-        }
-
-        if (!SpellMgr::IsSpellValid(spell))
-        {
-            handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
-            return false;
-        }
-
-        Pet* pet = handler->GetSession()->GetPlayer()->GetPet();
-        if (!pet)
-        {
-            handler->SendErrorMessage("You have no pet");
-            return false;
-        }
-
-        if (pet->HasSpell(spell->Id))
-        {
-            pet->removeSpell(spell->Id, false);
-        }
-        else
-        {
-            handler->PSendSysMessage("Pet doesn't have that spell");
-        }
-
-        return true;
+      handler->SendErrorMessage(LANG_CREATURE_NON_TAMEABLE, creatrueTemplate->Entry);
+      return false;
     }
+
+    return true;
+  }
+
+  static bool HandlePetLearnCommand(ChatHandler* handler, SpellInfo const* spell)
+  {
+    if (!spell)
+    {
+      handler->SendErrorMessage(LANG_COMMAND_NOSPELLFOUND);
+      return false;
+    }
+
+    if (!SpellMgr::IsSpellValid(spell))
+    {
+      handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
+      return false;
+    }
+
+    Pet* pet = handler->GetSession()->GetPlayer()->GetPet();
+    if (!pet)
+    {
+      handler->SendErrorMessage("You have no pet");
+      return false;
+    }
+
+    SpellScriptsBounds bounds            = sObjectMgr->GetSpellScriptsBounds(spell->Id);
+    uint32             spellDifficultyId = sSpellMgr->GetSpellDifficultyId(spell->Id);
+    if (bounds.first != bounds.second || spellDifficultyId)
+    {
+      handler->SendErrorMessage("Spell {} cannot be learnt using a command!", spell->Id);
+      return false;
+    }
+
+    // Check if pet already has it
+    if (pet->HasSpell(spell->Id))
+    {
+      handler->SendErrorMessage("Pet already has spell: {}", spell->Id);
+      return false;
+    }
+
+    pet->learnSpell(spell->Id);
+    handler->PSendSysMessage("Pet has learned spell {}", spell->Id);
+
+    return true;
+  }
+
+  static bool HandlePetUnlearnCommand(ChatHandler* handler, SpellInfo const* spell)
+  {
+    if (!spell)
+    {
+      handler->SendErrorMessage(LANG_COMMAND_NOSPELLFOUND);
+      return false;
+    }
+
+    if (!SpellMgr::IsSpellValid(spell))
+    {
+      handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
+      return false;
+    }
+
+    Pet* pet = handler->GetSession()->GetPlayer()->GetPet();
+    if (!pet)
+    {
+      handler->SendErrorMessage("You have no pet");
+      return false;
+    }
+
+    if (pet->HasSpell(spell->Id))
+    {
+      pet->removeSpell(spell->Id, false);
+    }
+    else
+    {
+      handler->PSendSysMessage("Pet doesn't have that spell");
+    }
+
+    return true;
+  }
 };
 
-void AddSC_pet_commandscript()
-{
-    new pet_commandscript();
-}
+void AddSC_pet_commandscript() { new pet_commandscript(); }

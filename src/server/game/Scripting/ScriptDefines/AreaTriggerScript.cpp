@@ -23,59 +23,57 @@
 
 bool ScriptMgr::OnAreaTrigger(Player* player, AreaTrigger const* trigger)
 {
-    ASSERT(player);
-    ASSERT(trigger);
+  ASSERT(player);
+  ASSERT(trigger);
 
-    auto ret = IsValidBoolScript<ElunaScript>([&](ElunaScript* script)
-    {
-        return script->CanAreaTrigger(player, trigger);
-    });
+  auto ret =
+      IsValidBoolScript<ElunaScript>([&](ElunaScript* script) { return script->CanAreaTrigger(player, trigger); });
 
-    if (ret && *ret)
-    {
-        return false;
-    }
+  if (ret && *ret)
+  {
+    return false;
+  }
 
-    auto tempScript = ScriptRegistry<AreaTriggerScript>::GetScriptById(sObjectMgr->GetAreaTriggerScriptId(trigger->entry));
-    return tempScript ? tempScript->OnTrigger(player, trigger) : false;
+  auto tempScript =
+      ScriptRegistry<AreaTriggerScript>::GetScriptById(sObjectMgr->GetAreaTriggerScriptId(trigger->entry));
+  return tempScript ? tempScript->OnTrigger(player, trigger) : false;
 }
 
-AreaTriggerScript::AreaTriggerScript(const char* name)
-    : ScriptObject(name)
+AreaTriggerScript::AreaTriggerScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<AreaTriggerScript>::AddScript(this);
+  ScriptRegistry<AreaTriggerScript>::AddScript(this);
 }
 
 bool OnlyOnceAreaTriggerScript::OnTrigger(Player* player, AreaTrigger const* trigger)
 {
-    uint32 const triggerId = trigger->entry;
+  uint32 const triggerId = trigger->entry;
 
-    if (InstanceScript* instance = player->GetInstanceScript())
+  if (InstanceScript* instance = player->GetInstanceScript())
+  {
+    if (instance->IsAreaTriggerDone(triggerId))
     {
-        if (instance->IsAreaTriggerDone(triggerId))
-        {
-            return true;
-        }
-        else
-        {
-            instance->MarkAreaTriggerDone(triggerId);
-        }
+      return true;
     }
+    else
+    {
+      instance->MarkAreaTriggerDone(triggerId);
+    }
+  }
 
-    return _OnTrigger(player, trigger);
+  return _OnTrigger(player, trigger);
 }
 
 void OnlyOnceAreaTriggerScript::ResetAreaTriggerDone(InstanceScript* script, uint32 triggerId)
 {
-    script->ResetAreaTriggerDone(triggerId);
+  script->ResetAreaTriggerDone(triggerId);
 }
 
 void OnlyOnceAreaTriggerScript::ResetAreaTriggerDone(Player const* player, AreaTrigger const* trigger)
 {
-    if (InstanceScript* instance = player->GetInstanceScript())
-    {
-        ResetAreaTriggerDone(instance, trigger->entry);
-    }
+  if (InstanceScript* instance = player->GetInstanceScript())
+  {
+    ResetAreaTriggerDone(instance, trigger->entry);
+  }
 }
 
 template class AC_GAME_API ScriptRegistry<AreaTriggerScript>;

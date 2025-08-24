@@ -20,141 +20,128 @@
 #include "ObjectMgr.h"
 #include "Player.h"
 
-constexpr std::array<std::string_view, MAX_ITEM_QUALITY> itemQualityToString =
-{
-    "poor",
-    "normal",
-    "uncommon",
-    "rare",
-    "epic",
-    "legendary",
-    "artifact",
-    "all"
-};
+constexpr std::array<std::string_view, MAX_ITEM_QUALITY> itemQualityToString = {"poor", "normal",    "uncommon", "rare",
+                                                                                "epic", "legendary", "artifact", "all"};
 
 using namespace Acore::ChatCommands;
 
 class bg_commandscript : public CommandScript
 {
 public:
-    bg_commandscript() : CommandScript("bg_commandscript") { }
+  bg_commandscript() : CommandScript("bg_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable commandTable = {
+        {"bags clear", HandleBagsClearCommand, SEC_GAMEMASTER, Console::No},
+    };
+
+    return commandTable;
+  }
+
+  static bool HandleBagsClearCommand(ChatHandler* handler, std::string_view args)
+  {
+    if (args.empty())
     {
-        static ChatCommandTable commandTable =
-        {
-            { "bags clear",  HandleBagsClearCommand, SEC_GAMEMASTER, Console::No },
-        };
-
-        return commandTable;
+      return false;
     }
 
-    static bool HandleBagsClearCommand(ChatHandler* handler, std::string_view args)
+    Player* player = handler->GetSession()->GetPlayer();
+    if (!player)
     {
-        if (args.empty())
-        {
-            return false;
-        }
+      return false;
+    }
 
-        Player* player = handler->GetSession()->GetPlayer();
-        if (!player)
-        {
-            return false;
-        }
+    uint8 itemQuality = MAX_ITEM_QUALITY;
+    for (uint8 i = ITEM_QUALITY_POOR; i < MAX_ITEM_QUALITY; ++i)
+    {
+      if (args == itemQualityToString[i])
+      {
+        itemQuality = i;
+        break;
+      }
+    }
 
-        uint8 itemQuality = MAX_ITEM_QUALITY;
-        for (uint8 i = ITEM_QUALITY_POOR; i < MAX_ITEM_QUALITY; ++i)
+    if (itemQuality == MAX_ITEM_QUALITY)
+    {
+      return false;
+    }
+
+    std::array<uint32, MAX_ITEM_QUALITY> removedItems = {};
+
+    // in inventory
+    for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+    {
+      if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+      {
+        if (ItemTemplate const* itemTemplate = item->GetTemplate())
         {
-            if (args == itemQualityToString[i])
+          if (itemTemplate->Quality <= itemQuality)
+          {
+            player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
+            ++removedItems[itemTemplate->Quality];
+          }
+        }
+      }
+    }
+
+    // in inventory bags
+    for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; i++)
+    {
+      if (Bag* bag = player->GetBagByPos(i))
+      {
+        for (uint32 j = 0; j < bag->GetBagSize(); j++)
+        {
+          if (Item* item = bag->GetItemByPos(j))
+          {
+            if (ItemTemplate const* itemTemplate = item->GetTemplate())
             {
-                itemQuality = i;
-                break;
+              if (itemTemplate->Quality <= itemQuality)
+              {
+                player->DestroyItem(i, j, true);
+                ++removedItems[itemTemplate->Quality];
+              }
             }
+          }
         }
+      }
+    }
 
-        if (itemQuality == MAX_ITEM_QUALITY)
+    std::ostringstream str;
+    str << "Removed ";
+    if (itemQuality == ITEM_QUALITY_HEIRLOOM)
+    {
+      str << "all";
+    }
+    else
+    {
+      bool initialize = true;
+      for (uint8 i = ITEM_QUALITY_POOR; i < MAX_ITEM_QUALITY; ++i)
+      {
+        if (uint32 itemCount = removedItems[i])
         {
-            return false;
+          std::string_view itemQualityString = itemQualityToString[i];
+
+          if (!initialize)
+          {
+            str << ", ";
+          }
+
+          str << "|c";
+          str << std::hex << ItemQualityColors[i] << std::dec;
+          str << itemCount << " " << itemQualityString << "|r";
+
+          initialize = false;
         }
+      }
+    }
 
-        std::array<uint32, MAX_ITEM_QUALITY> removedItems = { };
+    str << " items from your bags.";
 
-        // in inventory
-        for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
-        {
-            if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-            {
-                if (ItemTemplate const* itemTemplate = item->GetTemplate())
-                {
-                    if (itemTemplate->Quality <= itemQuality)
-                    {
-                        player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
-                        ++removedItems[itemTemplate->Quality];
-                    }
-                }
-            }
-        }
+    handler->SendSysMessage(str.str().c_str());
 
-        // in inventory bags
-        for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; i++)
-        {
-            if (Bag* bag = player->GetBagByPos(i))
-            {
-                for (uint32 j = 0; j < bag->GetBagSize(); j++)
-                {
-                    if (Item* item = bag->GetItemByPos(j))
-                    {
-                        if (ItemTemplate const* itemTemplate = item->GetTemplate())
-                        {
-                            if (itemTemplate->Quality <= itemQuality)
-                            {
-                                player->DestroyItem(i, j, true);
-                                ++removedItems[itemTemplate->Quality];
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        std::ostringstream str;
-        str << "Removed ";
-        if (itemQuality == ITEM_QUALITY_HEIRLOOM)
-        {
-            str << "all";
-        }
-        else
-        {
-            bool initialize = true;
-            for (uint8 i = ITEM_QUALITY_POOR; i < MAX_ITEM_QUALITY; ++i)
-            {
-                if (uint32 itemCount = removedItems[i])
-                {
-                    std::string_view itemQualityString = itemQualityToString[i];
-
-                    if (!initialize)
-                    {
-                        str << ", ";
-                    }
-
-                    str << "|c";
-                    str << std::hex << ItemQualityColors[i] << std::dec;
-                    str << itemCount << " " << itemQualityString << "|r";
-
-                    initialize = false;
-                }
-            }
-        }
-
-        str << " items from your bags.";
-
-        handler->SendSysMessage(str.str().c_str());
-
-        return true;
-    };
+    return true;
+  };
 };
 
-void AddSC_bag_commandscript()
-{
-    new bg_commandscript();
-}
+void AddSC_bag_commandscript() { new bg_commandscript(); }

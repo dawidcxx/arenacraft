@@ -20,16 +20,16 @@
 
 int32 ReactorAI::Permissible(Creature const* creature)
 {
-    if (creature->IsCivilian() || creature->IsNeutralToAll())
-        return PERMIT_BASE_REACTIVE;
+  if (creature->IsCivilian() || creature->IsNeutralToAll())
+    return PERMIT_BASE_REACTIVE;
 
-    return PERMIT_BASE_NO;
+  return PERMIT_BASE_NO;
 }
 
 void ReactorAI::UpdateAI(uint32 /*diff*/)
 {
-    if (!UpdateVictim())
-        return;
+  if (!UpdateVictim())
+    return;
 
-    DoMeleeAttackIfReady();
+  DoMeleeAttackIfReady();
 }

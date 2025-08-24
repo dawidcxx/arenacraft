@@ -33,83 +33,71 @@ using namespace Acore::ChatCommands;
 class honor_commandscript : public CommandScript
 {
 public:
-    honor_commandscript() : CommandScript("honor_commandscript") { }
+  honor_commandscript() : CommandScript("honor_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable honorAddCommandTable = {{"kill", HandleHonorAddKillCommand, SEC_GAMEMASTER, Console::No},
+                                                    {"", HandleHonorAddCommand, SEC_GAMEMASTER, Console::No}};
+
+    static ChatCommandTable honorCommandTable = {{"add", honorAddCommandTable},
+                                                 {"update", HandleHonorUpdateCommand, SEC_GAMEMASTER, Console::No}};
+
+    static ChatCommandTable commandTable = {{"honor", honorCommandTable}};
+    return commandTable;
+  }
+
+  static bool HandleHonorAddCommand(ChatHandler* handler, uint32 amount)
+  {
+    Player* target = handler->getSelectedPlayer();
+    if (!target)
     {
-        static ChatCommandTable honorAddCommandTable =
-        {
-            { "kill", HandleHonorAddKillCommand, SEC_GAMEMASTER, Console::No },
-            { "",     HandleHonorAddCommand,     SEC_GAMEMASTER, Console::No }
-        };
-
-        static ChatCommandTable honorCommandTable =
-        {
-            { "add",    honorAddCommandTable },
-            { "update", HandleHonorUpdateCommand, SEC_GAMEMASTER, Console::No }
-        };
-
-        static ChatCommandTable commandTable =
-        {
-            { "honor", honorCommandTable }
-        };
-        return commandTable;
+      handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
+      return false;
     }
 
-    static bool HandleHonorAddCommand(ChatHandler* handler, uint32 amount)
+    // check online security
+    if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
+      return false;
+
+    target->RewardHonor(nullptr, 1, amount);
+    return true;
+  }
+
+  static bool HandleHonorAddKillCommand(ChatHandler* handler)
+  {
+    Unit* target = handler->getSelectedUnit();
+    if (!target)
     {
-        Player* target = handler->getSelectedPlayer();
-        if (!target)
-        {
-            handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
-            return false;
-        }
-
-        // check online security
-        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
-            return false;
-
-        target->RewardHonor(nullptr, 1, amount);
-        return true;
+      handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
+      return false;
     }
 
-    static bool HandleHonorAddKillCommand(ChatHandler* handler)
+    // check online security
+    if (Player* player = target->ToPlayer())
+      if (handler->HasLowerSecurity(player, ObjectGuid::Empty))
+        return false;
+
+    handler->GetSession()->GetPlayer()->RewardHonor(target, 1);
+    return true;
+  }
+
+  static bool HandleHonorUpdateCommand(ChatHandler* handler)
+  {
+    Player* target = handler->getSelectedPlayer();
+    if (!target)
     {
-        Unit* target = handler->getSelectedUnit();
-        if (!target)
-        {
-            handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
-            return false;
-        }
-
-        // check online security
-        if (Player* player = target->ToPlayer())
-            if (handler->HasLowerSecurity(player, ObjectGuid::Empty))
-                return false;
-
-        handler->GetSession()->GetPlayer()->RewardHonor(target, 1);
-        return true;
+      handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
+      return false;
     }
 
-    static bool HandleHonorUpdateCommand(ChatHandler* handler)
-    {
-        Player* target = handler->getSelectedPlayer();
-        if (!target)
-        {
-            handler->SendErrorMessage(LANG_PLAYER_NOT_FOUND);
-            return false;
-        }
+    // check online security
+    if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
+      return false;
 
-        // check online security
-        if (handler->HasLowerSecurity(target, ObjectGuid::Empty))
-            return false;
-
-        target->UpdateHonorFields();
-        return true;
-    }
+    target->UpdateHonorFields();
+    return true;
+  }
 };
 
-void AddSC_honor_commandscript()
-{
-    new honor_commandscript();
-}
+void AddSC_honor_commandscript() { new honor_commandscript(); }

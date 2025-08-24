@@ -27,7 +27,7 @@ void AddSC_npc_innkeeper();
 void AddSC_npcs_special();
 void AddSC_npc_taxi();
 void AddSC_achievement_scripts();
-void AddSC_chat_log(); // location: scripts\World\chat_log.cpp
+void AddSC_chat_log();         // location: scripts\World\chat_log.cpp
 void AddSC_action_ip_logger(); // location: scripts\World\action_ip_logger.cpp
 void AddSC_player_scripts();
 void AddSC_npc_stave_of_ancients();
@@ -38,21 +38,21 @@ void AddSC_transport_zeppelins();
 // void Add${NameOfDirectory}Scripts()
 void AddWorldScripts()
 {
-    AddSC_areatrigger_scripts();
-    AddSC_emerald_dragons();
-    AddSC_generic_creature();
-    AddSC_go_scripts();
-    AddSC_guards();
-    AddSC_item_scripts();
-    AddSC_npc_professions();
-    AddSC_npc_innkeeper();
-    AddSC_npcs_special();
-    AddSC_npc_taxi();
-    AddSC_achievement_scripts();
-    AddSC_chat_log(); // location: scripts\World\chat_log.cpp
-    AddSC_action_ip_logger(); // location: scripts\World\action_ip_logger.cpp
-    AddSC_player_scripts();
-    AddSC_npc_stave_of_ancients();
-    AddSC_server_mail();
-    AddSC_transport_zeppelins();
+  AddSC_areatrigger_scripts();
+  AddSC_emerald_dragons();
+  AddSC_generic_creature();
+  AddSC_go_scripts();
+  AddSC_guards();
+  AddSC_item_scripts();
+  AddSC_npc_professions();
+  AddSC_npc_innkeeper();
+  AddSC_npcs_special();
+  AddSC_npc_taxi();
+  AddSC_achievement_scripts();
+  AddSC_chat_log();         // location: scripts\World\chat_log.cpp
+  AddSC_action_ip_logger(); // location: scripts\World\action_ip_logger.cpp
+  AddSC_player_scripts();
+  AddSC_npc_stave_of_ancients();
+  AddSC_server_mail();
+  AddSC_transport_zeppelins();
 }

@@ -5,13 +5,13 @@
 class RedisConn
 {
 private:
-    redisContext *m_redis_ctx;
+  redisContext* m_redis_ctx;
 
-    RedisConn();
+  RedisConn();
+
 public:
-    static RedisConn& instance();
-    void init();
+  static RedisConn& instance();
+  void              init();
 
-    void publishMessage(const char *channel, const char *message);  
-
+  void publishMessage(const char* channel, const char* message);
 };

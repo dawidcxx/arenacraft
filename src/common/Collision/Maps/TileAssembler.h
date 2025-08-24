@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -28,87 +29,89 @@
 
 namespace VMAP
 {
-    /**
-    This Class is used to convert raw vector data into balanced BSP-Trees.
-    To start the conversion call convertWorld().
-    */
-    //===============================================
+/**
+This Class is used to convert raw vector data into balanced BSP-Trees.
+To start the conversion call convertWorld().
+*/
+//===============================================
 
-    class ModelPosition
-    {
-    private:
-        G3D::Matrix3 iRotation;
-    public:
-        ModelPosition() { }
-        G3D::Vector3 iPos;
-        G3D::Vector3 iDir;
-        float iScale{0.0f};
-        void init()
-        {
-            iRotation = G3D::Matrix3::fromEulerAnglesZYX(G3D::pif() * iDir.y / 180.f, G3D::pif() * iDir.x / 180.f, G3D::pif() * iDir.z / 180.f);
-        }
-        [[nodiscard]] G3D::Vector3 transform(const G3D::Vector3& pIn) const;
-        void moveToBasePos(const G3D::Vector3& pBasePos) { iPos -= pBasePos; }
-    };
+class ModelPosition
+{
+private:
+  G3D::Matrix3 iRotation;
 
-    typedef std::map<uint32, ModelSpawn> UniqueEntryMap;
-    typedef std::multimap<uint32, uint32> TileMap;
+public:
+  ModelPosition() {}
+  G3D::Vector3 iPos;
+  G3D::Vector3 iDir;
+  float        iScale{0.0f};
+  void         init()
+  {
+    iRotation = G3D::Matrix3::fromEulerAnglesZYX(G3D::pif() * iDir.y / 180.f, G3D::pif() * iDir.x / 180.f,
+                                                 G3D::pif() * iDir.z / 180.f);
+  }
+  [[nodiscard]] G3D::Vector3 transform(const G3D::Vector3& pIn) const;
+  void                       moveToBasePos(const G3D::Vector3& pBasePos) { iPos -= pBasePos; }
+};
 
-    struct MapSpawns
-    {
-        UniqueEntryMap UniqueEntries;
-        TileMap TileEntries;
-    };
+typedef std::map<uint32, ModelSpawn>  UniqueEntryMap;
+typedef std::multimap<uint32, uint32> TileMap;
 
-    typedef std::map<uint32, MapSpawns*> MapData;
-    //===============================================
+struct MapSpawns
+{
+  UniqueEntryMap UniqueEntries;
+  TileMap        TileEntries;
+};
 
-    struct GroupModel_Raw
-    {
-        uint32 mogpflags{0};
-        uint32 GroupWMOID{0};
+typedef std::map<uint32, MapSpawns*> MapData;
+//===============================================
 
-        G3D::AABox bounds;
-        uint32 liquidflags{0};
-        std::vector<MeshTriangle> triangles;
-        std::vector<G3D::Vector3> vertexArray;
-        class WmoLiquid* liquid;
+struct GroupModel_Raw
+{
+  uint32 mogpflags{0};
+  uint32 GroupWMOID{0};
 
-        GroupModel_Raw() : liquid(nullptr) { }
+  G3D::AABox                bounds;
+  uint32                    liquidflags{0};
+  std::vector<MeshTriangle> triangles;
+  std::vector<G3D::Vector3> vertexArray;
+  class WmoLiquid*          liquid;
 
-        ~GroupModel_Raw();
+  GroupModel_Raw() : liquid(nullptr) {}
 
-        bool Read(FILE* f);
-    };
+  ~GroupModel_Raw();
 
-    struct WorldModel_Raw
-    {
-        uint32 RootWMOID;
-        std::vector<GroupModel_Raw> groupsArray;
+  bool Read(FILE* f);
+};
 
-        bool Read(const char* path);
-    };
+struct WorldModel_Raw
+{
+  uint32                      RootWMOID;
+  std::vector<GroupModel_Raw> groupsArray;
 
-    class TileAssembler
-    {
-    private:
-        std::string iDestDir;
-        std::string iSrcDir;
-        G3D::Table<std::string, unsigned int > iUniqueNameIds;
-        MapData mapData;
-        std::set<std::string> spawnedModelFiles;
+  bool Read(const char* path);
+};
 
-    public:
-        TileAssembler(const std::string& pSrcDirName, const std::string& pDestDirName);
-        virtual ~TileAssembler();
+class TileAssembler
+{
+private:
+  std::string                           iDestDir;
+  std::string                           iSrcDir;
+  G3D::Table<std::string, unsigned int> iUniqueNameIds;
+  MapData                               mapData;
+  std::set<std::string>                 spawnedModelFiles;
 
-        bool convertWorld2();
-        bool readMapSpawns();
-        bool calculateTransformedBound(ModelSpawn& spawn);
-        void exportGameobjectModels();
+public:
+  TileAssembler(const std::string& pSrcDirName, const std::string& pDestDirName);
+  virtual ~TileAssembler();
 
-        bool convertRawFile(const std::string& pModelFilename);
-    };
+  bool convertWorld2();
+  bool readMapSpawns();
+  bool calculateTransformedBound(ModelSpawn& spawn);
+  void exportGameobjectModels();
 
-}                                                           // VMAP
-#endif                                                      /*_TILEASSEMBLER_H_*/
+  bool convertRawFile(const std::string& pModelFilename);
+};
+
+} // namespace VMAP
+#endif /*_TILEASSEMBLER_H_*/

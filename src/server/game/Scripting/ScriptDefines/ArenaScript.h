@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -24,37 +25,35 @@
 
 enum ArenaHook
 {
-    ARENAHOOK_CAN_ADD_MEMBER,
-    ARENAHOOK_ON_GET_POINTS,
-    ARENAHOOK_CAN_SAVE_TO_DB,
-    ARENAHOOK_ON_BEFORE_CHECK_WIN_CONDITION,
-    ARENAHOOK_ON_ARENA_START,
-    ARENAHOOK_ON_ARENA_END,
-    ARENAHOOK_ON_ARENA_INVITES_SENT,
-    ARENAHOOK_END
+  ARENAHOOK_CAN_ADD_MEMBER,
+  ARENAHOOK_ON_GET_POINTS,
+  ARENAHOOK_CAN_SAVE_TO_DB,
+  ARENAHOOK_ON_BEFORE_CHECK_WIN_CONDITION,
+  ARENAHOOK_ON_ARENA_START,
+  ARENAHOOK_ON_ARENA_END,
+  ARENAHOOK_ON_ARENA_INVITES_SENT,
+  ARENAHOOK_END
 };
 
 class ArenaScript : public ScriptObject
 {
 protected:
-
-    ArenaScript(const char* name, std::vector<uint16> enabledHooks = std::vector<uint16>());
+  ArenaScript(const char* name, std::vector<uint16> enabledHooks = std::vector<uint16>());
 
 public:
+  [[nodiscard]] bool IsDatabaseBound() const override { return false; }
 
-    [[nodiscard]] bool IsDatabaseBound() const override { return false; }
+  [[nodiscard]] virtual bool CanAddMember(ArenaTeam* /*team*/, ObjectGuid /*PlayerGuid*/) { return true; }
 
-    [[nodiscard]] virtual bool CanAddMember(ArenaTeam* /*team*/, ObjectGuid /*PlayerGuid*/) { return true; }
+  virtual void OnGetPoints(ArenaTeam* /*team*/, uint32 /*memberRating*/, float& /*points*/) {}
 
-    virtual void OnGetPoints(ArenaTeam* /*team*/, uint32 /*memberRating*/, float& /*points*/) { }
+  [[nodiscard]] virtual bool OnBeforeArenaCheckWinConditions(Battleground* const /* bg */) { return true; }
 
-    [[nodiscard]] virtual bool OnBeforeArenaCheckWinConditions(Battleground* const /* bg */) { return true; }
+  [[nodiscard]] virtual bool CanSaveToDB(ArenaTeam* /*team*/) { return true; }
 
-    [[nodiscard]] virtual bool CanSaveToDB(ArenaTeam* /*team*/) { return true; }
-    
-    virtual void OnArenaInvitesSent(Battleground* /* bg */) { };
-    virtual void OnArenaStart(Battleground* /* bg */) { };
-    virtual void OnArenaEnd(Battleground* /* bg */) { };
+  virtual void OnArenaInvitesSent(Battleground* /* bg */) {};
+  virtual void OnArenaStart(Battleground* /* bg */) {};
+  virtual void OnArenaEnd(Battleground* /* bg */) {};
 };
 
 #endif

@@ -28,11 +28,11 @@ void AddSC_outdoorpvp_gh();
 // void Add${NameOfDirectory}Scripts()
 void AddOutdoorPvPScripts()
 {
-    AddSC_outdoorpvp_ep();
-    AddSC_outdoorpvp_hp();
-    AddSC_outdoorpvp_na();
-    AddSC_outdoorpvp_si();
-    AddSC_outdoorpvp_tf();
-    AddSC_outdoorpvp_zm();
-    AddSC_outdoorpvp_gh();
+  AddSC_outdoorpvp_ep();
+  AddSC_outdoorpvp_hp();
+  AddSC_outdoorpvp_na();
+  AddSC_outdoorpvp_si();
+  AddSC_outdoorpvp_tf();
+  AddSC_outdoorpvp_zm();
+  AddSC_outdoorpvp_gh();
 }

@@ -22,31 +22,29 @@
 #include "MySQLWorkaround.h"
 #include "QueryResult.h"
 
-PreparedStatementBase::PreparedStatementBase(uint32 index, uint8 capacity) :
-    m_index(index),
-    statement_data(capacity) { }
+PreparedStatementBase::PreparedStatementBase(uint32 index, uint8 capacity) : m_index(index), statement_data(capacity) {}
 
-PreparedStatementBase::~PreparedStatementBase() { }
+PreparedStatementBase::~PreparedStatementBase() {}
 
 //- Bind to buffer
-template<typename T>
+template <typename T>
 Acore::Types::is_non_string_view_v<T> PreparedStatementBase::SetValidData(const uint8 index, T const& value)
 {
-    ASSERT(index < statement_data.size());
-    statement_data[index].data.emplace<T>(value);
+  ASSERT(index < statement_data.size());
+  statement_data[index].data.emplace<T>(value);
 }
 
 // Non template functions
 void PreparedStatementBase::SetValidData(const uint8 index)
 {
-    ASSERT(index < statement_data.size());
-    statement_data[index].data.emplace<std::nullptr_t>(nullptr);
+  ASSERT(index < statement_data.size());
+  statement_data[index].data.emplace<std::nullptr_t>(nullptr);
 }
 
 void PreparedStatementBase::SetValidData(const uint8 index, std::string_view value)
 {
-    ASSERT(index < statement_data.size());
-    statement_data[index].data.emplace<std::string>(value);
+  ASSERT(index < statement_data.size());
+  statement_data[index].data.emplace<std::string>(value);
 }
 
 template void PreparedStatementBase::SetValidData(const uint8 index, uint8 const& value);
@@ -63,54 +61,44 @@ template void PreparedStatementBase::SetValidData(const uint8 index, std::string
 template void PreparedStatementBase::SetValidData(const uint8 index, std::vector<uint8> const& value);
 
 //- Execution
-PreparedStatementTask::PreparedStatementTask(PreparedStatementBase* stmt, bool async) :
-    m_stmt(stmt),
-    m_result(nullptr)
+PreparedStatementTask::PreparedStatementTask(PreparedStatementBase* stmt, bool async) : m_stmt(stmt), m_result(nullptr)
 {
-    m_has_result = async; // If it's async, then there's a result
+  m_has_result = async; // If it's async, then there's a result
 
-    if (async)
-        m_result = new PreparedQueryResultPromise();
+  if (async)
+    m_result = new PreparedQueryResultPromise();
 }
 
 PreparedStatementTask::~PreparedStatementTask()
 {
-    delete m_stmt;
+  delete m_stmt;
 
-    if (m_has_result && m_result)
-        delete m_result;
+  if (m_has_result && m_result)
+    delete m_result;
 }
 
 bool PreparedStatementTask::Execute()
 {
-    if (m_has_result)
+  if (m_has_result)
+  {
+    PreparedResultSet* result = m_conn->Query(m_stmt);
+    if (!result || !result->GetRowCount())
     {
-        PreparedResultSet* result = m_conn->Query(m_stmt);
-        if (!result || !result->GetRowCount())
-        {
-            delete result;
-            m_result->set_value(PreparedQueryResult(nullptr));
-            return false;
-        }
-
-        m_result->set_value(PreparedQueryResult(result));
-        return true;
+      delete result;
+      m_result->set_value(PreparedQueryResult(nullptr));
+      return false;
     }
 
-    return m_conn->Execute(m_stmt);
+    m_result->set_value(PreparedQueryResult(result));
+    return true;
+  }
+
+  return m_conn->Execute(m_stmt);
 }
 
-template<typename T>
-std::string PreparedStatementData::ToString(T value)
-{
-    return Acore::StringFormat("{}", value);
-}
+template <typename T> std::string PreparedStatementData::ToString(T value) { return Acore::StringFormat("{}", value); }
 
-template<>
-std::string PreparedStatementData::ToString(std::vector<uint8> /*value*/)
-{
-    return "BINARY";
-}
+template <> std::string PreparedStatementData::ToString(std::vector<uint8> /*value*/) { return "BINARY"; }
 
 template std::string PreparedStatementData::ToString(uint8);
 template std::string PreparedStatementData::ToString(uint16);
@@ -125,7 +113,4 @@ template std::string PreparedStatementData::ToString(float);
 template std::string PreparedStatementData::ToString(double);
 template std::string PreparedStatementData::ToString(bool);
 
-std::string PreparedStatementData::ToString(std::nullptr_t /*value*/)
-{
-    return "NULL";
-}
+std::string PreparedStatementData::ToString(std::nullptr_t /*value*/) { return "NULL"; }

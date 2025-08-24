@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -24,17 +25,17 @@
 class AC_COMMON_API AuthCrypt
 {
 public:
-    AuthCrypt() = default;
+  AuthCrypt() = default;
 
-    void Init(SessionKey const& K);
-    void DecryptRecv(uint8* data, std::size_t len);
-    void EncryptSend(uint8* data, std::size_t len);
+  void Init(SessionKey const& K);
+  void DecryptRecv(uint8* data, std::size_t len);
+  void EncryptSend(uint8* data, std::size_t len);
 
-    bool IsInitialized() const { return _initialized; }
+  bool IsInitialized() const { return _initialized; }
 
 private:
-    Acore::Crypto::ARC4 _clientDecrypt;
-    Acore::Crypto::ARC4 _serverEncrypt;
-    bool _initialized{ false };
+  Acore::Crypto::ARC4 _clientDecrypt;
+  Acore::Crypto::ARC4 _serverEncrypt;
+  bool                _initialized{false};
 };
 #endif

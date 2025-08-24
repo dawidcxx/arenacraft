@@ -15,12 +15,12 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
- /* ScriptData
- Name: event_commandscript
- %Complete: 100
- Comment: All event related commands
- Category: commandscripts
- EndScriptData */
+/* ScriptData
+Name: event_commandscript
+%Complete: 100
+Comment: All event related commands
+Category: commandscripts
+EndScriptData */
 
 #include "Chat.h"
 #include "CommandScript.h"
@@ -36,158 +36,151 @@ using EventEntry = Variant<Hyperlink<gameevent>, uint16>;
 class event_commandscript : public CommandScript
 {
 public:
-    event_commandscript() : CommandScript("event_commandscript") { }
+  event_commandscript() : CommandScript("event_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable eventCommandTable = {
+        {"activelist", HandleEventActiveListCommand, SEC_GAMEMASTER, Console::Yes},
+        {"start", HandleEventStartCommand, SEC_GAMEMASTER, Console::Yes},
+        {"stop", HandleEventStopCommand, SEC_GAMEMASTER, Console::Yes},
+        {"info", HandleEventInfoCommand, SEC_GAMEMASTER, Console::Yes}};
+    static ChatCommandTable commandTable = {{"event", eventCommandTable}};
+    return commandTable;
+  }
+
+  static bool HandleEventActiveListCommand(ChatHandler* handler)
+  {
+    uint32 counter = 0;
+
+    GameEventMgr::GameEventDataMap const& events       = sGameEventMgr->GetEventMap();
+    GameEventMgr::ActiveEvents const&     activeEvents = sGameEventMgr->GetActiveEventList();
+
+    char const* active = handler->GetAcoreString(LANG_ACTIVE);
+
+    for (uint16 eventId : activeEvents)
     {
-        static ChatCommandTable eventCommandTable =
-        {
-            { "activelist", HandleEventActiveListCommand, SEC_GAMEMASTER, Console::Yes },
-            { "start",      HandleEventStartCommand,      SEC_GAMEMASTER, Console::Yes },
-            { "stop",       HandleEventStopCommand,       SEC_GAMEMASTER, Console::Yes },
-            { "info",       HandleEventInfoCommand,       SEC_GAMEMASTER, Console::Yes }
-        };
-        static ChatCommandTable commandTable =
-        {
-            { "event", eventCommandTable }
-        };
-        return commandTable;
+      GameEventData const& eventData = events[eventId];
+
+      if (handler->GetSession())
+      {
+        handler->PSendSysMessage(LANG_EVENT_ENTRY_LIST_CHAT, eventId, eventId, eventData.description, active);
+      }
+      else
+      {
+        handler->PSendSysMessage(LANG_EVENT_ENTRY_LIST_CONSOLE, eventId, eventData.description, active);
+      }
+
+      ++counter;
     }
 
-    static bool HandleEventActiveListCommand(ChatHandler* handler)
+    if (counter == 0)
     {
-        uint32 counter = 0;
-
-        GameEventMgr::GameEventDataMap const& events = sGameEventMgr->GetEventMap();
-        GameEventMgr::ActiveEvents const& activeEvents = sGameEventMgr->GetActiveEventList();
-
-        char const* active = handler->GetAcoreString(LANG_ACTIVE);
-
-        for (uint16 eventId : activeEvents)
-        {
-            GameEventData const& eventData = events[eventId];
-
-            if (handler->GetSession())
-            {
-                handler->PSendSysMessage(LANG_EVENT_ENTRY_LIST_CHAT, eventId, eventId, eventData.description, active);
-            }
-            else
-            {
-                handler->PSendSysMessage(LANG_EVENT_ENTRY_LIST_CONSOLE, eventId, eventData.description, active);
-            }
-
-            ++counter;
-        }
-
-        if (counter == 0)
-        {
-            handler->SendSysMessage(LANG_NOEVENTFOUND);
-        }
-
-        handler->SetSentErrorMessage(true);
-
-        return true;
+      handler->SendSysMessage(LANG_NOEVENTFOUND);
     }
 
-    static bool HandleEventInfoCommand(ChatHandler* handler, EventEntry const eventId)
+    handler->SetSentErrorMessage(true);
+
+    return true;
+  }
+
+  static bool HandleEventInfoCommand(ChatHandler* handler, EventEntry const eventId)
+  {
+    GameEventMgr::GameEventDataMap const& events = sGameEventMgr->GetEventMap();
+
+    if (std::size_t(eventId) >= events.size())
     {
-        GameEventMgr::GameEventDataMap const& events = sGameEventMgr->GetEventMap();
-
-        if (std::size_t(eventId) >= events.size())
-        {
-            handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
-            return false;
-        }
-
-        GameEventData const& eventData = events[eventId];
-        if (!eventData.isValid())
-        {
-            handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
-            return false;
-        }
-
-        GameEventMgr::ActiveEvents const& activeEvents = sGameEventMgr->GetActiveEventList();
-        bool active = activeEvents.find(eventId) != activeEvents.end();
-        char const* activeStr = active ? handler->GetAcoreString(LANG_ACTIVE) : "";
-
-        std::string startTimeStr = Acore::Time::TimeToTimestampStr(Seconds(eventData.start));
-        std::string endTimeStr = Acore::Time::TimeToTimestampStr(Seconds(eventData.end));
-
-        uint32 delay = sGameEventMgr->NextCheck(eventId);
-        time_t nextTime = GameTime::GetGameTime().count() + delay;
-        std::string nextStr = nextTime >= eventData.start && nextTime < eventData.end ? Acore::Time::TimeToTimestampStr(Seconds(nextTime)) : "-";
-
-        std::string occurenceStr = secsToTimeString(eventData.occurence * MINUTE, true);
-        std::string lengthStr = secsToTimeString(eventData.length * MINUTE, true);
-
-        handler->PSendSysMessage(LANG_EVENT_INFO, uint16(eventId), eventData.description, activeStr,
-            startTimeStr, endTimeStr, occurenceStr, lengthStr,
-            nextStr);
-
-        return true;
+      handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
+      return false;
     }
 
-    static bool HandleEventStartCommand(ChatHandler* handler, EventEntry const eventId)
+    GameEventData const& eventData = events[eventId];
+    if (!eventData.isValid())
     {
-        GameEventMgr::GameEventDataMap const& events = sGameEventMgr->GetEventMap();
-
-        if (*eventId < 1 || *eventId >= events.size())
-        {
-            handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
-            return false;
-        }
-
-        GameEventData const& eventData = events[eventId];
-        if (!eventData.isValid())
-        {
-            handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
-            return false;
-        }
-
-        GameEventMgr::ActiveEvents const& activeEvents = sGameEventMgr->GetActiveEventList();
-        if (activeEvents.find(eventId) != activeEvents.end())
-        {
-            handler->SendErrorMessage(LANG_EVENT_ALREADY_ACTIVE, uint16(eventId), eventData.description);
-            return false;
-        }
-
-        handler->PSendSysMessage(LANG_EVENT_STARTED, uint16(eventId), eventData.description);
-        sGameEventMgr->StartEvent(eventId, true);
-        return true;
+      handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
+      return false;
     }
 
-    static bool HandleEventStopCommand(ChatHandler* handler, EventEntry const eventId)
+    GameEventMgr::ActiveEvents const& activeEvents = sGameEventMgr->GetActiveEventList();
+    bool                              active       = activeEvents.find(eventId) != activeEvents.end();
+    char const*                       activeStr    = active ? handler->GetAcoreString(LANG_ACTIVE) : "";
+
+    std::string startTimeStr = Acore::Time::TimeToTimestampStr(Seconds(eventData.start));
+    std::string endTimeStr   = Acore::Time::TimeToTimestampStr(Seconds(eventData.end));
+
+    uint32      delay    = sGameEventMgr->NextCheck(eventId);
+    time_t      nextTime = GameTime::GetGameTime().count() + delay;
+    std::string nextStr  = nextTime >= eventData.start && nextTime < eventData.end
+                               ? Acore::Time::TimeToTimestampStr(Seconds(nextTime))
+                               : "-";
+
+    std::string occurenceStr = secsToTimeString(eventData.occurence * MINUTE, true);
+    std::string lengthStr    = secsToTimeString(eventData.length * MINUTE, true);
+
+    handler->PSendSysMessage(LANG_EVENT_INFO, uint16(eventId), eventData.description, activeStr, startTimeStr,
+                             endTimeStr, occurenceStr, lengthStr, nextStr);
+
+    return true;
+  }
+
+  static bool HandleEventStartCommand(ChatHandler* handler, EventEntry const eventId)
+  {
+    GameEventMgr::GameEventDataMap const& events = sGameEventMgr->GetEventMap();
+
+    if (*eventId < 1 || *eventId >= events.size())
     {
-        GameEventMgr::GameEventDataMap const& events = sGameEventMgr->GetEventMap();
-
-        if (*eventId < 1 || *eventId >= events.size())
-        {
-            handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
-            return false;
-        }
-
-        GameEventData const& eventData = events[eventId];
-        if (!eventData.isValid())
-        {
-            handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
-            return false;
-        }
-
-        GameEventMgr::ActiveEvents const& activeEvents = sGameEventMgr->GetActiveEventList();
-
-        if (activeEvents.find(eventId) == activeEvents.end())
-        {
-            handler->SendErrorMessage(LANG_EVENT_NOT_ACTIVE, uint16(eventId), eventData.description);
-            return false;
-        }
-
-        handler->PSendSysMessage(LANG_EVENT_STOPPED, uint16(eventId), eventData.description);
-        sGameEventMgr->StopEvent(eventId, true);
-        return true;
+      handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
+      return false;
     }
+
+    GameEventData const& eventData = events[eventId];
+    if (!eventData.isValid())
+    {
+      handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
+      return false;
+    }
+
+    GameEventMgr::ActiveEvents const& activeEvents = sGameEventMgr->GetActiveEventList();
+    if (activeEvents.find(eventId) != activeEvents.end())
+    {
+      handler->SendErrorMessage(LANG_EVENT_ALREADY_ACTIVE, uint16(eventId), eventData.description);
+      return false;
+    }
+
+    handler->PSendSysMessage(LANG_EVENT_STARTED, uint16(eventId), eventData.description);
+    sGameEventMgr->StartEvent(eventId, true);
+    return true;
+  }
+
+  static bool HandleEventStopCommand(ChatHandler* handler, EventEntry const eventId)
+  {
+    GameEventMgr::GameEventDataMap const& events = sGameEventMgr->GetEventMap();
+
+    if (*eventId < 1 || *eventId >= events.size())
+    {
+      handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
+      return false;
+    }
+
+    GameEventData const& eventData = events[eventId];
+    if (!eventData.isValid())
+    {
+      handler->SendErrorMessage(LANG_EVENT_NOT_EXIST);
+      return false;
+    }
+
+    GameEventMgr::ActiveEvents const& activeEvents = sGameEventMgr->GetActiveEventList();
+
+    if (activeEvents.find(eventId) == activeEvents.end())
+    {
+      handler->SendErrorMessage(LANG_EVENT_NOT_ACTIVE, uint16(eventId), eventData.description);
+      return false;
+    }
+
+    handler->PSendSysMessage(LANG_EVENT_STOPPED, uint16(eventId), eventData.description);
+    sGameEventMgr->StopEvent(eventId, true);
+    return true;
+  }
 };
 
-void AddSC_event_commandscript()
-{
-    new event_commandscript();
-}
+void AddSC_event_commandscript() { new event_commandscript(); }

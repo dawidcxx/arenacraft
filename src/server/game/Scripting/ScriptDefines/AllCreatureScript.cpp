@@ -21,67 +21,52 @@
 
 void ScriptMgr::OnCreatureAddWorld(Creature* creature)
 {
-    ASSERT(creature);
+  ASSERT(creature);
 
-    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        script->OnCreatureAddWorld(creature);
-    });
+  ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script) { script->OnCreatureAddWorld(creature); });
 }
 
 void ScriptMgr::OnCreatureRemoveWorld(Creature* creature)
 {
-    ASSERT(creature);
+  ASSERT(creature);
 
-    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        script->OnCreatureRemoveWorld(creature);
-    });
+  ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script) { script->OnCreatureRemoveWorld(creature); });
 }
 
 void ScriptMgr::OnCreatureSaveToDB(Creature* creature)
 {
-    ASSERT(creature);
+  ASSERT(creature);
 
-    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        script->OnCreatureSaveToDB(creature);
-    });
+  ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script) { script->OnCreatureSaveToDB(creature); });
 }
 
 void ScriptMgr::OnBeforeCreatureSelectLevel(const CreatureTemplate* cinfo, Creature* creature, uint8& level)
 {
-    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        script->OnBeforeCreatureSelectLevel(cinfo, creature, level);
-    });
+  ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
+                                   { script->OnBeforeCreatureSelectLevel(cinfo, creature, level); });
 }
 
 void ScriptMgr::Creature_SelectLevel(const CreatureTemplate* cinfo, Creature* creature)
 {
-    ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script)
-    {
-        script->Creature_SelectLevel(cinfo, creature);
-    });
+  ExecuteScript<AllCreatureScript>([&](AllCreatureScript* script) { script->Creature_SelectLevel(cinfo, creature); });
 }
 
-//bool ScriptMgr::CanCreatureSendListInventory(Player* player, Creature* creature, uint32 vendorEntry)
+// bool ScriptMgr::CanCreatureSendListInventory(Player* player, Creature* creature, uint32 vendorEntry)
 //{
-//    auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
-//    {
-//        return !script->CanCreatureSendListInventory(player, creature, vendorEntry);
-//    });
+//     auto ret = IsValidBoolScript<AllCreatureScript>([&](AllCreatureScript* script)
+//     {
+//         return !script->CanCreatureSendListInventory(player, creature, vendorEntry);
+//     });
 //
-//    if (ret && *ret)
-//        return false;
+//     if (ret && *ret)
+//         return false;
 //
-//    return true;
-//}
+//     return true;
+// }
 
-AllCreatureScript::AllCreatureScript(const char* name) :
-    ScriptObject(name)
+AllCreatureScript::AllCreatureScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<AllCreatureScript>::AddScript(this);
+  ScriptRegistry<AllCreatureScript>::AddScript(this);
 }
 
 template class AC_GAME_API ScriptRegistry<AllCreatureScript>;

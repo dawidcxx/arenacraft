@@ -25,57 +25,54 @@ using namespace Acore::ChatCommands;
 class player_settings_commandscript : public CommandScript
 {
 public:
-    player_settings_commandscript() : CommandScript("player_settings_commandscript") {}
+  player_settings_commandscript() : CommandScript("player_settings_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable playerSettingsCommandTable = {
+        {"announcer", HandleSettingsAnnouncerFlags, SEC_MODERATOR, Console::No},
+    };
+    static ChatCommandTable commandTable = {
+        {"settings", playerSettingsCommandTable},
+    };
+    return commandTable;
+  }
+
+  static bool HandleSettingsAnnouncerFlags(ChatHandler* handler, std::string type, bool on)
+  {
+    Player* player = handler->GetPlayer();
+
+    PlayerSetting setting;
+    setting = player->GetPlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS);
+
+    if (type == "bg")
     {
-        static ChatCommandTable playerSettingsCommandTable =
-        {
-            { "announcer", HandleSettingsAnnouncerFlags, SEC_MODERATOR, Console::No },
-        };
-        static ChatCommandTable commandTable =
-        {
-            { "settings", playerSettingsCommandTable },
-        };
-        return commandTable;
+      on ? setting.RemoveFlag(ANNOUNCER_FLAG_DISABLE_BG_QUEUE) : setting.AddFlag(ANNOUNCER_FLAG_DISABLE_BG_QUEUE);
+      player->UpdatePlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS, setting.value);
+    }
+    else if (type == "arena")
+    {
+      on ? setting.RemoveFlag(ANNOUNCER_FLAG_DISABLE_ARENA_QUEUE) : setting.AddFlag(ANNOUNCER_FLAG_DISABLE_ARENA_QUEUE);
+      player->UpdatePlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS, setting.value);
+    }
+    else if (type == "autobroadcast")
+    {
+      if (player->GetLevel() < sWorld->getIntConfig(CONFIG_AUTOBROADCAST_MIN_LEVEL_DISABLE))
+      {
+        handler->SetSentErrorMessage(true);
+        handler->PSendSysMessage(LANG_CMD_AUTOBROADCAST_LVL_ERROR,
+                                 sWorld->getIntConfig(CONFIG_AUTOBROADCAST_MIN_LEVEL_DISABLE));
+      }
+
+      on ? setting.RemoveFlag(ANNOUNCER_FLAG_DISABLE_AUTOBROADCAST)
+         : setting.AddFlag(ANNOUNCER_FLAG_DISABLE_AUTOBROADCAST);
+      player->UpdatePlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS, setting.value);
     }
 
-    static bool HandleSettingsAnnouncerFlags(ChatHandler* handler, std::string type, bool on)
-    {
-        Player* player = handler->GetPlayer();
-
-        PlayerSetting setting;
-        setting = player->GetPlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS);
-
-        if (type == "bg")
-        {
-            on ? setting.RemoveFlag(ANNOUNCER_FLAG_DISABLE_BG_QUEUE) : setting.AddFlag(ANNOUNCER_FLAG_DISABLE_BG_QUEUE);
-            player->UpdatePlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS, setting.value);
-        }
-        else if (type == "arena")
-        {
-            on ? setting.RemoveFlag(ANNOUNCER_FLAG_DISABLE_ARENA_QUEUE) : setting.AddFlag(ANNOUNCER_FLAG_DISABLE_ARENA_QUEUE);
-            player->UpdatePlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS, setting.value);
-        }
-        else if (type == "autobroadcast")
-        {
-            if (player->GetLevel() < sWorld->getIntConfig(CONFIG_AUTOBROADCAST_MIN_LEVEL_DISABLE))
-            {
-                handler->SetSentErrorMessage(true);
-                handler->PSendSysMessage(LANG_CMD_AUTOBROADCAST_LVL_ERROR, sWorld->getIntConfig(CONFIG_AUTOBROADCAST_MIN_LEVEL_DISABLE));
-            }
-
-            on ? setting.RemoveFlag(ANNOUNCER_FLAG_DISABLE_AUTOBROADCAST) : setting.AddFlag(ANNOUNCER_FLAG_DISABLE_AUTOBROADCAST);
-            player->UpdatePlayerSetting(AzerothcorePSSource, SETTING_ANNOUNCER_FLAGS, setting.value);
-        }
-
-        handler->SetSentErrorMessage(false);
-        handler->PSendSysMessage(on ? LANG_CMD_SETTINGS_ANNOUNCER_ON : LANG_CMD_SETTINGS_ANNOUNCER_OFF, type);
-        return true;
-    }
+    handler->SetSentErrorMessage(false);
+    handler->PSendSysMessage(on ? LANG_CMD_SETTINGS_ANNOUNCER_ON : LANG_CMD_SETTINGS_ANNOUNCER_OFF, type);
+    return true;
+  }
 };
 
-void AddSC_player_settings_commandscript()
-{
-    new player_settings_commandscript();
-}
+void AddSC_player_settings_commandscript() { new player_settings_commandscript(); }

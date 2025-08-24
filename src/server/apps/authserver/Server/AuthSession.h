@@ -1,5 +1,6 @@
 /*
- * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright
+ * information
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Affero General Public License as published by the
@@ -8,8 +9,8 @@
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
- * more details.
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
@@ -36,84 +37,84 @@ struct AuthHandler;
 
 enum AuthStatus
 {
-    STATUS_CHALLENGE = 0,
-    STATUS_LOGON_PROOF,
-    STATUS_RECONNECT_PROOF,
-    STATUS_AUTHED,
-    STATUS_WAITING_FOR_REALM_LIST,
-    STATUS_CLOSED
+  STATUS_CHALLENGE = 0,
+  STATUS_LOGON_PROOF,
+  STATUS_RECONNECT_PROOF,
+  STATUS_AUTHED,
+  STATUS_WAITING_FOR_REALM_LIST,
+  STATUS_CLOSED
 };
 
 // cppcheck-suppress ctuOneDefinitionRuleViolation
 struct AccountInfo
 {
-    void LoadResult(Field* fields);
+  void LoadResult(Field* fields);
 
-    uint32 Id = 0;
-    std::string Login;
-    bool IsLockedToIP = false;
-    std::string LockCountry;
-    std::string LastIP;
-    uint32 FailedLogins = 0;
-    bool IsBanned = false;
-    bool IsPermanentlyBanned = false;
-    AccountTypes SecurityLevel = SEC_PLAYER;
+  uint32       Id = 0;
+  std::string  Login;
+  bool         IsLockedToIP = false;
+  std::string  LockCountry;
+  std::string  LastIP;
+  uint32       FailedLogins        = 0;
+  bool         IsBanned            = false;
+  bool         IsPermanentlyBanned = false;
+  AccountTypes SecurityLevel       = SEC_PLAYER;
 };
 
 class AuthSession : public Socket<AuthSession>
 {
-    typedef Socket<AuthSession> AuthSocket;
+  typedef Socket<AuthSession> AuthSocket;
 
 public:
-    static std::unordered_map<uint8, AuthHandler> InitHandlers();
+  static std::unordered_map<uint8, AuthHandler> InitHandlers();
 
-    AuthSession(tcp::socket&& socket);
+  AuthSession(tcp::socket&& socket);
 
-    void Start() override;
-    bool Update() override;
+  void Start() override;
+  bool Update() override;
 
-    void SendPacket(ByteBuffer& packet);
+  void SendPacket(ByteBuffer& packet);
 
 protected:
-    void ReadHandler() override;
+  void ReadHandler() override;
 
 private:
-    bool HandleLogonChallenge();
-    bool HandleLogonProof();
-    bool HandleReconnectChallenge();
-    bool HandleReconnectProof();
-    bool HandleRealmList();
+  bool HandleLogonChallenge();
+  bool HandleLogonProof();
+  bool HandleReconnectChallenge();
+  bool HandleReconnectProof();
+  bool HandleRealmList();
 
-    void CheckIpCallback(PreparedQueryResult result);
-    void LogonChallengeCallback(PreparedQueryResult result);
-    void ReconnectChallengeCallback(PreparedQueryResult result);
-    void RealmListCallback(PreparedQueryResult result);
+  void CheckIpCallback(PreparedQueryResult result);
+  void LogonChallengeCallback(PreparedQueryResult result);
+  void ReconnectChallengeCallback(PreparedQueryResult result);
+  void RealmListCallback(PreparedQueryResult result);
 
-    bool VerifyVersion(uint8 const* a, int32 aLength, Acore::Crypto::SHA1::Digest const& versionProof, bool isReconnect);
+  bool VerifyVersion(uint8 const* a, int32 aLength, Acore::Crypto::SHA1::Digest const& versionProof, bool isReconnect);
 
-    Optional<Acore::Crypto::SRP6> _srp6;
-    SessionKey _sessionKey = {};
-    std::array<uint8, 16> _reconnectProof = {};
+  Optional<Acore::Crypto::SRP6> _srp6;
+  SessionKey                    _sessionKey     = {};
+  std::array<uint8, 16>         _reconnectProof = {};
 
-    AuthStatus _status;
-    AccountInfo _accountInfo;
-    Optional<std::vector<uint8>> _totpSecret;
-    std::string _localizationName;
-    std::string _os;
-    std::string _ipCountry;
-    uint16 _build;
-    uint8 _expversion;
+  AuthStatus                   _status;
+  AccountInfo                  _accountInfo;
+  Optional<std::vector<uint8>> _totpSecret;
+  std::string                  _localizationName;
+  std::string                  _os;
+  std::string                  _ipCountry;
+  uint16                       _build;
+  uint8                        _expversion;
 
-    QueryCallbackProcessor _queryProcessor;
+  QueryCallbackProcessor _queryProcessor;
 };
 
 #pragma pack(push, 1)
 
 struct AuthHandler
 {
-    AuthStatus status;
-    std::size_t packetSize;
-    bool (AuthSession::* handler)();
+  AuthStatus  status;
+  std::size_t packetSize;
+  bool (AuthSession::*handler)();
 };
 
 #pragma pack(pop)

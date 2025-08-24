@@ -18,60 +18,61 @@
 #include "DBCStore.h"
 #include "DBCDatabaseLoader.h"
 
-DBCStorageBase::DBCStorageBase(char const* fmt) : _fieldCount(0), _fileFormat(fmt), _dataTable(nullptr), _indexTableSize(0)
+DBCStorageBase::DBCStorageBase(char const* fmt)
+    : _fieldCount(0), _fileFormat(fmt), _dataTable(nullptr), _indexTableSize(0)
 {
 }
 
 DBCStorageBase::~DBCStorageBase()
 {
-    delete[] _dataTable;
-    for (char* strings : _stringPool)
-        delete[] strings;
+  delete[] _dataTable;
+  for (char* strings : _stringPool)
+    delete[] strings;
 }
 
 bool DBCStorageBase::Load(char const* path, char**& indexTable)
 {
-    indexTable = nullptr;
+  indexTable = nullptr;
 
-    DBCFileLoader dbc;
+  DBCFileLoader dbc;
 
-    // Check if load was sucessful, only then continue
-    if (!dbc.Load(path, _fileFormat))
-        return false;
+  // Check if load was sucessful, only then continue
+  if (!dbc.Load(path, _fileFormat))
+    return false;
 
-    _fieldCount = dbc.GetCols();
+  _fieldCount = dbc.GetCols();
 
-    // load raw non-string data
-    _dataTable = dbc.AutoProduceData(_fileFormat, _indexTableSize, indexTable);
+  // load raw non-string data
+  _dataTable = dbc.AutoProduceData(_fileFormat, _indexTableSize, indexTable);
 
-    // load strings from dbc data
-    if (char* stringBlock = dbc.AutoProduceStrings(_fileFormat, _dataTable))
-        _stringPool.push_back(stringBlock);
+  // load strings from dbc data
+  if (char* stringBlock = dbc.AutoProduceStrings(_fileFormat, _dataTable))
+    _stringPool.push_back(stringBlock);
 
-    // error in dbc file at loading if nullptr
-    return indexTable != nullptr;
+  // error in dbc file at loading if nullptr
+  return indexTable != nullptr;
 }
 
 bool DBCStorageBase::LoadStringsFrom(char const* path, char** indexTable)
 {
-    // DBC must be already loaded using Load
-    if (!indexTable)
-        return false;
+  // DBC must be already loaded using Load
+  if (!indexTable)
+    return false;
 
-    DBCFileLoader dbc;
+  DBCFileLoader dbc;
 
-    // Check if load was successful, only then continue
-    if (!dbc.Load(path, _fileFormat))
-        return false;
+  // Check if load was successful, only then continue
+  if (!dbc.Load(path, _fileFormat))
+    return false;
 
-    // load strings from another locale dbc data
-    if (char* stringBlock = dbc.AutoProduceStrings(_fileFormat, _dataTable))
-        _stringPool.push_back(stringBlock);
+  // load strings from another locale dbc data
+  if (char* stringBlock = dbc.AutoProduceStrings(_fileFormat, _dataTable))
+    _stringPool.push_back(stringBlock);
 
-    return true;
+  return true;
 }
 
 void DBCStorageBase::LoadFromDB(char const* table, char const* format, char**& indexTable)
 {
-    _stringPool.push_back(DBCDatabaseLoader(table, format, _stringPool).Load(_indexTableSize, indexTable));
+  _stringPool.push_back(DBCDatabaseLoader(table, format, _stringPool).Load(_indexTableSize, indexTable));
 }

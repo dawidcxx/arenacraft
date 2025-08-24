@@ -20,15 +20,14 @@
 
 Battleground* ScriptMgr::CreateBattleground(BattlegroundTypeId /*typeId*/)
 {
-    /// @todo: Implement script-side battlegrounds.
-    ABORT();
-    return nullptr;
+  /// @todo: Implement script-side battlegrounds.
+  ABORT();
+  return nullptr;
 }
 
-BattlegroundScript::BattlegroundScript(const char* name)
-    : ScriptObject(name)
+BattlegroundScript::BattlegroundScript(const char* name) : ScriptObject(name)
 {
-    ScriptRegistry<BattlegroundScript>::AddScript(this);
+  ScriptRegistry<BattlegroundScript>::AddScript(this);
 }
 
 template class AC_GAME_API ScriptRegistry<BattlegroundScript>;

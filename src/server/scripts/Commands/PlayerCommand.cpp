@@ -21,70 +21,72 @@
 #include "SpellInfo.h"
 #include "SpellMgr.h"
 
-bool Acore::PlayerCommand::HandleLearnSpellCommand(ChatHandler* handler, Player* targetPlayer, SpellInfo const* spell, Optional<EXACT_SEQUENCE("all")> allRanks)
+bool Acore::PlayerCommand::HandleLearnSpellCommand(ChatHandler* handler, Player* targetPlayer, SpellInfo const* spell,
+                                                   Optional<EXACT_SEQUENCE("all")> allRanks)
 {
-    if (!SpellMgr::IsSpellValid(spell))
+  if (!SpellMgr::IsSpellValid(spell))
+  {
+    handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
+    return false;
+  }
+
+  if (!allRanks && targetPlayer->HasSpell(spell->Id))
+  {
+    if (targetPlayer == handler->GetPlayer())
     {
-        handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
-        return false;
-    }
-
-    if (!allRanks && targetPlayer->HasSpell(spell->Id))
-    {
-        if (targetPlayer == handler->GetPlayer())
-        {
-            handler->SendErrorMessage(LANG_YOU_KNOWN_SPELL);
-        }
-        else
-        {
-            handler->SendErrorMessage(LANG_TARGET_KNOWN_SPELL, handler->GetNameLink(targetPlayer).c_str());
-        }
-
-        return false;
-    }
-
-    targetPlayer->learnSpell(spell->Id, false);
-
-    if (allRanks)
-    {
-        uint32 spellId = spell->Id;
-
-        while ((spellId = sSpellMgr->GetNextSpellInChain(spellId)))
-        {
-            targetPlayer->learnSpell(spellId, false);
-        }
-    }
-
-    if (GetTalentSpellCost(spell->GetFirstRankSpell()->Id))
-    {
-        targetPlayer->SendTalentsInfoData(false);
-    }
-
-    return true;
-}
-
-bool Acore::PlayerCommand::HandleUnlearnSpellCommand(ChatHandler* handler, Player* target, SpellInfo const* spell, Optional<EXACT_SEQUENCE("all")> allRanks)
-{
-    uint32 spellId = spell->Id;
-
-    if (allRanks)
-    {
-        spellId = sSpellMgr->GetFirstSpellInChain(spellId);
-    }
-
-    if (target->HasSpell(spellId))
-    {
-        target->removeSpell(spellId, SPEC_MASK_ALL, false);
+      handler->SendErrorMessage(LANG_YOU_KNOWN_SPELL);
     }
     else
     {
-        handler->SendSysMessage(LANG_FORGET_SPELL);
+      handler->SendErrorMessage(LANG_TARGET_KNOWN_SPELL, handler->GetNameLink(targetPlayer).c_str());
     }
 
-    if (GetTalentSpellCost(spellId))
+    return false;
+  }
+
+  targetPlayer->learnSpell(spell->Id, false);
+
+  if (allRanks)
+  {
+    uint32 spellId = spell->Id;
+
+    while ((spellId = sSpellMgr->GetNextSpellInChain(spellId)))
     {
-        target->SendTalentsInfoData(false);
+      targetPlayer->learnSpell(spellId, false);
     }
+  }
 
-    return true;
+  if (GetTalentSpellCost(spell->GetFirstRankSpell()->Id))
+  {
+    targetPlayer->SendTalentsInfoData(false);
+  }
+
+  return true;
+}
+
+bool Acore::PlayerCommand::HandleUnlearnSpellCommand(ChatHandler* handler, Player* target, SpellInfo const* spell,
+                                                     Optional<EXACT_SEQUENCE("all")> allRanks)
+{
+  uint32 spellId = spell->Id;
+
+  if (allRanks)
+  {
+    spellId = sSpellMgr->GetFirstSpellInChain(spellId);
+  }
+
+  if (target->HasSpell(spellId))
+  {
+    target->removeSpell(spellId, SPEC_MASK_ALL, false);
+  }
+  else
+  {
+    handler->SendSysMessage(LANG_FORGET_SPELL);
+  }
+
+  if (GetTalentSpellCost(spellId))
+  {
+    target->SendTalentsInfoData(false);
+  }
+
+  return true;
 }

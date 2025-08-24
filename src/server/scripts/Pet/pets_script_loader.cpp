@@ -28,10 +28,10 @@ void AddSC_shaman_pet_scripts();
 // void Add${NameOfDirectory}Scripts()
 void AddPetScripts()
 {
-    AddSC_deathknight_pet_scripts();
-    AddSC_generic_pet_scripts();
-    AddSC_hunter_pet_scripts();
-    AddSC_mage_pet_scripts();
-    AddSC_priest_pet_scripts();
-    AddSC_shaman_pet_scripts();
+  AddSC_deathknight_pet_scripts();
+  AddSC_generic_pet_scripts();
+  AddSC_hunter_pet_scripts();
+  AddSC_mage_pet_scripts();
+  AddSC_priest_pet_scripts();
+  AddSC_shaman_pet_scripts();
 }

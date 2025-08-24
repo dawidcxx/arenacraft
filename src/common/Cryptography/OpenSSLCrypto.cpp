@@ -28,28 +28,30 @@ OSSL_PROVIDER* DefaultProvider;
 
 void SetupLibrariesForWindows()
 {
-    namespace fs = std::filesystem;
+  namespace fs = std::filesystem;
 
-    fs::path programLocation{ boost::dll::program_location().remove_filename().string() };
-    fs::path libLegacy{ boost::dll::program_location().remove_filename().string() + "/legacy.dll" };
+  fs::path programLocation{boost::dll::program_location().remove_filename().string()};
+  fs::path libLegacy{boost::dll::program_location().remove_filename().string() + "/legacy.dll"};
 
-    ASSERT(fs::exists(libLegacy), "Not found 'legacy.dll'. Please copy library 'legacy.dll' from OpenSSL default dir to '{}'", programLocation.generic_string());
-    OSSL_PROVIDER_set_default_search_path(nullptr, programLocation.generic_string().c_str());
+  ASSERT(fs::exists(libLegacy),
+         "Not found 'legacy.dll'. Please copy library 'legacy.dll' from OpenSSL default dir to '{}'",
+         programLocation.generic_string());
+  OSSL_PROVIDER_set_default_search_path(nullptr, programLocation.generic_string().c_str());
 }
 #endif
 
 void OpenSSLCrypto::threadsSetup()
 {
 #if AC_PLATFORM == AC_PLATFORM_WINDOWS
-    SetupLibrariesForWindows();
+  SetupLibrariesForWindows();
 #endif
-    LegacyProvider = OSSL_PROVIDER_load(nullptr, "legacy");
-    DefaultProvider = OSSL_PROVIDER_load(nullptr, "default");
+  LegacyProvider  = OSSL_PROVIDER_load(nullptr, "legacy");
+  DefaultProvider = OSSL_PROVIDER_load(nullptr, "default");
 }
 
 void OpenSSLCrypto::threadsCleanup()
 {
-    OSSL_PROVIDER_unload(LegacyProvider);
-    OSSL_PROVIDER_unload(DefaultProvider);
-    OSSL_PROVIDER_set_default_search_path(nullptr, nullptr);
+  OSSL_PROVIDER_unload(LegacyProvider);
+  OSSL_PROVIDER_unload(DefaultProvider);
+  OSSL_PROVIDER_set_default_search_path(nullptr, nullptr);
 }

@@ -24,114 +24,116 @@
 
 uint32 Acore::XP::BaseGain(uint8 pl_level, uint8 mob_level, ContentLevels content)
 {
-    uint32 baseGain;
-    uint32 nBaseExp;
+  uint32 baseGain;
+  uint32 nBaseExp;
 
-    switch (content)
+  switch (content)
+  {
+  case CONTENT_1_60:
+    nBaseExp = 45;
+    break;
+  case CONTENT_61_70:
+    nBaseExp = 235;
+    break;
+  case CONTENT_71_80:
+    nBaseExp = 580;
+    break;
+  default:
+    LOG_ERROR("misc", "BaseGain: Unsupported content level {}", content);
+    nBaseExp = 45;
+    break;
+  }
+
+  if (mob_level >= pl_level)
+  {
+    uint8 nLevelDiff = mob_level - pl_level;
+    if (nLevelDiff > 4)
+      nLevelDiff = 4;
+
+    baseGain = ((pl_level * 5 + nBaseExp) * (20 + nLevelDiff) / 10 + 1) / 2;
+  }
+  else
+  {
+    uint8 gray_level = GetGrayLevel(pl_level);
+    if (mob_level > gray_level)
     {
-    case CONTENT_1_60:
-        nBaseExp = 45;
-        break;
-    case CONTENT_61_70:
-        nBaseExp = 235;
-        break;
-    case CONTENT_71_80:
-        nBaseExp = 580;
-        break;
-    default:
-        LOG_ERROR("misc", "BaseGain: Unsupported content level {}", content);
-        nBaseExp = 45;
-        break;
-    }
-
-    if (mob_level >= pl_level)
-    {
-        uint8 nLevelDiff = mob_level - pl_level;
-        if (nLevelDiff > 4)
-            nLevelDiff = 4;
-
-        baseGain = ((pl_level * 5 + nBaseExp) * (20 + nLevelDiff) / 10 + 1) / 2;
+      uint8 ZD = GetZeroDifference(pl_level);
+      baseGain = (pl_level * 5 + nBaseExp) * (ZD + mob_level - pl_level) / ZD;
     }
     else
-    {
-        uint8 gray_level = GetGrayLevel(pl_level);
-        if (mob_level > gray_level)
-        {
-            uint8 ZD = GetZeroDifference(pl_level);
-            baseGain = (pl_level * 5 + nBaseExp) * (ZD + mob_level - pl_level) / ZD;
-        }
-        else
-            baseGain = 0;
-    }
+      baseGain = 0;
+  }
 
-    //sScriptMgr->OnBaseGainCalculation(baseGain, pl_level, mob_level, content); // pussywizard: optimization
-    return baseGain;
+  // sScriptMgr->OnBaseGainCalculation(baseGain, pl_level, mob_level, content); // pussywizard: optimization
+  return baseGain;
 }
 
 uint32 Acore::XP::Gain(Player* player, Unit* unit, bool isBattleGround /*= false*/)
 {
-    Creature* creature = unit->ToCreature();
-    uint32 gain = 0;
+  Creature* creature = unit->ToCreature();
+  uint32    gain     = 0;
 
-    if (!creature || (!creature->IsTotem() && !creature->IsPet() && !creature->IsCritter() &&
-        !(creature->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_XP)))
+  if (!creature || (!creature->IsTotem() && !creature->IsPet() && !creature->IsCritter() &&
+                    !(creature->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_XP)))
+  {
+    float xpMod = 1.0f;
+
+    gain = BaseGain(player->GetLevel(), unit->GetLevel(),
+                    GetContentLevelsForMapAndZone(unit->GetMapId(), unit->GetZoneId()));
+
+    if (gain && creature)
     {
-        float xpMod = 1.0f;
-
-        gain = BaseGain(player->GetLevel(), unit->GetLevel(), GetContentLevelsForMapAndZone(unit->GetMapId(), unit->GetZoneId()));
-
-        if (gain && creature)
-        {
-            if (creature->isElite())
-            {
-                // Elites in instances have a 2.75x XP bonus instead of the regular 2x world bonus.
-                if (unit->GetMap() && unit->GetMap()->IsDungeon())
-                    xpMod *= 2.75f;
-                else
-                    xpMod *= 2.0f;
-            }
-
-            xpMod *= creature->GetCreatureTemplate()->ModExperience;
-        }
-
-        if (isBattleGround)
-        {
-            switch (player->GetMapId())
-            {
-                case MAP_BG_ALTERAC_VALLEY:
-                    xpMod *= sWorld->getRate(RATE_XP_BG_KILL_AV);
-                    break;
-                case MAP_BG_WARSONG_GULCH:
-                    xpMod *= sWorld->getRate(RATE_XP_BG_KILL_WSG);
-                    break;
-                case MAP_BG_ARATHI_BASIN:
-                    xpMod *= sWorld->getRate(RATE_XP_BG_KILL_AB);
-                    break;
-                case MAP_BG_EYE_OF_THE_STORM:
-                    xpMod *= sWorld->getRate(RATE_XP_BG_KILL_EOTS);
-                    break;
-                case MAP_BG_STRAND_OF_THE_ANCIENTS:
-                    xpMod *= sWorld->getRate(RATE_XP_BG_KILL_SOTA);
-                    break;
-                case MAP_BG_ISLE_OF_CONQUEST:
-                    xpMod *= sWorld->getRate(RATE_XP_BG_KILL_IC);
-                    break;
-            }
-        }
+      if (creature->isElite())
+      {
+        // Elites in instances have a 2.75x XP bonus instead of the regular 2x world bonus.
+        if (unit->GetMap() && unit->GetMap()->IsDungeon())
+          xpMod *= 2.75f;
         else
-        {
-            xpMod *= sWorld->getRate(RATE_XP_KILL);
-        }
+          xpMod *= 2.0f;
+      }
 
-        // if players dealt less than 50% of the damage and were credited anyway (due to CREATURE_FLAG_EXTRA_NO_PLAYER_DAMAGE_REQ), scale XP gained appropriately (linear scaling)
-        if (creature && creature->GetPlayerDamageReq())
-        {
-            xpMod *= 1.0f - 2.0f * creature->GetPlayerDamageReq() / creature->GetMaxHealth();
-        }
-
-        gain = uint32(gain * xpMod);
+      xpMod *= creature->GetCreatureTemplate()->ModExperience;
     }
 
-    //sScriptMgr->OnGainCalculation(gain, player, u); // pussywizard: optimization
-    return gain;
+    if (isBattleGround)
+    {
+      switch (player->GetMapId())
+      {
+      case MAP_BG_ALTERAC_VALLEY:
+        xpMod *= sWorld->getRate(RATE_XP_BG_KILL_AV);
+        break;
+      case MAP_BG_WARSONG_GULCH:
+        xpMod *= sWorld->getRate(RATE_XP_BG_KILL_WSG);
+        break;
+      case MAP_BG_ARATHI_BASIN:
+        xpMod *= sWorld->getRate(RATE_XP_BG_KILL_AB);
+        break;
+      case MAP_BG_EYE_OF_THE_STORM:
+        xpMod *= sWorld->getRate(RATE_XP_BG_KILL_EOTS);
+        break;
+      case MAP_BG_STRAND_OF_THE_ANCIENTS:
+        xpMod *= sWorld->getRate(RATE_XP_BG_KILL_SOTA);
+        break;
+      case MAP_BG_ISLE_OF_CONQUEST:
+        xpMod *= sWorld->getRate(RATE_XP_BG_KILL_IC);
+        break;
+      }
+    }
+    else
+    {
+      xpMod *= sWorld->getRate(RATE_XP_KILL);
+    }
+
+    // if players dealt less than 50% of the damage and were credited anyway (due to
+    // CREATURE_FLAG_EXTRA_NO_PLAYER_DAMAGE_REQ), scale XP gained appropriately (linear scaling)
+    if (creature && creature->GetPlayerDamageReq())
+    {
+      xpMod *= 1.0f - 2.0f * creature->GetPlayerDamageReq() / creature->GetMaxHealth();
+    }
+
+    gain = uint32(gain * xpMod);
+  }
+
+  // sScriptMgr->OnGainCalculation(gain, player, u); // pussywizard: optimization
+  return gain;
 }

@@ -21,38 +21,38 @@
 
 DatabaseWorker::DatabaseWorker(ProducerConsumerQueue<SQLOperation*>* newQueue, MySQLConnection* connection)
 {
-    _connection = connection;
-    _queue = newQueue;
-    _cancelationToken = false;
-    _workerThread = std::thread(&DatabaseWorker::WorkerThread, this);
+  _connection       = connection;
+  _queue            = newQueue;
+  _cancelationToken = false;
+  _workerThread     = std::thread(&DatabaseWorker::WorkerThread, this);
 }
 
 DatabaseWorker::~DatabaseWorker()
 {
-    _cancelationToken = true;
+  _cancelationToken = true;
 
-    _queue->Cancel();
+  _queue->Cancel();
 
-    _workerThread.join();
+  _workerThread.join();
 }
 
 void DatabaseWorker::WorkerThread()
 {
-    if (!_queue)
-        return;
+  if (!_queue)
+    return;
 
-    for (;;)
-    {
-        SQLOperation* operation = nullptr;
+  for (;;)
+  {
+    SQLOperation* operation = nullptr;
 
-        _queue->WaitAndPop(operation);
+    _queue->WaitAndPop(operation);
 
-        if (_cancelationToken || !operation)
-            return;
+    if (_cancelationToken || !operation)
+      return;
 
-        operation->SetConnection(_connection);
-        operation->call();
+    operation->SetConnection(_connection);
+    operation->call();
 
-        delete operation;
-    }
+    delete operation;
+  }
 }

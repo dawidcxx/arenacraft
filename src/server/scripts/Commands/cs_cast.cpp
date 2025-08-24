@@ -35,219 +35,215 @@ using namespace Acore::ChatCommands;
 class cast_commandscript : public CommandScript
 {
 public:
-    cast_commandscript() : CommandScript("cast_commandscript") { }
+  cast_commandscript() : CommandScript("cast_commandscript") {}
 
-    ChatCommandTable GetCommands() const override
+  ChatCommandTable GetCommands() const override
+  {
+    static ChatCommandTable castCommandTable = {{"back", HandleCastBackCommand, SEC_GAMEMASTER, Console::No},
+                                                {"dist", HandleCastDistCommand, SEC_GAMEMASTER, Console::No},
+                                                {"self", HandleCastSelfCommand, SEC_GAMEMASTER, Console::No},
+                                                {"target", HandleCastTargetCommad, SEC_GAMEMASTER, Console::No},
+                                                {"dest", HandleCastDestCommand, SEC_GAMEMASTER, Console::No},
+                                                {"", HandleCastCommand, SEC_GAMEMASTER, Console::No}};
+    static ChatCommandTable commandTable     = {{"cast", castCommandTable}};
+    return commandTable;
+  }
+
+  static bool CheckSpellCastResult(ChatHandler* handler, SpellCastResult result)
+  {
+    if (result != SPELL_CAST_OK)
     {
-        static ChatCommandTable castCommandTable =
-        {
-            { "back",   HandleCastBackCommand,  SEC_GAMEMASTER, Console::No },
-            { "dist",   HandleCastDistCommand,  SEC_GAMEMASTER, Console::No },
-            { "self",   HandleCastSelfCommand,  SEC_GAMEMASTER, Console::No },
-            { "target", HandleCastTargetCommad, SEC_GAMEMASTER, Console::No },
-            { "dest",   HandleCastDestCommand,  SEC_GAMEMASTER, Console::No },
-            { "",       HandleCastCommand,      SEC_GAMEMASTER, Console::No }
-        };
-        static ChatCommandTable commandTable =
-        {
-            { "cast", castCommandTable }
-        };
-        return commandTable;
+      handler->PSendSysMessage(LANG_CMD_CAST_ERROR_CODE, EnumUtils::ToTitle(SpellCastResult(result)), result);
+      return false;
     }
 
-    static bool CheckSpellCastResult(ChatHandler* handler, SpellCastResult result)
-    {
-        if (result != SPELL_CAST_OK)
-        {
-            handler->PSendSysMessage(LANG_CMD_CAST_ERROR_CODE, EnumUtils::ToTitle(SpellCastResult(result)), result);
-            return false;
-        }
+    return true;
+  }
 
-        return true;
+  static bool CheckSpellExistsAndIsValid(ChatHandler* handler, SpellInfo const* spell)
+  {
+    if (!spell)
+    {
+      handler->SendErrorMessage(LANG_COMMAND_NOSPELLFOUND);
+      return false;
     }
 
-    static bool CheckSpellExistsAndIsValid(ChatHandler* handler, SpellInfo const* spell)
+    if (!SpellMgr::IsSpellValid(spell))
     {
-        if (!spell)
-        {
-            handler->SendErrorMessage(LANG_COMMAND_NOSPELLFOUND);
-            return false;
-        }
+      handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
+      return false;
+    }
+    return true;
+  }
 
-        if (!SpellMgr::IsSpellValid(spell))
-        {
-            handler->SendErrorMessage(LANG_COMMAND_SPELL_BROKEN, spell->Id);
-            return false;
-        }
-        return true;
+  static Optional<TriggerCastFlags> GetTriggerFlags(Optional<std::string> triggeredStr)
+  {
+    if (triggeredStr)
+    {
+      if (StringStartsWith(
+              "triggered",
+              *triggeredStr)) // check if "triggered" starts with *triggeredStr (e.g. "trig", "trigger", etc.)
+        return TRIGGERED_FULL_DEBUG_MASK;
+      else
+        return std::nullopt;
+    }
+    return TRIGGERED_NONE;
+  }
+
+  static bool HandleCastCommand(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+  {
+    Unit* target = handler->getSelectedUnit();
+    if (!target)
+    {
+      handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
+      return false;
     }
 
-    static Optional<TriggerCastFlags> GetTriggerFlags(Optional<std::string> triggeredStr)
+    if (!CheckSpellExistsAndIsValid(handler, spell))
+      return false;
+
+    Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
+    if (!triggerFlags)
+      return false;
+
+    if (!CheckSpellCastResult(handler, handler->GetSession()->GetPlayer()->CastSpell(target, spell->Id, *triggerFlags)))
     {
-        if (triggeredStr)
-        {
-            if (StringStartsWith("triggered", *triggeredStr)) // check if "triggered" starts with *triggeredStr (e.g. "trig", "trigger", etc.)
-                return TRIGGERED_FULL_DEBUG_MASK;
-            else
-                return std::nullopt;
-        }
-        return TRIGGERED_NONE;
+      handler->SetSentErrorMessage(true);
+      return false;
     }
 
-    static bool HandleCastCommand(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+    return true;
+  }
+
+  static bool HandleCastBackCommand(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+  {
+    Creature* caster = handler->getSelectedCreature();
+    if (!caster)
     {
-        Unit* target = handler->getSelectedUnit();
-        if (!target)
-        {
-            handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
-            return false;
-        }
-
-        if (!CheckSpellExistsAndIsValid(handler, spell))
-            return false;
-
-        Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
-        if (!triggerFlags)
-            return false;
-
-        if (!CheckSpellCastResult(handler, handler->GetSession()->GetPlayer()->CastSpell(target, spell->Id, *triggerFlags)))
-        {
-            handler->SetSentErrorMessage(true);
-            return false;
-        }
-
-        return true;
+      handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
+      return false;
     }
 
-    static bool HandleCastBackCommand(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+    if (!CheckSpellExistsAndIsValid(handler, spell))
+      return false;
+
+    Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
+    if (!triggerFlags)
+      return false;
+
+    if (!CheckSpellCastResult(handler, caster->CastSpell(handler->GetSession()->GetPlayer(), spell->Id, *triggerFlags)))
     {
-        Creature* caster = handler->getSelectedCreature();
-        if (!caster)
-        {
-            handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
-            return false;
-        }
-
-        if (!CheckSpellExistsAndIsValid(handler, spell))
-            return false;
-
-        Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
-        if (!triggerFlags)
-            return false;
-
-        if (!CheckSpellCastResult(handler, caster->CastSpell(handler->GetSession()->GetPlayer(), spell->Id, *triggerFlags)))
-        {
-            handler->SetSentErrorMessage(true);
-            return false;
-        }
-
-        return true;
+      handler->SetSentErrorMessage(true);
+      return false;
     }
 
-    static bool HandleCastDistCommand(ChatHandler* handler, SpellInfo const* spell, float dist, Optional<std::string> triggeredStr)
+    return true;
+  }
+
+  static bool HandleCastDistCommand(ChatHandler* handler, SpellInfo const* spell, float dist,
+                                    Optional<std::string> triggeredStr)
+  {
+    if (!CheckSpellExistsAndIsValid(handler, spell))
+      return false;
+
+    Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
+    if (!triggerFlags)
+      return false;
+
+    float x, y, z;
+    handler->GetSession()->GetPlayer()->GetClosePoint(x, y, z, dist);
+
+    if (!CheckSpellCastResult(handler,
+                              handler->GetSession()->GetPlayer()->CastSpell(x, y, z, spell->Id, *triggerFlags)))
     {
-        if (!CheckSpellExistsAndIsValid(handler, spell))
-            return false;
-
-        Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
-        if (!triggerFlags)
-            return false;
-
-        float x, y, z;
-        handler->GetSession()->GetPlayer()->GetClosePoint(x, y, z, dist);
-
-        if (!CheckSpellCastResult(handler, handler->GetSession()->GetPlayer()->CastSpell(x, y, z, spell->Id, *triggerFlags)))
-        {
-            handler->SetSentErrorMessage(true);
-            return false;
-        }
-
-        return true;
+      handler->SetSentErrorMessage(true);
+      return false;
     }
 
-    static bool HandleCastSelfCommand(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+    return true;
+  }
+
+  static bool HandleCastSelfCommand(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+  {
+    Unit* target = handler->getSelectedUnit();
+    if (!target)
     {
-        Unit* target = handler->getSelectedUnit();
-        if (!target)
-        {
-            handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
-            return false;
-        }
-
-        if (!CheckSpellExistsAndIsValid(handler, spell))
-            return false;
-
-        Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
-        if (!triggerFlags)
-            return false;
-
-        if (!CheckSpellCastResult(handler, target->CastSpell(target, spell->Id, *triggerFlags)))
-        {
-            handler->SetSentErrorMessage(true);
-            return false;
-        }
-
-        return true;
+      handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
+      return false;
     }
 
-    static bool HandleCastTargetCommad(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+    if (!CheckSpellExistsAndIsValid(handler, spell))
+      return false;
+
+    Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
+    if (!triggerFlags)
+      return false;
+
+    if (!CheckSpellCastResult(handler, target->CastSpell(target, spell->Id, *triggerFlags)))
     {
-        Creature* caster = handler->getSelectedCreature();
-        if (!caster)
-        {
-            handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
-            return false;
-        }
-
-        if (!caster->GetVictim())
-        {
-            handler->SendErrorMessage(LANG_SELECTED_TARGET_NOT_HAVE_VICTIM);
-            return false;
-        }
-
-        if (!CheckSpellExistsAndIsValid(handler, spell))
-            return false;
-
-        Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
-        if (!triggerFlags)
-            return false;
-
-        if (!CheckSpellCastResult(handler, caster->CastSpell(caster->GetVictim(), spell->Id, *triggerFlags)))
-        {
-            handler->SetSentErrorMessage(true);
-            return false;
-        }
-
-        return true;
+      handler->SetSentErrorMessage(true);
+      return false;
     }
 
-    static bool HandleCastDestCommand(ChatHandler* handler, SpellInfo const* spell, float x, float y, float z, Optional<std::string> triggeredStr)
+    return true;
+  }
+
+  static bool HandleCastTargetCommad(ChatHandler* handler, SpellInfo const* spell, Optional<std::string> triggeredStr)
+  {
+    Creature* caster = handler->getSelectedCreature();
+    if (!caster)
     {
-        Unit* caster = handler->getSelectedUnit();
-        if (!caster)
-        {
-            handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
-            return false;
-        }
-
-        if (!CheckSpellExistsAndIsValid(handler, spell))
-            return false;
-
-        Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
-        if (!triggerFlags)
-            return false;
-
-        if (!CheckSpellCastResult(handler, caster->CastSpell(x, y, z, spell->Id, *triggerFlags)))
-        {
-            handler->SetSentErrorMessage(true);
-            return false;
-        }
-
-        return true;
+      handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
+      return false;
     }
+
+    if (!caster->GetVictim())
+    {
+      handler->SendErrorMessage(LANG_SELECTED_TARGET_NOT_HAVE_VICTIM);
+      return false;
+    }
+
+    if (!CheckSpellExistsAndIsValid(handler, spell))
+      return false;
+
+    Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
+    if (!triggerFlags)
+      return false;
+
+    if (!CheckSpellCastResult(handler, caster->CastSpell(caster->GetVictim(), spell->Id, *triggerFlags)))
+    {
+      handler->SetSentErrorMessage(true);
+      return false;
+    }
+
+    return true;
+  }
+
+  static bool HandleCastDestCommand(ChatHandler* handler, SpellInfo const* spell, float x, float y, float z,
+                                    Optional<std::string> triggeredStr)
+  {
+    Unit* caster = handler->getSelectedUnit();
+    if (!caster)
+    {
+      handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
+      return false;
+    }
+
+    if (!CheckSpellExistsAndIsValid(handler, spell))
+      return false;
+
+    Optional<TriggerCastFlags> triggerFlags = GetTriggerFlags(triggeredStr);
+    if (!triggerFlags)
+      return false;
+
+    if (!CheckSpellCastResult(handler, caster->CastSpell(x, y, z, spell->Id, *triggerFlags)))
+    {
+      handler->SetSentErrorMessage(true);
+      return false;
+    }
+
+    return true;
+  }
 };
 
-void AddSC_cast_commandscript()
-{
-    new cast_commandscript();
-}
+void AddSC_cast_commandscript() { new cast_commandscript(); }
