@@ -6,11 +6,20 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs { inherit system; };
-      in {
+        lib = nixpkgs.lib;
+      in
+      {
         devShells = {
           default = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
             nativeBuildInputs = with pkgs; [
@@ -25,6 +34,7 @@
               bzip2
               hiredis
               bun
+              clang-tools
             ];
             MYSQL_INCLUDE_DIR = pkgs.mysql80 + "/include/mysql";
             shellHook = ''
@@ -32,5 +42,6 @@
             '';
           };
         };
-      });
+      }
+    );
 }

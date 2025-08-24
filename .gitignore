@@ -105,3 +105,5 @@ local.properties
 !modules/mod-learn-highest-talent
 !modules/mod-npc-services
 !modules/mod-npc-enchanter
+
+.cache/
