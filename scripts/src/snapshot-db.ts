@@ -3,7 +3,7 @@
 import { $, ShellError } from 'bun'
 import { requireProjectDir } from "./shared";
 
-requireProjectDir();
+await requireProjectDir();
 
 
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");

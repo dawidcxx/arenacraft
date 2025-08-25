@@ -3,7 +3,7 @@
 import { $ } from "bun";
 import { exitedSuccessfully, info, requireProjectDir } from "./shared";
 
-requireProjectDir();
+await requireProjectDir();
 
 // process.env.PATH=`${process.env.PATH}:${process.env.HOME}/.local/arenacraft/bin`;
 

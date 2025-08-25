@@ -13,8 +13,8 @@ const DEST = realpathSync(`${process.env.HOME}/.local/arenacraft`);
 
 const withClangDrefresh = process.argv.includes("--refresh-clangd");
 
-requireProjectDir();
-requireProgram("cmake", "Did you forget to run nix develop?");
+await requireProjectDir();
+await requireProgram("cmake", "Did you forget to run nix develop?");
 
 await $`mkdir ~/.local`.quiet().nothrow();
 await $`mkdir ~/.local/arenacraft`.quiet().nothrow();
