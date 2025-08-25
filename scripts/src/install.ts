@@ -31,28 +31,38 @@ await $`
   .quiet()
   .nothrow();
 
+const buildCommand = [
+  "cmake ../",
+  '-G "Ninja"',
+  "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+  "-DTOOLS_BUILD=all",
+  ...(withClangDrefresh ? ["-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"] : []),
+  `-DCMAKE_INSTALL_PREFIX="${DEST}"`,
+].join(" ");
+
 try {
   const started = Date.now();
   info("Building ArenaCraft");
   if (withClangDrefresh) {
     info("Clangd compile commands will be regenerated");
   }
+  info("Build flags: " + buildCommand);
   await $`
         cd build
-        cmake ../ \
-            -G "Ninja" \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DTOOLS_BUILD=all \
-            ${withClangDrefresh ? "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \\" : ""}
-            -DCMAKE_INSTALL_PREFIX=${DEST}
+        ${{ raw: buildCommand }}
         cmake --build . --target install
     `.quiet();
   const elapsed = Date.now() - started;
   info(`Building ArenaCraft done in ${formatElapsedTime(elapsed)}`);
+  if (withClangDrefresh) {
+    await $`
+      cp ./build/compile_commands.json .
+    `.nothrow();
+  }
 } catch (e) {
   const er = e as ShellError;
   console.error("Build failed");
-  console.log(er.stdout.toString("utf-8"));
+  console.log(er.stderr.toString("utf-8"));
   process.exit(1);
 }
 
@@ -112,6 +122,6 @@ for (const [name, content] of [systemdWorldService, systemdAuthService]) {
   await $`mkdir -p ~/.config/systemd/user`.quiet().nothrow();
   await $`touch ~/.config/systemd/user/${name}.service`.quiet().nothrow();
   await Bun.file(
-    `${process.env.HOME}/.config/systemd/user/${name}.service`,
+    `${process.env.HOME}/.config/systemd/user/${name}.service`
   ).write(content);
 }
