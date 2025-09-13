@@ -8,7 +8,6 @@
 
   outputs =
     {
-      self,
       nixpkgs,
       flake-utils,
       ...
@@ -17,24 +16,32 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        lib = nixpkgs.lib;
       in
       {
         devShells = {
+
           default = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
             nativeBuildInputs = with pkgs; [
-              boost183
-              cmake
-              ninja
-              openssl
-              readline
-              mysql80
-              zlib
-              pkg-config
-              bzip2
-              hiredis
+              # dev tools
+              zls
               bun
               clang-tools
+
+              # build tools
+              cmake
+              ninja
+              pkg-config
+              zig
+
+              # native dependencies
+              boost183
+              readline
+              bzip2
+              zlib
+              hiredis
+              openssl
+              mysql80
+
             ];
             MYSQL_INCLUDE_DIR = pkgs.mysql80 + "/include/mysql";
             shellHook = ''

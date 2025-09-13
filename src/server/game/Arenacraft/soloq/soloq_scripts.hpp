@@ -16,6 +16,7 @@
 #include "CreatureScript.h"
 #include "GossipDef.h"
 #include "Player.h"
+#include "Chat.h"
 #include "ScriptedGossip.h"
 
 constexpr uint32 PLAYER_TAUNT_NPC_TEXT_ID = 5215;

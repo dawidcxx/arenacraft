@@ -110,3 +110,6 @@ local.properties
 
 compile_commands.json
 *.conf
+
+.zig-cache
+zig-out

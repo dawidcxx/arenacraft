@@ -2,6 +2,7 @@
 #include <hiredis/hiredis.h>
 #include <iostream>
 #include <stdexcept>
+#include "Log.h"
 
 RedisConn& RedisConn::instance()
 {

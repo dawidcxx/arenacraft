@@ -34,6 +34,7 @@ await $`
 const buildCommand = [
   "cmake ../",
   '-G "Ninja"',
+  '-DNOPCH=1',
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
   "-DTOOLS_BUILD=all",
   ...(withClangDrefresh ? ["-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"] : []),
