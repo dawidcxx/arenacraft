@@ -25,6 +25,9 @@ var detour_mod_lib: *std.Build.Step.Compile = undefined;
 var recast_mod_lib: *std.Build.Step.Compile = undefined;
 var fmt_mod_lib: *std.Build.Step.Compile = undefined;
 
+// src
+var common_mod_lib: *std.Build.Step.Compile = undefined;
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -41,6 +44,11 @@ pub fn build(b: *std.Build) void {
     buildCommonLibrary(b, options) catch {
         @panic("Failed to buildCommonLibrary");
     };
+
+
+    // buildAuthServer(b, options) catch {
+    //     @panic("Failed to buildAuthServer");
+    // };
 }
 
 const CommonBuildOptions = struct {
@@ -80,13 +88,27 @@ fn buildCommonLibrary(b: *std.Build, opts: CommonBuildOptions) !void {
         });
     }
 
-    const common_lib = b.addLibrary(.{
+    common_mod_lib = b.addLibrary(.{
         .name = "common",
         .linkage = .static,
         .root_module = common_mod,
     });
 
-    b.installArtifact(common_lib);
+    b.installArtifact(common_mod_lib);
+}
+
+fn linkCommon(b: *std.Build, target: *std.Build.Module) void {
+    target.linkLibrary(common_mod_lib);
+    for (common_mod_lib.root_module.include_dirs.items) |incl| {
+        switch (incl) {
+            .path => |p| {
+                // std.log.info("Linking {s}", .{p.getDisplayName()});
+                // TODO: filter out inner dependenecy include paths
+                target.addIncludePath(p.dupe(b));
+            },
+            else => {},
+        }
+    }
 }
 
 fn buildAuthServer(b: *std.Build, opts: CommonBuildOptions) !void {
@@ -104,7 +126,7 @@ fn buildAuthServer(b: *std.Build, opts: CommonBuildOptions) !void {
     authserver_mod.addIncludePath(b.path("./src/server/apps/authserver/Authentication"));
     authserver_mod.addIncludePath(b.path("./src/server/apps/authserver/Server"));
 
-    authserver_mod.addIncludePath(b.path("./src/common"));
+    linkCommon(b, authserver_mod);
 
     const authserver_cpp_srcs = try getAllSources(gpa, "./src/server/apps/authserver", JUST_CPP);
     for (authserver_cpp_srcs.items) |src| {
