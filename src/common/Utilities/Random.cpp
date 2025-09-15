@@ -17,22 +17,12 @@
 
 #include "Random.h"
 #include "Errors.h"
-#include "SFMTRand.h"
 #include <memory>
 #include <random>
 
-static thread_local std::unique_ptr<SFMTRand> sfmtRand;
-static RandomEngine                           engine;
-
-static SFMTRand* GetRng()
-{
-  if (!sfmtRand)
-  {
-    sfmtRand = std::make_unique<SFMTRand>();
-  }
-
-  return sfmtRand.get();
-}
+// Thread-local Mersenne Twister engine for high-quality non-cryptographic RNG
+static thread_local std::mt19937 mt_engine{std::random_device{}()};
+static RandomEngine engine;
 
 int32 irand(int32 min, int32 max)
 {
@@ -69,7 +59,7 @@ Milliseconds randtime(Milliseconds min, Milliseconds max)
   return min + Milliseconds(urand(0, diff));
 }
 
-uint32 rand32() { return GetRng()->RandomUInt32(); }
+uint32 rand32() { return mt_engine(); }
 
 double rand_norm()
 {

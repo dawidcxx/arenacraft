@@ -54,14 +54,5 @@ char const* GitRevision::GetMySQLExecutable() { return _MYSQL_EXECUTABLE; }
 
 char const* GitRevision::GetFullVersion()
 {
-  return VER_COMPANYNAME_STR " rev. " VER_PRODUCTVERSION_STR " (" AZEROTH_PLATFORM_STR ", " _BUILD_DIRECTIVE
-                             ", " ACORE_LINKAGE_TYPE_STR ")";
+  return "Arenacraft v0";
 }
-
-char const* GitRevision::GetCompanyNameStr() { return VER_COMPANYNAME_STR; }
-
-char const* GitRevision::GetLegalCopyrightStr() { return VER_LEGALCOPYRIGHT_STR; }
-
-char const* GitRevision::GetFileVersionStr() { return VER_FILEVERSION_STR; }
-
-char const* GitRevision::GetProductVersionStr() { return VER_PRODUCTVERSION_STR; }

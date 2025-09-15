@@ -33,10 +33,6 @@ AC_COMMON_API char const* GetBuildDirectory();
 AC_COMMON_API char const* GetSourceDirectory();
 AC_COMMON_API char const* GetMySQLExecutable();
 AC_COMMON_API char const* GetFullVersion();
-AC_COMMON_API char const* GetCompanyNameStr();
-AC_COMMON_API char const* GetLegalCopyrightStr();
-AC_COMMON_API char const* GetFileVersionStr();
-AC_COMMON_API char const* GetProductVersionStr();
 } // namespace GitRevision
 
 #endif
