@@ -20,6 +20,7 @@
 #define _QUERYHOLDER_H
 
 #include "SQLOperation.h"
+#include <functional>
 #include <vector>
 
 class AC_DATABASE_API SQLQueryHolderBase

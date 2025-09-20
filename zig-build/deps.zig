@@ -69,7 +69,7 @@ pub fn linkFmt(b: *std.Build, target: *std.Build.Module) void {
     for (fmt_mod_lib.root_module.include_dirs.items) |incl| {
         target.addIncludePath(incl.path.dupe(b));
     }
-    target.addCMacro("FMT_CONSTEVAL", " ");
+    target.addCMacro("FMT_CONSTEVAL", "constexpr");
 }
 
 pub fn linkArgon2(b: *std.Build, target: *std.Build.Module) void {
@@ -273,8 +273,6 @@ fn buildRecast(b: *std.Build, options: CommonBuildOptions) !void {
 }
 
 fn buildFmt(b: *std.Build, options: CommonBuildOptions) !void {
-    const gpa = b.allocator;
-
     const fmt_mod = b.createModule(.{
         .target = options.target,
         .optimize = options.optimize,
@@ -282,15 +280,47 @@ fn buildFmt(b: *std.Build, options: CommonBuildOptions) !void {
     });
 
     fmt_mod.addIncludePath(b.path("./deps/fmt/include"));
-    fmt_mod.addCMacro("FMT_CONSTEVAL", " ");
 
-    const srcs = try utils.getAllSources(gpa, "./deps/fmt/src/", utils.JUST_CC);
+    // Define FMT_CONSTEVAL for current using in c++20 (exactly like CMakeLists.txt)
+    fmt_mod.addCMacro("FMT_CONSTEVAL", "constexpr");
 
-    for (srcs.items) |src| {
-        // std.log.info("Linking {s}", .{src});
+    // Use exact sources from CMakeLists.txt instead of wildcard
+    const FMT_SOURCES = [_][]const u8{
+        "./deps/fmt/src/format.cc",
+        "./deps/fmt/src/os.cc",
+    };
+
+    // Define the fmt library headers exactly like CMakeLists.txt
+    const FMT_HEADERS = [_][]const u8{
+        "./deps/fmt/include/fmt/args.h",
+        "./deps/fmt/include/fmt/chrono.h",
+        "./deps/fmt/include/fmt/color.h",
+        "./deps/fmt/include/fmt/compile.h",
+        "./deps/fmt/include/fmt/core.h",
+        "./deps/fmt/include/fmt/format.h",
+        "./deps/fmt/include/fmt/format-inl.h",
+        "./deps/fmt/include/fmt/os.h",
+        "./deps/fmt/include/fmt/ostream.h",
+        "./deps/fmt/include/fmt/printf.h",
+        "./deps/fmt/include/fmt/ranges.h",
+        "./deps/fmt/include/fmt/std.h",
+        "./deps/fmt/include/fmt/xchar.h",
+    };
+
+    for (FMT_SOURCES) |src| {
+        // std.log.info("Linking source {s}", .{src});
         fmt_mod.addCSourceFile(.{
             .file = b.path(src),
             .flags = &.{"-std=c++20"},
+        });
+    }
+
+    for (FMT_HEADERS) |header| {
+        // std.log.info("Adding header {s}", .{header});
+        fmt_mod.addCSourceFile(.{
+            .file = b.path(header),
+            .flags = &.{"-std=c++20"},
+            .language = .cpp,
         });
     }
 

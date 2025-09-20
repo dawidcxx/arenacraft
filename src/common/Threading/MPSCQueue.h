@@ -20,6 +20,8 @@
 #define MPSCQueue_h__
 
 #include <atomic>
+#include <memory>
+#include <type_traits>
 
 namespace Acore::Impl
 {
@@ -146,10 +148,10 @@ public:
   }
 
 private:
-  std::aligned_storage_t<sizeof(T), alignof(T)> _dummy;
-  T*                                            _dummyPtr;
-  std::atomic<T*>                               _head;
-  std::atomic<T*>                               _tail;
+  std::aligned_storage<sizeof(T), alignof(T)>::type _dummy;
+  T*                                                _dummyPtr;
+  std::atomic<T*>                                   _head;
+  std::atomic<T*>                                   _tail;
 
   MPSCQueueIntrusive(MPSCQueueIntrusive const&)            = delete;
   MPSCQueueIntrusive& operator=(MPSCQueueIntrusive const&) = delete;

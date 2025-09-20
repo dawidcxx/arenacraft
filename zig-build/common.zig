@@ -16,7 +16,12 @@ pub fn buildCommon(b: *std.Build, opts: CommonBuildOptions) !void {
 pub fn linkCommon(b: *std.Build, target: *std.Build.Module) void {
     target.linkLibrary(common_lib);
     for (common_lib.root_module.include_dirs.items) |incl| {
-        target.addIncludePath(incl.path.dupe(b));
+        switch (incl) {
+            .path => |p| {
+                target.addIncludePath(p.dupe(b));
+            },
+            else => {},
+        }
     }
 }
 
@@ -55,7 +60,7 @@ fn buildCommonLib(b: *std.Build, options: CommonBuildOptions) !void {
         // std.log.info("Adding '{s}'", .{src});
         mod.addCSourceFile(.{
             .file = b.path(src),
-            .flags = &.{"-std=c++20"},
+            .flags = &.{"-std=c++23"},
         });
     }
 
