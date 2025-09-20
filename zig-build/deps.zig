@@ -11,8 +11,9 @@ var recast_mod_lib: *std.Build.Step.Compile = undefined;
 var fmt_mod_lib: *std.Build.Step.Compile = undefined;
 var argon2_lib: *std.Build.Step.Compile = undefined;
 var zstd_lib: *std.Build.Step.Compile = undefined;
+var boost_lib: *std.Build.Step.Compile = undefined;
 
-var boost_path: []const u8 = undefined;
+var boost_incl_path: []const u8 = undefined;
 
 pub fn buildDeps(b: *std.Build, opts: CommonBuildOptions) !void {
     try buildG3DLiteLib(b, opts);
@@ -29,13 +30,21 @@ pub fn buildDeps(b: *std.Build, opts: CommonBuildOptions) !void {
     });
     zstd_lib = zstd_dep.artifact("zstd");
 
-    boost_path = opts.boost_path;
+    boost_incl_path = opts.boost_path;
+
+    const boost_dep = b.dependency("boost", .{
+        .target = opts.target,
+        .optimize = opts.optimize,
+        .program_options = true,
+        .filesystem = true,
+    });
+
+    boost_lib = boost_dep.artifact("boost");
 }
 
 //
 // Links
 //
-
 pub fn linkG3DLite(b: *std.Build, target: *std.Build.Module) void {
     target.linkLibrary(g3d_lite_lib);
     for (g3d_lite_lib.root_module.include_dirs.items) |incl| {
@@ -80,17 +89,15 @@ pub fn linkArgon2(b: *std.Build, target: *std.Build.Module) void {
 }
 
 pub fn linkBoost(b: *std.Build, target: *std.Build.Module) void {
-    const boost_include_path = std.mem.concat(b.allocator, u8, &.{ boost_path, "/include" }) catch {
+    const boost_include_path = std.mem.concat(b.allocator, u8, &.{ boost_incl_path, "/include" }) catch {
         @panic("oom");
     };
     target.addIncludePath(.{ .cwd_relative = boost_include_path });
+    target.linkLibrary(boost_lib);
 }
 
 pub fn linkUtf8(b: *std.Build, target: *std.Build.Module) void {
-    for (utfcpp_lib.root_module.include_dirs.items) |incl| {
-        target.addIncludePath(incl.path.dupe(b));
-    }
-    target.linkLibrary(utfcpp_lib);
+    target.addIncludePath(b.path("./deps/utf8cpp"));
 }
 
 pub fn linkZstd(b: *std.Build, target: *std.Build.Module) void {
@@ -143,7 +150,7 @@ fn buildG3DLiteLib(b: *std.Build, options: CommonBuildOptions) !void {
     for (g3d_srcs.items) |src| {
         g3d_lite_mod.addCSourceFile(.{
             .file = b.path(src),
-            .flags = &.{"-std=c++20"},
+            .flags = &.{"-std=c++23"},
         });
     }
 
@@ -193,31 +200,33 @@ fn buildMpqLib(b: *std.Build, options: CommonBuildOptions) !void {
 }
 
 fn buildUtf8Lib(b: *std.Build, options: CommonBuildOptions) !void {
-    const gpa = b.allocator;
-    const utf8cpp_mod = b.createModule(.{
-        .target = options.target,
-        .optimize = options.optimize,
-        .link_libcpp = true,
-    });
+    _ = b;
+    _ = options;
+    // const gpa = b.allocator;
+    // const utf8cpp_mod = b.createModule(.{
+    //     .target = options.target,
+    //     .optimize = options.optimize,
+    //     .link_libcpp = true,
+    // });
 
-    utf8cpp_mod.addIncludePath(b.path("./deps/utf8cpp"));
+    // utf8cpp_mod.addIncludePath(b.path("./deps/utf8cpp"));
 
-    var utf8_srcs = try utils.getAllSources(gpa, "./deps/utf8cpp/utf8", utils.JUST_H);
-    utils.filterOutFile(&utf8_srcs, "cpp17.h");
-    for (utf8_srcs.items) |src| {
-        utf8cpp_mod.addCSourceFile(
-            .{
-                .file = b.path(src),
-                .flags = &.{"-std=c++11"},
-                .language = .cpp,
-            },
-        );
-    }
+    // var utf8_srcs = try utils.getAllSources(gpa, "./deps/utf8cpp/utf8", utils.JUST_H);
+    // utils.filterOutFile(&utf8_srcs, "cpp17.h");
+    // for (utf8_srcs.items) |src| {
+    //     utf8cpp_mod.addCSourceFile(
+    //         .{
+    //             .file = b.path(src),
+    //             .flags = &.{"-std=c++23"},
+    //             .language = .cpp,
+    //         },
+    //     );
+    // }
 
-    utfcpp_lib = b.addLibrary(.{
-        .name = "utf8cpp",
-        .root_module = utf8cpp_mod,
-    });
+    // utfcpp_lib = b.addLibrary(.{
+    //     .name = "utf8cpp",
+    //     .root_module = utf8cpp_mod,
+    // });
 }
 
 fn buildDetour(b: *std.Build, options: CommonBuildOptions) !void {
@@ -236,7 +245,7 @@ fn buildDetour(b: *std.Build, options: CommonBuildOptions) !void {
     for (srcs.items) |src| {
         recast_detour_mod.addCSourceFile(.{
             .file = b.path(src),
-            .flags = &.{"-std=c++14"},
+            .flags = &.{"-std=c++23"},
         });
     }
 
@@ -262,7 +271,7 @@ fn buildRecast(b: *std.Build, options: CommonBuildOptions) !void {
     for (srcs.items) |src| {
         recast_mod.addCSourceFile(.{
             .file = b.path(src),
-            .flags = &.{"-std=c++14"},
+            .flags = &.{"-std=c++23"},
         });
     }
 
@@ -311,7 +320,7 @@ fn buildFmt(b: *std.Build, options: CommonBuildOptions) !void {
         // std.log.info("Linking source {s}", .{src});
         fmt_mod.addCSourceFile(.{
             .file = b.path(src),
-            .flags = &.{"-std=c++20"},
+            .flags = &.{"-std=c++23"},
         });
     }
 
@@ -319,7 +328,7 @@ fn buildFmt(b: *std.Build, options: CommonBuildOptions) !void {
         // std.log.info("Adding header {s}", .{header});
         fmt_mod.addCSourceFile(.{
             .file = b.path(header),
-            .flags = &.{"-std=c++20"},
+            .flags = &.{"-std=c++23"},
             .language = .cpp,
         });
     }

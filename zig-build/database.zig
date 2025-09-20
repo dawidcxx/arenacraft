@@ -36,6 +36,7 @@ fn buildDatabaseLib(b: *std.Build, options: CommonBuildOptions) !void {
         .link_libcpp = true,
     });
 
+    deps.linkBoost(b, mod);
     deps.linkFmt(b, mod);
     common.linkCommon(b, mod);
 
@@ -49,15 +50,7 @@ fn buildDatabaseLib(b: *std.Build, options: CommonBuildOptions) !void {
         mod.addIncludePath(b.path(dir));
     }
 
-    var srcs = try utils.getAllSources(b.allocator, "./src/server/database", utils.JUST_CPP);
-
-    // Skip problematic files that have C++20 consteval issues with Zig
-    utils.filterOutFile(&srcs, "DatabaseLoader.cpp");
-    utils.filterOutFile(&srcs, "DatabaseWorkerPool.cpp");
-    utils.filterOutFile(&srcs, "DBUpdater.cpp");
-    utils.filterOutFile(&srcs, "UpdateFetcher.cpp");
-    // Filter files with heavy logging that cause consteval issues
-    utils.filterOutFile(&srcs, "Field.cpp");
+    const srcs = try utils.getAllSources(b.allocator, "./src/server/database", utils.JUST_CPP);
 
     for (srcs.items) |src| {
         // std.log.info("Adding database source '{s}'", .{src});

@@ -34,8 +34,7 @@
               zig_0_14
 
               # native dependencies
-              boost183
-              boost183.dev
+              boost
               readline
               bzip2
               zlib
@@ -45,12 +44,11 @@
               zstd
               lzlib
               xz
-
             ];
             MYSQL_INCLUDE_DIR = pkgs.mysql80 + "/include/mysql";
             shellHook = ''
               export PATH=$PATH:~/.local/arenacraft/bin
-              export BOOST_PATH=${pkgs.boost183.dev}
+              export BOOST_PATH=${pkgs.boost.dev}
               unset NIX_CFLAGS_COMPILE
               unset NIX_LDFLAGS
             '';

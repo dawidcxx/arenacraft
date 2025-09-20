@@ -44,7 +44,7 @@ fn buildCommonLib(b: *std.Build, options: CommonBuildOptions) !void {
     deps.linkUtf8(b, mod);
     deps.linkZstd(b, mod);
 
-    mod.linkSystemLibrary("hiredis", .{});
+    mod.linkSystemLibrary("hiredis", .{ .needed = true, .preferred_link_mode = .static });
     mod.linkSystemLibrary("openssl", .{});
     mod.linkSystemLibrary("zlib", .{});
 

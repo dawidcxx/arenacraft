@@ -3,12 +3,16 @@
     .version = "0.15.1",
     .dependencies = .{
         .boost = .{
-            .url = "git+https://github.com/allyourcodebase/boost-libraries-zig#398c0b12a049387eaa8356a29225868cac38e556",
-            .hash = "boost_libraries-1.89.0-frkKHFKXAQCfBAeTSUrEcOVdIF4mDFYVfk1HAnv8FrK_",
+            .url = "git+https://github.com/dawidcxx/boost-libraries-zig#caaac8d444484b2cee126d9a01144717be6ae89f",
+            .hash = "boost_libraries-1.89.0-frkKHGikAQDJUCdQa5H8MYwO7r-K7MdnMtm9cTyXPAgy",
         },
         .zstd = .{
             .url = "git+https://github.com/allyourcodebase/zstd.git?ref=1.5.7#01327d49cbc56dc24c20a167bb0055d7fc23de84",
             .hash = "zstd-1.5.7-KEItkJ8vAAC5_rRlKmLflYQ-eKXbAIQBWZNmmJtS18q0",
+        },
+        .compile_commands = .{
+            .url = "https://github.com/the-argus/zig-compile-commands/archive/11cc2917816875aae4890e0a899f810e33570d70.tar.gz",
+            .hash = "N-V-__8AAFLOAACuuPPvb9E05PlcLiPoxsMOTRiP4K1hSaoB",
         },
     },
     .paths = .{""},
