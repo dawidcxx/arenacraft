@@ -79,6 +79,7 @@ boost::cobalt::task<void> AuthSession::send_auth_error(std::uint8_t cmd, std::ui
 
 boost::cobalt::task<void> AuthSession::handle_logon_challenge()
 {
+  logging::write(logging::Level::info, "Received logon challenge");
   const auto hdr          = co_await read_exact(3);
   const auto payload_size = static_cast<std::uint16_t>(hdr[1] | (static_cast<std::uint16_t>(hdr[2]) << 8));
   const auto payload      = co_await read_exact(payload_size);
