@@ -42,7 +42,10 @@ fn buildAuth(
         },
     });
 
-    auth_module.addIncludePath(.{ .cwd_relative = INCLUDE_PATH });
+    auth_module.addIncludePath(b.path("./src/auth/Impl/"));
+
+    addSystemLibIncludes(auth_module);
+    auth_module.linkSystemLibrary("openssl", .{});
 
     const auth_app_exe = b.addExecutable(.{
         .name = "auth_app",
@@ -77,4 +80,11 @@ fn addBoost(
         compile_task.root_module.include_dirs.append(b.allocator, include_dir) catch @panic("Failed to add boost include directory");
     }
     compile_task.linkLibrary(boost_artifact);
+}
+
+fn addSystemLibIncludes(mod: *std.Build.Module) void {
+    var split = std.mem.splitScalar(u8, INCLUDE_PATH, ':');
+    while (split.next()) |item| {
+        mod.addIncludePath(.{ .cwd_relative = item });
+    }
 }

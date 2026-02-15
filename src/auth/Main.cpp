@@ -1,7 +1,7 @@
 #include <array>
 #include <cstdint>
 #include <exception>
-#include <iostream>
+#include <sstream>
 #include <string_view>
 
 #include <boost/asio.hpp>
@@ -10,6 +10,9 @@
 #include <boost/cobalt/spawn.hpp>
 #include <boost/cobalt/task.hpp>
 #include <boost/cobalt/this_coro.hpp>
+
+#include "Include/Logging.hpp"
+
 
 namespace asio = boost::asio;
 using tcp      = asio::ip::tcp;
@@ -37,7 +40,7 @@ boost::cobalt::task<void> handle_client(tcp::socket socket)
   }
   catch (const std::exception& ex)
   {
-    std::cerr << "Client session ended with error: " << ex.what() << std::endl;
+    logging::write(logging::Level::error, std::string("Client session ended with error: ") + ex.what());
   }
 }
 
@@ -48,7 +51,11 @@ boost::cobalt::task<void> run_server(const std::uint16_t port)
   tcp::acceptor acceptor(executor, tcp::endpoint(tcp::v4(), port));
   acceptor.set_option(tcp::acceptor::reuse_address(true));
 
-  std::cout << "Auth TCP service listening on 0.0.0.0:" << port << std::endl;
+  {
+    std::ostringstream message;
+    message << "Auth TCP service listening on 0.0.0.0:" << port;
+    logging::write(logging::Level::info, message.str());
+  }
 
   for (;;)
   {
@@ -58,7 +65,9 @@ boost::cobalt::task<void> run_server(const std::uint16_t port)
     const auto                remote = socket.remote_endpoint(ec);
     if (!ec)
     {
-      std::cout << "Accepted connection from " << remote << std::endl;
+      std::ostringstream message;
+      message << "Accepted connection from " << remote;
+      logging::write(logging::Level::info, message.str());
     }
 
     boost::cobalt::spawn(executor, handle_client(std::move(socket)),
@@ -75,7 +84,7 @@ boost::cobalt::task<void> run_server(const std::uint16_t port)
                            }
                            catch (const std::exception& ex)
                            {
-                             std::cerr << "Detached client task error: " << ex.what() << std::endl;
+                             logging::write(logging::Level::error, std::string("Detached client task error: ") + ex.what());
                            }
                          });
   }
@@ -89,7 +98,7 @@ int main()
   }
   catch (const std::exception& ex)
   {
-    std::cerr << "Fatal server error: " << ex.what() << std::endl;
+    logging::write(logging::Level::error, std::string("Fatal server error: ") + ex.what());
     return 1;
   }
 
