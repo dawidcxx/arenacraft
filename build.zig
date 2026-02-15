@@ -42,10 +42,11 @@ fn buildAuth(
         },
     });
 
-    auth_module.addIncludePath(b.path("./src/auth/Impl/"));
+    auth_module.addIncludePath(b.path("./src/auth/Include/"));
 
     addSystemLibIncludes(auth_module);
     auth_module.linkSystemLibrary("openssl", .{});
+    auth_module.linkSystemLibrary("mysqlclient", .{});
 
     const auth_app_exe = b.addExecutable(.{
         .name = "auth_app",
@@ -62,6 +63,10 @@ fn buildAuth(
 
     const run_step = b.step("run-auth", "Run the Main application");
     run_step.dependOn(&app_exe_run.step);
+
+    const output_exe = b.addInstallArtifact(auth_app_exe, .{});
+
+    b.default_step.dependOn(&output_exe.step);
 }
 
 fn addBoost(

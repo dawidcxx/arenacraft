@@ -1,4 +1,4 @@
-#include "../Include/Logging.hpp"
+#include "Logging.h"
 
 #include <chrono>
 #include <ctime>
