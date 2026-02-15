@@ -36,16 +36,17 @@
               lldb
 
               # Libraries
-              boost
+              mysql80
               zlib
               doctest
               jemalloc
             ];
-
+            MYSQL_INCLUDE_DIR = pkgs.mysql80 + "/include/mysql";
             shellHook = ''
               unset NIX_CFLAGS_COMPILE
               export FLAKE_INCLUDES="${
                 composeIncludePath [
+                    pkgs.mysql80
                 ]
               }"
             '';

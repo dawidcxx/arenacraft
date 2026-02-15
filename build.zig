@@ -42,15 +42,15 @@ fn buildAuth(
         },
     });
 
-    // auth_module.addIncludePath(.{ .cwd_relative = INCLUDE_PATH });
+    auth_module.addIncludePath(.{ .cwd_relative = INCLUDE_PATH });
 
     const auth_app_exe = b.addExecutable(.{
         .name = "auth_app",
         .root_module = auth_module,
     });
 
-    addBoost(b, target, optimize, auth_app_exe);
     cpp.addCompileCommands(auth_app_exe);
+    addBoost(b, target, optimize, auth_app_exe);
 
     const app_exe_run = b.addRunArtifact(auth_app_exe);
     if (b.args) |args| {

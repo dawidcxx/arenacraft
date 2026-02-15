@@ -86,8 +86,18 @@ fn gatherCompileCommandEntries(
             var headers: std.ArrayListUnmanaged([]const u8) = try .initCapacity(alloc, 16);
             defer headers.deinit(alloc);
             for (compile_step.root_module.include_dirs.items) |d| {
-                const path = getIncludeDirPath(d) orelse continue;
-                try headers.append(alloc, path);
+                switch (d) {
+                    .other_step => |other_compile| {
+                        for (other_compile.root_module.include_dirs.items) |nested| {
+                            const nested_path = getIncludeDirPath(nested, b, owning_step) orelse continue;
+                            try headers.append(alloc, nested_path);
+                        }
+                    },
+                    else => {
+                        const path = getIncludeDirPath(d, b, owning_step) orelse continue;
+                        try headers.append(alloc, path);
+                    },
+                }
             }
 
             var libraries: std.ArrayListUnmanaged([]const u8) = try .initCapacity(alloc, 16);
@@ -104,7 +114,7 @@ fn gatherCompileCommandEntries(
             for (compile_step.root_module.link_objects.items) |link_object| {
                 switch (link_object) {
                     .c_source_file => |csf| {
-                        const file_path = getFilePath(csf.file) orelse continue;
+                        const file_path = getFilePath(csf.file, b, owning_step) orelse continue;
                         try compile_commands_db.update(
                             file_path,
                             headers.items,
@@ -130,22 +140,52 @@ fn gatherCompileCommandEntries(
     }
 }
 
-fn getFilePath(lazyPath: std.Build.LazyPath) ?[]const u8 {
-    switch (lazyPath) {
-        .cwd_relative => |cwd| {
-            return cwd;
-        },
-        else => return null,
-    }
+fn getFilePath(
+    lazyPath: std.Build.LazyPath,
+    b: *std.Build,
+    asking_step: *std.Build.Step,
+) ?[]const u8 {
+    lazyPath.addStepDependencies(asking_step);
+    return lazyPath.getPath2(b, asking_step);
 }
 
-fn getIncludeDirPath(include_dir: std.Build.Module.IncludeDir) ?[]const u8 {
-    switch (include_dir.path) {
-        .cwd_relative => |cwd| {
-            return cwd;
+fn getIncludeDirPath(
+    include_dir: std.Build.Module.IncludeDir,
+    b: *std.Build,
+    asking_step: *std.Build.Step,
+) ?[]const u8 {
+    return switch (include_dir) {
+        .path => |lp| blk: {
+            lp.addStepDependencies(asking_step);
+            break :blk lp.getPath2(b, asking_step);
         },
-        else => return null,
-    }
+        .path_system => |lp| blk: {
+            lp.addStepDependencies(asking_step);
+            break :blk lp.getPath2(b, asking_step);
+        },
+        .path_after => |lp| blk: {
+            lp.addStepDependencies(asking_step);
+            break :blk lp.getPath2(b, asking_step);
+        },
+        .framework_path => |lp| blk: {
+            lp.addStepDependencies(asking_step);
+            break :blk lp.getPath2(b, asking_step);
+        },
+        .framework_path_system => |lp| blk: {
+            lp.addStepDependencies(asking_step);
+            break :blk lp.getPath2(b, asking_step);
+        },
+        .embed_path => |lp| blk: {
+            lp.addStepDependencies(asking_step);
+            break :blk lp.getPath2(b, asking_step);
+        },
+        .config_header_step => |ch| blk: {
+            const out_dir = ch.getOutputDir();
+            out_dir.addStepDependencies(asking_step);
+            break :blk out_dir.getPath2(b, asking_step);
+        },
+        .other_step => null,
+    };
 }
 
 fn isCompileCommandsMarked(compile: *std.Build.Step.Compile) bool {
@@ -209,7 +249,7 @@ const CompileCommandsDb = struct {
             }
         }
         for (flags) |flag| {
-            if (!compile_command.libraries.has(flag)) {
+            if (!compile_command.flags.has(flag)) {
                 const owned_flag = try alloc.dupe(u8, flag);
                 try compile_command.flags.add(alloc, owned_flag);
             }
