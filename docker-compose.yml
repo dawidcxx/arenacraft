@@ -28,8 +28,6 @@ services:
     volumes:
       - redis-insight:/data
 
-
-
   adminer:
     image: adminer
     ports:

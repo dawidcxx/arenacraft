@@ -1,5 +1,6 @@
 {
-  description = "Complete Open Source and Modular solution for MMO";
+
+  description = "Basic C++ project using Zig as build system with clangd support";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
@@ -8,6 +9,7 @@
 
   outputs =
     {
+      self,
       nixpkgs,
       flake-utils,
       ...
@@ -16,41 +18,35 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        lib = nixpkgs.lib;
+        composeLibraryPath =
+          packages: lib.concatStringsSep ":" (map (pkg: "${pkg.out or pkg}/lib") packages);
+        composeIncludePath =
+          packages: lib.concatStringsSep ":" (map (pkg: "${pkg.dev or pkg}/include") packages);
       in
       {
         devShells = {
-
           default = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
             nativeBuildInputs = with pkgs; [
-              # dev tools
-              zls
-              bun
+              # Dev tools
+              zig_0_15
+              zls_0_15
+              pkg-config # zig uses this for .linkSystemLibrary()
               clang-tools
+              lldb
 
-              # build tools
-              cmake
-              ninja
-              pkg-config
-              zig_0_14
-
-              # native dependencies
-              boost
-              readline
-              bzip2
+              # Libraries
               zlib
-              hiredis
-              openssl
-              mysql80
-              zstd
-              lzlib
-              xz
+              doctest
+              jemalloc
             ];
-            MYSQL_INCLUDE_DIR = pkgs.mysql80 + "/include/mysql";
+
             shellHook = ''
-              export PATH=$PATH:~/.local/arenacraft/bin
-              export BOOST_PATH=${pkgs.boost.dev}
               unset NIX_CFLAGS_COMPILE
-              unset NIX_LDFLAGS
+              export FLAKE_INCLUDES="${
+                composeIncludePath [
+                ]
+              }"
             '';
           };
         };
