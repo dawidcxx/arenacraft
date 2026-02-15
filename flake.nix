@@ -36,6 +36,7 @@
               lldb
 
               # Libraries
+              boost
               zlib
               doctest
               jemalloc

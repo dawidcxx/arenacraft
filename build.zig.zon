@@ -3,8 +3,8 @@
     .version = "0.15.1",
     .dependencies = .{
         .boost = .{
-            .url = "git+https://github.com/dawidcxx/boost-libraries-zig#caaac8d444484b2cee126d9a01144717be6ae89f",
-            .hash = "boost_libraries-1.89.0-frkKHGikAQDJUCdQa5H8MYwO7r-K7MdnMtm9cTyXPAgy",
+            .url = "git+https://github.com/allyourcodebase/boost-libraries-zig#b04c323025691d45ad8e1530c0b523e765a9f643",
+            .hash = "boost_libraries-1.89.0-frkKHLCXAQASDNJkyAQCiQZKs1kmnLozkP6Mx46J5d1_",
         },
         .zstd = .{
             .url = "git+https://github.com/allyourcodebase/zstd.git?ref=1.5.7#01327d49cbc56dc24c20a167bb0055d7fc23de84",
