@@ -40,7 +40,7 @@
               zlib
               doctest
               jemalloc
-              openssl_3
+              openssl
             ];
             MYSQL_INCLUDE_DIR = pkgs.mysql80 + "/include/mysql";
             shellHook = ''
@@ -48,7 +48,7 @@
               export FLAKE_INCLUDES="${
                 composeIncludePath [
                     pkgs.mysql80
-                    pkgs.openssl_3
+                    pkgs.openssl
                 ]
               }"
             '';

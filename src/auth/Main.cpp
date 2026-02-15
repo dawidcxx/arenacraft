@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -17,6 +16,7 @@
 #include "AuthSession.h"
 #include "Logging.h"
 #include "MySqlAsync.h"
+#include "argparse.h"
 
 namespace asio = boost::asio;
 using tcp      = asio::ip::tcp;
@@ -83,61 +83,59 @@ boost::cobalt::task<void> run_server(std::shared_ptr<auth::AppConfig> cfg)
 int main(int argc, char** argv)
 {
   auto cfg = std::make_shared<auth::AppConfig>();
+  argparse::ArgumentParser parser("arenacraft-auth");
+
 
   try
   {
-    auto print_help = []()
-    {
-      std::cout << "arenacraft auth server options\n"
-                   "  --bind <ip>\n"
-                   "  --port <num>\n"
-                   "  --realm-name <name>\n"
-                   "  --realm-address <host:port>\n"
-                   "  --db-host <host>\n"
-                   "  --db-port <num>\n"
-                   "  --db-user <user>\n"
-                   "  --db-pass <pass>\n"
-                   "  --db-name <schema>\n"
-                   "  --help\n";
-    };
+    parser.add_description("Arenacraft auth server");
 
-    for (int i = 1; i < argc; ++i)
-    {
-      const std::string arg = argv[i];
-      const auto require_value = [&](const std::string& name) -> std::string
-      {
-        if (i + 1 >= argc)
-          throw std::runtime_error("missing value for argument: " + name);
-        ++i;
-        return argv[i];
-      };
+    parser.add_argument("--bind")
+        .help("bind IPv4/IPv6 address")
+        .default_value(cfg->bind_ip)
+        .store_into(cfg->bind_ip);
 
-      if (arg == "--help" || arg == "-h")
-      {
-        print_help();
-        return 0;
-      }
-      if (arg == "--bind")
-        cfg->bind_ip = require_value(arg);
-      else if (arg == "--port")
-        cfg->port = static_cast<std::uint16_t>(std::stoul(require_value(arg)));
-      else if (arg == "--realm-name")
-        cfg->realm_name = require_value(arg);
-      else if (arg == "--realm-address")
-        cfg->realm_address = require_value(arg);
-      else if (arg == "--db-host")
-        cfg->db_host = require_value(arg);
-      else if (arg == "--db-port")
-        cfg->db_port = static_cast<std::uint16_t>(std::stoul(require_value(arg)));
-      else if (arg == "--db-user")
-        cfg->db_user = require_value(arg);
-      else if (arg == "--db-pass")
-        cfg->db_pass = require_value(arg);
-      else if (arg == "--db-name")
-        cfg->db_name = require_value(arg);
-      else
-        throw std::runtime_error("unknown argument: " + arg);
-    }
+    parser.add_argument("--port")
+        .help("auth listening port")
+        .default_value(cfg->port)
+        .store_into(cfg->port);
+
+    parser.add_argument("--realm-name")
+        .help("realm display name")
+        .default_value(cfg->realm_name)
+        .store_into(cfg->realm_name);
+
+    parser.add_argument("--realm-address")
+        .help("realm host:port advertised to clients")
+        .default_value(cfg->realm_address)
+        .store_into(cfg->realm_address);
+
+    parser.add_argument("--db-host")
+        .help("MySQL host")
+        .default_value(cfg->db_host)
+        .store_into(cfg->db_host);
+
+    parser.add_argument("--db-port")
+        .help("MySQL port")
+        .default_value(cfg->db_port)
+        .store_into(cfg->db_port);
+
+    parser.add_argument("--db-user")
+        .help("MySQL user")
+        .default_value(cfg->db_user)
+        .store_into(cfg->db_user);
+
+    parser.add_argument("--db-pass")
+        .help("MySQL password")
+        .default_value(cfg->db_pass)
+        .store_into(cfg->db_pass);
+
+    parser.add_argument("--db-name")
+        .help("MySQL schema")
+        .default_value(cfg->db_name)
+        .store_into(cfg->db_name);
+
+    parser.parse_args(argc, argv);
 
     if (argc == 1)
     {
