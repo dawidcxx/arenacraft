@@ -115,3 +115,4 @@ compile_commands.json
 zig-out
 .direnv
 zig-pkg
+*.a

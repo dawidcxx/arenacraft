@@ -22,9 +22,18 @@
 #include "Tokenize.h"
 #include "Util.h"
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <unordered_map>
+
+#if AC_PLATFORM == AC_PLATFORM_WINDOWS
+#include <windows.h>
+#elif AC_PLATFORM == AC_PLATFORM_APPLE
+#include <mach-o/dyld.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace
 {
@@ -540,15 +549,36 @@ std::string const ConfigMgr::GetFilename()
 
 std::vector<std::string> const& ConfigMgr::GetArguments() const { return _args; }
 
+// Directory containing the running executable - config files are resolved
+// relative to it (zig-build port change: /foo/bar/ac -> /foo/bar/authserver.conf)
+static std::string GetExecutableDir()
+{
+  char buffer[4096];
+#if AC_PLATFORM == AC_PLATFORM_WINDOWS
+  DWORD const len = GetModuleFileNameA(nullptr, buffer, sizeof(buffer));
+  if (!len)
+    return "./";
+#elif AC_PLATFORM == AC_PLATFORM_APPLE
+  uint32_t size = sizeof(buffer);
+  if (_NSGetExecutablePath(buffer, &size) != 0)
+    return "./";
+#else
+  ssize_t const len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+  if (len <= 0)
+    return "./";
+  buffer[len] = '\0';
+#endif
+
+  std::error_code ec;
+  std::filesystem::path const exePath = std::filesystem::weakly_canonical(buffer, ec);
+  return exePath.parent_path().generic_string() + "/";
+}
+
 std::string const ConfigMgr::GetConfigPath()
 {
   std::lock_guard<std::mutex> lock(_configLock);
 
-#if AC_PLATFORM == AC_PLATFORM_WINDOWS
-  return "configs/";
-#else
-  return std::string(_CONF_DIR) + "/";
-#endif
+  return GetExecutableDir();
 }
 
 void ConfigMgr::Configure(std::string const& initFileName, std::vector<std::string> args,

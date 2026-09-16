@@ -2,11 +2,12 @@
  * `ac` - master executable of the zig-build port.
  *
  * Architecture: this router validates the requested sub program with argparse
- * and forwards the remaining arguments 1:1 to the original tool entry points
+ * and forwards the remaining arguments 1:1 to the original entry points
  * (src-port/subcommands.h). The sub programs keep their own argument parsing,
  * so they behave exactly like the old standalone executables did - including
  * usage strings, since the forwarded argv[0] is the sub command name.
  *
+ *   ./zig-out/bin/ac authserver <original authserver args>
  *   ./zig-out/bin/ac map_extractor <original map_extractor args>
  */
 
@@ -23,7 +24,7 @@ int main(int argc, char** argv)
     argparse::ArgumentParser program("ac", "1.0");
     program.add_description("AzerothCore unified executable (zig-build port)");
     program.add_argument("command").metavar("COMMAND").help(
-        "sub program to run: map_extractor | mmaps_generator | vmap4_extractor | vmap4_assembler");
+        "sub program to run: authserver | map_extractor | mmaps_generator | vmap4_extractor | vmap4_assembler");
 
     if (argc < 2)
     {
@@ -49,6 +50,7 @@ int main(int argc, char** argv)
 
     using EntryPoint = int (*)(int, char**);
     std::map<std::string, EntryPoint> const entry_points = {
+        {"authserver", &authserver_main},
         {"map_extractor", &map_extractor_main},
         {"mmaps_generator", &mmaps_generator_main},
         {"vmap4_extractor", &vmap4_extractor_main},

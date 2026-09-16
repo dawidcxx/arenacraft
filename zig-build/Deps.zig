@@ -143,7 +143,17 @@ pub const Deps = struct {
 
     pub fn linkMysqlClient(self: *Self, mod: *Build.Module) void {
         _ = self;
-        mod.linkSystemLibrary("mysqlclient", .{});
+        // real libmysqlclient from the nix mysql84 package (mariadb-connector
+        // poisons __cpp_nontype_template_args and lacks mysql_ssl_mode);
+        // paths are exported by the flake shellHook, no pkg-config available
+        const env = &mod.owner.graph.environ_map;
+        if (env.get("MYSQL_INCLUDE_DIR")) |inc_dir| {
+            mod.addIncludePath(.{ .cwd_relative = inc_dir });
+        }
+        if (env.get("MYSQL_LIB_DIR")) |lib_dir| {
+            mod.addLibraryPath(.{ .cwd_relative = lib_dir });
+        }
+        mod.linkSystemLibrary("mysqlclient", .{ .use_pkg_config = .no });
     }
 
     pub fn linkZlib(self: *Self, mod: *Build.Module) void {

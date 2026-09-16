@@ -14,6 +14,12 @@ Zig build (`zig-build/`) with the `AcGraph` / `Deps.zig` architecture:
   centralized there. Consumers never add include paths manually - libs expose
   headers via `installHeadersDirectory` (Zig 0.16 propagates them through
   `linkLibrary`).
+- Ported modules live in `zig-build/Src.zig` (AcGraph holds it under `src`,
+  next to `deps`), same pattern: common/database/shared/auth/tools are
+  `module + library` pairs with `link*` helpers that CASCADE like CMake
+  PUBLIC propagation (`linkAuth` gives you shared->database->common includes
+  and libs). Core cflags (C++23 + deprecation suppressions) are defined once
+  as `Src.core_cflags`.
 - Source querying via `cppkit-zig` (`cpp.querySources` + `filterOut*`).
 
 | Dependency | Type | Status | Notes |
@@ -154,6 +160,25 @@ Keep the existing conf files as-is for now (`authserver.conf.dist`,
 16. Banner art replaced with ARENA/CRAFT (same slanted ANSI-shadow glyphs,
     extracted from the original banner); tagline: "ArenaCraft - based on
     AzerothCore 3.3.5a".
+17. **libmysqlclient, NOT mariadb-connector**: mariadb's mysql.h forces
+    `__cpp_nontype_template_args` down to 201411L (breaks fmt 11 under
+    C++23) and lacks `mysql_ssl_mode`/`mysql_stmt_bind_named_param`. The
+    flake now uses `mysql84` with `MYSQL_INCLUDE_DIR`/`MYSQL_LIB_DIR` env
+    vars consumed by `Deps.linkMysqlClient` (no pkg-config for this one).
+18. **core module cflags**: `-Wno-deprecated-literal-operator` (fmt 11
+    fallback shim under zig 0.16's clang) and `-Wno-deprecated-declarations`
+    (newer asio marks `basic_deadline_timer`/`null_buffers` deprecated;
+    AC's DeadlineTimer/Socket wrappers inherit/use them - warnings only,
+    suppressed deliberately).
+19. **libc++ drift header fixes** in ported sources: `DatabaseEnvFwd.h`
+    gained `#include <memory>`, `ByteBuffer.h` gained
+    `#include <type_traits>` (newer libc++ no longer provides these
+    transitively).
+20. **Config files resolve relative to the executable**: `ConfigMgr::
+    GetConfigPath()` returns the exe's directory (portable helper:
+    `_NSGetExecutablePath` / `/proc/self/exe` / `GetModuleFileName`), so
+    `/foo/bar/ac authserver` loads `/foo/bar/authserver.conf`. The
+    `_CONF_DIR` build macro is gone.
 
 ## Phased roadmap
 
@@ -170,13 +195,20 @@ Order is bottom-up: deps -> libs -> apps. Each phase should end with a green
   Excluded from the port: `Platform/` (Win32 only), `Debugging/
   WheatyExceptionReport` (Win32 only), `Utilities/StartProcess` (dropped,
   boost/iostreams consumer).
-- **Phase 2 - database**: port `src/server/database` minus update/migration
-  files. Links common + mysqlclient. Step: `zig build database-port`.
-- **Phase 3 - shared**: port `src/server/shared`. Links database (+common).
-- **Phase 4 - authserver**: port auth app, replace program_options with
-  argparse, replace boost/dll usage. Wire `ac authserver` subcommand.
-- **Phase 5 - worldserver**: port world app + gsoap + readline deps.
-  Wire `ac worldserver`.
+- **Phase 2 (done)**: `src-port/database` - full database lib, DBUpdater/
+  UpdateFetcher dropped, `DatabaseLoader` stripped of update hooks (explicit
+  instantiations kept, so `AddDatabase<T>` links 1:1). Links common +
+  libmysqlclient. Step: `zig build database`.
+- **Phase 3 (done)**: `src-port/shared` - Realms, Secrets, DataStores,
+  ByteBuffer, SharedDefines (Network is header-only). Links database.
+  Step: `zig build shared`.
+- **Phase 4 (done)**: `src-port/auth` - Main.cpp entry renamed to
+  `authserver_main`, `GetConsoleArguments` rewritten from
+  boost::program_options to argparse (same flags: -h/--help, -v/--version,
+  -d/--dry-run, -c/--config; unknown args still tolerated because
+  sConfigMgr->Configure() re-scans full argv). `ac authserver` works
+  end-to-end: config load -> banner -> SSL/Boost info -> MySQL connect
+  (fails without docker, as expected). Phases 5-7 unchanged.
 - **Phase 7 - cleanup & runtime**: prune unused `deps/` vendors, docker-compose
   wiring for mysql/redis, bun/TS scripting layer for SQL management, unified
   process decision (defer), config consolidation (defer).

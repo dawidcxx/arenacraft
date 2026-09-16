@@ -40,15 +40,18 @@
               zlib
               doctest
               jemalloc
-              libmysqlclient
-              libmysqlclient.dev
               openssl
               hiredis
               bzip2
+              # real libmysqlclient - mariadb-connector poisons
+              # __cpp_nontype_template_args and lacks mysql_ssl_mode
+              mysql84
             ];
 
             shellHook = ''
               unset NIX_CFLAGS_COMPILE
+              export MYSQL_INCLUDE_DIR="${pkgs.mysql84}/include/mysql"
+              export MYSQL_LIB_DIR="${pkgs.mysql84}/lib"
               export FLAKE_INCLUDES="${
                 composeIncludePath [
                   pkgs.minizip
