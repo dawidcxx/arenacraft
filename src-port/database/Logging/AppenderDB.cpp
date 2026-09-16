@@ -36,7 +36,7 @@ void AppenderDB::_write(LogMessage const* message)
     return;
 
   LoginDatabasePreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_INS_LOG);
-  stmt->SetData(0, message->mtime.count());
+  stmt->SetData(0, message->mtime);
   stmt->SetData(1, realmId);
   stmt->SetData(2, message->type);
   stmt->SetData(3, uint8(message->level));

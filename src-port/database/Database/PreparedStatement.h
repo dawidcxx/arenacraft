@@ -35,6 +35,21 @@ using is_default = std::enable_if_t<std::is_arithmetic_v<T> || std::is_same_v<st
 template <typename T> using is_enum_v = std::enable_if_t<std::is_enum_v<T>>;
 
 template <typename T> using is_non_string_view_v = std::enable_if_t<!std::is_base_of_v<std::string_view, T>>;
+
+// zig 0.16 ships libc++ whose <chrono> hardcodes long long reps, while on linux
+// int64_t is long (on apple they coincide). map the stray types onto the typedefs
+// that have SetValidData instantiations in PreparedStatement.cpp, so call sites
+// can never instantiate a specialization the database lib does not provide.
+template <typename T>
+constexpr auto canonical(T value)
+{
+  if constexpr (std::is_same_v<T, long long>)
+    return static_cast<int64>(value);
+  else if constexpr (std::is_same_v<T, unsigned long long>)
+    return static_cast<uint64>(value);
+  else
+    return value;
+}
 } // namespace Acore::Types
 
 struct PreparedStatementData
@@ -60,7 +75,7 @@ public:
   // Set numerlic and default binary
   template <typename T> inline Acore::Types::is_default<T> SetData(const uint8 index, T value)
   {
-    SetValidData(index, value);
+    SetValidData(index, Acore::Types::canonical(value));
   }
 
   // Set enums
@@ -84,9 +99,13 @@ public:
 
   // Set duration
   template <class _Rep, class _Period>
-  inline void SetData(const uint8 index, std::chrono::duration<_Rep, _Period> const& value, bool convertToUin32 = true)
+  inline void SetData(const uint8 index, std::chrono::duration<_Rep, _Period> const& value)
   {
-    SetValidData(index, convertToUin32 ? static_cast<uint32>(value.count()) : value.count());
+    // always convert to uint32: libc++ hardcodes chrono reps as long long, which
+    // has no SetValidData instantiation on linux (int64_t is long there), so the
+    // unconverted path from upstream cannot be linked on this toolchain. no caller
+    // ever used it - all columns are uint32 unix time.
+    SetValidData(index, static_cast<uint32>(value.count()));
   }
 
   // Set all

@@ -587,7 +587,7 @@ void Pet::SavePetToDB(PetSaveMode mode)
     stmt->SetData(12, curhealth);
     stmt->SetData(13, curmana);
     stmt->SetData(14, GetPower(POWER_HAPPINESS));
-    stmt->SetData(15, GameTime::GetGameTime().count());
+    stmt->SetData(15, uint32(GameTime::GetGameTime().count()));
     stmt->SetData(16, actionBar);
 
     trans->Append(stmt);

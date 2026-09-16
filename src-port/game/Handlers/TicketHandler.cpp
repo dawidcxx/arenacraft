@@ -276,7 +276,7 @@ void WorldSession::HandleReportLag(WorldPacket& recv_data)
   stmt->SetData(4, y);
   stmt->SetData(5, z);
   stmt->SetData(6, GetLatency());
-  stmt->SetData(7, GameTime::GetGameTime().count());
+  stmt->SetData(7, uint32(GameTime::GetGameTime().count()));
   CharacterDatabase.Execute(stmt);
 }
 

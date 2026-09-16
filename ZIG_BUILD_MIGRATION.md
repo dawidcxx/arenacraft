@@ -179,14 +179,36 @@ no platform-specific compile errors up to the point the deps failed.
 25. **Cross-compile from macOS to Linux is abandoned** in favor of native
     builds on the Linux nix host (see "Linux / cross-compile findings"
     above for the exact failures the next person will re-hit).
+26. **Linux port fixes landed (2026-09-16)**: (a) the two C-only deps
+    (`argon2`, `mpq`) were missing `link_libc = true` in `Deps.zig` - the
+    "argon2 header resolution is a zig-target quirk" above was actually
+    this; macOS auto-resolves SDK headers, NixOS has no /usr/include to
+    fall back on. (b) zig's bundled libc++ hardcodes `long long` chrono
+    reps while linux `int64_t` is `long` (on apple they coincide, which is
+    why the mac build linked). Global fix: `Acore::Types::canonical()` in
+    `PreparedStatement.h` maps `long long`/`unsigned long long` onto the
+    typedef'd types at the single `SetData` funnel; the duration overload
+    now always converts to `uint32` (no caller ever passed
+    `convertToUin32 = false`, and the old ternary promoted to `long long`
+    even on the convert path). (c) three raw `GetGameTime().count()`
+    `SetData` call sites got upstream's `uint32` cast (Pet.cpp, 
+    TicketHandler.cpp, cs_quest.cpp).
+27. **Stale .zig-cache on header-only changes**: while debugging the libc++
+    rep mismatch, `zig build` kept linking old objects (same archive hash
+    across runs despite edited headers). If a link error references a
+    symbol signature you already fixed, `rm -rf .zig-cache` before
+    questioning your sanity.
 
 ## Roadmap (what remains)
 
-### R1 - Linux native build (in progress on the nix linux host)
-Replicate the flake with linux nixpkgs libs, fix the vendored-dep issues
-listed above (argon2 header resolution is a zig-target quirk; g3dlite needs
-`<sys/time.h>` + enum-arithmetic fixes), then `zig build ac`. The ported
-sources are expected to be clean.
+### R1 - Linux native build (DONE, verified 2026-09-16)
+`zig build ac` succeeds on the nix linux host (zig 0.16.0). Smoke-tested
+1:1 like the mac: authserver banner -> dies waiting on MySQL; worldserver
+banner -> dies at Redis connect (`Connection refused`); tools run (no
+client data yet, so "No locales detected" from map_extractor is normal).
+Two mac->linux source class issues had to be fixed, see decisions 26/27.
+Minor linux-only noise: "Can't set process priority class" warning on
+worldserver startup is cosmetic.
 
 ### R2 - Runtime bring-up (docker + bootstrap)
 - `docker compose up -d db valkey` (mysql + valkey; credentials in

@@ -242,6 +242,7 @@ pub const Deps = struct {
         const module = b.createModule(.{
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         });
 
         module.addCMacro("ARGON2_NO_THREADS", "1");
@@ -395,6 +396,7 @@ pub const Deps = struct {
         const module = b.createModule(.{
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
         });
 
         // own sources include each other flat, config.h comes from the vendored root

@@ -1,6 +1,7 @@
 services:
   db:
-    image: mysql:8.0
+    image: docker.io/library/mysql:8.0
+    # mysql_native_password is still available in 8.0; the flag is removed in 8.4+
     command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_PASSWORD: acore
@@ -10,34 +11,42 @@ services:
       - mysql-data:/var/lib/mysql
     ports:
       - 3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pacore", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
 
   valkey:
-    image: docker.io/bitnami/valkey:8.0
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes
+    # official valkey image (docker.io/bitnami images were frozen in sep 2025;
+    # ALLOW_EMPTY_PASSWORD was bitnami-only and is not needed here)
+    image: docker.io/valkey/valkey:8.0
     ports:
       - '6379:6379'
     volumes:
-      - 'valkey_data:/bitnami/valkey/data'
+      - 'valkey_data:/data'
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   redis-insight:
-    image: redis/redisinsight:latest
+    image: docker.io/redis/redisinsight:latest
     restart: always
     ports:
       - "5540:5540"
     volumes:
       - redis-insight:/data
 
-
-
   adminer:
-    image: adminer
+    image: docker.io/library/adminer:latest
+    restart: always
     ports:
       - 6664:8080
-
 
 volumes:
   mysql-data:
   redis-insight:
   valkey_data:
-    driver: local
