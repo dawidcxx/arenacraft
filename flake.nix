@@ -44,7 +44,6 @@
               libmysqlclient.dev
               openssl
               hiredis
-              hiredis.dev
             ];
 
             shellHook = ''
@@ -55,6 +54,7 @@
                   pkgs.zlib
                   pkgs.expat
                   pkgs.doctest
+                  pkgs.hiredis
                 ]
               }"
             '';
