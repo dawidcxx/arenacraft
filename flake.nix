@@ -40,6 +40,11 @@
               zlib
               doctest
               jemalloc
+              libmysqlclient
+              libmysqlclient.dev
+              openssl
+              hiredis
+              hiredis.dev
             ];
 
             shellHook = ''

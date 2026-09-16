@@ -57,7 +57,16 @@ pub const AcGraph = struct {
             .flags = &.{"-std=c++20"},
         });
 
-        module.linkLibrary(self.deps.utf8.library);
+        const deps = &self.deps;
+        deps.linkUtf8(module);
+        deps.linkArgon2(module);
+        deps.linkDetour(module);
+        deps.linkFmt(module);
+        deps.linkBoost(module);
+
+        deps.linkOpenSSL(module);
+        deps.linkHiredis(module);
+        deps.linkMysqlClient(module);
 
         const exe = bl.addExecutable(.{
             .name = "test-build",
