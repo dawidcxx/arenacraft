@@ -1,107 +1,86 @@
-# Zig Build Migration
+# Zig Build Migration — Hand-off Document
 
-Living document for the CMake -> Zig build migration. Read this before starting a
-session. Update it as decisions land; do not delete entries from the decisions
-log, append amendments instead.
+Status: **the port is complete and building**. This document is the entry
+point for anyone (human or AI) continuing development, now primarily on
+**nix / Linux**. Read this fully before changing anything.
 
-## Current state (Phase 0 - DONE)
+Last verified state (macOS host, zig 0.16.0, nix dev shell):
 
-Zig build (`zig-build/`) with the `AcGraph` / `Deps.zig` architecture:
+- `zig build ac` - full stack: common -> database -> shared -> auth/game/
+  scripts/modules/worldserver + tools, all routed through ONE binary
+- `./zig-out/bin/ac authserver` - starts 1:1 like upstream (config -> banner
+  -> SSL/Boost info -> dies at MySQL connect: no DB running yet)
+- `./zig-out/bin/ac worldserver` - starts 1:1 (config -> banner -> dies at
+  Redis connect: no Redis running yet)
+- `./zig-out/bin/ac map_extractor|vmap4_extractor|vmap4_assembler|
+  mmaps_generator` - behave exactly like the old standalone tools
+- `zig build test-build` - linking smoke test exercising every dependency
+- `zig build compile-commands` - compile_commands.json for clangd (gitignored)
 
-- Build entry: root `build.zig` delegates to `zig-build/build.zig` (`runBuild`).
-- Dependencies live in `zig-build/Deps.zig`, each dep is a `module + library`
-  pair with a `link*` helper that consumers use. Include/define knowledge is
-  centralized there. Consumers never add include paths manually - libs expose
-  headers via `installHeadersDirectory` (Zig 0.16 propagates them through
-  `linkLibrary`).
-- Ported modules live in `zig-build/Src.zig` (AcGraph holds it under `src`,
-  next to `deps`), same pattern: common/database/shared/auth/tools are
-  `module + library` pairs with `link*` helpers that CASCADE like CMake
-  PUBLIC propagation (`linkAuth` gives you shared->database->common includes
-  and libs). Core cflags (C++23 + deprecation suppressions) are defined once
-  as `Src.core_cflags`.
-- Source querying via `cppkit-zig` (`cpp.querySources` + `filterOut*`).
+## How the build is structured
 
-| Dependency | Type | Status | Notes |
-|---|---|---|---|
-| utf8cpp | vendored | done | headers compiled as TUs, `cpp17.h` filtered |
-| argon2 | vendored | done | `-DARGON2_NO_THREADS=1`, arch-based ref/opt filter |
-| detour | vendored | done | `-std=c++14` |
-| fmt | vendored | done | `.cc` sources, `FMT_CONSTEVAL=constexpr`, `fmt.cc` filtered |
-| boost | zon (`allyourcodebase/boost-libraries-zig` v1.91) | done | headers-only usage; `linkBoost` mirrors artifact `include_dirs` + 8 `BOOST_*` defines. **No `dll` module** (see decisions) |
-| openssl, hiredis, mysqlclient | system (nix) | done | `linkSystemLibrary` via pkg-config; mysqlclient resolves to nix `mariadb-connector-c` |
-| SFMT, jemalloc, gperftools, stdfs, threads, jsonpath | - | dropped | unused / no-op / optional |
-| zlib, g3dlite, recast, gsoap, readline | vendored/system | pending | needed by worldserver/tools phases |
-| bzip2, libmpq | vendored | pending | needed by extractor tools phase |
+Root `build.zig` -> `zig-build/build.zig` (`runBuild`) -> `AcGraph`
+(`zig-build/BuildCommons.zig`) which owns two sub-graphs:
 
-Verification tooling in place:
+- **`Deps` (`zig-build/Deps.zig`)** - third parties only. Each dep is a
+  `module + library` pair built by a `build*` fn, consumed via `link*`
+  helpers that encapsulate include paths + defines. Vendored: utf8cpp,
+  argon2, detour, fmt, mpq, recast, g3dlite, gsoap, argparse (header-only).
+  System (nix/pkg-config): openssl, hiredis, readline, zlib, bzip2, and
+  **libmysqlclient** (special path, see decision 17).
+- **`Src` (`zig-build/Src.zig`)** - our ported sources under `src-port/`:
+  common, database, shared, auth, tools, game, scripts, modules, worldserver.
+  Same pattern; `link*` helpers CASCADE like CMake PUBLIC propagation
+  (`linkAuth` = auth lib + shared->database->common libs+includes). Core
+  cflags (C++23 + deprecation suppressions) live in `Src.core_cflags`.
+- Exe targets live in BuildCommons: `ac` (argparse router in
+  `src-port/main.cpp` + `src-port/subcommands.h`, forwards argv 1:1 to
+  `*_main` entry points) and `test-build`.
+- Source querying via `cppkit-zig` (`cpp.querySources`, `cpp.addFlatIncludes`
+  - the latter puts a dir + every subdir on the include path, replicating
+  CMake's `CollectIncludeDirectories`; needed because AC uses flat-name
+  includes across subdirectories).
+- Every ported module registers an isolated `zig build <name>` step
+  (common, database, shared, game) for triage.
 
-- `zig build test-build` - linking smoke test exercising every dependency with
-  real symbol usage (`zig-build/Test.cpp`).
-- `zig build compile-commands` - emits `compile_commands.json` (gitignored) via
-  `cppkit-zig` for clangd. New targets must call `cpp.addCompileCommands(exe)`.
-- Builds must run inside `nix develop` (pkg-config + system libs).
+`src-port/` is **fully self-contained**: nothing references the old `src/`
+tree anymore. Old-tree content was copied, not linked.
 
-## Target architecture
+## Environment (important)
 
-### `src-port/`
+- Build ONLY inside `nix develop` (flake.nix): provides zig, pkg-config and
+  the C libraries. Outside it, pkg-config resolution of openssl/hiredis
+  fails.
+- The flake exports `MYSQL_INCLUDE_DIR` / `MYSQL_LIB_DIR` (nix `mysql84`)
+  consumed by `Deps.linkMysqlClient` via `mod.owner.graph.environ_map`.
+- On a **Linux nix host**: replicate the same flake pattern with linux
+  nixpkgs libs; `zig build` natively should work once pkg-config/env resolve
+  (the C++ sources themselves are platform-clean, see Linux findings below).
+- `docker-compose.yml` is ready (mysql:8.0 + valkey:8.0 + redis-insight).
 
-New source root. Sources are **selectively** pulled in from `src/` as they are
-ported - no bulk copy. The old `src/` stays untouched as the reference until a
-phase is complete. Expect restructure, not translation: this is the moment to
-drop dead code (see decisions).
+## Linux / cross-compile findings (from the macOS host)
 
-Rough layout (adjust while porting):
+Attempted `zig build -Dtarget=x86_64-linux-{gnu,musl}` cross-compile:
 
-```
-src-port/
-  common/        # from src/common (Cryptography, Database? no - database is separate, Logging, Utilities, ...)
-  database/      # from src/server/database, minus everything update/migration
-  shared/        # from src/server/shared
-  auth/          # from src/server/apps/authserver (Main, Authentication, Server)
-  world/         # from src/server/apps/worldserver + game glue it needs
-  tools/         # map_extractor, mmaps_generator, vmap4_extractor, vmap4_assembler
-```
+- `gnu` target: fails immediately - glibc headers are not bundled; musl is
+  the zero-friction zig target.
+- `musl` target: vendored C deps hit missing libc headers (argon2:
+  `string.h`/`stdio.h` not found) and vendored g3dlite has real portability
+  issues under stricter clang: incomplete `struct timeval` (missing
+  `<sys/time.h>` include in G3D/System.h) and `-Wenum-enum-conversion`
+  errors in System.cpp.
+- Additionally, the system libs (openssl/hiredis/libmysqlclient/readline/
+  zlib/bzip2) resolve through the HOST pkg-config/env - cross-linking needs
+  a linux sysroot; from macOS that is a nix `pkgsCross` exercise.
 
-### `ac` master executable
+**Conclusion / chosen path**: build natively on the Linux nix host instead
+of cross-compiling. The compile failures above are all in vendored deps and
+are mechanical fixes (missing includes / warning-as-error); expect to touch
+`deps/g3dlite` the same way `deps/g3dlite/source/System.cpp` was already
+patched (see decision 11). The ported `src-port` sources themselves showed
+no platform-specific compile errors up to the point the deps failed.
 
-Single binary, subcommand dispatch (`zig build` installs `zig-out/bin/ac`):
-
-| Subcommand | Source | Notes |
-|---|---|---|
-| `ac authserver` | src-port/auth | replaces the authserver app |
-| `ac worldserver` | src-port/world | replaces the worldserver app |
-| `ac map_extractor` | src-port/tools | needs libmpq + bzip2 + zlib |
-| `ac mmaps_generator` | src-port/tools | needs recast + detour + g3dlite |
-| `ac vmap4_extractor` | src-port/tools | needs libmpq + bzip2 |
-| `ac vmap4_assembler` | src-port/tools | |
-
-- CLI parsing: **p-ranav/argparse** (header-only). Prior art: vendored at
-  `src/auth/Include/argparse.h` in commit `361dfc0b2` on the old experiment
-  branch - rescue it from git history into `src-port/common` (or a
-  `src-port/third_party` dir).
-- Unified world+auth process is **deferred**: `ac authserver` and
-  `ac worldserver` run separately for now (keeps configs and startup simple).
-  Unification is a later, opt-in refactor.
-
-### Scope removals
-
-- **No DB migration machinery in C++.** `DBUpdater`, `UpdateFetcher` and the
-  update-apply paths are not ported. `DatabaseLoader` ports without the update
-  fetcher hookup. SQL/schema management moves to a scripting layer (TypeScript
-  + bun) at the very end of the migration.
-- `dbimport` tool is dropped (same reasoning - base SQL bootstrap becomes a
-  script concern).
-- Docker-compose provides MySQL + Redis for local runs. **Do not run any
-  docker commands during the port phases** - container wiring happens at the
-  end.
-
-### Configs
-
-Keep the existing conf files as-is for now (`authserver.conf.dist`,
-`worldserver.conf.dist`). Revisit when/IF the server processes unify.
-
-## Decisions log
+## Decisions log (append-only; do not delete entries)
 
 1. C++ standard is **C++23** for all ported core libs (old zig build proved
    C++20 consteval issues with libc++; CMake says 20, we don't care).
@@ -113,13 +92,13 @@ Keep the existing conf files as-is for now (`authserver.conf.dist`,
    std::filesystem, or drop the crash-log feature it feeds).
 3. `StartProcess.cpp` (boost/iostreams consumer, only referenced by the
    removed DBUpdater) is not ported.
-4. Known consteval blockers from the old build, apply filters if they resurface:
-   `DatabaseLoader.cpp`, `DatabaseWorkerPool.cpp`, `Field.cpp`
-   (DBUpdater/UpdateFetcher are dropped outright now). Old patches to
-   `MPSCQueue.h` / `QueryHolder.h` are already in tree.
+4. Known consteval blockers from the old build turned out to be gone on
+   zig 0.16 + newer libc++: `Field.cpp`, `DatabaseWorkerPool.cpp`,
+   `DatabaseLoader.cpp` all compile now (old build filtered them; we don't).
+   Old patches to `MPSCQueue.h` / `QueryHolder.h` are already in tree.
 5. Deps.zig conventions: vendored dep = `querySources` + `addCSourceFiles` +
-   `installHeadersDirectory` + `link*` helper; system dep = `link*` helper with
-   `linkSystemLibrary`; boost = zon artifact + include-dir mirroring.
+   `installHeadersDirectory` + `link*` helper; system dep = `link*` helper
+   with `linkSystemLibrary`; boost = zon artifact + include-dir mirroring.
 6. Every ported lib gets its own `zig build <name>` step for isolated
    verification, plus smoke-test / compile-commands registration.
 7. Git: the assistant does NOT commit; the human commits after review.
@@ -127,36 +106,34 @@ Keep the existing conf files as-is for now (`authserver.conf.dist`,
    "add database static library", `62fa5a143` "auth-server (kind of) builds")
    is the reference for known source-level fixes - reuse those lessons.
 9. **`ac` router architecture** (`src-port/main.cpp`): argparse validates the
-   sub command name only, then forwards `argv+1` 1:1 to the renamed tool
-   `main()`s (declared in `src-port/subcommands.h`). Tools keep their own arg
-   parsing, so usage strings and flags are identical to the old standalone
-   binaries. `ac <bad command>` prints the router help.
+   sub command name only, then forwards `argv+1` 1:1 to the renamed
+   `main()`s (declared in `src-port/subcommands.h`). Sub programs keep their
+   own argument parsing, so usage strings and flags are identical to the old
+   standalone binaries.
 10. **asio define deviation**: `BOOST_ASIO_NO_DEPRECATED` (from CMake's boost
     interface) is deliberately NOT set - with asio 1.91 it strips
-    `basic_deadline_timer` members that common's `DeadlineTimer` wrapper uses.
-11. **g3dlite patch**: `System::free()` got the same lazy `initMem()` guard its
-    malloc/realloc siblings have; without it, static destructors freeing G3D
-    memory before any G3D allocation crashed on a null `BufferPool` (bare
-    `ac` invocation).
-12. **tool source consolidation** (needed because all tools now link into ONE
-    binary): the duplicated `dbcfile.{h,cpp}` / `mpq_libmpq04.h` /
-    `mpq_libmpq.cpp` copies of map_extractor + vmap4_extractor moved to
+    `basic_deadline_timer` members that common's `DeadlineTimer` wrapper
+    uses.
+11. **g3dlite patch**: `System::free()` got the same lazy `initMem()` guard
+    its malloc/realloc siblings have; without it, static destructors freeing
+    G3D memory before any G3D allocation crashed on a null `BufferPool`.
+12. **tool source consolidation** (all tools link into ONE binary): the
+    duplicated `dbcfile.{h,cpp}` / `mpq_libmpq04.h` / `mpq_libmpq.cpp`
+    copies of map_extractor + vmap4_extractor moved to
     `src-port/tools/shared/` (vmap4 variant, `close()` made public again);
     map_extractor's `FileExists` is `static`; vmap4's globals
     (`input_path`/`output_path`/`map_ids`) prefixed with `vmap_`.
 13. **Flat-name includes**: common and the tools rely on every subdirectory
     being on the include path (CMake `CollectIncludeDirectories` behavior).
-    Replicated via `Deps.addFlatIncludes()` - dirs are sorted so same-named
+    Replicated via `cpp.addFlatIncludes` - dirs are sorted so same-named
     headers resolve deterministically (`map_extractor/loadlib` wins over
     `vmap4_extractor/loadlib`, matching CMake).
 14. boost zon dep runs with `.filesystem = true` (common's TileAssembler
     needs it); `zig-pkg/` (boost sub-package extraction) is gitignored.
-15. AcGraph mirrors the ported module structure: `common` (and later
-    database/shared/...) live as direct AcGraph members built by
-    `BuildCommons.zig`; `Deps.zig` holds third parties only (argparse moved
-    there too, at `deps/argparse` - header-only, linked via include-dir
-    propagation). Flat-include dirs helper was factored into cppkit
-    (`cpp.addFlatIncludes`).
+15. AcGraph mirrors the ported module structure: `Deps.zig` holds third
+    parties, `Src.zig` holds our modules (common/database/shared/auth/
+    tools/game/scripts/modules/worldserver). The `ac` exe targets stay in
+    BuildCommons.zig.
 16. Banner art replaced with ARENA/CRAFT (same slanted ANSI-shadow glyphs,
     extracted from the original banner); tagline: "ArenaCraft - based on
     AzerothCore 3.3.5a".
@@ -165,11 +142,12 @@ Keep the existing conf files as-is for now (`authserver.conf.dist`,
     C++23) and lacks `mysql_ssl_mode`/`mysql_stmt_bind_named_param`. The
     flake now uses `mysql84` with `MYSQL_INCLUDE_DIR`/`MYSQL_LIB_DIR` env
     vars consumed by `Deps.linkMysqlClient` (no pkg-config for this one).
-18. **core module cflags**: `-Wno-deprecated-literal-operator` (fmt 11
-    fallback shim under zig 0.16's clang) and `-Wno-deprecated-declarations`
-    (newer asio marks `basic_deadline_timer`/`null_buffers` deprecated;
-    AC's DeadlineTimer/Socket wrappers inherit/use them - warnings only,
-    suppressed deliberately).
+    On Linux, use the distro/nix real libmysqlclient equivalently.
+18. **core module cflags** (`Src.core_cflags`): `-Wno-deprecated-literal-
+    operator` (fmt 11 fallback shim under zig 0.16's clang) and
+    `-Wno-deprecated-declarations` (newer asio marks `basic_deadline_timer`/
+    `null_buffers` deprecated; AC's DeadlineTimer/Socket wrappers inherit/
+    use them - warnings only, suppressed deliberately).
 19. **libc++ drift header fixes** in ported sources: `DatabaseEnvFwd.h`
     gained `#include <memory>`, `ByteBuffer.h` gained
     `#include <type_traits>` (newer libc++ no longer provides these
@@ -180,11 +158,11 @@ Keep the existing conf files as-is for now (`authserver.conf.dist`,
     `/foo/bar/ac authserver` loads `/foo/bar/authserver.conf`. The
     `_CONF_DIR` build macro is gone.
 21. **modules/scripts loaders are hand-written**, replacing CMake's
-    configure_file generation (ScriptLoader.cpp: AddCommandsScripts()...
-    AddWorldScripts(); ModulesLoader.cpp: Addmod_arenacraftScripts() +
-    Addmod_duel_resetScripts()). The CMake INTERFACE macros
-    `AC_MODULES_LIST` / `CONFIG_FILE_LIST` are defined on the worldserver
-    module in Src.zig (trailing commas are part of the format).
+    configure_file generation (`src-port/scripts/ScriptLoader.cpp`: 
+    AddCommandsScripts()... AddWorldScripts(); `src-port/modules/
+    ModulesLoader.cpp`: Addmod_arenacraftScripts() +
+    Addmod_duel_resetScripts()). Keep them in sync when adding script
+    dirs/modules.
 22. **TU-local helpers static-ified** in both server Mains: StartDB/StopDB/
     GetConsoleArguments were defined with identical names in auth and
     worldserver Main.cpp; with everything in one binary they must be
@@ -198,57 +176,66 @@ Keep the existing conf files as-is for now (`authserver.conf.dist`,
     `.server modules` chat command and nothing else since DB updates are
     dropped), and `sConfigMgr->LoadModulesConfigs()` is no longer called.
     No `modules/` config dir is needed next to the executable.
+25. **Cross-compile from macOS to Linux is abandoned** in favor of native
+    builds on the Linux nix host (see "Linux / cross-compile findings"
+    above for the exact failures the next person will re-hit).
 
-## Phased roadmap
+## Roadmap (what remains)
 
-Order is bottom-up: deps -> libs -> apps. Each phase should end with a green
-`zig build test-build` (or its successor) and the phase's build step.
+### R1 - Linux native build (in progress on the nix linux host)
+Replicate the flake with linux nixpkgs libs, fix the vendored-dep issues
+listed above (argon2 header resolution is a zig-target quirk; g3dlite needs
+`<sys/time.h>` + enum-arithmetic fixes), then `zig build ac`. The ported
+sources are expected to be clean.
 
-- **Phase 0 (done)**: dependency layer (see table above) + smoke test +
-  compile-commands.
-- **Phase 1 (done)**: `src-port/` skeleton + **entire** `src/common` ported to
-  `src-port/common` (C++23, links fmt/boost/openssl/hiredis/argon2/utf8/detour/
-  g3dlite) + `recast`, `g3dlite`, `mpq` deps + zlib/bzip2 system helpers +
-  `ac` master executable with the four map tools working 1:1 (see decisions
-  9-12). Steps: `zig build common` (lib in isolation), `zig build ac`.
-  Excluded from the port: `Platform/` (Win32 only), `Debugging/
-  WheatyExceptionReport` (Win32 only), `Utilities/StartProcess` (dropped,
-  boost/iostreams consumer).
-- **Phase 2 (done)**: `src-port/database` - full database lib, DBUpdater/
-  UpdateFetcher dropped, `DatabaseLoader` stripped of update hooks (explicit
-  instantiations kept, so `AddDatabase<T>` links 1:1). Links common +
-  libmysqlclient. Step: `zig build database`.
-- **Phase 3 (done)**: `src-port/shared` - Realms, Secrets, DataStores,
-  ByteBuffer, SharedDefines (Network is header-only). Links database.
-  Step: `zig build shared`.
-- **Phase 4 (done)**: `src-port/auth` - Main.cpp entry renamed to
-  `authserver_main`, `GetConsoleArguments` rewritten from
-  boost::program_options to argparse (same flags: -h/--help, -v/--version,
-  -d/--dry-run, -c/--config; unknown args still tolerated because
-  sConfigMgr->Configure() re-scans full argv). `ac authserver` works
-  end-to-end: config load -> banner -> SSL/Boost info -> MySQL connect
-  (fails without docker, as expected).
-- **Phase 5 (done)**: `src-port/worldserver` + `src-port/game` (290 sources)
-  + `src-port/scripts` (105) + `src-port/modules` (mod-arenacraft,
-  mod-duel-reset). CMake's configure_file loader generation replaced with
-  hand-written `src-port/scripts/ScriptLoader.cpp` and
-  `src-port/modules/ModulesLoader.cpp` (static module set - keep in sync
-  when adding script dirs/modules). New deps: gsoap (vendored), readline
-  (nix). `ac worldserver` compiles and starts 1:1: config -> module configs
-  -> banner -> dies at Redis connect (docker phase). Phases 6-7 unchanged
-  (tools already landed in Phase 1).
-- **Phase 7 - cleanup & runtime**: prune unused `deps/` vendors, docker-compose
-  wiring for mysql/redis, bun/TS scripting layer for SQL management, unified
-  process decision (defer), config consolidation (defer).
+### R2 - Runtime bring-up (docker + bootstrap)
+- `docker compose up -d db valkey` (mysql + valkey; credentials in
+  docker-compose.yml)
+- **Bun/TS bootstrap scripts** (the replacement for the dropped
+  dbimport/DBUpdater): create `acore_auth`, `acore_characters`,
+  `acore_world` and apply `data/sql/base/db_*` schemas (654MB of base SQL,
+  already in tree)
+- Then chase: `ac authserver` reaching LISTENING state; `ac worldserver`
+  past Redis -> next gate is game client data
 
-## Open questions
+### R3 - Client data via our own tools
+`ac map_extractor` / `vmap4_extractor` / `vmap4_assembler` /
+`mmaps_generator` against a 3.3.5a client (user provides the client).
+worldserver will refuse to start without maps/vmaps/DBC data.
 
-- Executable/module naming inside `zig build` (e.g. `zig build ac` producing
-  `zig-out/bin/ac` vs one lib step per phase). Lean towards building the `ac`
-  exe from Phase 4 onward with subcommands appearing as they port.
-- Do tools keep their exact old CLI flags (argparse rewrite should mirror
-  them for muscle memory)?
-- `revision.h`: keep placeholder values (old approach) or run `git describe`
-  at build time via a zig Run step?
-- jemalloc/gperftools: dropped for good, or keep as opt-in `--build-option`
-  later? (currently: dropped)
+### R4 - Old-tree removal
+`src-port/` is self-contained (verified: zero references to `src/`). Once
+the Linux host builds and the servers boot against docker:
+- delete `src/` (the entire old source tree)
+- delete root `CMakeLists.txt`, `src/cmake/`, `acore.json`, `conf/`
+  (only contains CMake configure scripts - the runtime templates live at
+  `src-port/auth/authserver.conf.dist` + `src-port/worldserver/worldserver.conf.dist`)
+  and all `*/CMakeLists.txt` leftovers
+- `modules/` root CMake machinery can go; `modules/mod-*/src` content is
+  already copied into `src-port/modules`
+- KEEP: `data/` (base SQL for bootstrap), `docker-compose.yml`,
+  `deps/` (vendored sources)
+- prune unused `deps/` vendors afterwards: SFMT, jemalloc, gperftools,
+  jsonpath, stdfs, threads (all unused; verify with rg before deleting)
+
+### R5 - Small polish items
+- `revision.h`: real `git describe` via a zig Run step (currently
+  placeholders, see `Src.zig` buildCommon)
+- `-Doptimize` release-build verification
+- deferred: unified `ac server` (world+auth one process), whether the main
+  confs (`worldserver.conf`/`authserver.conf`) get the module-config
+  treatment (hardcoded) too
+
+## Gotchas quick list for the next AI
+
+- Build inside `nix develop`, always.
+- Do not reintroduce mariadb-connector (decision 17) - it poisons
+  `__cpp_nontype_template_args` and lacks mysql8 APIs.
+- `src-port/modules/mod-*/src` files reference game headers flat; the
+  cascade order in `Src.zig` link helpers matters (`linkGame` after
+  `linkShared` etc.). Follow the existing pattern.
+- When adding a script dir or module: copy sources into `src-port/...` AND
+  update the hand-written loader cpp (decision 21).
+- After adding a new build target: register `cpp.addCompileCommands(exe)`
+  and extend `zig-build/Test.cpp` + `test-build` if it introduces a dep.
+- `zig-cache/`, `zig-out/`, `zig-pkg/`, `*.a` are gitignored artifacts.
