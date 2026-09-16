@@ -7,4 +7,7 @@ pub fn runBuild(b: *std.Build) !void {
     var graph = AcGraph.create(b.allocator, io);
     defer graph.destroy();
     try graph.build(b);
+
+    // after all targets exist so nothing is missed
+    cpp.addCompileCommandsStep(b);
 }

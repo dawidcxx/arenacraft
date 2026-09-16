@@ -2,6 +2,7 @@ const std = @import("std");
 const Build = std.Build;
 
 const Deps = @import("./Deps.zig").Deps;
+const cpp = @import("./cppkit-zig/build.zig");
 
 pub const BuildRequest = struct { *Build, Build.ResolvedTarget, std.builtin.OptimizeMode };
 
@@ -72,6 +73,9 @@ pub const AcGraph = struct {
             .name = "test-build",
             .root_module = module,
         });
+
+        // linked dependencies are picked up by the walk automatically
+        cpp.addCompileCommands(exe);
 
         const install = bl.addInstallArtifact(exe, .{});
         const run = bl.addRunArtifact(exe);
