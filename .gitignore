@@ -114,3 +114,4 @@ compile_commands.json
 .zig-cache
 zig-out
 .direnv
+zig-pkg
