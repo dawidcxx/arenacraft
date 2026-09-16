@@ -1474,6 +1474,9 @@ void* System::realloc(void* block, size_t bytes) {
 
 void System::free(void* p) {
 #ifndef NO_BUFFERPOOL
+    // initMem guard added by the zig build port: freeing from static
+    // destructors without any prior G3D allocation crashed on a null pool
+    initMem();
     bufferpool->free(p);
 #else
     return ::free(p);

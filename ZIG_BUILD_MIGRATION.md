@@ -1,0 +1,194 @@
+# Zig Build Migration
+
+Living document for the CMake -> Zig build migration. Read this before starting a
+session. Update it as decisions land; do not delete entries from the decisions
+log, append amendments instead.
+
+## Current state (Phase 0 - DONE)
+
+Zig build (`zig-build/`) with the `AcGraph` / `Deps.zig` architecture:
+
+- Build entry: root `build.zig` delegates to `zig-build/build.zig` (`runBuild`).
+- Dependencies live in `zig-build/Deps.zig`, each dep is a `module + library`
+  pair with a `link*` helper that consumers use. Include/define knowledge is
+  centralized there. Consumers never add include paths manually - libs expose
+  headers via `installHeadersDirectory` (Zig 0.16 propagates them through
+  `linkLibrary`).
+- Source querying via `cppkit-zig` (`cpp.querySources` + `filterOut*`).
+
+| Dependency | Type | Status | Notes |
+|---|---|---|---|
+| utf8cpp | vendored | done | headers compiled as TUs, `cpp17.h` filtered |
+| argon2 | vendored | done | `-DARGON2_NO_THREADS=1`, arch-based ref/opt filter |
+| detour | vendored | done | `-std=c++14` |
+| fmt | vendored | done | `.cc` sources, `FMT_CONSTEVAL=constexpr`, `fmt.cc` filtered |
+| boost | zon (`allyourcodebase/boost-libraries-zig` v1.91) | done | headers-only usage; `linkBoost` mirrors artifact `include_dirs` + 8 `BOOST_*` defines. **No `dll` module** (see decisions) |
+| openssl, hiredis, mysqlclient | system (nix) | done | `linkSystemLibrary` via pkg-config; mysqlclient resolves to nix `mariadb-connector-c` |
+| SFMT, jemalloc, gperftools, stdfs, threads, jsonpath | - | dropped | unused / no-op / optional |
+| zlib, g3dlite, recast, gsoap, readline | vendored/system | pending | needed by worldserver/tools phases |
+| bzip2, libmpq | vendored | pending | needed by extractor tools phase |
+
+Verification tooling in place:
+
+- `zig build test-build` - linking smoke test exercising every dependency with
+  real symbol usage (`zig-build/Test.cpp`).
+- `zig build compile-commands` - emits `compile_commands.json` (gitignored) via
+  `cppkit-zig` for clangd. New targets must call `cpp.addCompileCommands(exe)`.
+- Builds must run inside `nix develop` (pkg-config + system libs).
+
+## Target architecture
+
+### `src-port/`
+
+New source root. Sources are **selectively** pulled in from `src/` as they are
+ported - no bulk copy. The old `src/` stays untouched as the reference until a
+phase is complete. Expect restructure, not translation: this is the moment to
+drop dead code (see decisions).
+
+Rough layout (adjust while porting):
+
+```
+src-port/
+  common/        # from src/common (Cryptography, Database? no - database is separate, Logging, Utilities, ...)
+  database/      # from src/server/database, minus everything update/migration
+  shared/        # from src/server/shared
+  auth/          # from src/server/apps/authserver (Main, Authentication, Server)
+  world/         # from src/server/apps/worldserver + game glue it needs
+  tools/         # map_extractor, mmaps_generator, vmap4_extractor, vmap4_assembler
+```
+
+### `ac` master executable
+
+Single binary, subcommand dispatch (`zig build` installs `zig-out/bin/ac`):
+
+| Subcommand | Source | Notes |
+|---|---|---|
+| `ac authserver` | src-port/auth | replaces the authserver app |
+| `ac worldserver` | src-port/world | replaces the worldserver app |
+| `ac map_extractor` | src-port/tools | needs libmpq + bzip2 + zlib |
+| `ac mmaps_generator` | src-port/tools | needs recast + detour + g3dlite |
+| `ac vmap4_extractor` | src-port/tools | needs libmpq + bzip2 |
+| `ac vmap4_assembler` | src-port/tools | |
+
+- CLI parsing: **p-ranav/argparse** (header-only). Prior art: vendored at
+  `src/auth/Include/argparse.h` in commit `361dfc0b2` on the old experiment
+  branch - rescue it from git history into `src-port/common` (or a
+  `src-port/third_party` dir).
+- Unified world+auth process is **deferred**: `ac authserver` and
+  `ac worldserver` run separately for now (keeps configs and startup simple).
+  Unification is a later, opt-in refactor.
+
+### Scope removals
+
+- **No DB migration machinery in C++.** `DBUpdater`, `UpdateFetcher` and the
+  update-apply paths are not ported. `DatabaseLoader` ports without the update
+  fetcher hookup. SQL/schema management moves to a scripting layer (TypeScript
+  + bun) at the very end of the migration.
+- `dbimport` tool is dropped (same reasoning - base SQL bootstrap becomes a
+  script concern).
+- Docker-compose provides MySQL + Redis for local runs. **Do not run any
+  docker commands during the port phases** - container wiring happens at the
+  end.
+
+### Configs
+
+Keep the existing conf files as-is for now (`authserver.conf.dist`,
+`worldserver.conf.dist`). Revisit when/IF the server processes unify.
+
+## Decisions log
+
+1. C++ standard is **C++23** for all ported core libs (old zig build proved
+   C++20 consteval issues with libc++; CMake says 20, we don't care).
+2. boost comes from the `allyourcodebase/boost-libraries-zig` zon package
+   (0.16-native). `boost::program_options` (old authserver Main.cpp) and
+   `boost::dll` (OpenSSLCrypto.cpp runtime_symbol_info) are NOT available in
+   the package: program_options is replaced by argparse, dll is replaced
+   during the port (executable path resolution via platform APIs /
+   std::filesystem, or drop the crash-log feature it feeds).
+3. `StartProcess.cpp` (boost/iostreams consumer, only referenced by the
+   removed DBUpdater) is not ported.
+4. Known consteval blockers from the old build, apply filters if they resurface:
+   `DatabaseLoader.cpp`, `DatabaseWorkerPool.cpp`, `Field.cpp`
+   (DBUpdater/UpdateFetcher are dropped outright now). Old patches to
+   `MPSCQueue.h` / `QueryHolder.h` are already in tree.
+5. Deps.zig conventions: vendored dep = `querySources` + `addCSourceFiles` +
+   `installHeadersDirectory` + `link*` helper; system dep = `link*` helper with
+   `linkSystemLibrary`; boost = zon artifact + include-dir mirroring.
+6. Every ported lib gets its own `zig build <name>` step for isolated
+   verification, plus smoke-test / compile-commands registration.
+7. Git: the assistant does NOT commit; the human commits after review.
+8. Old branch history (`a86cff049` "got common lib to build", `706edd85e`
+   "add database static library", `62fa5a143` "auth-server (kind of) builds")
+   is the reference for known source-level fixes - reuse those lessons.
+9. **`ac` router architecture** (`src-port/main.cpp`): argparse validates the
+   sub command name only, then forwards `argv+1` 1:1 to the renamed tool
+   `main()`s (declared in `src-port/subcommands.h`). Tools keep their own arg
+   parsing, so usage strings and flags are identical to the old standalone
+   binaries. `ac <bad command>` prints the router help.
+10. **asio define deviation**: `BOOST_ASIO_NO_DEPRECATED` (from CMake's boost
+    interface) is deliberately NOT set - with asio 1.91 it strips
+    `basic_deadline_timer` members that common's `DeadlineTimer` wrapper uses.
+11. **g3dlite patch**: `System::free()` got the same lazy `initMem()` guard its
+    malloc/realloc siblings have; without it, static destructors freeing G3D
+    memory before any G3D allocation crashed on a null `BufferPool` (bare
+    `ac` invocation).
+12. **tool source consolidation** (needed because all tools now link into ONE
+    binary): the duplicated `dbcfile.{h,cpp}` / `mpq_libmpq04.h` /
+    `mpq_libmpq.cpp` copies of map_extractor + vmap4_extractor moved to
+    `src-port/tools/shared/` (vmap4 variant, `close()` made public again);
+    map_extractor's `FileExists` is `static`; vmap4's globals
+    (`input_path`/`output_path`/`map_ids`) prefixed with `vmap_`.
+13. **Flat-name includes**: common and the tools rely on every subdirectory
+    being on the include path (CMake `CollectIncludeDirectories` behavior).
+    Replicated via `Deps.addFlatIncludes()` - dirs are sorted so same-named
+    headers resolve deterministically (`map_extractor/loadlib` wins over
+    `vmap4_extractor/loadlib`, matching CMake).
+14. boost zon dep runs with `.filesystem = true` (common's TileAssembler
+    needs it); `zig-pkg/` (boost sub-package extraction) is gitignored.
+15. AcGraph mirrors the ported module structure: `common` (and later
+    database/shared/...) live as direct AcGraph members built by
+    `BuildCommons.zig`; `Deps.zig` holds third parties only (argparse moved
+    there too, at `deps/argparse` - header-only, linked via include-dir
+    propagation). Flat-include dirs helper was factored into cppkit
+    (`cpp.addFlatIncludes`).
+16. Banner art replaced with ARENA/CRAFT (same slanted ANSI-shadow glyphs,
+    extracted from the original banner); tagline: "ArenaCraft - based on
+    AzerothCore 3.3.5a".
+
+## Phased roadmap
+
+Order is bottom-up: deps -> libs -> apps. Each phase should end with a green
+`zig build test-build` (or its successor) and the phase's build step.
+
+- **Phase 0 (done)**: dependency layer (see table above) + smoke test +
+  compile-commands.
+- **Phase 1 (done)**: `src-port/` skeleton + **entire** `src/common` ported to
+  `src-port/common` (C++23, links fmt/boost/openssl/hiredis/argon2/utf8/detour/
+  g3dlite) + `recast`, `g3dlite`, `mpq` deps + zlib/bzip2 system helpers +
+  `ac` master executable with the four map tools working 1:1 (see decisions
+  9-12). Steps: `zig build common` (lib in isolation), `zig build ac`.
+  Excluded from the port: `Platform/` (Win32 only), `Debugging/
+  WheatyExceptionReport` (Win32 only), `Utilities/StartProcess` (dropped,
+  boost/iostreams consumer).
+- **Phase 2 - database**: port `src/server/database` minus update/migration
+  files. Links common + mysqlclient. Step: `zig build database-port`.
+- **Phase 3 - shared**: port `src/server/shared`. Links database (+common).
+- **Phase 4 - authserver**: port auth app, replace program_options with
+  argparse, replace boost/dll usage. Wire `ac authserver` subcommand.
+- **Phase 5 - worldserver**: port world app + gsoap + readline deps.
+  Wire `ac worldserver`.
+- **Phase 7 - cleanup & runtime**: prune unused `deps/` vendors, docker-compose
+  wiring for mysql/redis, bun/TS scripting layer for SQL management, unified
+  process decision (defer), config consolidation (defer).
+
+## Open questions
+
+- Executable/module naming inside `zig build` (e.g. `zig build ac` producing
+  `zig-out/bin/ac` vs one lib step per phase). Lean towards building the `ac`
+  exe from Phase 4 onward with subcommands appearing as they port.
+- Do tools keep their exact old CLI flags (argparse rewrite should mirror
+  them for muscle memory)?
+- `revision.h`: keep placeholder values (old approach) or run `git describe`
+  at build time via a zig Run step?
+- jemalloc/gperftools: dropped for good, or keep as opt-in `--build-option`
+  later? (currently: dropped)

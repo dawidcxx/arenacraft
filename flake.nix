@@ -44,6 +44,7 @@
               libmysqlclient.dev
               openssl
               hiredis
+              bzip2
             ];
 
             shellHook = ''

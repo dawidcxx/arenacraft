@@ -1,3 +1,5 @@
+// Chcks if vendored (deps/) and system (nix) dependencies are properly loading
+// with zig build
 #include <string>
 #include <utf8.h>
 

@@ -1,6 +1,7 @@
 const std = @import("std");
 const cc = @import("./compile_commands.zig");
 const file_queries = @import("file_queries.zig");
+const include_dirs = @import("include_dirs.zig");
 
 pub fn build(b: *std.Build) void {
     _ = b;
@@ -17,6 +18,9 @@ pub const Exts = struct {
 
 pub const querySources = file_queries.querySources;
 pub const SourceSet = file_queries.SourceSet;
+
+// include path helpers
+pub const addFlatIncludes = include_dirs.addFlatIncludes;
 
 // compile commands stuff
 pub const addCompileCommands = cc.addCompileCommands;
