@@ -46,6 +46,7 @@ public:
 
   std::string const                             GetFilename();
   std::string const                             GetConfigPath();
+  std::string const                             GetDataPath();
   [[nodiscard]] std::vector<std::string> const& GetArguments() const;
   std::vector<std::string>                      GetKeysByString(std::string const& name);
 

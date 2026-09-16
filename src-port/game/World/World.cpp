@@ -1436,8 +1436,8 @@ void World::LoadConfigSettings(bool reload)
 
   _int_configs[CONFIG_AUCTION_HOUSE_SEARCH_TIMEOUT] = sConfigMgr->GetOption<uint32>("AuctionHouse.SearchTimeout", 1000);
 
-  ///- Read the "Data" directory from the config file
-  std::string dataPath = sConfigMgr->GetOption<std::string>("DataDir", "./");
+  ///- Read the "Data" directory from the config file (resolved relative to the executable)
+  std::string dataPath = sConfigMgr->GetDataPath();
   if (dataPath.empty() || (dataPath.at(dataPath.length() - 1) != '/' && dataPath.at(dataPath.length() - 1) != '\\'))
     dataPath.push_back('/');
 

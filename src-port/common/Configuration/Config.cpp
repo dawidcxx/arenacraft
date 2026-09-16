@@ -581,6 +581,21 @@ std::string const ConfigMgr::GetConfigPath()
   return GetExecutableDir();
 }
 
+// Data directory resolved relative to the executable (zig-build port change:
+// "data" in the config means <exe dir>/data, mirroring how config files are
+// resolved). Absolute paths are used as-is.
+std::string const ConfigMgr::GetDataPath()
+{
+  std::string dataPath = GetOption<std::string>("DataDir", "data");
+
+  std::error_code ec;
+  std::filesystem::path const path(dataPath);
+  if (!path.is_absolute())
+    dataPath = std::filesystem::weakly_canonical(GetExecutableDir() + dataPath, ec).generic_string();
+
+  return dataPath;
+}
+
 void ConfigMgr::Configure(std::string const& initFileName, std::vector<std::string> args,
                           std::string_view modulesConfigList /*= {}*/)
 {
