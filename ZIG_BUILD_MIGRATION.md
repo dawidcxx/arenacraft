@@ -179,6 +179,25 @@ Keep the existing conf files as-is for now (`authserver.conf.dist`,
     `_NSGetExecutablePath` / `/proc/self/exe` / `GetModuleFileName`), so
     `/foo/bar/ac authserver` loads `/foo/bar/authserver.conf`. The
     `_CONF_DIR` build macro is gone.
+21. **modules/scripts loaders are hand-written**, replacing CMake's
+    configure_file generation (ScriptLoader.cpp: AddCommandsScripts()...
+    AddWorldScripts(); ModulesLoader.cpp: Addmod_arenacraftScripts() +
+    Addmod_duel_resetScripts()). The CMake INTERFACE macros
+    `AC_MODULES_LIST` / `CONFIG_FILE_LIST` are defined on the worldserver
+    module in Src.zig (trailing commas are part of the format).
+22. **TU-local helpers static-ified** in both server Mains: StartDB/StopDB/
+    GetConsoleArguments were defined with identical names in auth and
+    worldserver Main.cpp; with everything in one binary they must be
+    `static`.
+23. Modules Lua/eluna machinery from CMake was skipped outright - the two
+    in-tree modules don't use it.
+24. **Module configs dropped entirely, values hardcoded**: duelreset.conf.dist
+    was redundant with the in-code defaults, so `DuelReset::LoadConfig` uses
+    constants, the `CONFIG_FILE_LIST`/`AC_MODULES_LIST` cmake macros are gone
+    (module list inlined in worldserver Main.cpp - it feeds the
+    `.server modules` chat command and nothing else since DB updates are
+    dropped), and `sConfigMgr->LoadModulesConfigs()` is no longer called.
+    No `modules/` config dir is needed next to the executable.
 
 ## Phased roadmap
 
@@ -208,7 +227,16 @@ Order is bottom-up: deps -> libs -> apps. Each phase should end with a green
   -d/--dry-run, -c/--config; unknown args still tolerated because
   sConfigMgr->Configure() re-scans full argv). `ac authserver` works
   end-to-end: config load -> banner -> SSL/Boost info -> MySQL connect
-  (fails without docker, as expected). Phases 5-7 unchanged.
+  (fails without docker, as expected).
+- **Phase 5 (done)**: `src-port/worldserver` + `src-port/game` (290 sources)
+  + `src-port/scripts` (105) + `src-port/modules` (mod-arenacraft,
+  mod-duel-reset). CMake's configure_file loader generation replaced with
+  hand-written `src-port/scripts/ScriptLoader.cpp` and
+  `src-port/modules/ModulesLoader.cpp` (static module set - keep in sync
+  when adding script dirs/modules). New deps: gsoap (vendored), readline
+  (nix). `ac worldserver` compiles and starts 1:1: config -> module configs
+  -> banner -> dies at Redis connect (docker phase). Phases 6-7 unchanged
+  (tools already landed in Phase 1).
 - **Phase 7 - cleanup & runtime**: prune unused `deps/` vendors, docker-compose
   wiring for mysql/redis, bun/TS scripting layer for SQL management, unified
   process decision (defer), config consolidation (defer).

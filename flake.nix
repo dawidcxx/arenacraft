@@ -43,6 +43,8 @@
               openssl
               hiredis
               bzip2
+              readline
+              ncurses
               # real libmysqlclient - mariadb-connector poisons
               # __cpp_nontype_template_args and lacks mysql_ssl_mode
               mysql84

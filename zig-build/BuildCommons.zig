@@ -123,7 +123,8 @@ pub const AcGraph = struct {
         const deps = &self.deps;
         const src = &self.src;
 
-        // linkAuth cascades: shared -> database -> common
+        // linkWorldserver cascades: modules/scripts -> game -> shared -> database -> common
+        try src.linkWorldserver(bl, module);
         try src.linkAuth(bl, module);
         try src.linkTools(bl, module);
         deps.linkArgparse(module);

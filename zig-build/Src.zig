@@ -47,6 +47,26 @@ pub const Src = struct {
         library: *Build.Step.Compile = undefined,
     } = .{},
 
+    game: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+    } = .{},
+
+    scripts: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+    } = .{},
+
+    modules: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+    } = .{},
+
+    worldserver: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+    } = .{},
+
     back_reference: *AcGraph = undefined,
 
     const Self = @This();
@@ -57,6 +77,10 @@ pub const Src = struct {
         try self.buildShared(b);
         try self.buildAuth(b);
         try self.buildTools(b);
+        try self.buildGame(b);
+        try self.buildScripts(b);
+        try self.buildModules(b);
+        try self.buildWorldserver(b);
     }
 
     //
@@ -93,6 +117,31 @@ pub const Src = struct {
         mod.linkLibrary(self.tools.library);
         try cpp.addFlatIncludes(b, "src-port/tools", mod);
         try self.linkCommon(b, mod);
+    }
+
+    pub fn linkGame(self: *Self, b: *Build, mod: *Build.Module) !void {
+        mod.linkLibrary(self.game.library);
+        try cpp.addFlatIncludes(b, "src-port/game", mod);
+        try self.linkShared(b, mod);
+    }
+
+    pub fn linkScripts(self: *Self, b: *Build, mod: *Build.Module) !void {
+        mod.linkLibrary(self.scripts.library);
+        try cpp.addFlatIncludes(b, "src-port/scripts", mod);
+        try self.linkGame(b, mod);
+    }
+
+    pub fn linkModules(self: *Self, b: *Build, mod: *Build.Module) !void {
+        mod.linkLibrary(self.modules.library);
+        try cpp.addFlatIncludes(b, "src-port/modules", mod);
+        try self.linkGame(b, mod);
+    }
+
+    pub fn linkWorldserver(self: *Self, b: *Build, mod: *Build.Module) !void {
+        mod.linkLibrary(self.worldserver.library);
+        try cpp.addFlatIncludes(b, "src-port/worldserver", mod);
+        try self.linkModules(b, mod);
+        try self.linkScripts(b, mod);
     }
 
     //
@@ -354,6 +403,195 @@ pub const Src = struct {
         self.tools.module = module;
         self.tools.library = b.addLibrary(.{
             .name = "tools",
+            .root_module = module,
+            .linkage = .static,
+        });
+    }
+
+    fn buildGame(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        });
+
+        try cpp.addFlatIncludes(b, "src-port/game", module);
+
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/game", .{
+            .extensions = cpp.Exts.JUST_CPP,
+            .recursive = true,
+        });
+
+        module.addCSourceFiles(.{
+            .files = sources.get(),
+            .language = .cpp,
+            .flags = &core_cflags,
+        });
+
+        try self.linkShared(b, module);
+
+        const deps = &self.back_reference.deps;
+        deps.linkFmt(module);
+        deps.linkBoost(module);
+        deps.linkUtf8(module);
+        deps.linkOpenSSL(module);
+        // game headers include <G3D/...> and <DetourNavMesh.h> (via common)
+        deps.linkG3DLite(module);
+        deps.linkDetour(module);
+
+        const library = b.addLibrary(.{
+            .name = "game",
+            .root_module = module,
+            .linkage = .static,
+        });
+
+        library.installHeadersDirectory(b.path("src-port/game"), "", .{});
+
+        // update graph at the end
+        self.game.module = module;
+        self.game.library = library;
+
+        const isolated = b.step("game", "Build the ported game library in isolation");
+        isolated.dependOn(&library.step);
+    }
+
+    fn buildScripts(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        });
+
+        try cpp.addFlatIncludes(b, "src-port/scripts", module);
+
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/scripts", .{
+            .extensions = cpp.Exts.JUST_CPP,
+            .recursive = true,
+        });
+
+        module.addCSourceFiles(.{
+            .files = sources.get(),
+            .language = .cpp,
+            .flags = &core_cflags,
+        });
+
+        try self.linkGame(b, module);
+        // game headers pull in boost/fmt/g3dlite/detour (no transitive propagation)
+        const deps = &self.back_reference.deps;
+        deps.linkFmt(module);
+        deps.linkBoost(module);
+        deps.linkG3DLite(module);
+        deps.linkDetour(module);
+
+        const library = b.addLibrary(.{
+            .name = "scripts",
+            .root_module = module,
+            .linkage = .static,
+        });
+
+        library.installHeadersDirectory(b.path("src-port/scripts"), "", .{});
+
+        // update graph at the end
+        self.scripts.module = module;
+        self.scripts.library = library;
+    }
+
+    fn buildModules(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        });
+
+        try cpp.addFlatIncludes(b, "src-port/modules", module);
+
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/modules", .{
+            .extensions = cpp.Exts.JUST_CPP,
+            .recursive = true,
+        });
+
+        module.addCSourceFiles(.{
+            .files = sources.get(),
+            .language = .cpp,
+            .flags = &core_cflags,
+        });
+
+        try self.linkGame(b, module);
+        const deps = &self.back_reference.deps;
+        deps.linkFmt(module);
+        deps.linkBoost(module);
+        deps.linkG3DLite(module);
+        deps.linkDetour(module);
+
+        const library = b.addLibrary(.{
+            .name = "modules",
+            .root_module = module,
+            .linkage = .static,
+        });
+
+        library.installHeadersDirectory(b.path("src-port/modules"), "", .{});
+
+        // update graph at the end
+        self.modules.module = module;
+        self.modules.library = library;
+    }
+
+    fn buildWorldserver(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        });
+
+        try cpp.addFlatIncludes(b, "src-port/worldserver", module);
+
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/worldserver", .{
+            .extensions = cpp.Exts.JUST_CPP,
+            .recursive = true,
+        });
+
+        module.addCSourceFiles(.{
+            .files = sources.get(),
+            .language = .cpp,
+            .flags = &core_cflags,
+        });
+
+        try self.linkModules(b, module);
+        try self.linkScripts(b, module);
+
+        const deps = &self.back_reference.deps;
+        deps.linkGsoap(module);
+        deps.linkReadline(module);
+        deps.linkFmt(module);
+        deps.linkBoost(module);
+        deps.linkUtf8(module);
+        deps.linkOpenSSL(module);
+        deps.linkHiredis(module);
+        deps.linkArgparse(module);
+        deps.linkMysqlClient(module);
+        deps.linkG3DLite(module);
+        deps.linkDetour(module);
+
+        // update graph at the end
+        self.worldserver.module = module;
+        self.worldserver.library = b.addLibrary(.{
+            .name = "worldserver",
             .root_module = module,
             .linkage = .static,
         });

@@ -57,8 +57,8 @@
 using boost::asio::ip::tcp;
 namespace fs = std::filesystem;
 
-bool StartDB();
-void StopDB();
+static bool StartDB();
+static void StopDB();
 void SignalHandler(std::weak_ptr<Acore::Asio::IoContext> ioContextRef, boost::system::error_code const& error,
                    int signalNumber);
 void KeepDatabaseAliveHandler(std::weak_ptr<Acore::Asio::DeadlineTimer> dbPingTimerRef, int32 dbPingInterval,
@@ -72,7 +72,7 @@ struct ConsoleArguments
     bool version = false;
 };
 
-ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& configFile);
+static ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& configFile);
 
 /// Launch the auth server
 int authserver_main(int argc, char** argv)
@@ -221,7 +221,7 @@ int authserver_main(int argc, char** argv)
 }
 
 /// Initialize connection to the database
-bool StartDB()
+static bool StartDB()
 {
   MySQL::Library_Init();
 
@@ -240,7 +240,7 @@ bool StartDB()
 }
 
 /// Close the connection to the database
-void StopDB()
+static void StopDB()
 {
   LoginDatabase.Close();
   MySQL::Library_End();
@@ -292,7 +292,7 @@ void BanExpiryHandler(std::weak_ptr<Acore::Asio::DeadlineTimer> banExpiryCheckTi
   }
 }
 
-ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& configFile)
+static ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& configFile)
 {
   argparse::ArgumentParser parser("ac authserver", "1.0", argparse::default_arguments::none);
   parser.add_argument("-h", "--help").help("print usage message").flag();

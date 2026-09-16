@@ -50,6 +50,11 @@ pub const Deps = struct {
         module: *Build.Module = undefined,
     } = .{},
 
+    gsoap: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+    } = .{},
+
     back_reference: *AcGraph = undefined,
 
     const Self = @This();
@@ -64,6 +69,7 @@ pub const Deps = struct {
         try self.buildRecast(b);
         try self.buildG3DLite(b);
         try self.buildArgparse(b);
+        try self.buildGsoap(b);
     }
 
     //
@@ -164,6 +170,15 @@ pub const Deps = struct {
     pub fn linkBzip2(self: *Self, mod: *Build.Module) void {
         _ = self;
         mod.linkSystemLibrary("bzip2", .{});
+    }
+
+    pub fn linkGsoap(self: *Self, mod: *Build.Module) void {
+        mod.linkLibrary(self.gsoap.library);
+    }
+
+    pub fn linkReadline(self: *Self, mod: *Build.Module) void {
+        _ = self;
+        mod.linkSystemLibrary("readline", .{});
     }
 
     //
@@ -552,5 +567,45 @@ pub const Deps = struct {
 
         // update graph at the end
         self.argparse.module = module;
+    }
+
+    fn buildGsoap(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const alloc = self.back_reference.gpa;
+        const io = self.back_reference.io;
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        });
+
+        module.addIncludePath(b.path("deps/gsoap"));
+
+        var sources = cpp.querySources(alloc, io, "deps/gsoap", .{
+            .extensions = cpp.Exts.JUST_CPP,
+            .recursive = false,
+        });
+
+        module.addCSourceFiles(.{
+            .files = sources.get(),
+            .language = .cpp,
+        });
+
+        const library = b.addLibrary(.{
+            .name = "gsoap",
+            .root_module = module,
+            .linkage = .static,
+        });
+
+        // expose <soapH.h> & co to every consumer linking this library
+        library.installHeadersDirectory(b.path("deps/gsoap"), "", .{});
+
+        // update graph at the end
+        self.gsoap.module = module;
+        self.gsoap.library = library;
     }
 };

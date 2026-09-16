@@ -24,7 +24,7 @@ int main(int argc, char** argv)
     argparse::ArgumentParser program("ac", "1.0");
     program.add_description("AzerothCore unified executable (zig-build port)");
     program.add_argument("command").metavar("COMMAND").help(
-        "sub program to run: authserver | map_extractor | mmaps_generator | vmap4_extractor | vmap4_assembler");
+        "sub program to run: authserver | worldserver | map_extractor | mmaps_generator | vmap4_extractor | vmap4_assembler");
 
     if (argc < 2)
     {
@@ -51,6 +51,7 @@ int main(int argc, char** argv)
     using EntryPoint = int (*)(int, char**);
     std::map<std::string, EntryPoint> const entry_points = {
         {"authserver", &authserver_main},
+        {"worldserver", &worldserver_main},
         {"map_extractor", &map_extractor_main},
         {"mmaps_generator", &mmaps_generator_main},
         {"vmap4_extractor", &vmap4_extractor_main},
