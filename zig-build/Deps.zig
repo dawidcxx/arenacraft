@@ -187,6 +187,7 @@ pub const Deps = struct {
         mod.linkSystemLibrary("zlib", .{});
         mod.linkSystemLibrary("bzip2", .{});
         mod.linkSystemLibrary("readline", .{});
+        mod.linkSystemLibrary("jemalloc", .{});
         const env = &mod.owner.graph.environ_map;
         if (env.get("MYSQL_INCLUDE_DIR")) |inc_dir| {
             mod.addIncludePath(.{ .cwd_relative = inc_dir });

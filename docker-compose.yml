@@ -48,17 +48,22 @@ services:
 
   # --- full profile: runs the core against db/valkey with ./data mounted ---
   # one-shot: applies data/sql into the databases (idempotent, always attempted)
+  # db_sync is pure bun/typescript: no cpp involved, so it runs in the bun
+  # image directly instead of the core image
   db-migrate:
     profiles: [full]
-    build: { context: ., dockerfile: Dockerfile }
-    image: arenacraft-core:latest
-    command: [bun, scripts/src/db_sync.ts]
+    image: docker.io/oven/bun:1
+    working_dir: /app
+    command: >-
+      sh -c 'bun install --production --frozen-lockfile --cwd scripts
+      && bun scripts/src/db_sync.ts'
     environment:
       AC_ROOT_DATABASE_INFO: "db;3306;root;acore"
       AC_LOGIN_DATABASE_INFO: "db;3306;acore;acore;acore_auth"
       AC_CHARACTER_DATABASE_INFO: "db;3306;acore;acore;acore_characters"
       AC_WORLD_DATABASE_INFO: "db;3306;acore;acore;acore_world"
     volumes:
+      - ./scripts:/app/scripts
       - ./data:/app/data
     depends_on:
       db:
@@ -67,6 +72,7 @@ services:
 
   auth:
     profiles: [full]
+    build: { context: ., dockerfile: Dockerfile }
     image: arenacraft-core:latest
     command: [ac, authserver]
     environment:
