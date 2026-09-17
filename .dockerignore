@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env*
+.flake.lock.orig
+**/node_modules
+zig-cache
+zig-out
+/data
+/backups
+*.log
+OLD_SCRIPTS.md
+Dockerfile
+docker-compose.yml

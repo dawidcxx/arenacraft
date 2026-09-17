@@ -4,6 +4,7 @@ const Build = std.Build;
 const cpp = @import("./cppkit-zig/build.zig");
 const AcGraph = @import("./BuildCommons.zig").AcGraph;
 const BuildRequest = @import("./BuildCommons.zig").BuildRequest;
+const BuildCommons = @import("./BuildCommons.zig");
 
 pub const Deps = struct {
     utf8: struct {
@@ -229,7 +230,7 @@ pub const Deps = struct {
         module.addCSourceFiles(.{
             .files = sources.get(),
             .language = .cpp,
-            .flags = &.{"-std=c++11"},
+            .flags = &.{ "-std=c++11", BuildCommons.no_ubsan },
         });
 
         const library = b.addLibrary(.{
@@ -317,7 +318,7 @@ pub const Deps = struct {
         module.addCSourceFiles(.{
             .files = sources.get(),
             .language = .cpp,
-            .flags = &.{"-std=c++14"},
+            .flags = &.{ "-std=c++14", BuildCommons.no_ubsan },
         });
 
         const library = b.addLibrary(.{
@@ -363,7 +364,7 @@ pub const Deps = struct {
         module.addCSourceFiles(.{
             .files = sources.get(),
             .language = .cpp,
-            .flags = &.{"-std=c++20"},
+            .flags = &.{ "-std=c++20", BuildCommons.no_ubsan },
         });
 
         const library = b.addLibrary(.{
@@ -428,7 +429,7 @@ pub const Deps = struct {
 
         module.addCSourceFiles(.{
             .files = sources.get(),
-            .flags = &.{"-std=gnu99"},
+            .flags = &.{ "-std=gnu99", BuildCommons.no_ubsan },
         });
 
         self.includeZlib(module);
@@ -472,7 +473,7 @@ pub const Deps = struct {
         module.addCSourceFiles(.{
             .files = sources.get(),
             .language = .cpp,
-            .flags = &.{"-std=c++14"},
+            .flags = &.{ "-std=c++14", BuildCommons.no_ubsan },
         });
 
         const library = b.addLibrary(.{
@@ -552,7 +553,7 @@ pub const Deps = struct {
                 "source/Vector4.cpp",
             },
             .language = .cpp,
-            .flags = &.{"-std=c++20"},
+            .flags = &.{ "-std=c++20", BuildCommons.no_ubsan },
         });
 
         self.includeZlib(module);

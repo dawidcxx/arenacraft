@@ -21,4 +21,4 @@ Dependencies: `nix` `podman` (or docker) `wow-3.3.5a-client-files`
 - use the ReleaseFast build, the extractors abort in debug (ubsan)
 7. run the core
 - `./zig-out/bin/ac authserver` / `./zig-out/bin/ac worldserver` (loads `./.env` automatically)
-- set `AC_DATADIR=../../data` in `.env` (resolved relative to the binary; only `data/` next to it by default)
+- set `AC_DATA_DIR=../../data` in `.env` (resolved relative to the binary; only `data/` next to it by default)

@@ -10,6 +10,7 @@ const Build = std.Build;
 const cpp = @import("./cppkit-zig/build.zig");
 const AcGraph = @import("./BuildCommons.zig").AcGraph;
 const BuildRequest = @import("./BuildCommons.zig").BuildRequest;
+const BuildCommons = @import("./BuildCommons.zig");
 
 pub const Src = struct {
     pub const core_cflags = [_][]const u8{
@@ -20,6 +21,7 @@ pub const Src = struct {
         //   AC DeadlineTimer/Socket wrappers inherit/use
         "-Wno-deprecated-literal-operator",
         "-Wno-deprecated-declarations",
+        BuildCommons.no_ubsan,
     };
 
     common: struct {

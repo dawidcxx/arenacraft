@@ -5,6 +5,10 @@ const Deps = @import("./Deps.zig").Deps;
 const Src = @import("./Src.zig").Src;
 const cpp = @import("./cppkit-zig/build.zig");
 
+// zig 0.16 ships a ubsan runtime that aborts in Debug; the legacy codebase
+// (loadlib/mpq readers etc.) contains deliberate unaligned access patterns
+pub const no_ubsan = "-fno-sanitize=undefined";
+
 pub const BuildRequest = struct { *Build, Build.ResolvedTarget, std.builtin.OptimizeMode };
 
 /// The build graph of the ported core: third-party `deps`, the ported
@@ -66,7 +70,7 @@ pub const AcGraph = struct {
         module.addCSourceFile(.{
             .file = bl.path("zig-build/Test.cpp"),
             .language = .cpp,
-            .flags = &.{"-std=c++20"},
+            .flags = &.{ "-std=c++20", no_ubsan },
         });
 
         const deps = &self.deps;

@@ -46,6 +46,69 @@ services:
     ports:
       - 6664:8080
 
+  # --- full profile: runs the core against db/valkey with ./data mounted ---
+  # one-shot: applies data/sql into the databases (idempotent, always attempted)
+  db-migrate:
+    profiles: [full]
+    build: { context: ., dockerfile: Dockerfile }
+    image: arenacraft-core:latest
+    command: [bun, scripts/src/db_sync.ts]
+    environment:
+      AC_ROOT_DATABASE_INFO: "db;3306;root;acore"
+      AC_LOGIN_DATABASE_INFO: "db;3306;acore;acore;acore_auth"
+      AC_CHARACTER_DATABASE_INFO: "db;3306;acore;acore;acore_characters"
+      AC_WORLD_DATABASE_INFO: "db;3306;acore;acore;acore_world"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  auth:
+    profiles: [full]
+    image: arenacraft-core:latest
+    command: [ac, authserver]
+    environment:
+      AC_LOGIN_DATABASE_INFO: "db;3306;acore;acore;acore_auth"
+      AC_REDIS_HOST: valkey
+    ports:
+      - 3724:3724
+    stdin_open: true
+    tty: true
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+
+  world:
+    profiles: [full]
+    image: arenacraft-core:latest
+    command: [ac, worldserver]
+    environment:
+      AC_LOGIN_DATABASE_INFO: "db;3306;acore;acore;acore_auth"
+      AC_CHARACTER_DATABASE_INFO: "db;3306;acore;acore;acore_characters"
+      AC_WORLD_DATABASE_INFO: "db;3306;acore;acore;acore_world"
+      AC_REDIS_HOST: valkey
+      AC_REALMID: 1
+      AC_DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data
+    ports:
+      - 8085:8085
+    stdin_open: true
+    tty: true
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
+
 volumes:
   mysql-data:
   redis-insight:
