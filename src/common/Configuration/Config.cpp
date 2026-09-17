@@ -16,14 +16,14 @@
  */
 
 #include "Config.h"
+#include "DefaultConfig.h"
 #include "Log.h"
 #include "StringConvert.h"
 #include "StringFormat.h"
-#include "Tokenize.h"
 #include "Util.h"
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <mutex>
 #include <unordered_map>
 
@@ -37,195 +37,9 @@
 
 namespace
 {
-std::string                                                     _filename;
-std::vector<std::string>                                        _additonalFiles;
-std::vector<std::string>                                        _args;
 std::unordered_map<std::string /*name*/, std::string /*value*/> _configOptions;
 std::unordered_map<std::string /*name*/, std::string /*value*/> _envVarCache;
 std::mutex                                                      _configLock;
-
-std::vector<std::string> _fatalConfigOptions = {
-    {"RealmID"},
-    {"LoginDatabaseInfo"},
-    {"WorldDatabaseInfo"},
-    {"CharacterDatabaseInfo"},
-};
-
-// Check system configs like *server.conf*
-bool IsAppConfig(std::string_view fileName)
-{
-  std::size_t foundAuth   = fileName.find("authserver.conf");
-  std::size_t foundWorld  = fileName.find("worldserver.conf");
-  std::size_t foundImport = fileName.find("dbimport.conf");
-
-  return foundAuth != std::string_view::npos || foundWorld != std::string_view::npos ||
-         foundImport != std::string_view::npos;
-}
-
-// Check logging system configs like Appender.* and Logger.*
-bool IsLoggingSystemOptions(std::string_view optionName)
-{
-  std::size_t foundAppender = optionName.find("Appender.");
-  std::size_t foundLogger   = optionName.find("Logger.");
-
-  return foundAppender != std::string_view::npos || foundLogger != std::string_view::npos;
-}
-
-template <typename Format, typename... Args>
-inline void PrintError(std::string_view filename, Format&& fmt, Args&&... args)
-{
-  std::string message = Acore::StringFormat(std::forward<Format>(fmt), std::forward<Args>(args)...);
-
-  if (IsAppConfig(filename))
-  {
-    fmt::print("{}\n", message);
-  }
-  else
-  {
-    LOG_ERROR("server.loading", message);
-  }
-}
-
-void AddKey(std::string const& optionName, std::string const& optionKey, std::string_view fileName, bool isOptional,
-            [[maybe_unused]] bool isReload)
-{
-  auto const& itr = _configOptions.find(optionName);
-
-  // Check old option
-  if (isOptional && itr == _configOptions.end())
-  {
-    if (!IsLoggingSystemOptions(optionName) && !isReload)
-    {
-      PrintError(fileName, "> Config::LoadFile: Found incorrect option '{}' in config file '{}'. Skip", optionName,
-                 fileName);
-
-#ifdef CONFIG_ABORT_INCORRECT_OPTIONS
-      ABORT("> Core can't start if found incorrect options");
-#endif
-
-      return;
-    }
-  }
-
-  // Check exit option
-  if (itr != _configOptions.end())
-  {
-    _configOptions.erase(optionName);
-  }
-
-  _configOptions.emplace(optionName, optionKey);
-}
-
-bool ParseFile(std::string const& file, bool isOptional, bool isReload)
-{
-  std::ifstream in(file);
-
-  if (in.fail())
-  {
-    if (isOptional)
-    {
-      // No display erorr if file optional
-      return false;
-    }
-
-    throw ConfigException(
-        Acore::StringFormat("Config::LoadFile: Failed open {}file '{}'", isOptional ? "optional " : "", file));
-  }
-
-  uint32                                                          count      = 0;
-  uint32                                                          lineNumber = 0;
-  std::unordered_map<std::string /*name*/, std::string /*value*/> fileConfigs;
-
-  auto IsDuplicateOption = [&](std::string const& confOption)
-  {
-    auto const& itr = fileConfigs.find(confOption);
-    if (itr != fileConfigs.end())
-    {
-      PrintError(file, "> Config::LoadFile: Duplicate key name '{}' in config file '{}'", confOption, file);
-      return true;
-    }
-
-    return false;
-  };
-
-  while (in.good())
-  {
-    lineNumber++;
-    std::string line;
-    std::getline(in, line);
-
-    // read line error
-    if (!in.good() && !in.eof())
-      throw ConfigException(
-          Acore::StringFormat("> Config::LoadFile: Failure to read line number {} in file '{}'", lineNumber, file));
-
-    // remove whitespace in line
-    line = Acore::String::Trim(line, in.getloc());
-
-    if (line.empty())
-      continue;
-
-    // comments and headers
-    if (line[0] == '#' || line[0] == '[')
-      continue;
-
-    auto const equal_pos = line.find('=');
-
-    if (equal_pos == std::string::npos || equal_pos == line.length())
-    {
-      PrintError(file, "> Config::LoadFile: Failure to read line number {} in file '{}'. Skip this line", lineNumber,
-                 file);
-      continue;
-    }
-
-    auto entry = Acore::String::Trim(line.substr(0, equal_pos), in.getloc());
-    auto value = Acore::String::Trim(line.substr(equal_pos + 1, std::string::npos), in.getloc());
-
-    value.erase(std::remove(value.begin(), value.end(), '"'), value.end());
-
-    // Skip if 2+ same options in one config file
-    if (IsDuplicateOption(entry))
-      continue;
-
-    // Add to temp container
-    fileConfigs.emplace(entry, value);
-    count++;
-  }
-
-  // No lines read
-  if (!count)
-  {
-    if (isOptional)
-    {
-      // No display erorr if file optional
-      return false;
-    }
-
-    throw ConfigException(Acore::StringFormat("Config::LoadFile: Empty file '{}'", file));
-  }
-
-  // Add correct keys if file load without errors
-  for (auto const& [entry, key] : fileConfigs)
-  {
-    AddKey(entry, key, file, isOptional, isReload);
-  }
-
-  return true;
-}
-
-bool LoadFile(std::string const& file, bool isOptional, bool isReload)
-{
-  try
-  {
-    return ParseFile(file, isOptional, isReload);
-  }
-  catch (const std::exception& e)
-  {
-    PrintError(file, "> {}", e.what());
-  }
-
-  return false;
-}
 
 // Converts ini keys to the environment variable key (upper snake case).
 // Example of conversions:
@@ -303,43 +117,6 @@ Optional<std::string> EnvVarForIniKey(std::string const& key)
 
   return std::string(val);
 }
-} // namespace
-
-bool ConfigMgr::LoadInitial(std::string const& file, bool isReload /*= false*/)
-{
-  std::lock_guard<std::mutex> lock(_configLock);
-  _configOptions.clear();
-  return LoadFile(file, false, isReload);
-}
-
-bool ConfigMgr::LoadAdditionalFile(std::string file, bool isOptional /*= false*/, bool isReload /*= false*/)
-{
-  std::lock_guard<std::mutex> lock(_configLock);
-  return LoadFile(file, isOptional, isReload);
-}
-
-ConfigMgr* ConfigMgr::instance()
-{
-  static ConfigMgr instance;
-  return &instance;
-}
-
-bool ConfigMgr::Reload()
-{
-  if (!LoadAppConfigs(true))
-  {
-    return false;
-  }
-
-  if (!LoadModulesConfigs(true, false))
-  {
-    return false;
-  }
-
-  OverrideWithEnvVariablesIfAny();
-
-  return true;
-}
 
 // Check the _envVarCache if the env var is there
 // if not, check the env for the value
@@ -364,77 +141,124 @@ Optional<std::string> GetEnvFromCache(std::string const& configName, std::string
   return foundInCache->second;
 }
 
-std::vector<std::string> ConfigMgr::OverrideWithEnvVariablesIfAny()
+std::string_view Trim(std::string_view s)
+{
+  while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\r' || s.front() == '\n'))
+    s.remove_prefix(1);
+  while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r' || s.back() == '\n'))
+    s.remove_suffix(1);
+  return s;
+}
+
+bool SetEnvVarIfAbsent(std::string const& key, std::string const& value)
+{
+  if (std::getenv(key.c_str()))
+    return false;
+
+#if AC_PLATFORM == AC_PLATFORM_WINDOWS
+  return _putenv_s(key.c_str(), value.c_str()) == 0;
+#else
+  return setenv(key.c_str(), value.c_str(), 0) == 0;
+#endif
+}
+} // namespace
+
+ConfigMgr* ConfigMgr::instance()
+{
+  static ConfigMgr instance;
+  return &instance;
+}
+
+bool ConfigMgr::LoadAppConfigs(bool isReload /*= false*/)
 {
   std::lock_guard<std::mutex> lock(_configLock);
 
-  std::vector<std::string> overriddenKeys;
+  _configOptions.clear();
+  for (auto const& [name, value] : DefaultConfig::Options())
+    _configOptions.emplace(name, value);
 
-  for (auto& itr : _configOptions)
+  fmt::print("Config: using built-in defaults ({} options), overridable via AC_* environment variables{}\n",
+             _configOptions.size(), isReload ? " (reload)" : "");
+
+  return true;
+}
+
+bool ConfigMgr::Reload()
+{
+  return LoadAppConfigs(true);
+}
+
+std::optional<std::size_t> ConfigMgr::ApplyEnvFile(std::string const& path)
+{
+  std::FILE* file = std::fopen(path.c_str(), "r");
+  if (!file)
+    return std::nullopt;
+
+  std::size_t loaded = 0;
+  char        line[4096];
+  while (std::fgets(line, sizeof(line), file))
   {
-    if (itr.first.empty())
+    std::string_view entry = Trim(line);
+    if (entry.empty() || entry.front() == '#')
       continue;
 
-    Optional<std::string> envVar = EnvVarForIniKey(itr.first);
-    if (!envVar)
+    if (entry.starts_with("export "))
+      entry.remove_prefix(7);
+
+    auto const sep = entry.find('=');
+    if (sep == std::string_view::npos)
       continue;
 
-    itr.second = *envVar;
+    std::string const key(Trim(entry.substr(0, sep)));
+    std::string_view  value = Trim(entry.substr(sep + 1));
 
-    overriddenKeys.push_back(itr.first);
+    // strip a single pair of surrounding quotes
+    if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front())
+      value = value.substr(1, value.size() - 2);
+
+    if (key.empty() || !SetEnvVarIfAbsent(key, std::string(value)))
+      continue;
+
+    ++loaded;
   }
+  std::fclose(file);
 
-  return overriddenKeys;
+  fmt::print("Config: loaded {} environment variables from '{}'\n", loaded, path);
+  return loaded;
 }
 
 template <class T> T ConfigMgr::GetValueDefault(std::string const& name, T const& def, bool showLogs /*= true*/) const
 {
   std::string strValue;
 
-  auto const&           itr         = _configOptions.find(name);
-  bool                  fatalConfig = false;
-  bool                  notFound    = itr == _configOptions.end();
-  auto                  envVarName  = GetEnvVarName(name);
-  Optional<std::string> envVar      = GetEnvFromCache(name, envVarName);
+  auto const&           itr        = _configOptions.find(name);
+  bool                  notFound   = itr == _configOptions.end();
+  auto                  envVarName = GetEnvVarName(name);
+  Optional<std::string> envVar     = GetEnvFromCache(name, envVarName);
   if (envVar)
   {
-    // If showLogs and this key/value pair wasn't found in the currently saved config
-    if (showLogs && (notFound || itr->second != envVar->c_str()))
+    // apply the env value to the map so the override is logged exactly once
+    if (notFound)
     {
-      LOG_INFO("server.loading", "> Config: Found config value '{}' from environment variable '{}'.", name, envVarName);
-      AddKey(name, envVar->c_str(), "ENVIRONMENT", false, false);
+      if (showLogs)
+        LOG_INFO("server.loading", "> Config: Found config value '{}' from environment variable '{}'.", name,
+                 envVarName);
+      _configOptions.emplace(name, *envVar);
+    }
+    else if (itr->second != *envVar)
+    {
+      if (showLogs)
+        LOG_INFO("server.loading", "> Config: Found config value '{}' from environment variable '{}'.", name,
+                 envVarName);
+      itr->second = *envVar;
     }
 
     strValue = *envVar;
   }
   else if (notFound)
-  {
-    if (showLogs)
-    {
-      for (std::string s : _fatalConfigOptions)
-        if (s == name)
-        {
-          fatalConfig = true;
-          break;
-        }
-
-      if (fatalConfig)
-        LOG_FATAL("server.loading",
-                  "> Config:\n\nFATAL ERROR: Missing property {} in config file {}, add \"{} = {}\" to this file or "
-                  "define '{}' as an environment variable\n\nYour server cannot start without this option!",
-                  name, _filename, name, Acore::ToString(def), envVarName);
-      else
-        LOG_WARN("server.loading",
-                 "> Config: Missing property {} in config file {}, add \"{} = {}\" to this file or define '{}' as an "
-                 "environment variable.",
-                 name, _filename, name, Acore::ToString(def), envVarName);
-    }
     return def;
-  }
   else
-  {
     strValue = itr->second;
-  }
 
   auto value = Acore::StringTo<T>(strValue);
   if (!value)
@@ -455,47 +279,31 @@ template <>
 std::string ConfigMgr::GetValueDefault<std::string>(std::string const& name, std::string const& def,
                                                     bool showLogs /*= true*/) const
 {
-  auto const&           itr         = _configOptions.find(name);
-  bool                  fatalConfig = false;
-  bool                  notFound    = itr == _configOptions.end();
-  auto                  envVarName  = GetEnvVarName(name);
-  Optional<std::string> envVar      = GetEnvFromCache(name, envVarName);
+  auto const&           itr        = _configOptions.find(name);
+  bool                  notFound   = itr == _configOptions.end();
+  auto                  envVarName = GetEnvVarName(name);
+  Optional<std::string> envVar     = GetEnvFromCache(name, envVarName);
   if (envVar)
   {
-    // If showLogs and this key/value pair wasn't found in the currently saved config
-    if (showLogs && (notFound || itr->second != envVar->c_str()))
+    if (notFound)
     {
-      LOG_INFO("server.loading", "> Config: Found config value '{}' from environment variable '{}'.", name, envVarName);
-      AddKey(name, *envVar, "ENVIRONMENT", false, false);
+      if (showLogs)
+        LOG_INFO("server.loading", "> Config: Found config value '{}' from environment variable '{}'.", name,
+                 envVarName);
+      _configOptions.emplace(name, *envVar);
+    }
+    else if (itr->second != *envVar)
+    {
+      if (showLogs)
+        LOG_INFO("server.loading", "> Config: Found config value '{}' from environment variable '{}'.", name,
+                 envVarName);
+      itr->second = *envVar;
     }
 
     return *envVar;
   }
   else if (notFound)
-  {
-    if (showLogs)
-    {
-      for (std::string s : _fatalConfigOptions)
-        if (s == name)
-        {
-          fatalConfig = true;
-          break;
-        }
-
-      if (fatalConfig)
-        LOG_FATAL("server.loading",
-                  "> Config:\n\nFATAL ERROR: Missing property {} in config file {}, add \"{} = {}\" to this file or "
-                  "define '{}' as an environment variable.\n\nYour server cannot start without this option!",
-                  name, _filename, name, def, envVarName);
-      else
-        LOG_WARN("server.loading",
-                 "> Config: Missing property {} in config file {}, add \"{} = {}\" to this file or define '{}' as an "
-                 "environment variable.",
-                 name, _filename, name, def, envVarName);
-    }
-
     return def;
-  }
 
   return itr->second;
 }
@@ -541,17 +349,7 @@ std::vector<std::string> ConfigMgr::GetKeysByString(std::string const& name)
   return keys;
 }
 
-std::string const ConfigMgr::GetFilename()
-{
-  std::lock_guard<std::mutex> lock(_configLock);
-  return _filename;
-}
-
-std::vector<std::string> const& ConfigMgr::GetArguments() const { return _args; }
-
-// Directory containing the running executable - config files are resolved
-// relative to it (zig-build port change: /foo/bar/ac -> /foo/bar/authserver.conf)
-static std::string GetExecutableDir()
+std::string ConfigMgr::GetExecutableDir()
 {
   char buffer[4096];
 #if AC_PLATFORM == AC_PLATFORM_WINDOWS
@@ -574,16 +372,8 @@ static std::string GetExecutableDir()
   return exePath.parent_path().generic_string() + "/";
 }
 
-std::string const ConfigMgr::GetConfigPath()
-{
-  std::lock_guard<std::mutex> lock(_configLock);
-
-  return GetExecutableDir();
-}
-
-// Data directory resolved relative to the executable (zig-build port change:
-// "data" in the config means <exe dir>/data, mirroring how config files are
-// resolved). Absolute paths are used as-is.
+// Data directory resolved relative to the executable ("data" means
+// <exe dir>/data). Absolute paths are used as-is.
 std::string const ConfigMgr::GetDataPath()
 {
   std::string dataPath = GetOption<std::string>("DataDir", "data");
@@ -596,110 +386,7 @@ std::string const ConfigMgr::GetDataPath()
   return dataPath;
 }
 
-void ConfigMgr::Configure(std::string const& initFileName, std::vector<std::string> args,
-                          std::string_view modulesConfigList /*= {}*/)
-{
-  _filename = initFileName;
-  _args     = std::move(args);
-
-  // Add modules config if exist
-  if (!modulesConfigList.empty())
-  {
-    for (auto const& itr : Acore::Tokenize(modulesConfigList, ',', false))
-    {
-      _additonalFiles.emplace_back(itr);
-    }
-  }
-}
-
-bool ConfigMgr::LoadAppConfigs(bool isReload /*= false*/)
-{
-  // #1 - Load init config file .conf
-  if (!LoadInitial(_filename, isReload))
-  {
-    return false;
-  }
-
-  return true;
-}
-
-bool ConfigMgr::LoadModulesConfigs(bool isReload /*= false*/, bool isNeedPrintInfo /*= true*/)
-{
-  if (_additonalFiles.empty())
-  {
-    // Send successful load if no found files
-    return true;
-  }
-
-  if (isNeedPrintInfo)
-  {
-    LOG_INFO("server.loading", " ");
-    LOG_INFO("server.loading", "Loading Modules Configuration...");
-  }
-
-  // Start loading module configs
-  std::string const& moduleConfigPath     = GetConfigPath() + "modules/";
-  bool               isExistDefaultConfig = true;
-  bool               isExistDistConfig    = true;
-
-  for (auto const& distFileName : _additonalFiles)
-  {
-    std::string defaultFileName = distFileName;
-
-    if (!defaultFileName.empty())
-    {
-      defaultFileName.erase(defaultFileName.end() - 5, defaultFileName.end());
-    }
-
-    // Load .conf.dist config
-    isExistDistConfig = LoadAdditionalFile(moduleConfigPath + distFileName, false, isReload);
-
-    if (!isReload && !isExistDistConfig)
-    {
-      LOG_FATAL("server.loading", "> ConfigMgr::LoadModulesConfigs: Not found original config '{}'. Stop loading",
-                distFileName);
-      ABORT();
-    }
-
-    // Load .conf config
-    isExistDefaultConfig = LoadAdditionalFile(moduleConfigPath + defaultFileName, true, isReload);
-
-    if (isExistDefaultConfig && isExistDistConfig)
-    {
-      _moduleConfigFiles.emplace_back(defaultFileName);
-    }
-    else if (!isExistDefaultConfig && isExistDistConfig)
-    {
-      _moduleConfigFiles.emplace_back(distFileName);
-    }
-  }
-
-  if (isNeedPrintInfo)
-  {
-    if (!_moduleConfigFiles.empty())
-    {
-      // Print modules configurations
-      LOG_INFO("server.loading", " ");
-      LOG_INFO("server.loading", "Using modules configuration:");
-
-      for (auto const& itr : _moduleConfigFiles)
-      {
-        LOG_INFO("server.loading", "> {}", itr);
-      }
-    }
-    else
-    {
-      LOG_INFO("server.loading", "> Not found modules config files");
-    }
-  }
-
-  if (isNeedPrintInfo)
-  {
-    LOG_INFO("server.loading", " ");
-  }
-
-  return true;
-}
+void ConfigMgr::Configure() {}
 
 #define TEMPLATE_CONFIG_OPTION(__typename)                                                                             \
   template __typename ConfigMgr::GetOption<__typename>(std::string const& name, __typename const& def,                 \

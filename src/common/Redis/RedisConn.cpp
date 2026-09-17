@@ -1,4 +1,5 @@
 #include "RedisConn.h"
+#include "Config.h"
 #include <hiredis/hiredis.h>
 #include <iostream>
 #include <stdexcept>
@@ -15,16 +16,17 @@ RedisConn::RedisConn() {}
 // Initialization method
 void RedisConn::init()
 {
-  // Example: Establish a connection to the Redis server
-  const char*   hostname = "127.0.0.1";
-  int           port     = 6379;
-  redisContext* context  = redisConnect(hostname, port);
+  // overridable via AC_REDIS_HOST / AC_REDIS_PORT
+  std::string const hostname = sConfigMgr->GetOption<std::string>("Redis.Host", "127.0.0.1");
+  int const         port     = sConfigMgr->GetOption<int32>("Redis.Port", 6379);
+  redisContext*     context  = redisConnect(hostname.c_str(), port);
 
   if (context == nullptr || context->err)
   {
-    throw std::runtime_error("Failed to connect to Redis: " + std::string(context->errstr));
+    throw std::runtime_error("Failed to connect to Redis at " + hostname + ":" + std::to_string(port) + ": " +
+                             std::string(context ? context->errstr : "context allocation failed"));
   }
-  std::cout << "Connected to Redis" << std::endl;
+  std::cout << "Connected to Redis at " << hostname << ":" << port << std::endl;
   this->m_redis_ctx = context;
 }
 

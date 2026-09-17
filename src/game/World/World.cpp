@@ -1454,7 +1454,7 @@ void World::LoadConfigSettings(bool reload)
   {
     if (dataPath != _dataPath)
       LOG_ERROR("server.loading",
-                "DataDir option can't be changed at worldserver.conf reload, using current value ({}).", _dataPath);
+                "DataDir option can't be changed at config reload, using current value ({}).", _dataPath);
   }
   else
   {

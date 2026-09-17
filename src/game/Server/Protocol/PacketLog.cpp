@@ -21,6 +21,7 @@
 #include "IpAddress.h"
 #include "Timer.h"
 #include "WorldPacket.h"
+#include <filesystem>
 
 #pragma pack(push, 1)
 
@@ -79,6 +80,11 @@ PacketLog* PacketLog::instance()
 void PacketLog::Initialize()
 {
   std::string logsDir = sConfigMgr->GetOption<std::string>("LogsDir", "");
+
+  // relative LogsDir resolves against the executable directory
+  std::error_code ec;
+  if (!logsDir.empty() && !std::filesystem::path(logsDir).is_absolute())
+    logsDir = std::filesystem::weakly_canonical(ConfigMgr::GetExecutableDir() + logsDir, ec).generic_string();
 
   if (!logsDir.empty() && (logsDir.at(logsDir.length() - 1) != '/') && (logsDir.at(logsDir.length() - 1) != '\\'))
   {

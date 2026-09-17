@@ -29,6 +29,7 @@
 #include "Timer.h"
 #include "Tokenize.h"
 #include <chrono>
+#include <filesystem>
 
 Log::Log() : AppenderId(0), highestLogLevel(LOG_LEVEL_FATAL)
 {
@@ -388,10 +389,17 @@ void Log::LoadFromConfig()
   m_logsDir       = sConfigMgr->GetOption<std::string>("LogsDir", "", false);
 
   if (!m_logsDir.empty())
+  {
+    // relative LogsDir resolves against the executable directory
+    std::error_code ec;
+    if (!std::filesystem::path(m_logsDir).is_absolute())
+      m_logsDir = std::filesystem::weakly_canonical(ConfigMgr::GetExecutableDir() + m_logsDir, ec).generic_string();
+
     if ((m_logsDir.at(m_logsDir.length() - 1) != '/') && (m_logsDir.at(m_logsDir.length() - 1) != '\\'))
     {
       m_logsDir.push_back('/');
     }
+  }
 
   ReadAppendersFromConfig();
   ReadLoggersFromConfig();

@@ -34,6 +34,7 @@
               pkg-config # zig uses this for .linkSystemLibrary()
               clang-tools
               lldb
+              python3 # llms love python..
 
               # Libraries
               minizip

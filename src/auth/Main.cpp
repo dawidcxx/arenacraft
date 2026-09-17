@@ -50,10 +50,6 @@
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
 
-#ifndef _ACORE_REALM_CONFIG
-#define _ACORE_REALM_CONFIG "authserver.conf"
-#endif
-
 using boost::asio::ip::tcp;
 namespace fs = std::filesystem;
 
@@ -70,9 +66,10 @@ struct ConsoleArguments
 {
     bool help = false;
     bool version = false;
+    std::string envFile;
 };
 
-static ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& configFile);
+static ConsoleArguments GetConsoleArguments(int argc, char** argv);
 
 /// Launch the auth server
 int authserver_main(int argc, char** argv)
@@ -81,8 +78,7 @@ int authserver_main(int argc, char** argv)
   signal(SIGABRT, &Acore::AbortHandler);
 
   // Command line parsing
-  auto configFile = fs::path(sConfigMgr->GetConfigPath() + std::string(_ACORE_REALM_CONFIG));
-  auto args       = GetConsoleArguments(argc, argv, configFile);
+  auto args       = GetConsoleArguments(argc, argv);
 
   // exit if help or version is enabled
   if (args.help)
@@ -93,8 +89,19 @@ int authserver_main(int argc, char** argv)
     return 0;
   }
 
-  // Add file and args in config
-  sConfigMgr->Configure(configFile.generic_string(), std::vector<std::string>(argv, argv + argc));
+  if (!args.envFile.empty())
+  {
+    if (!sConfigMgr->ApplyEnvFile(args.envFile))
+    {
+      fmt::print(stderr, "Failed to open env file '{}'\n", args.envFile);
+      return 1;
+    }
+  }
+  else
+    sConfigMgr->ApplyEnvFile(".env");
+
+  // Add args in config
+  sConfigMgr->Configure();
 
   if (!sConfigMgr->LoadAppConfigs())
     return 1;
@@ -107,7 +114,6 @@ int authserver_main(int argc, char** argv)
       "authserver", [](std::string_view text) { LOG_INFO("server.authserver", text); },
       []()
       {
-        LOG_INFO("server.authserver", "> Using configuration file       {}", sConfigMgr->GetFilename());
         LOG_INFO("server.authserver", "> Using SSL version:             {} (library: {})", OPENSSL_VERSION_TEXT,
                  OpenSSL_version(OPENSSL_VERSION));
         LOG_INFO("server.authserver", "> Using Boost version:           {}.{}.{}", BOOST_VERSION / 100000,
@@ -122,6 +128,10 @@ int authserver_main(int argc, char** argv)
   std::string pidFile = sConfigMgr->GetOption<std::string>("PidFile", "");
   if (!pidFile.empty())
   {
+    // relative PidFile resolves against the executable directory
+    if (!fs::path(pidFile).is_absolute())
+      pidFile = sConfigMgr->GetExecutableDir() + pidFile;
+
     if (uint32 pid = CreatePIDFile(pidFile))
       LOG_INFO("server.authserver", "Daemon PID: {}\n", pid); // outError for red color in console
     else
@@ -223,6 +233,21 @@ int authserver_main(int argc, char** argv)
 /// Initialize connection to the database
 static bool StartDB()
 {
+  // database connectivity comes from the environment only - no config files
+  for (char const* name : { "AC_LOGIN_DATABASE_INFO" })
+  {
+    char const* value = std::getenv(name);
+    if (!value || !*value)
+    {
+      fmt::print(stderr,
+                 "FATAL: environment variable '{}' is not set.\n"
+                 "Expected format: {}=\"hostname;port;username;password;database\"\n"
+                 "Set it in the environment or in a .env file (see .env.example).\n",
+                 name, name);
+      return false;
+    }
+  }
+
   MySQL::Library_Init();
 
   // Load databases
@@ -292,20 +317,19 @@ void BanExpiryHandler(std::weak_ptr<Acore::Asio::DeadlineTimer> banExpiryCheckTi
   }
 }
 
-static ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& configFile)
+static ConsoleArguments GetConsoleArguments(int argc, char** argv)
 {
   argparse::ArgumentParser parser("ac authserver", "1.0", argparse::default_arguments::none);
   parser.add_argument("-h", "--help").help("print usage message").flag();
   parser.add_argument("-v", "--version").help("print version build info").flag();
   parser.add_argument("-d", "--dry-run").help("Dry run").flag();
-  parser.add_argument("-c", "--config")
-      .help("use <arg> as configuration file")
-      .default_value(std::string(sConfigMgr->GetConfigPath() + std::string(_ACORE_REALM_CONFIG)))
+  parser.add_argument("-e", "--env-file")
+      .help("load environment variables from a KEY=VALUE file (default: ./.env if present)")
+      .default_value(std::string(""))
       .append();
 
   // mimic the old allow_unregistered behavior: unknown arguments are not
-  // ours to parse - sConfigMgr->Configure() re-scans the full argv for
-  // config overrides, so only pick out the known flags here
+  // ours to parse - only pick out the known flags here
   std::vector<std::string> known;
   known.push_back(argv[0]);
   for (int i = 1; i < argc; ++i)
@@ -313,17 +337,17 @@ static ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& con
     std::string_view const arg = argv[i];
     if (arg == "-h" || arg == "--help" || arg == "-v" || arg == "--version" || arg == "-d" || arg == "--dry-run")
       known.emplace_back(arg);
-    else if (arg == "-c" || arg == "--config")
+    else if (arg == "-e" || arg == "--env-file")
     {
-      known.emplace_back("--config");
+      known.emplace_back("--env-file");
       if (i + 1 < argc)
         known.emplace_back(argv[++i]);
     }
-    else if (arg.starts_with("--config="))
+    else if (arg.starts_with("--env-file="))
       known.emplace_back(arg);
-    else if (arg.starts_with("-c="))
+    else if (arg.starts_with("-e="))
     {
-      known.emplace_back("--config");
+      known.emplace_back("--env-file");
       known.emplace_back(arg.substr(3));
     }
   }
@@ -333,7 +357,7 @@ static ConsoleArguments GetConsoleArguments(int argc, char** argv, fs::path& con
   {
     parser.parse_args(known);
 
-    configFile = fs::path(parser.get<std::string>("--config"));
+    out.envFile = parser.get<std::string>("--env-file");
     out.help = parser.get<bool>("--help");
     out.version = parser.get<bool>("--version");
 
