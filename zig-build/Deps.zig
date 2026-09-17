@@ -224,7 +224,7 @@ pub const Deps = struct {
         });
 
         // expose the headers to every consumer linking this library
-        library.installHeadersDirectory(b.path("deps/utf8cpp"), "", .{});
+        library.installHeadersDirectory(b.path("deps/utf8cpp"), "", cpp.header_install_options);
 
         // update graph at the end
         self.utf8.module = module;
@@ -271,7 +271,7 @@ pub const Deps = struct {
         });
 
         // expose <argon2/argon2.h> to every consumer linking this library
-        library.installHeadersDirectory(b.path("deps/argon2"), "", .{});
+        library.installHeadersDirectory(b.path("deps/argon2"), "", cpp.header_install_options);
 
         // update graph at the end
         self.argon2.module = module;
@@ -312,7 +312,7 @@ pub const Deps = struct {
         });
 
         // expose <DetourNavMesh.h> & co to every consumer linking this library
-        library.installHeadersDirectory(b.path("deps/recastnavigation/Detour/Include"), "", .{});
+        library.installHeadersDirectory(b.path("deps/recastnavigation/Detour/Include"), "", cpp.header_install_options);
 
         // update graph at the end
         self.detour.module = module;
@@ -358,7 +358,7 @@ pub const Deps = struct {
         });
 
         // expose <fmt/format.h> & co to every consumer linking this library
-        library.installHeadersDirectory(b.path("deps/fmt/include"), "", .{});
+        library.installHeadersDirectory(b.path("deps/fmt/include"), "", cpp.header_install_options);
 
         // update graph at the end
         self.fmt.module = module;
@@ -379,6 +379,9 @@ pub const Deps = struct {
         // the artifact bundles the enabled compiled modules; its root module
         // carries the include paths of every header-only boost library
         const library = boost_dep.artifact("boost");
+
+        // drop include dirs of boost libs we don't compile against
+        try pruneBoostIncludes(library, boost_dep.builder, self.back_reference.io);
 
         // update graph at the end
         self.boost.library = library;
@@ -423,7 +426,7 @@ pub const Deps = struct {
         });
 
         // consumers include <libmpq/mpq.h>
-        library.installHeadersDirectory(b.path("deps/libmpq"), "", .{});
+        library.installHeadersDirectory(b.path("deps/libmpq"), "", cpp.header_install_options);
 
         // update graph at the end
         self.mpq.module = module;
@@ -464,7 +467,7 @@ pub const Deps = struct {
         });
 
         // expose <Recast.h> & co to every consumer linking this library
-        library.installHeadersDirectory(b.path("deps/recastnavigation/Recast/Include"), "", .{});
+        library.installHeadersDirectory(b.path("deps/recastnavigation/Recast/Include"), "", cpp.header_install_options);
 
         // update graph at the end
         self.recast.module = module;
@@ -546,7 +549,7 @@ pub const Deps = struct {
         });
 
         // expose <G3D/AABox.h> & co to every consumer linking this library
-        library.installHeadersDirectory(b.path("deps/g3dlite/include"), "", .{});
+        library.installHeadersDirectory(b.path("deps/g3dlite/include"), "", cpp.header_install_options);
 
         // update graph at the end
         self.g3dlite.module = module;
@@ -604,10 +607,72 @@ pub const Deps = struct {
         });
 
         // expose <soapH.h> & co to every consumer linking this library
-        library.installHeadersDirectory(b.path("deps/gsoap"), "", .{});
+        library.installHeadersDirectory(b.path("deps/gsoap"), "", cpp.header_install_options);
 
         // update graph at the end
         self.gsoap.module = module;
         self.gsoap.library = library;
     }
 };
+
+//
+// boost include dir pruning
+//
+
+/// Top-level `boost/` names the port compiles against. The package carries an
+/// include dir per boost lib (~125); everything not named here is dropped.
+/// Mirrors the headers `zig-build/Test.cpp` includes as its tripwire.
+const boost_used_libs = [_][]const u8{
+    "algorithm",     "asio",            "assert",         "atomic",
+    "bind",          "blank",           "cast",           "config",
+    "concept_check", "container",       "container_hash", "core",
+    "date_time",     "filesystem",      "function",       "intrusive",
+    "io",            "iterator",        "lexical_cast",   "move",
+    "mp11",          "mpl",             "predef",         "preprocessor",
+    "range",         "scope",           "smart_ptr",      "stacktrace",
+    "system",        "throw_exception", "type_traits",    "utility",
+};
+
+/// Prune `library.root_module`'s include dirs down to `boost_used_libs` in
+/// place. Dirs without a static location before their step runs cannot be
+/// probed and pass through untouched.
+fn pruneBoostIncludes(library: *Build.Step.Compile, owner: *Build, io: std.Io) !void {
+    const mod = library.root_module;
+
+    var kept: std.ArrayListUnmanaged(Build.Module.IncludeDir) = .empty;
+    for (mod.include_dirs.items) |include_dir| {
+        if (boostIncludeDirUsed(include_dir, owner, io)) {
+            try kept.append(owner.allocator, include_dir);
+        }
+    }
+    std.log.info("boost: keeping {d}/{d} include dirs", .{ kept.items.len, mod.include_dirs.items.len });
+
+    mod.include_dirs.clearRetainingCapacity();
+    try mod.include_dirs.appendSlice(owner.allocator, kept.items);
+}
+
+fn boostIncludeDirUsed(include_dir: Build.Module.IncludeDir, owner: *Build, io: std.Io) bool {
+    const lazy_path = switch (include_dir) {
+        .path, .path_system, .path_after => |lp| lp,
+        else => return true,
+    };
+    switch (lazy_path) {
+        .src_path, .dependency, .cwd_relative => {},
+        else => return true,
+    }
+
+    const cache_path = lazy_path.getPath3(owner, null);
+    var inc_dir = cache_path.root_dir.handle.openDir(io, cache_path.subPathOrDot(), .{ .iterate = true }) catch return false;
+    defer inc_dir.close(io);
+    var boost_dir = inc_dir.openDir(io, "boost", .{ .iterate = true }) catch return false;
+    defer boost_dir.close(io);
+
+    var it = boost_dir.iterate();
+    while (it.next(io) catch return false) |entry| {
+        const name = if (std.mem.endsWith(u8, entry.name, ".hpp")) entry.name[0 .. entry.name.len - 4] else entry.name;
+        for (boost_used_libs) |lib| {
+            if (std.mem.eql(u8, name, lib)) return true;
+        }
+    }
+    return false;
+}

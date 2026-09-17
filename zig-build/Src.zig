@@ -208,7 +208,7 @@ pub const Src = struct {
         // expose the headers to every consumer linking this library; note
         // that flat-name include resolution still needs the subdirectory
         // paths on the consumer (linkCommon)
-        library.installHeadersDirectory(b.path("src-port/common"), "", .{});
+        library.installHeadersDirectory(b.path("src-port/common"), "", cpp.header_install_options);
 
         // update graph at the end
         self.common.module = module;
@@ -259,7 +259,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/database"), "", .{});
+        library.installHeadersDirectory(b.path("src-port/database"), "", cpp.header_install_options);
 
         // update graph at the end
         self.database.module = module;
@@ -307,7 +307,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/shared"), "", .{});
+        library.installHeadersDirectory(b.path("src-port/shared"), "", cpp.header_install_options);
 
         // update graph at the end
         self.shared.module = module;
@@ -449,7 +449,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/game"), "", .{});
+        library.installHeadersDirectory(b.path("src-port/game"), "", cpp.header_install_options);
 
         // update graph at the end
         self.game.module = module;
@@ -497,7 +497,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/scripts"), "", .{});
+        library.installHeadersDirectory(b.path("src-port/scripts"), "", cpp.header_install_options);
 
         // update graph at the end
         self.scripts.module = module;
@@ -541,7 +541,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/modules"), "", .{});
+        library.installHeadersDirectory(b.path("src-port/modules"), "", cpp.header_install_options);
 
         // update graph at the end
         self.modules.module = module;

@@ -22,6 +22,15 @@ pub const SourceSet = file_queries.SourceSet;
 // include path helpers
 pub const addFlatIncludes = include_dirs.addFlatIncludes;
 
+/// Options for `installHeadersDirectory` so emitted include trees only carry
+/// real headers (the `.h`-only default misses `.hpp` etc). Without this,
+/// whole source dirs would get copied and hashed into the trees, and since
+/// consumers take `-I` on the tree, any source edit would churn every
+/// downstream TU's flags.
+pub const header_install_options: std.Build.Step.Compile.HeaderInstallation.Directory.Options = .{
+    .include_extensions = &.{ ".h", ".hpp", ".hxx", ".inc", ".inl" },
+};
+
 // compile commands stuff
 pub const addCompileCommands = cc.addCompileCommands;
 pub const addCompileCommandsStep = cc.addCompileCommandsStep;
