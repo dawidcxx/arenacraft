@@ -722,6 +722,8 @@ fn pkgConfigIncludeDirs(mod: *Build.Module, pkg: []const u8) void {
     var it = std.mem.tokenizeScalar(u8, cflags, ' ');
     while (it.next()) |tok| {
         if (std.mem.startsWith(u8, tok, "-I") and tok.len > 2)
-            mod.addIncludePath(.{ .cwd_relative = std.mem.trim(u8, tok[2..], "\n") });
+            // system include path: on Docker these resolve to /usr/include,
+            // which must not shadow zig's bundled libc/libc++ headers
+            mod.addSystemIncludePath(.{ .cwd_relative = std.mem.trim(u8, tok[2..], "\n") });
     }
 }

@@ -37,6 +37,7 @@
               python3 # llms love python..
               bun # scripts tooling (db_sync, extract_assets)
               gdb
+              netcat
 
               # Libraries
               minizip

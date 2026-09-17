@@ -90,6 +90,9 @@ services:
       db-migrate:
         condition: service_completed_successfully
 
+  # RA is the built-in remote console (same commands as the local one):
+  #   nc localhost 3443  ->  account with account_access.gmlevel >= 3, RealmID = -1
+  # kept on localhost because the protocol is plaintext
   world:
     profiles: [full]
     image: arenacraft-core:latest
@@ -101,10 +104,12 @@ services:
       AC_REDIS_HOST: valkey
       AC_REALMID: 1
       AC_DATA_DIR: /app/data
+      AC_RA_ENABLE: "true"
     volumes:
       - ./data:/app/data
     ports:
       - 8085:8085
+      - "127.0.0.1:3443:3443"
     stdin_open: true
     tty: true
     depends_on:

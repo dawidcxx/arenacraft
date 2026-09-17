@@ -103,7 +103,7 @@ int RASession::Send(std::string_view data)
 std::string RASession::ReadString()
 {
   boost::system::error_code error;
-  std::size_t               read = boost::asio::read_until(_socket, _readBuffer, "\r\n", error);
+  std::size_t               read = boost::asio::read_until(_socket, _readBuffer, "\n", error);
   if (!read)
   {
     _socket.close();
@@ -114,8 +114,8 @@ std::string RASession::ReadString()
   std::istream is(&_readBuffer);
   std::getline(is, line);
 
-  if (*line.rbegin() == '\r')
-    line.erase(line.length() - 1);
+  if (!line.empty() && line.back() == '\r')
+    line.pop_back();
 
   return line;
 }

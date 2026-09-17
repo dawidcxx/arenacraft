@@ -19,8 +19,22 @@
 
 #include "subcommands.h"
 
+extern "C" int mallctl(char const* name, void* oldp, size_t* oldlenp, void* newp, size_t newlen);
+
+static void TuneAllocator()
+{
+    bool background_thread = true;
+    mallctl("background_thread", nullptr, nullptr, &background_thread, sizeof(background_thread));
+
+    ssize_t decay_ms = 2000;
+    mallctl("dirty_decay_ms", nullptr, nullptr, &decay_ms, sizeof(decay_ms));
+    mallctl("muzzy_decay_ms", nullptr, nullptr, &decay_ms, sizeof(decay_ms));
+}
+
 int main(int argc, char** argv)
 {
+    TuneAllocator();
+
     argparse::ArgumentParser program("ac", "1.0");
     program.add_description("AzerothCore unified executable (zig-build port)");
     program.add_argument("command").metavar("COMMAND").help(
