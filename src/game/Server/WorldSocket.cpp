@@ -335,7 +335,7 @@ bool WorldSocket::ReadHeaderHandler()
   return true;
 }
 
-struct AuthSession
+struct AuthSessionData
 {
   uint32                      BattlegroupID   = 0;
   uint32                      LoginServerType = 0;
@@ -350,7 +350,7 @@ struct AuthSession
   ByteBuffer                  AddonInfo;
 };
 
-struct AccountInfo
+struct LoginAccountInfo
 {
   uint32         Id;
   ::SessionKey   SessionKey;
@@ -367,7 +367,7 @@ struct AccountInfo
   bool           IsBanned;
   uint32         TotalTime;
 
-  explicit AccountInfo(Field* fields)
+  explicit LoginAccountInfo(Field* fields)
   {
     //           0             1          2         3               4            5           6         7            8 9
     //           10          11
@@ -544,7 +544,7 @@ void WorldSocket::SendPacket(WorldPacket const& packet)
 
 void WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
 {
-  std::shared_ptr<AuthSession> authSession = std::make_shared<AuthSession>();
+  std::shared_ptr<AuthSessionData> authSession = std::make_shared<AuthSessionData>();
 
   // Read the content of the packet
   recvPacket >> authSession->Build;
@@ -570,7 +570,7 @@ void WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
       std::bind(&WorldSocket::HandleAuthSessionCallback, this, authSession, std::placeholders::_1)));
 }
 
-void WorldSocket::HandleAuthSessionCallback(std::shared_ptr<AuthSession> authSession, PreparedQueryResult result)
+void WorldSocket::HandleAuthSessionCallback(std::shared_ptr<AuthSessionData> authSession, PreparedQueryResult result)
 {
   // Stop if the account is not found
   if (!result)
@@ -582,7 +582,7 @@ void WorldSocket::HandleAuthSessionCallback(std::shared_ptr<AuthSession> authSes
     return;
   }
 
-  AccountInfo account(result->Fetch());
+  LoginAccountInfo account(result->Fetch());
 
   // For hook purposes, we get Remoteaddress at this point.
   std::string address = sConfigMgr->GetOption<bool>("AllowLoggingIPAddressesInDatabase", true, true)

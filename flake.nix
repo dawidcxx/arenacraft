@@ -36,6 +36,7 @@
               lldb
               python3 # llms love python..
               bun # scripts tooling (db_sync, extract_assets)
+              gdb
 
               # Libraries
               minizip
@@ -47,8 +48,6 @@
               bzip2
               readline
               ncurses
-              # real libmysqlclient - mariadb-connector poisons
-              # __cpp_nontype_template_args and lacks mysql_ssl_mode
               mysql84
             ];
 

@@ -843,12 +843,12 @@ enum Doctor
   HORDE_COORDS    = 6
 };
 
-struct Location
+struct NpcLocation
 {
   float x, y, z, o;
 };
 
-static Location AllianceCoords[] = {
+static NpcLocation AllianceCoords[] = {
     {-3757.38f, -4533.05f, 14.16f, 3.62f}, // Top-far-right bunk as seen from entrance
     {-3754.36f, -4539.13f, 14.16f, 5.13f}, // Top-far-left bunk
     {-3749.54f, -4540.25f, 14.28f, 3.34f}, // Far-right bunk
@@ -863,7 +863,7 @@ static Location AllianceCoords[] = {
 #define A_RUNTOY -4531.52f
 #define A_RUNTOZ 11.91f
 
-static Location HordeCoords[] = {
+static NpcLocation HordeCoords[] = {
     {-1013.75f, -3492.59f, 62.62f, 4.34f}, // Left, Behind
     {-1017.72f, -3490.92f, 62.62f, 4.34f}, // Right, Behind
     {-1015.77f, -3497.15f, 62.82f, 4.34f}, // Left, Mid
@@ -911,7 +911,7 @@ public:
     bool Event;
 
     GuidList               Patients;
-    std::vector<Location*> Coordinates;
+    std::vector<NpcLocation*> Coordinates;
 
     void Reset() override
     {
@@ -955,7 +955,7 @@ public:
       me->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
     }
 
-    void PatientDied(Location* point)
+    void PatientDied(NpcLocation* point)
     {
       Player* player = ObjectAccessor::GetPlayer(*me, PlayerGUID);
       if (player && ((player->GetQuestStatus(6624) == QUEST_STATUS_INCOMPLETE) ||
@@ -981,7 +981,7 @@ public:
         Reset();
     }
 
-    void PatientSaved(Creature* savedPatient, Player* player, Location* point)
+    void PatientSaved(Creature* savedPatient, Player* player, NpcLocation* point)
     {
       if (player && PlayerGUID == player->GetGUID())
       {
@@ -1046,7 +1046,7 @@ public:
     npc_injured_patientAI(Creature* creature) : ScriptedAI(creature) {}
 
     ObjectGuid DoctorGUID;
-    Location*  Coord;
+    NpcLocation*  Coord;
 
     void Reset() override
     {
@@ -1177,7 +1177,7 @@ void npc_doctor::npc_doctorAI::UpdateAI(uint32 diff)
       if (Coordinates.empty())
         return;
 
-      std::vector<Location*>::iterator itr          = Coordinates.begin() + rand() % Coordinates.size();
+      std::vector<NpcLocation*>::iterator itr          = Coordinates.begin() + rand() % Coordinates.size();
       uint32                           patientEntry = 0;
 
       switch (me->GetEntry())
@@ -1193,7 +1193,7 @@ void npc_doctor::npc_doctorAI::UpdateAI(uint32 diff)
         return;
       }
 
-      if (Location* point = *itr)
+      if (NpcLocation* point = *itr)
       {
         if (Creature* Patient = me->SummonCreature(patientEntry, point->x, point->y, point->z, point->o,
                                                    TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 5000))
