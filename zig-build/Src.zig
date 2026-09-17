@@ -194,8 +194,8 @@ pub const Src = struct {
         deps.linkArgon2(module);
         deps.linkFmt(module);
         deps.linkBoost(module);
-        deps.linkOpenSSL(module);
-        deps.linkHiredis(module);
+        deps.includeOpenSSL(module);
+        deps.includeHiredis(module);
         deps.linkDetour(module);
         deps.linkG3DLite(module);
 
@@ -250,7 +250,7 @@ pub const Src = struct {
         // their include paths + defines too (no transitive propagation)
         deps.linkFmt(module);
         deps.linkBoost(module);
-        deps.linkMysqlClient(module);
+        deps.includeMysqlClient(module);
 
         const library = b.addLibrary(.{
             .name = "database",
@@ -299,6 +299,7 @@ pub const Src = struct {
         deps.linkFmt(module);
         deps.linkBoost(module);
         deps.linkUtf8(module);
+        deps.includeOpenSSL(module);
 
         const library = b.addLibrary(.{
             .name = "shared",
@@ -347,10 +348,10 @@ pub const Src = struct {
         deps.linkFmt(module);
         deps.linkBoost(module);
         deps.linkUtf8(module);
-        deps.linkOpenSSL(module);
-        deps.linkHiredis(module);
+        deps.includeOpenSSL(module);
+        deps.includeHiredis(module);
         deps.linkArgparse(module);
-        deps.linkMysqlClient(module);
+        deps.includeMysqlClient(module);
 
         // update graph at the end
         self.auth.module = module;
@@ -396,7 +397,7 @@ pub const Src = struct {
         deps.linkBoost(module);
         deps.linkUtf8(module);
         deps.linkArgon2(module);
-        deps.linkOpenSSL(module);
+        deps.includeOpenSSL(module);
 
         // update graph at the end
         self.tools.module = module;
@@ -437,7 +438,8 @@ pub const Src = struct {
         deps.linkFmt(module);
         deps.linkBoost(module);
         deps.linkUtf8(module);
-        deps.linkOpenSSL(module);
+        deps.includeOpenSSL(module);
+        deps.includeZlib(module);
         // game headers include <G3D/...> and <DetourNavMesh.h> (via common)
         deps.linkG3DLite(module);
         deps.linkDetour(module);
@@ -487,6 +489,7 @@ pub const Src = struct {
         const deps = &self.back_reference.deps;
         deps.linkFmt(module);
         deps.linkBoost(module);
+        deps.includeOpenSSL(module);
         deps.linkG3DLite(module);
         deps.linkDetour(module);
 
@@ -531,6 +534,7 @@ pub const Src = struct {
         const deps = &self.back_reference.deps;
         deps.linkFmt(module);
         deps.linkBoost(module);
+        deps.includeHiredis(module);
         deps.linkG3DLite(module);
         deps.linkDetour(module);
 
@@ -576,14 +580,14 @@ pub const Src = struct {
 
         const deps = &self.back_reference.deps;
         deps.linkGsoap(module);
-        deps.linkReadline(module);
+        deps.includeReadline(module);
         deps.linkFmt(module);
         deps.linkBoost(module);
         deps.linkUtf8(module);
-        deps.linkOpenSSL(module);
-        deps.linkHiredis(module);
+        deps.includeOpenSSL(module);
+        deps.includeHiredis(module);
         deps.linkArgparse(module);
-        deps.linkMysqlClient(module);
+        deps.includeMysqlClient(module);
         deps.linkG3DLite(module);
         deps.linkDetour(module);
 

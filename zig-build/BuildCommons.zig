@@ -76,9 +76,7 @@ pub const AcGraph = struct {
         deps.linkFmt(module);
         deps.linkBoost(module);
 
-        deps.linkOpenSSL(module);
-        deps.linkHiredis(module);
-        deps.linkMysqlClient(module);
+        deps.linkSystemLibraries(module);
 
         const exe = bl.addExecutable(.{
             .name = "test-build",
@@ -128,6 +126,7 @@ pub const AcGraph = struct {
         try src.linkAuth(bl, module);
         try src.linkTools(bl, module);
         deps.linkArgparse(module);
+        deps.linkSystemLibraries(module);
 
         const exe = bl.addExecutable(.{
             .name = "ac",

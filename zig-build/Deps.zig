@@ -137,17 +137,17 @@ pub const Deps = struct {
     }
 
     // unvendored libraries, provided by nix and resolved through pkg-config
-    pub fn linkOpenSSL(self: *Self, mod: *Build.Module) void {
+    pub fn includeOpenSSL(self: *Self, mod: *Build.Module) void {
         _ = self;
-        mod.linkSystemLibrary("openssl", .{});
+        pkgConfigIncludeDirs(mod, "openssl");
     }
 
-    pub fn linkHiredis(self: *Self, mod: *Build.Module) void {
+    pub fn includeHiredis(self: *Self, mod: *Build.Module) void {
         _ = self;
-        mod.linkSystemLibrary("hiredis", .{});
+        pkgConfigIncludeDirs(mod, "hiredis");
     }
 
-    pub fn linkMysqlClient(self: *Self, mod: *Build.Module) void {
+    pub fn includeMysqlClient(self: *Self, mod: *Build.Module) void {
         _ = self;
         // real libmysqlclient from the nix mysql84 package (mariadb-connector
         // poisons __cpp_nontype_template_args and lacks mysql_ssl_mode);
@@ -156,29 +156,44 @@ pub const Deps = struct {
         if (env.get("MYSQL_INCLUDE_DIR")) |inc_dir| {
             mod.addIncludePath(.{ .cwd_relative = inc_dir });
         }
-        if (env.get("MYSQL_LIB_DIR")) |lib_dir| {
-            mod.addLibraryPath(.{ .cwd_relative = lib_dir });
-        }
-        mod.linkSystemLibrary("mysqlclient", .{ .use_pkg_config = .no });
     }
 
-    pub fn linkZlib(self: *Self, mod: *Build.Module) void {
+    pub fn includeZlib(self: *Self, mod: *Build.Module) void {
         _ = self;
-        mod.linkSystemLibrary("zlib", .{});
+        pkgConfigIncludeDirs(mod, "zlib");
     }
 
-    pub fn linkBzip2(self: *Self, mod: *Build.Module) void {
+    pub fn includeBzip2(self: *Self, mod: *Build.Module) void {
         _ = self;
-        mod.linkSystemLibrary("bzip2", .{});
+        pkgConfigIncludeDirs(mod, "bzip2");
+    }
+
+    pub fn includeReadline(self: *Self, mod: *Build.Module) void {
+        _ = self;
+        pkgConfigIncludeDirs(mod, "readline");
     }
 
     pub fn linkGsoap(self: *Self, mod: *Build.Module) void {
         mod.linkLibrary(self.gsoap.library);
     }
 
-    pub fn linkReadline(self: *Self, mod: *Build.Module) void {
+    /// Links every system library. Final executables only (ac) - module
+    /// static libs carry include paths via the include* helpers instead.
+    pub fn linkSystemLibraries(self: *Self, mod: *Build.Module) void {
         _ = self;
+        mod.linkSystemLibrary("openssl", .{});
+        mod.linkSystemLibrary("hiredis", .{});
+        mod.linkSystemLibrary("zlib", .{});
+        mod.linkSystemLibrary("bzip2", .{});
         mod.linkSystemLibrary("readline", .{});
+        const env = &mod.owner.graph.environ_map;
+        if (env.get("MYSQL_INCLUDE_DIR")) |inc_dir| {
+            mod.addIncludePath(.{ .cwd_relative = inc_dir });
+        }
+        if (env.get("MYSQL_LIB_DIR")) |lib_dir| {
+            mod.addLibraryPath(.{ .cwd_relative = lib_dir });
+        }
+        mod.linkSystemLibrary("mysqlclient", .{ .use_pkg_config = .no });
     }
 
     //
@@ -416,8 +431,8 @@ pub const Deps = struct {
             .flags = &.{"-std=gnu99"},
         });
 
-        self.linkZlib(module);
-        self.linkBzip2(module);
+        self.includeZlib(module);
+        self.includeBzip2(module);
 
         const library = b.addLibrary(.{
             .name = "mpq",
@@ -540,7 +555,7 @@ pub const Deps = struct {
             .flags = &.{"-std=c++20"},
         });
 
-        self.linkZlib(module);
+        self.includeZlib(module);
 
         const library = b.addLibrary(.{
             .name = "g3dlite",
@@ -675,4 +690,36 @@ fn boostIncludeDirUsed(include_dir: Build.Module.IncludeDir, owner: *Build, io: 
         }
     }
     return false;
+}
+
+// system libraries are linked only on final executables: on intermediate
+// static libs zig bakes them into the archive as members, which lld rejects
+// ("archive member ... is neither ET_REL nor LLVM bitcode")
+var pkg_config_cflags_cache: ?std.StringHashMapUnmanaged(?[]const u8) = null;
+
+fn pkgConfigIncludeDirs(mod: *Build.Module, pkg: []const u8) void {
+    const gpa = mod.owner.allocator;
+    if (pkg_config_cflags_cache == null)
+        pkg_config_cflags_cache = .empty;
+
+    const gop = pkg_config_cflags_cache.?.getOrPut(gpa, pkg) catch return;
+    if (!gop.found_existing) {
+        gop.value_ptr.* = null;
+        const res = std.process.run(gpa, mod.owner.graph.io, .{
+            .argv = &.{ "pkg-config", "--cflags-only-I", pkg },
+        }) catch return;
+        switch (res.term) {
+            .exited => |code| if (code == 0) {
+                gop.value_ptr.* = res.stdout;
+            },
+            else => {},
+        }
+    }
+
+    const cflags = gop.value_ptr.* orelse return;
+    var it = std.mem.tokenizeScalar(u8, cflags, ' ');
+    while (it.next()) |tok| {
+        if (std.mem.startsWith(u8, tok, "-I") and tok.len > 2)
+            mod.addIncludePath(.{ .cwd_relative = std.mem.trim(u8, tok[2..], "\n") });
+    }
 }
