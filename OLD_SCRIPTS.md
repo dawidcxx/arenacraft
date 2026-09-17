@@ -7,6 +7,12 @@ the eventual clean rewrite, which should only cover **db management
 management is obsolete now that the core ships as a single `ac` binary and
 configs resolve next to the executable.
 
+> Update: the rewrite has started - `scripts/db_sync` (forward-only sql sync
+> into the target databases, `scripts/db_sync --help`) and a skeleton
+> `scripts/extract_assets` now live in `scripts/src/`, invoked via the
+> `scripts/<tool>` symlinks. The patterns below are still the reference for
+> what remains to be ported.
+
 ## What existed
 
 - `bin/install` (`src/install.ts`) - cmake configure + build + install to
