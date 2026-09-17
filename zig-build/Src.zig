@@ -1,4 +1,4 @@
-// Ported core modules ("our" sources from src-port/) - mirrors the Deps.zig
+// Ported core modules ("our" sources from src/) - mirrors the Deps.zig
 // pattern: one entry per module with its build fn, plus link helpers that
 // encapsulate how consumers consume a module (library + flat-name includes).
 //
@@ -92,54 +92,54 @@ pub const Src = struct {
     pub fn linkCommon(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.common.library);
         // flat-name include resolution ("MapDefines.h" etc)
-        try cpp.addFlatIncludes(b, "src-port/common", mod);
+        try cpp.addFlatIncludes(b, "src/common", mod);
     }
 
     pub fn linkDatabase(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.database.library);
-        try cpp.addFlatIncludes(b, "src-port/database", mod);
+        try cpp.addFlatIncludes(b, "src/database", mod);
         try self.linkCommon(b, mod);
     }
 
     pub fn linkShared(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.shared.library);
-        try cpp.addFlatIncludes(b, "src-port/shared", mod);
+        try cpp.addFlatIncludes(b, "src/shared", mod);
         try self.linkDatabase(b, mod);
     }
 
     pub fn linkAuth(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.auth.library);
-        try cpp.addFlatIncludes(b, "src-port/auth", mod);
+        try cpp.addFlatIncludes(b, "src/auth", mod);
         try self.linkShared(b, mod);
     }
 
     pub fn linkTools(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.tools.library);
-        try cpp.addFlatIncludes(b, "src-port/tools", mod);
+        try cpp.addFlatIncludes(b, "src/tools", mod);
         try self.linkCommon(b, mod);
     }
 
     pub fn linkGame(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.game.library);
-        try cpp.addFlatIncludes(b, "src-port/game", mod);
+        try cpp.addFlatIncludes(b, "src/game", mod);
         try self.linkShared(b, mod);
     }
 
     pub fn linkScripts(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.scripts.library);
-        try cpp.addFlatIncludes(b, "src-port/scripts", mod);
+        try cpp.addFlatIncludes(b, "src/scripts", mod);
         try self.linkGame(b, mod);
     }
 
     pub fn linkModules(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.modules.library);
-        try cpp.addFlatIncludes(b, "src-port/modules", mod);
+        try cpp.addFlatIncludes(b, "src/modules", mod);
         try self.linkGame(b, mod);
     }
 
     pub fn linkWorldserver(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.worldserver.library);
-        try cpp.addFlatIncludes(b, "src-port/worldserver", mod);
+        try cpp.addFlatIncludes(b, "src/worldserver", mod);
         try self.linkModules(b, mod);
         try self.linkScripts(b, mod);
     }
@@ -161,10 +161,10 @@ pub const Src = struct {
 
         // common uses flat-name includes across subdirectories, mirroring
         // the CMake CollectIncludeDirectories behavior
-        try cpp.addFlatIncludes(b, "src-port/common", module);
+        try cpp.addFlatIncludes(b, "src/common", module);
 
         // placeholder revision data, mirrors the old zig build; real values
-        // need a git describe run step (see ZIG_BUILD_MIGRATION.md open questions)
+        // need a git describe run step
         const revision_header = std.Build.Step.ConfigHeader.create(b, .{});
         revision_header.include_path = "revision.h";
         revision_header.addValue("_HASH", []const u8, "");
@@ -178,7 +178,7 @@ pub const Src = struct {
         revision_header.addValue("_MYSQL_EXECUTABLE", []const u8, "");
         module.addConfigHeader(revision_header);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/common", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/common", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -208,7 +208,7 @@ pub const Src = struct {
         // expose the headers to every consumer linking this library; note
         // that flat-name include resolution still needs the subdirectory
         // paths on the consumer (linkCommon)
-        library.installHeadersDirectory(b.path("src-port/common"), "", cpp.header_install_options);
+        library.installHeadersDirectory(b.path("src/common"), "", cpp.header_install_options);
 
         // update graph at the end
         self.common.module = module;
@@ -218,8 +218,7 @@ pub const Src = struct {
         isolated.dependOn(&library.step);
     }
 
-    /// DB migration machinery (Updater/) is intentionally not ported - see
-    /// ZIG_BUILD_MIGRATION.md decisions.
+    /// DB migration machinery (Updater/) is intentionally not ported.
     fn buildDatabase(self: *Self, build_request: BuildRequest) !void {
         const b = build_request[0];
         const target = build_request[1];
@@ -231,9 +230,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/database", module);
+        try cpp.addFlatIncludes(b, "src/database", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/database", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/database", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -259,7 +258,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/database"), "", cpp.header_install_options);
+        library.installHeadersDirectory(b.path("src/database"), "", cpp.header_install_options);
 
         // update graph at the end
         self.database.module = module;
@@ -280,9 +279,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/shared", module);
+        try cpp.addFlatIncludes(b, "src/shared", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/shared", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/shared", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -307,7 +306,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/shared"), "", cpp.header_install_options);
+        library.installHeadersDirectory(b.path("src/shared"), "", cpp.header_install_options);
 
         // update graph at the end
         self.shared.module = module;
@@ -328,9 +327,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/auth", module);
+        try cpp.addFlatIncludes(b, "src/auth", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/auth", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/auth", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -373,9 +372,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/tools", module);
+        try cpp.addFlatIncludes(b, "src/tools", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/tools", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/tools", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -419,9 +418,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/game", module);
+        try cpp.addFlatIncludes(b, "src/game", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/game", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/game", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -449,7 +448,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/game"), "", cpp.header_install_options);
+        library.installHeadersDirectory(b.path("src/game"), "", cpp.header_install_options);
 
         // update graph at the end
         self.game.module = module;
@@ -470,9 +469,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/scripts", module);
+        try cpp.addFlatIncludes(b, "src/scripts", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/scripts", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/scripts", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -497,7 +496,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/scripts"), "", cpp.header_install_options);
+        library.installHeadersDirectory(b.path("src/scripts"), "", cpp.header_install_options);
 
         // update graph at the end
         self.scripts.module = module;
@@ -515,9 +514,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/modules", module);
+        try cpp.addFlatIncludes(b, "src/modules", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/modules", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/modules", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });
@@ -541,7 +540,7 @@ pub const Src = struct {
             .linkage = .static,
         });
 
-        library.installHeadersDirectory(b.path("src-port/modules"), "", cpp.header_install_options);
+        library.installHeadersDirectory(b.path("src/modules"), "", cpp.header_install_options);
 
         // update graph at the end
         self.modules.module = module;
@@ -559,9 +558,9 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        try cpp.addFlatIncludes(b, "src-port/worldserver", module);
+        try cpp.addFlatIncludes(b, "src/worldserver", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src-port/worldserver", .{
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/worldserver", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
         });

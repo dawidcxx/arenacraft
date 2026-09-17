@@ -86,7 +86,7 @@ bool MMapMgr::loadMapData(uint32 mapId)
 
   // load and init dtNavMesh - read parameters from file
   std::string fileName =
-      Acore::StringFormat(MAP_FILE_NAME_FORMAT, sConfigMgr->GetOption<std::string>("DataDir", "."), mapId);
+      Acore::StringFormat(MAP_FILE_NAME_FORMAT, sConfigMgr->GetDataPath(), mapId);
 
   FILE* file = fopen(fileName.c_str(), "rb");
   if (!file)
@@ -145,7 +145,7 @@ bool MMapMgr::loadMap(uint32 mapId, int32 x, int32 y)
 
   // load this tile :: mmaps/MMMXXYY.mmtile
   std::string fileName =
-      Acore::StringFormat(TILE_FILE_NAME_FORMAT, sConfigMgr->GetOption<std::string>("DataDir", "."), mapId, x, y);
+      Acore::StringFormat(TILE_FILE_NAME_FORMAT, sConfigMgr->GetDataPath(), mapId, x, y);
   FILE* file = fopen(fileName.c_str(), "rb");
   if (!file)
   {

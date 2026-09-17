@@ -25,7 +25,7 @@
 #include <openssl/evp.h>
 
 // the boost include dirs are filtered in Deps.zig (boost_used_libs); the
-// includes above mirror every boost header family src-port uses, so a
+// includes above mirror every boost header family src uses, so a
 // missing dir fails here before it fails somewhere in the port
 int main()
 {

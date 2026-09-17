@@ -227,7 +227,7 @@ int finish(const char* message, int returnValue)
   return returnValue;
 }
 
-int main(int argc, char** argv)
+int mmaps_generator_main(int argc, char** argv)
 {
   unsigned int threads = std::thread::hardware_concurrency();
   int          mapnum  = -1;

@@ -13,7 +13,7 @@ Dependencies: `nix` `docker` `wow-3.3.5a-client-files`
 3. setup 3rd party runtime dependencies
 - `docker compose up`
 4. build core
-- `./scripts/bin/install`
+- `zig build ac`
 5. drop client assets to `~/.local/var/wow`
 6. extract client assets
-- `./scripts/bin/extract-client`
+- see OLD_SCRIPTS.md (extract-client, pending rewrite)

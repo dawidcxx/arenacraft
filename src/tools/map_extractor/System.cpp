@@ -18,6 +18,7 @@
 #define _CRT_SECURE_NO_DEPRECATE
 
 #include <cstdio>
+#include <cstring>
 #include <cstdlib>
 #include <deque>
 #include <filesystem>
@@ -133,7 +134,7 @@ void CreateDir(const std::string& Path)
   }
 }
 
-bool FileExists(const char* FileName)
+static bool FileExists(const char* FileName)
 {
   int fp = _open(FileName, OPEN_FLAGS);
   if (fp != -1)
@@ -311,6 +312,15 @@ static char const*  MAP_AREA_MAGIC    = "AREA";
 static char const*  MAP_HEIGHT_MAGIC  = "MHGT";
 static char const*  MAP_LIQUID_MAGIC  = "MLIQ";
 
+// fourcc from a string literal; memcpy because reinterpret_cast<uint32 const*> on
+// a char* is misaligned UB and traps under zig's debug sanitizers
+static uint32 FourCC(char const* tag)
+{
+  uint32 value;
+  memcpy(&value, tag, sizeof(value));
+  return value;
+}
+
 struct map_fileheader
 {
   uint32 mapMagic;
@@ -417,7 +427,7 @@ bool ConvertADT(std::string const& inputPath, std::string const& outputPath, int
 
   // Prepare map header
   map_fileheader map;
-  map.mapMagic     = *reinterpret_cast<uint32 const*>(MAP_MAGIC);
+  map.mapMagic     = FourCC(MAP_MAGIC);
   map.versionMagic = MAP_VERSION_MAGIC;
   map.buildMagic   = build;
 
@@ -447,7 +457,7 @@ bool ConvertADT(std::string const& inputPath, std::string const& outputPath, int
   map.areaMapSize   = sizeof(map_areaHeader);
 
   map_areaHeader areaHeader;
-  areaHeader.fourcc = *reinterpret_cast<uint32 const*>(MAP_AREA_MAGIC);
+  areaHeader.fourcc = FourCC(MAP_AREA_MAGIC);
   areaHeader.flags  = 0;
   if (fullAreaData)
   {
@@ -588,7 +598,7 @@ bool ConvertADT(std::string const& inputPath, std::string const& outputPath, int
   map.heightMapSize   = sizeof(map_heightHeader);
 
   map_heightHeader heightHeader;
-  heightHeader.fourcc        = *reinterpret_cast<uint32 const*>(MAP_HEIGHT_MAGIC);
+  heightHeader.fourcc        = FourCC(MAP_HEIGHT_MAGIC);
   heightHeader.flags         = 0;
   heightHeader.gridHeight    = minHeight;
   heightHeader.gridMaxHeight = maxHeight;
@@ -851,7 +861,7 @@ bool ConvertADT(std::string const& inputPath, std::string const& outputPath, int
     }
     map.liquidMapOffset      = map.heightMapOffset + map.heightMapSize;
     map.liquidMapSize        = sizeof(map_liquidHeader);
-    liquidHeader.fourcc      = *(uint32 const*)MAP_LIQUID_MAGIC;
+    liquidHeader.fourcc      = FourCC(MAP_LIQUID_MAGIC);
     liquidHeader.flags       = 0;
     liquidHeader.liquidType  = 0;
     liquidHeader.offsetX     = minX;
@@ -1184,7 +1194,7 @@ inline void CloseMPQFiles()
   gOpenArchives.clear();
 }
 
-int main(int argc, char* arg[])
+int map_extractor_main(int argc, char* arg[])
 {
   printf("Map & DBC Extractor\n");
   printf("===================\n\n");

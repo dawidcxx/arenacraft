@@ -55,10 +55,10 @@ typedef struct
   unsigned int id;
 } map_id;
 
-std::vector<map_id>                            map_ids;
+std::vector<map_id>                            vmap_map_ids;
 uint32                                         map_count;
-char                                           output_path[128]  = ".";
-char                                           input_path[1024]  = ".";
+char                                           vmap_output_path[128]  = ".";
+char                                           vmap_input_path[1024]  = ".";
 bool                                           hasInputPathParam = false;
 bool                                           preciseVectorData = false;
 std::unordered_map<std::string, WMODoodadData> WmoDoodads;
@@ -202,19 +202,19 @@ void ParsMapFiles()
   // char id_filename[64];
   for (unsigned int i = 0; i < map_count; ++i)
   {
-    sprintf(fn, "World\\Maps\\%s\\%s.wdt", map_ids[i].name, map_ids[i].name);
-    WDTFile WDT(fn, map_ids[i].name);
-    if (WDT.init(map_ids[i].id))
+    sprintf(fn, "World\\Maps\\%s\\%s.wdt", vmap_map_ids[i].name, vmap_map_ids[i].name);
+    WDTFile WDT(fn, vmap_map_ids[i].name);
+    if (WDT.init(vmap_map_ids[i].id))
     {
-      printf("Processing Map %u\n[", map_ids[i].id);
+      printf("Processing Map %u\n[", vmap_map_ids[i].id);
       for (int x = 0; x < 64; ++x)
       {
         for (int y = 0; y < 64; ++y)
         {
           if (ADTFile* ADT = WDT.GetMap(x, y))
           {
-            // sprintf(id_filename,"%02u %02u %03u",x,y,map_ids[i].id);//!!!!!!!!!
-            ADT->init(map_ids[i].id, x, y);
+            // sprintf(id_filename,"%02u %02u %03u",x,y,vmap_map_ids[i].id);//!!!!!!!!!
+            ADT->init(vmap_map_ids[i].id, x, y);
             delete ADT;
           }
         }
@@ -229,9 +229,9 @@ void ParsMapFiles()
 void getGamePath()
 {
 #ifdef _WIN32
-  strcpy(input_path, "Data\\");
+  strcpy(vmap_input_path, "Data\\");
 #else
-  strcpy(input_path, "Data/");
+  strcpy(vmap_input_path, "Data/");
 #endif
 }
 
@@ -270,10 +270,10 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
   if (!hasInputPathParam)
     getGamePath();
 
-  printf("\nGame path: %s\n", input_path);
+  printf("\nGame path: %s\n", vmap_input_path);
 
   char                     path[512];
-  string                   in_path(input_path);
+  string                   in_path(vmap_input_path);
   std::vector<std::string> locales, searchLocales;
 
   searchLocales.emplace_back("enGB");
@@ -313,14 +313,14 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
   }
 
   // open expansion and common files
-  pArchiveNames.push_back(input_path + string("common.MPQ"));
-  pArchiveNames.push_back(input_path + string("common-2.MPQ"));
-  pArchiveNames.push_back(input_path + string("expansion.MPQ"));
-  pArchiveNames.push_back(input_path + string("lichking.MPQ"));
+  pArchiveNames.push_back(vmap_input_path + string("common.MPQ"));
+  pArchiveNames.push_back(vmap_input_path + string("common-2.MPQ"));
+  pArchiveNames.push_back(vmap_input_path + string("expansion.MPQ"));
+  pArchiveNames.push_back(vmap_input_path + string("lichking.MPQ"));
 
   // now, scan for the patch levels in the core dir
   printf("Scanning patch levels from data directory.\n");
-  int ret = snprintf(path, 512, "%spatch", input_path);
+  int ret = snprintf(path, 512, "%spatch", vmap_input_path);
   if (ret < 0)
   {
     printf("Error when formatting string");
@@ -335,7 +335,7 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
   for (auto& locale : locales)
   {
     printf("Locale: %s\n", locale.c_str());
-    int ret2 = snprintf(path, 512, "%s%s/patch-%s", input_path, locale.c_str(), locale.c_str());
+    int ret2 = snprintf(path, 512, "%s%s/patch-%s", vmap_input_path, locale.c_str(), locale.c_str());
     if (ret2 < 0)
     {
       printf("Error when formatting string");
@@ -373,9 +373,9 @@ bool processArgv(int argc, char** argv, const char* versionString)
       if ((i + 1) < argc)
       {
         hasInputPathParam = true;
-        strcpy(input_path, argv[i + 1]);
-        if (input_path[strlen(input_path) - 1] != '\\' && input_path[strlen(input_path) - 1] != '/')
-          strcat(input_path, "/");
+        strcpy(vmap_input_path, argv[i + 1]);
+        if (vmap_input_path[strlen(vmap_input_path) - 1] != '\\' && vmap_input_path[strlen(vmap_input_path) - 1] != '/')
+          strcat(vmap_input_path, "/");
         ++i;
       }
       else
@@ -418,7 +418,7 @@ bool processArgv(int argc, char** argv, const char* versionString)
 //  Arg2 - Listfile name
 //
 
-int main(int argc, char** argv)
+int vmap4_extractor_main(int argc, char** argv)
 {
   bool        success       = true;
   const char* versionString = "V4.00 2012_02";
@@ -465,7 +465,7 @@ int main(int argc, char** argv)
 
   if (gOpenArchives.empty())
   {
-    printf("FATAL ERROR: None MPQ archive found by path '%s'. Use -d option with proper path.\n", input_path);
+    printf("FATAL ERROR: None MPQ archive found by path '%s'. Use -d option with proper path.\n", vmap_input_path);
     return 1;
   }
 
@@ -481,13 +481,13 @@ int main(int argc, char** argv)
       return 1;
     }
     map_count = dbc->getRecordCount();
-    map_ids.resize(map_count);
+    vmap_map_ids.resize(map_count);
     for (unsigned int x = 0; x < map_count; ++x)
     {
-      map_ids[x].id = dbc->getRecord(x).getUInt(0);
+      vmap_map_ids[x].id = dbc->getRecord(x).getUInt(0);
 
       char const* map_name            = dbc->getRecord(x).getString(1);
-      std::size_t max_map_name_length = sizeof(map_ids[x].name);
+      std::size_t max_map_name_length = sizeof(vmap_map_ids[x].name);
       if (strlen(map_name) >= max_map_name_length)
       {
         delete dbc;
@@ -495,9 +495,9 @@ int main(int argc, char** argv)
         return 1;
       }
 
-      strncpy(map_ids[x].name, map_name, max_map_name_length);
-      map_ids[x].name[max_map_name_length - 1] = '\0';
-      printf("Map - %s\n", map_ids[x].name);
+      strncpy(vmap_map_ids[x].name, map_name, max_map_name_length);
+      vmap_map_ids[x].name[max_map_name_length - 1] = '\0';
+      printf("Map - %s\n", vmap_map_ids[x].name);
     }
 
     delete dbc;
