@@ -490,7 +490,8 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
   for (uint8 i = 0; i < PLAYER_SLOTS_COUNT; i++)
     m_items[i] = nullptr;
 
-  Relocate(info->positionX, info->positionY, info->positionZ, info->orientation);
+  // all characters start at the arena hub (Netherstorm)
+  Relocate(3369.469f, 2880.0032f, 143.62909f, 2.15f);
 
   ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(createInfo->Class);
   if (!cEntry)
@@ -502,7 +503,7 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
     return false;
   }
 
-  SetMap(sMapMgr->CreateMap(info->mapId, this));
+  SetMap(sMapMgr->CreateMap(530, this));
 
   uint8 powertype = cEntry->powerType;
 

@@ -18,9 +18,9 @@ public:
     void OnFirstLogin(Player *player) override
     {
 
-        // set HS to starting zone in grizzly hills
-        WorldLocation loc(4035.6206, -3756.447, 116.24431, 4.15822);
-        player->SetHomebind(loc, 395);
+        // bind players to the arena hub
+        WorldLocation loc(530, 3369.469f, 2880.0032f, 143.62909f, 2.15f);
+        player->SetHomebind(loc, 3523);
         player->AddItem(6948, 1);
 
         // Add mount

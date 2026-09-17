@@ -571,8 +571,13 @@ void WorldSession::HandleCharCreateOpcode(WorldPacket& recvData)
                     return;
                   }
 
-                  if ((haveSameRace && skipCinematics == 1) || skipCinematics == 2)
-                    newChar->setCinematic(1); // not show intro
+                  // never show the intro cinematic
+                  newChar->setCinematic(1);
+
+                  // mark every tutorial as seen so new characters don't get tutorial popups
+                  for (uint8 i = 0; i < MAX_ACCOUNT_TUTORIAL_VALUES; ++i)
+                    SetTutorialInt(i, 0xFFFFFFFF);
+                  SendTutorialsData();
 
                   newChar->SetAtLoginFlag(AT_LOGIN_FIRST); // First login
 
