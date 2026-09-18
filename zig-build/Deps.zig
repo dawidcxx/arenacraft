@@ -153,10 +153,7 @@ pub const Deps = struct {
         // real libmysqlclient from the nix mysql84 package (mariadb-connector
         // poisons __cpp_nontype_template_args and lacks mysql_ssl_mode);
         // paths are exported by the flake shellHook, no pkg-config available
-        const env = &mod.owner.graph.environ_map;
-        if (env.get("MYSQL_INCLUDE_DIR")) |inc_dir| {
-            mod.addIncludePath(.{ .cwd_relative = inc_dir });
-        }
+        mysqlIncludeDirs(mod);
     }
 
     pub fn includeZlib(self: *Self, mod: *Build.Module) void {
@@ -189,9 +186,7 @@ pub const Deps = struct {
         mod.linkSystemLibrary("readline", .{});
         mod.linkSystemLibrary("jemalloc", .{});
         const env = &mod.owner.graph.environ_map;
-        if (env.get("MYSQL_INCLUDE_DIR")) |inc_dir| {
-            mod.addIncludePath(.{ .cwd_relative = inc_dir });
-        }
+        mysqlIncludeDirs(mod);
         if (env.get("MYSQL_LIB_DIR")) |lib_dir| {
             mod.addLibraryPath(.{ .cwd_relative = lib_dir });
         }
@@ -697,6 +692,20 @@ fn boostIncludeDirUsed(include_dir: Build.Module.IncludeDir, owner: *Build, io: 
 // system libraries are linked only on final executables: on intermediate
 // static libs zig bakes them into the archive as members, which lld rejects
 // ("archive member ... is neither ET_REL nor LLVM bitcode")
+// MYSQL_INCLUDE_DIR points at the directory holding mysql.h. Oracle/nix layouts
+// also keep a nested mysql/ subdir there that internal headers include as
+// "mysql/...", but Debian/Ubuntu flatten those headers and drop the subdir, so
+// mysql_com.h's `#include "mysql/udf_registration_types.h"` stops resolving.
+// Add the directory that holds the mysql/ component as a *system* include path
+// too (a regular path around /usr/include would shadow zig's bundled libc).
+fn mysqlIncludeDirs(mod: *Build.Module) void {
+    const env = &mod.owner.graph.environ_map;
+    const inc_dir = env.get("MYSQL_INCLUDE_DIR") orelse return;
+    mod.addIncludePath(.{ .cwd_relative = inc_dir });
+    if (std.fs.path.dirname(inc_dir)) |parent|
+        mod.addSystemIncludePath(.{ .cwd_relative = parent });
+}
+
 var pkg_config_cflags_cache: ?std.StringHashMapUnmanaged(?[]const u8) = null;
 
 fn pkgConfigIncludeDirs(mod: *Build.Module, pkg: []const u8) void {

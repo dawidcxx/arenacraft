@@ -1,32 +1,11 @@
 # Custom folder
 
-Here you can create a CMakeLists.txt file where to add your custom scripts.
-They will be git-ignored.
+Legacy shim: `custom_script_loader.cpp` forwards `AddCustomScripts()` to
+`AddArenacraftScripts()` in `src/game/Arenacraft/`. That experiment is slated
+for removal — do not add new code there or here.
 
-Remember to use cmake macros inside your CMakeLists.txt to correctly add your scripts to the project solution.
-
-**/!\ BTW, we strongly suggest you to use our module system to create your custom powerful module instead of simple scripts.**
-
----------------------------
-
-## How to add your custom script:
-
-**1 - Create a CMakeLists.txt in this directory**
-
-Example (everything below is needed, just replace with your scripts' names):
-
-```
-set(scripts_STAT_SRCS
-  ${scripts_STAT_SRCS}
-  ${AC_SCRIPTS_DIR}/Custom/your_script.cpp
-  ${AC_SCRIPTS_DIR}/Custom/your_script.h
-)
-
-AC_ADD_SCRIPT_LOADER("Custom" "ScriptLoader.h")
-
-message("  -> Prepared: My custom scripts")
-```
-
-**2 - Add the script to ../ScriptLoader.cpp**
-
-Open the file `ScriptLoader.cpp` and go at the end to know what to edit.
+New custom gameplay belongs directly in the core (`src/game/`). When you need
+event hooks, use the script registries in
+`src/game/Scripting/ScriptDefines/` (PlayerScript, AllCreatureScript,
+SpellScriptLoader, ...) and register scripts via
+`src/scripts/ScriptLoader.cpp`.
