@@ -37,7 +37,7 @@ void GrantStartingDeathKnightSpells(Player* player);
 // Learns the class's complete level-80 ability set (every rank) directly into
 // the spellbook, so an instant-80 character never has to visit a class trainer.
 // Covers trainer-taught abilities plus the auto/quest abilities trainers do not
-// carry (hunter pet commands, druid forms, warlock summons, mage teleports,
-// warrior stances, ...).
+// carry (hunter pet commands, druid forms, warlock summons, warrior stances,
+// ...). Mage teleports/portals are intentionally omitted (PvP-only server).
 void GrantStartingSpells(Player* player);
 } // namespace arenacraft

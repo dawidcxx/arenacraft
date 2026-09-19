@@ -142,24 +142,9 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          7381,  // Berserker Stance Passive
          7384,  // Overpower
          7386,  // Sunder Armor
-         // Mortal Strike
-         12294, // rank 1
-         21551, // rank 2
-         21552, // rank 3
-         21553, // rank 4
-         25248, // rank 5
-         30330, // rank 6
-         47485, // rank 7
-         47486, // rank 8
          12678, // Stance Mastery
          18499, // Berserker Rage
          20230, // Retaliation
-         // Devastate
-         20243, // rank 1
-         30016, // rank 2
-         30022, // rank 3
-         47497, // rank 4
-         47498, // rank 5
          20252, // Intercept
          21156, // Battle Stance Passive
          23920, // Spell Reflection
@@ -320,21 +305,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          20166, // Seal of Wisdom
          20217, // Blessing of Kings
          20271, // Judgement of Light
-                // Holy Shock
-         20473, // rank 1
-         20929, // rank 2
-         20930, // rank 3
-         27174, // rank 4
-         33072, // rank 5
-         48824, // rank 6
-         48825, // rank 7
-                // Holy Shield
-         20925, // rank 1
-         20927, // rank 2
-         20928, // rank 3
-         27179, // rank 4
-         48951, // rank 5
-         48952, // rank 6
          23214, // Charger
                 // Hammer of Wrath
          24275, // rank 1
@@ -370,12 +340,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          31789, // Righteous Defense
          31801, // Seal of Vengeance
          31884, // Avenging Wrath
-                // Avenger's Shield
-         31935, // rank 1
-         32699, // rank 2
-         32700, // rank 3
-         48826, // rank 4
-         48827, // rank 5
          32223, // Crusader Aura
          34767, // Summon Charger
          34769, // Summon Warhorse
@@ -492,13 +456,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          49045, // rank 11
          3045,  // Rapid Fire
          3127,  // Parry
-               // Black Arrow
-         3674,  // rank 1
-         63668, // rank 2
-         63669, // rank 3
-         63670, // rank 4
-         63671, // rank 5
-         63672, // rank 6
          5116,  // Concussive Shot
          5118,  // Aspect of the Cheetah
          5384,  // Feign Death
@@ -536,30 +493,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          49066, // rank 5
          49067, // rank 6
          19263, // Deterrence
-                // Counterattack
-         19306, // rank 1
-         20909, // rank 2
-         20910, // rank 3
-         27067, // rank 4
-         48998, // rank 5
-         48999, // rank 6
-                // Wyvern Sting
-         19386, // rank 1
-         24132, // rank 2
-         24133, // rank 3
-         27068, // rank 4
-         49011, // rank 5
-         49012, // rank 6
-                // Aimed Shot
-         19434, // rank 1
-         20900, // rank 2
-         20901, // rank 3
-         20902, // rank 4
-         20903, // rank 5
-         20904, // rank 6
-         27065, // rank 7
-         49049, // rank 8
-         49050, // rank 9
          19801, // Tranquilizing Shot
          19878, // Track Demons
          19879, // Track Dragonkin
@@ -586,11 +519,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          34477, // Misdirection
          34600, // Snake Trap
          53271, // Master's Call
-                // Explosive Shot
-         53301, // rank 1
-         60051, // rank 2
-         60052, // rank 3
-         60053, // rank 4
                 // Kill Shot
          53351, // rank 1
          61005, // rank 2
@@ -637,13 +565,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48675, // rank 9
          48676, // rank 10
          921,   // Pick Pocket
-              // Mutilate
-         1329,  // rank 1
-         34411, // rank 2
-         34412, // rank 3
-         34413, // rank 4
-         48663, // rank 5
-         48666, // rank 6
          1725,  // Distract
                // Sinister Strike
          1752,  // rank 1
@@ -732,12 +653,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48689, // rank 8
          48690, // rank 9
          48691, // rank 10
-                // Hemorrhage
-         16511, // rank 1
-         17347, // rank 2
-         17348, // rank 3
-         26864, // rank 4
-         48660, // rank 5
                 // Deadly Throw
          26679, // rank 1
          48673, // rank 2
@@ -836,14 +751,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          25308, // rank 6
          48072, // rank 7
          605,   // Mind Control
-              // Lightwell
-         724,   // rank 1
-         27870, // rank 2
-         27871, // rank 3
-         28275, // rank 4
-         48086, // rank 5
-         48087, // rank 6
-                // Shadow Protection
+              // Shadow Protection
          976,   // rank 1
          10957, // rank 2
          10958, // rank 3
@@ -965,26 +873,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          25331, // rank 7
          48077, // rank 8
          48078, // rank 9
-                // Mind Flay
-         15407, // rank 1
-         17311, // rank 2
-         17312, // rank 3
-         17313, // rank 4
-         17314, // rank 5
-         18807, // rank 6
-         25387, // rank 7
-         48155, // rank 8
-         48156, // rank 9
-                // Desperate Prayer
-         19236, // rank 1
-         19238, // rank 2
-         19240, // rank 3
-         19241, // rank 4
-         19242, // rank 5
-         19243, // rank 6
-         25437, // rank 7
-         48172, // rank 8
-         48173, // rank 9
                 // Prayer of Fortitude
          21562, // rank 1
          21564, // rank 2
@@ -1013,26 +901,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48112, // rank 2
          48113, // rank 3
          34433, // Shadowfiend
-                // Circle of Healing
-         34861, // rank 1
-         34863, // rank 2
-         34864, // rank 3
-         34865, // rank 4
-         34866, // rank 5
-         48088, // rank 6
-         48089, // rank 7
-                // Vampiric Touch
-         34914, // rank 1
-         34916, // rank 2
-         34917, // rank 3
-         48159, // rank 4
-         48160, // rank 5
          34919, // Vampiric Touch
-                // Penance
-         47540, // rank 1
-         53005, // rank 2
-         53006, // rank 3
-         53007, // rank 4
                 // Mind Sear
          48045, // rank 1
          53023, // rank 2
@@ -1096,24 +965,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          51423, // rank 2
          51424, // rank 3
          51425, // rank 4
-                // Frost Strike
-         49143, // rank 1
-         51416, // rank 2
-         51417, // rank 3
-         51418, // rank 4
-         51419, // rank 5
-         55268, // rank 6
-                // Corpse Explosion
-         49158, // rank 1
-         51325, // rank 2
-         51326, // rank 3
-         51327, // rank 4
-         51328, // rank 5
-                // Howling Blast
-         49184, // rank 1
-         51409, // rank 2
-         51410, // rank 3
-         51411, // rank 4
                 // Death Strike
          49998, // rank 1
          49999, // rank 2
@@ -1134,18 +985,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          53428, // Runeforging
          54446, // Rune of Swordbreaking
          54447, // Rune of Spellbreaking
-                // Heart Strike
-         55050, // rank 1
-         55258, // rank 2
-         55259, // rank 3
-         55260, // rank 4
-         55261, // rank 5
-         55262, // rank 6
-                // Scourge Strike
-         55090, // rank 1
-         55265, // rank 2
-         55270, // rank 3
-         55271, // rank 4
          56222, // Dark Command
          56815, // Rune Strike
                 // Horn of Winter
@@ -1221,13 +1060,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          526,   // Cure Toxins
          546,   // Water Walking
          556,   // Astral Recall
-              // Earth Shield
-         974,   // rank 1
-         32593, // rank 2
-         32594, // rank 3
-         49283, // rank 4
-         49284, // rank 5
-                // Chain Heal
+              // Chain Heal
          1064,  // rank 1
          10622, // rank 2
          10623, // rank 3
@@ -1440,20 +1273,10 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          58746, // rank 5
          58749, // rank 6
          20608, // Reincarnation
-                // Totem of Wrath
-         30706, // rank 1
-         57720, // rank 2
-         57721, // rank 3
-         57722, // rank 4
          30824, // Shamanistic Rage
          32182, // Heroism
          36591, // Spirit Weapons
          36936, // Totemic Recall
-                // Thunderstorm
-         51490, // rank 1
-         59156, // rank 2
-         59158, // rank 3
-         59159, // rank 4
                 // Lava Burst
          51505, // rank 1
          60043, // rank 2
@@ -1476,11 +1299,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          33736, // rank 8
          57960, // rank 9
          57994, // Wind Shear
-                // Riptide
-         61295, // rank 1
-         61299, // rank 2
-         61300, // rank 3
-         61301, // rank 4
          66842, // Call of the Elements
          66843, // Call of the Ancestors
          66844, // Call of the Spirits
@@ -1664,13 +1482,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27074, // rank 9
          42858, // rank 10
          42859, // rank 11
-         3561,  // Teleport: Stormwind
-         3562,  // Teleport: Ironforge
-         3563,  // Teleport: Undercity
-         3565,  // Teleport: Darnassus
-         3566,  // Teleport: Thunder Bluff
-         3567,  // Teleport: Orgrimmar
-               // Arcane Missiles
+                // Arcane Missiles
          5143,  // rank 1
          5144,  // rank 2
          5145,  // rank 3
@@ -1716,44 +1528,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          10220, // rank 4
          27124, // rank 5
          43008, // rank 6
-         10059, // Portal: Stormwind
-                // Blast Wave
-         11113, // rank 1
-         13018, // rank 2
-         13019, // rank 3
-         13020, // rank 4
-         13021, // rank 5
-         27133, // rank 6
-         33933, // rank 7
-         42944, // rank 8
-         42945, // rank 9
-                // Pyroblast
-         11366, // rank 1
-         12505, // rank 2
-         12522, // rank 3
-         12523, // rank 4
-         12524, // rank 5
-         12525, // rank 6
-         12526, // rank 7
-         18809, // rank 8
-         27132, // rank 9
-         33938, // rank 10
-         42890, // rank 11
-         42891, // rank 12
-         11416, // Portal: Ironforge
-         11417, // Portal: Orgrimmar
-         11418, // Portal: Undercity
-         11419, // Portal: Darnassus
-         11420, // Portal: Thunder Bluff
-                // Ice Barrier
-         11426, // rank 1
-         13031, // rank 2
-         13032, // rank 3
-         13033, // rank 4
-         27134, // rank 5
-         33405, // rank 6
-         43038, // rank 7
-         43039, // rank 8
          12051, // Evocation
          12355, // Impact
                 // Arcane Brilliance
@@ -1774,45 +1548,16 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          30482, // rank 1
          43045, // rank 2
          43046, // rank 3
-                // Dragon's Breath
-         31661, // rank 1
-         33041, // rank 2
-         33042, // rank 3
-         33043, // rank 4
-         42949, // rank 5
-         42950, // rank 6
-         32266, // Portal: Exodar
-         32267, // Portal: Silvermoon
-         32271, // Teleport: Exodar
-         32272, // Teleport: Silvermoon
-         33690, // Teleport: Shattrath
-         33691, // Portal: Shattrath
-         35715, // Teleport: Shattrath
-         35717, // Portal: Shattrath
                 // Conjure Refreshment
          42955, // rank 1
          42956, // rank 2
                 // Ritual of Refreshment
          43987, // rank 1
          58659, // rank 2
-                // Arcane Barrage
-         44425, // rank 1
-         44780, // rank 2
-         44781, // rank 3
-                // Living Bomb
-         44457, // rank 1
-         55359, // rank 2
-         55360, // rank 3
                 // Frostfire Bolt
          44614, // rank 1
          47610, // rank 2
          45438, // Ice Block
-         49358, // Teleport: Stonard
-         49359, // Teleport: Theramore
-         49360, // Portal: Theramore
-         49361, // Portal: Stonard
-         53140, // Teleport: Dalaran
-         53142, // Portal: Dalaran
          55342, // Mirror Image
      }},
     {CLASS_WARLOCK,
@@ -2041,23 +1786,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27223, // rank 4
          47859, // rank 5
          47860, // rank 6
-                // Shadowburn
-         17877, // rank 1
-         18867, // rank 2
-         18868, // rank 3
-         18869, // rank 4
-         18870, // rank 5
-         18871, // rank 6
-         27263, // rank 7
-         30546, // rank 8
-         47826, // rank 9
-         47827, // rank 10
-                // Dark Pact
-         18220, // rank 1
-         18937, // rank 2
-         18938, // rank 3
-         27265, // rank 4
-         59092, // rank 5
          23161, // Dreadsteed
                 // Seed of Corruption
          27243, // rank 1
@@ -2082,33 +1810,11 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
                 // Ritual of Souls
          29893, // rank 1
          58887, // rank 2
-                // Unstable Affliction
-         30108, // rank 1
-         30404, // rank 2
-         30405, // rank 3
-         47841, // rank 4
-         47843, // rank 5
-                // Shadowfury
-         30283, // rank 1
-         30413, // rank 2
-         30414, // rank 3
-         47846, // rank 4
-         47847, // rank 5
                 // Shadowflame
          47897, // rank 1
          61290, // rank 2
          48018, // Demonic Circle: Summon
          48020, // Demonic Circle: Teleport
-                // Haunt
-         48181, // rank 1
-         59161, // rank 2
-         59163, // rank 3
-         59164, // rank 4
-                // Chaos Bolt
-         50796, // rank 1
-         59170, // rank 2
-         59171, // rank 3
-         59172, // rank 4
          58889, // Create Soulwell
      }},
     {CLASS_DRUID,
@@ -2298,15 +2004,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
                // Bear Form
          5487, // rank 1
          9634, // rank 2
-               // Insect Swarm
-         5570,  // rank 1
-         24974, // rank 2
-         24975, // rank 3
-         24976, // rank 4
-         24977, // rank 5
-         27013, // rank 6
-         48468, // rank 7
-                // Ravage
+               // Ravage
          6785,  // rank 1
          6787,  // rank 2
          9866,  // rank 3
@@ -2446,23 +2144,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          33943, // rank 1
          40120, // rank 2
          33950, // Flight Form
-                // Wild Growth
-         48438, // rank 1
-         53248, // rank 2
-         53249, // rank 3
-         53251, // rank 4
-                // Starfall
-         48505, // rank 1
-         53199, // rank 2
-         53200, // rank 3
-         53201, // rank 4
          50464, // Nourish
-                // Typhoon
-         50516, // rank 1
-         53223, // rank 2
-         53225, // rank 3
-         53226, // rank 4
-         61384, // rank 5
                 // Revive
          50769, // rank 1
          50768, // rank 2
