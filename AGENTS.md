@@ -64,7 +64,7 @@ script/plugin layer.
     (`ApplySpellFix(...)`)
   - scripted behavior → `src/game/Scripts/Spells/spell_<class>.cpp` with
     `RegisterSpellScript`, bound via `spell_script_names` DB table
-- Vendor items: `npc_vendor` rows.
+- Vendor items: `npc_vendor` rows or code-driven stock (see `ai-doc/vendor.md`).
 - Scripts are plain game code, compiled into the `game` library (no separate
   module, no dynamic loading). The registry is hand-maintained — edit directly,
   no globs: `src/game/Scripts/ScriptLoader.cpp`.
@@ -77,3 +77,6 @@ script/plugin layer.
 - Repo was restructured from upstream: `src/server/game/...` → `src/game/...`.
   AC wiki docs and old diffs reference stale paths.
 - `.env` holds secrets; never commit it.
+- `ai-doc/` holds living reference notes (e.g. `ai-doc/vendor.md`). If a doc is
+  outdated or wrong when you touch the area it describes, update/reify it in the
+  same change — don't leave it stale.

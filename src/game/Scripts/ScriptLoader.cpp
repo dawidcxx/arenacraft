@@ -33,6 +33,9 @@ void AddPetScripts();
 void AddSpellsScripts();
 void AddWorldScripts();
 
+// Arenacraft custom scripts
+void AddArenacraftScripts();
+
 /// Exposed in script modules to register all scripts to the ScriptMgr.
 void AddScripts()
 {
@@ -43,4 +46,7 @@ void AddScripts()
     AddPetScripts();
     AddSpellsScripts();
     AddWorldScripts();
+
+    // Arenacraft custom scripts
+    AddArenacraftScripts();
 }
