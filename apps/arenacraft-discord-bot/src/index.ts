@@ -17,7 +17,9 @@ import { CharacterService } from "./characterService";
 
 const config = getConfig();
 console.log("config", config);
-const discordBot = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
+const discordBot = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+});
 const discordRestClient = new REST().setToken(config.DISCORD_TOKEN);
 const authDb = await mysql.createConnection({
   uri: config.ACORE_AUTH_DB,

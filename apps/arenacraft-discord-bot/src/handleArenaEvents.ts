@@ -1,4 +1,10 @@
-import { ChannelType, Collection, TextChannel, VoiceChannel, type Guild } from "discord.js";
+import {
+  ChannelType,
+  Collection,
+  TextChannel,
+  VoiceChannel,
+  type Guild,
+} from "discord.js";
 import { assert, isNil, requireNotNull, throttle } from "./utils";
 import { z } from "zod";
 import { AllRoomsTakenError } from "./error";
@@ -33,8 +39,8 @@ export function getHandleAreneaEvents(
       console.error("Failed to parse message", message.error);
       return;
     }
-    try { 
-    await rooms.book(message.data);
+    try {
+      await rooms.book(message.data);
     } catch (e) {
       if (e instanceof AllRoomsTakenError) {
         await infoChannel.send(
@@ -44,7 +50,7 @@ export function getHandleAreneaEvents(
         throw e;
       }
     }
-  };
+  }
 
   async function handleArenaEndedCmd(messageRaw: string) {
     const message = ArenaEndedEventSchema.safeParse(JSON.parse(messageRaw));
@@ -85,7 +91,10 @@ const ArenaEndedEventSchema = z.object({
 
 type ArenaEndedEvent = z.infer<typeof ArenaEndedEventSchema>;
 
-function buildRooms(waitingRoom: VoiceChannel, gameChannels: Collection<string, VoiceChannel>) {
+function buildRooms(
+  waitingRoom: VoiceChannel,
+  gameChannels: Collection<string, VoiceChannel>,
+) {
   const groupping: Record<string, Array<VoiceChannel>> = {};
   const rooms: Array<Room> = [];
   // remap channels from { [channel1-1]: .., [channel1-2] } to { "1": [channel1, channel2] } etc
@@ -100,7 +109,10 @@ function buildRooms(waitingRoom: VoiceChannel, gameChannels: Collection<string, 
     }
   }
   for (const channelPair of Object.values(groupping)) {
-    assert(channelPair.length === 2, `Invalid channel group size: ${channelPair.length}`);
+    assert(
+      channelPair.length === 2,
+      `Invalid channel group size: ${channelPair.length}`,
+    );
     rooms.push(new Room(waitingRoom, channelPair[0], channelPair[1]));
   }
 
@@ -114,18 +126,15 @@ class Room {
     public waitingRoom: VoiceChannel,
     public channel1: VoiceChannel,
     public channel2: VoiceChannel,
-  ) { }
+  ) {}
 
   public get isTaken() {
     return this.instanceId !== null;
   }
 
-  async take(
-    event: ArenaStartedEvent,
-    characterService: CharacterService, 
-  ) {
+  async take(event: ArenaStartedEvent, characterService: CharacterService) {
     this.instanceId = event.instanceId;
-    
+
     const team1DiscordIds = await Promise.all(
       event.team1.map((it) =>
         characterService.getDiscordIdByCharacterName(it.characterName),
@@ -138,28 +147,34 @@ class Room {
       ),
     );
 
-    // queues get processed once every 5s 
-    await throttle('REFRESH_WAITING_ROOMS', async () => {
-       await this.waitingRoom.fetch();
+    // queues get processed once every 5s
+    await throttle("REFRESH_WAITING_ROOMS", async () => {
+      await this.waitingRoom.fetch();
     });
 
     let moveCount = 0;
-    const moveToGameChannel = (channel: VoiceChannel) => async (discordId: string) => {
-      const member = this.waitingRoom.members.get(discordId);
-      if (isNil(member)) {
-        return;
-      }
-      moveCount += 1;
-      await member.voice.setChannel(channel);
-    }
+    const moveToGameChannel =
+      (channel: VoiceChannel) => async (discordId: string) => {
+        const member = this.waitingRoom.members.get(discordId);
+        if (isNil(member)) {
+          return;
+        }
+        moveCount += 1;
+        await member.voice.setChannel(channel);
+      };
 
-    const team1ChannelMoves = team1DiscordIds.map(moveToGameChannel(this.channel1));
-    const team2ChannelMoves = team2DiscordIds.map(moveToGameChannel(this.channel2));
+    const team1ChannelMoves = team1DiscordIds.map(
+      moveToGameChannel(this.channel1),
+    );
+    const team2ChannelMoves = team2DiscordIds.map(
+      moveToGameChannel(this.channel2),
+    );
 
     await Promise.all([team1ChannelMoves, team2ChannelMoves].flat());
 
-    console.info(`Moved ${moveCount} members to game channels for game '${event.instanceId}'`);
-
+    console.info(
+      `Moved ${moveCount} members to game channels for game '${event.instanceId}'`,
+    );
   }
 
   async release() {
@@ -167,10 +182,12 @@ class Room {
 
     const members1 = this.channel1.members;
     const members2 = this.channel2.members;
-    
-    const channelMoves = [...members1.values(), ...members2.values()].map(async (member) => {  
-      await member.voice.setChannel(this.waitingRoom);
-    });
+
+    const channelMoves = [...members1.values(), ...members2.values()].map(
+      async (member) => {
+        await member.voice.setChannel(this.waitingRoom);
+      },
+    );
 
     await Promise.all(channelMoves);
   }
@@ -181,7 +198,7 @@ class Rooms {
     public readonly rooms: Room[],
     public readonly waitRoomChannel: VoiceChannel,
     public readonly characterService: CharacterService,
-  ) { }
+  ) {}
 
   getRoomByInstanceId(instanceId: number): Room | null {
     const room = this.rooms.find((it) => it.instanceId);

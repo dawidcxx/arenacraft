@@ -31,6 +31,7 @@ invites the six players (see `CreateArenaForMatch`).
 | `SoloqTeam.hpp/.cpp` | the player's real 5v5 `ArenaTeam` (visible in the PvP pane, persisted in the characters DB) |
 | `SoloqArenaQueue.hpp/.cpp` | registers/removes players in the real 5v5 battleground queue (client badge) and creates/invites a 3v3 arena for a match |
 | `SoloqNpc.hpp/.cpp` | `SoloqNpc` (gossip menu on entry 20810), `SoloqDriver` (world tick) and `SoloqBattlegroundScript` (suppresses core 5v5 matchmaking) |
+| `SoloqEvents.hpp/.cpp` | builds and publishes the `soloq-matchup` Redis event when a match pops |
 | `*_test.cpp` | doctest unit tests (co-located, auto-discovered by the game test target) |
 
 The pure logic (`Types`/`Roles`/`SoloqQueue`/`Outcome`) only depends on the core
@@ -177,6 +178,50 @@ The matchmaker builds 3-player teams. The queue is 5v5, but the arena instance i
 created with `ARENA_TYPE_3v3`, so the match itself (scoreboard, ready check 6/6)
 is treated as 3v3 while the queue badge stays on the 5v5 track.
 
+## Redis matchup event
+
+When a match pops (i.e. `CreateArenaForMatch` has created the arena and sent
+the invites), the core publishes a `soloq-matchup` event so external consumers
+(web, Discord, overlays) can react. Publishing is **best-effort**: `RedisConn`
+(`src/common/Redis/`) never blocks the world, reconnects on demand (10s backoff)
+and no-ops when Redis is disabled or unreachable. Config is `AC_REDIS_ENABLED`,
+`AC_REDIS_HOST`, `AC_REDIS_PORT`, `AC_REDIS_PASSWORD`, `AC_REDIS_DB` (see
+`.env.example`).
+
+Payload (`event = "soloq.matchup"`, see `SoloqEvents.hpp`):
+
+```json
+{
+  "event": "soloq.matchup",
+  "instanceId": 1234,
+  "arenaType": 3,
+  "matchup": { "instanceId": 1234, "arenaType": 3, "mapId": 617, "bracketId": 2, "queueType": 5, "startedAtMs": 1700000000000 },
+  "players": [
+    { "guid": "0x0000000000001000", "characterName": "Alpha", "accountId": 1, "accountName": "acc-alpha",
+      "classId": 1, "specIndex": 0, "role": "melee", "teamId": 0, "faction": "alliance", "rating": 1500, "mmr": 1550 }
+  ],
+  "teamA": { "teamId": 0, "faction": "alliance", "averageRating": 1400, "averageMmr": 1450, "players": [/* 3 */] },
+  "teamB": { "teamId": 1, "faction": "horde", "averageRating": 1300, "averageMmr": 1350, "players": [/* 3 */] },
+  "rating": {
+    "teamA": { "averageRating": 1400, "averageMmr": 1450, "winDelta": 9, "lossDelta": -7 },
+    "teamB": { "averageRating": 1300, "averageMmr": 1350, "winDelta": 7, "lossDelta": -9 }
+  }
+}
+```
+
+- `players` is the flat union (team A first, then team B); `teamA`/`teamB` inline
+  the same objects. Each player carries the role slot, rating/MMR snapshot, the
+  character name and the auth account id/name.
+- `guid` is serialized as a `0x`-prefixed hex **string** (raw `ObjectGuid` is a
+  uint64 and would lose precision as a JSON number).
+- `winDelta`/`lossDelta` come from the same Elo used by `resolveMatch`; they are
+  the hypothetical result for each side (`Outcome.hpp` exposes
+  `teamAverageMmr`/`teamAverageRating`/`winningRatingDelta`).
+- `SoloqEvents_test.cpp` covers the pure `buildMatchupPayload` serializer.
+
+`arena-ended` is **not** emitted yet; when a consumer needs to close a session
+keyed by `instanceId`, add it from `SoloqBattlegroundScript::OnBattlegroundEnd`.
+
 ## Debug command
 
 `src/game/Scripts/Commands/cs_soloq.cpp` (registered in `cs_script_loader.cpp`),
@@ -206,3 +251,4 @@ admin-only:
 - Block talent/spec changes while queued (cheat prevention).
 - Queue-count queries and richer NPC/UI feedback.
 - Thread safety once there is more than one writer.
+- Emit `arena-ended` (instance id) so event consumers can close sessions.

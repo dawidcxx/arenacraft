@@ -24,7 +24,10 @@ export function assert(condition: boolean, message: string): asserts condition {
 }
 
 const throttleMap = new Map<string, number>();
-export function throttle<T>(throttleActionKey: string, action: () => Promise<void>) {
+export function throttle<T>(
+  throttleActionKey: string,
+  action: () => Promise<void>,
+) {
   const lastAction = throttleMap.get(throttleActionKey);
   if (lastAction === undefined || +new Date() - lastAction > 5000) {
     throttleMap.set(throttleActionKey, +new Date());

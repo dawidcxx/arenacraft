@@ -40,9 +40,9 @@ export async function createUser(
   const salt = randomBytes(32);
   const verifier = getVerifier(params.username, params.password, salt);
 
-  if (
-    !(isValidSrp6SecurityBuffer(verifier) && isValidSrp6SecurityBuffer(salt))
-  ) {
+  if (!(
+    isValidSrp6SecurityBuffer(verifier) && isValidSrp6SecurityBuffer(salt)
+  )) {
     throw new RetryError("Generated invalid buffers, retrying");
   }
 

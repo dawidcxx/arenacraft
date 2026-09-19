@@ -6,6 +6,7 @@
 #include "DBCStores.h"
 #include "Player.h"
 #include "SharedDefines.h"
+#include "SoloqEvents.hpp"
 #include "SoloqService.hpp"
 #include "WorldPacket.h"
 
@@ -109,6 +110,10 @@ bool CreateArenaForMatch(Match const& match)
   SoloqService::instance().registerMatch(arena->GetInstanceID(), match);
 
   arena->StartBattleground();
+
+  // Notify external consumers that a matchup popped. Best-effort: a missing
+  // Redis never blocks the arena.
+  publishMatchup(makeMatchupEvent(match, arena));
   return true;
 }
 } // namespace arenacraft::soloq
