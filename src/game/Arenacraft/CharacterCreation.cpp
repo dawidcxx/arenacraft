@@ -78,4 +78,21 @@ void GrantStartingMount(Player* player)
   if (!player->HasSpell(StartingMountSpell))
     player->addSpell(StartingMountSpell, SPEC_MASK_ALL, true);
 }
+
+void GrantStartingFirstAid(Player* player)
+{
+  // SetSkill adds the skill line if missing and learns the rewarded bandage
+  // ranks.
+  player->SetSkill(SKILL_FIRST_AID, 0, 450, 450);
+}
+
+void GrantStartingTotems(Player* player)
+{
+  if (player->getClass() != CLASS_SHAMAN)
+    return;
+
+  static constexpr uint32 Totems[] = {5175, 5176, 5177, 5178}; // Earth/Fire/Water/Air
+  for (uint32 totem : Totems)
+    player->StoreNewItemInBestSlots(totem, 1);
+}
 } // namespace arenacraft

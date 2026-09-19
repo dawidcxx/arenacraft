@@ -65,6 +65,15 @@ Menus can be built without SQL by overriding
   naming the item. Add a name to `CategoryOrder()` to create a new gossip
   option / vendor list (menu index `i` maps to `VendorEntryBase + i`).
 
+The first menu entry is **General goods**. `GeneralGoodsVendorItems.cpp` holds a
+flat `std::vector<uint32>` of everyday consumables/reagents (conjured mage food,
+Soul Shard, ammo, rogue poisons, class reagents, the best WotLK bandage) exposed
+as `AllGeneralGoods()`;
+the option points at `GeneralGoodsVendorEntry`. It is inserted before the
+categories, and because the gossip menu is a `std::map` keyed by menu item id it
+takes id 0 and shows first. Some entries are conjured and tagged "Not available
+to players" on evowow, but are intentionally stocked anyway.
+
 The menu also has a class-dependent **Glyphs** option. It is not part of the
 item list: `GlyphVendorItems.cpp` holds a flat `{CLASS_X, itemId}` list (one row
 per glyph, grouped/ordered by class, trailing comment naming it) exposed as
@@ -123,6 +132,8 @@ options fall through to the core handler):
 
 Item ids are checked against wotlk.evowow.com; skip anything tagged
 "Not available to players". No `npc_vendor` SQL is involved (`persist = false`).
+Soul Shards (`6265`) are made stackable (stack size 20) by the world migration
+`data/sql/updates/db_world/2026_09_19_00.sql` (applied by `scripts/db_sync`).
 
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator

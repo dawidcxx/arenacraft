@@ -14,4 +14,11 @@ void GrantStartingWeaponSkills(Player* player);
 // Learns the maximum riding skill plus a ground mount directly into the
 // spellbook. The mount is a spell, not an item, so it never touches the bags.
 void GrantStartingMount(Player* player);
+
+// Raises the First Aid secondary skill to the level cap.
+void GrantStartingFirstAid(Player* player);
+
+// Puts the four starting shaman totems into the bags (the totem quests are
+// skipped on a level-80-only server). No-op for other classes.
+void GrantStartingTotems(Player* player);
 } // namespace arenacraft

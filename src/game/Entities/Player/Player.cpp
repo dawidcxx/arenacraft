@@ -621,6 +621,7 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
   // with riding, at creation rather than through a first-login script.
   arenacraft::GrantStartingWeaponSkills(this);
   arenacraft::GrantStartingMount(this);
+  arenacraft::GrantStartingFirstAid(this);
 
   // original action bar
   for (PlayerCreateInfoActions::const_iterator action_itr = info->action.begin(); action_itr != info->action.end();
@@ -643,6 +644,9 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
     if (bagMsg == EQUIP_ERR_OK)
       EquipNewItem(bagDest, startingBagItem, true);
   }
+
+  // Shamans get their four totems in the bags (after the bags exist).
+  arenacraft::GrantStartingTotems(this);
 
   // ensure player starts with full health
   UpdateAllStats();

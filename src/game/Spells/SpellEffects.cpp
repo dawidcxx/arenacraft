@@ -3101,12 +3101,11 @@ void Spell::EffectEnchantItemTmp(SpellEffIndex effIndex)
   // select enchantment duration
   uint32 duration;
 
-  // rogue family enchantments exception by duration
-  if (m_spellInfo->Id == 38615)
-    duration = 1800; // 30 mins
-  // other rogue family enchantments always 1 hour (some have spell damage=0, but some have wrong data in EffBasePoints)
-  else if (m_spellInfo->SpellFamilyName == SPELLFAMILY_ROGUE)
-    duration = 3600; // 1 hour
+  // Arenacraft: rogue family enchantments (poisons) last 7 days instead of the
+  // DBC 30 mins / 1 hour, so they don't need reapplying while gearing up. The
+  // family-wide override also covers the odd poison with wrong EffBasePoints.
+  if (m_spellInfo->SpellFamilyName == SPELLFAMILY_ROGUE)
+    duration = 7 * 24 * 3600; // 7 days
   // shaman family enchantments
   else if (m_spellInfo->SpellFamilyName == SPELLFAMILY_SHAMAN)
     duration = 1800; // 30 mins

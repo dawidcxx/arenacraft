@@ -21,7 +21,15 @@ What a fresh character gets:
 - **Mount + riding.** `arenacraft::GrantStartingMount` learns the four Riding
   ranks (33388/33389/34090/34091), Cold Weather Flying (54197) and the Magic
   Rooster mount (65917) as spells, so nothing lands in the bags.
+- **First Aid.** `arenacraft::GrantStartingFirstAid` raises the First Aid
+  secondary skill (`SKILL_FIRST_AID`, 129) to the level cap (450) via
+  `Player::SetSkill`, which also learns the rewarded bandage ranks.
+- **Shaman totems.** `arenacraft::GrantStartingTotems` puts the four starting
+  totems - Earth (5175), Fire (5176), Water (5177), Air (5178) - into the bags
+  (the totem quests are skipped on a level-80-only server). No-op for other
+  classes.
 
-Both helpers are called from `Player::Create` right after
-`LearnDefaultSkills()` / `LearnCustomSpells()`. Extend the tables in
-`CharacterCreation.cpp` to change what classes get.
+The helpers are called from `Player::Create` right after
+`LearnDefaultSkills()` / `LearnCustomSpells()`, except `GrantStartingTotems`,
+which runs after the starting bags are equipped so the items have somewhere to
+go. Extend the tables in `CharacterCreation.cpp` to change what classes get.

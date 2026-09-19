@@ -94,46 +94,54 @@ bool ItemVendor::CanCreatureGossipHello(Player* player, Creature* creature)
   GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
   menu.SetMenuId(GossipMenuId);
 
-  for (uint32 i = 0; i < uint32(categories.size()); ++i)
+  // Menu items are kept in a std::map keyed by menu item id, so the ids are
+  // assigned in display order. "General goods" is deliberately the first entry.
+  uint32 menuIndex = 0;
+
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "General goods", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, GeneralGoodsVendorEntry, 0);
+  ++menuIndex;
+
+  for (uint32 i = 0; i < uint32(categories.size()); ++i, ++menuIndex)
   {
-    menu.AddMenuItem(int32(i), GOSSIP_ICON_VENDOR, std::string(categories[i].Name), 0, GOSSIP_OPTION_VENDOR, "", 0,
-                     false);
-    menu.AddGossipMenuItemData(i, VendorEntryBase + i, 0);
+    menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, std::string(categories[i].Name), 0, GOSSIP_OPTION_VENDOR, "",
+                     0, false);
+    menu.AddGossipMenuItemData(menuIndex, VendorEntryBase + i, 0);
   }
 
   // Glyphs depend on the player's class, so this option points at a
   // class-specific vendor list (stocked in ItemVendorStock::OnStartup).
-  uint32 const glyphMenuIndex = uint32(categories.size());
-  menu.AddMenuItem(int32(glyphMenuIndex), GOSSIP_ICON_VENDOR, "Glyphs", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
-  menu.AddGossipMenuItemData(glyphMenuIndex, GlyphVendorEntryBase + player->getClass(), 0);
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "Glyphs", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, GlyphVendorEntryBase + player->getClass(), 0);
+  ++menuIndex;
 
   // One shared, slot-ordered enchant list for every player.
-  uint32 const enchantMenuIndex = glyphMenuIndex + 1;
-  menu.AddMenuItem(int32(enchantMenuIndex), GOSSIP_ICON_VENDOR, "Enchantments", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
-  menu.AddGossipMenuItemData(enchantMenuIndex, EnchantVendorEntry, 0);
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "Enchantments", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, EnchantVendorEntry, 0);
+  ++menuIndex;
 
   // Ordinary WotLK epic gems (grouped by colour), then the WotLK meta gems.
-  uint32 const gemsMenuIndex = enchantMenuIndex + 1;
-  menu.AddMenuItem(int32(gemsMenuIndex), GOSSIP_ICON_VENDOR, "Gems", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
-  menu.AddGossipMenuItemData(gemsMenuIndex, GemVendorEntry, 0);
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "Gems", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, GemVendorEntry, 0);
+  ++menuIndex;
 
-  uint32 const metaGemsMenuIndex = gemsMenuIndex + 1;
-  menu.AddMenuItem(int32(metaGemsMenuIndex), GOSSIP_ICON_VENDOR, "Meta Gems", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
-  menu.AddGossipMenuItemData(metaGemsMenuIndex, MetaGemVendorEntry, 0);
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "Meta Gems", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, MetaGemVendorEntry, 0);
+  ++menuIndex;
 
   // Utility actions, handled in CanCreatureGossipSelect.
-  uint32 const resetTalentsIndex = metaGemsMenuIndex + 1;
-  menu.AddMenuItem(int32(resetTalentsIndex), GOSSIP_ICON_TRAINER, "Reset Talents", 0, UtilResetTalents, "", 0, false);
-  menu.AddGossipMenuItemData(resetTalentsIndex, 0, 0);
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_TRAINER, "Reset Talents", 0, UtilResetTalents, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, 0, 0);
+  ++menuIndex;
 
-  uint32 const dualSpecIndex = resetTalentsIndex + 1;
-  menu.AddMenuItem(int32(dualSpecIndex), GOSSIP_ICON_TRAINER, "Learn Dual Talent Specialization", 0, UtilLearnDualSpec,
-                   "", 0, false);
-  menu.AddGossipMenuItemData(dualSpecIndex, 0, 0);
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_TRAINER, "Learn Dual Talent Specialization", 0, UtilLearnDualSpec, "",
+                   0, false);
+  menu.AddGossipMenuItemData(menuIndex, 0, 0);
+  ++menuIndex;
 
-  uint32 const learnSpellsIndex = dualSpecIndex + 1;
-  menu.AddMenuItem(int32(learnSpellsIndex), GOSSIP_ICON_TRAINER, "Learn Spells", 0, UtilLearnSpells, "", 0, false);
-  menu.AddGossipMenuItemData(learnSpellsIndex, 0, 0);
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_TRAINER, "Learn Spells", 0, UtilLearnSpells, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, 0, 0);
+  ++menuIndex;
 
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
   return true;
@@ -193,6 +201,10 @@ void ItemVendorStock::OnStartup()
     StockItem(ItemVendor::GemVendorEntry, item);
   for (uint32 item : AllMetaGems())
     StockItem(ItemVendor::MetaGemVendorEntry, item);
+
+  // Shared general-goods list, opened by the "General goods" option.
+  for (uint32 item : AllGeneralGoods())
+    StockItem(ItemVendor::GeneralGoodsVendorEntry, item);
 
   // "Learn Spells" is served from the player's real class trainer list (see
   // ClassTrainer.hpp). The vendor only needs a non-class trainer_type so the
