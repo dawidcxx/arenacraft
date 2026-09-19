@@ -19,21 +19,21 @@ export async function handleRegister(interaction: ChatInputCommandInteraction, a
   const discordUsername = interaction.user.username;
   const accountName = normalizeAccountName(discordUsername);
 
+  // Acknowledge within Discord's 3s window; the DB/SRP work below can be slower.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
   if (!accountName) {
-    await interaction.reply({
-      content:
-        `Your Discord name \`${discordUsername}\` can't be used as an ArenaCraft account name.\n` +
-        "Supported names are 2-20 letters or digits (no dots, dashes, underscores or spaces).",
-      flags: MessageFlags.Ephemeral,
-    });
+    await interaction.editReply(
+      `Your Discord name \`${discordUsername}\` can't be used as an ArenaCraft account name.\n` +
+        "Supported names are 2-20 letters, digits or underscores (no dots, dashes or spaces).",
+    );
     return;
   }
 
   if (await authDb.accountExists(accountName)) {
-    await interaction.reply({
-      content: `An account named \`${accountName}\` is already registered. If you lost your password, ask an admin.`,
-      flags: MessageFlags.Ephemeral,
-    });
+    await interaction.editReply(
+      `An account named \`${accountName}\` is already registered. If you lost your password, ask an admin.`,
+    );
     return;
   }
 
@@ -41,7 +41,7 @@ export async function handleRegister(interaction: ChatInputCommandInteraction, a
   await authDb.createAccount(accountName, password);
 
   const reply = `Welcome to ArenaCraft! Your login:\n${credentialsBlock(accountName, password)}`;
-  await interaction.reply({ content: reply, flags: MessageFlags.Ephemeral });
+  await interaction.editReply(reply);
 
   try {
     await interaction.user.send(reply);
