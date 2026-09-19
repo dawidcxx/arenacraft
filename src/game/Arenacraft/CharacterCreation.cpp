@@ -34,6 +34,22 @@ enum WeaponProficiency : uint32
   THROW_WAR    = 2567,
 };
 
+// Armor proficiency passives, by class. The lower tiers a class can wear
+// (cloth/leather/mail) already come from `playercreateinfo_skills`; the ones
+// below are the top tiers that normally need a trainer (plate for
+// warrior/paladin/death knight, mail for hunter/shaman). Learned up front so an
+// instant-80 character can equip the vendor gear immediately.
+enum ArmorProficiency : uint32
+{
+  PLATE_MAIL = 750,
+  MAIL       = 8737,
+};
+
+std::unordered_map<uint8, uint32> const ClassArmorProficiencies = {
+    {CLASS_WARRIOR, PLATE_MAIL},      {CLASS_PALADIN, PLATE_MAIL}, {CLASS_HUNTER, MAIL},
+    {CLASS_DEATH_KNIGHT, PLATE_MAIL}, {CLASS_SHAMAN, MAIL},
+};
+
 std::unordered_map<uint8, std::vector<uint32>> const ClassWeaponProficiencies = {
     {CLASS_WARRIOR,
      {THROW_WAR, TWO_H_SWORDS, TWO_H_MACES, TWO_H_AXES, STAVES, POLEARMS, ONE_H_SWORDS, ONE_H_MACES, ONE_H_AXES, GUNS,
@@ -56,6 +72,16 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassWeaponProficiencies = 
 constexpr uint32 RidingSpells[]     = {33388, 33389, 34090, 34091, 54197};
 constexpr uint32 StartingMountSpell = 65917; // Magic Rooster
 } // namespace
+
+void GrantStartingArmorProficiencies(Player* player)
+{
+  auto itr = ClassArmorProficiencies.find(player->getClass());
+  if (itr == ClassArmorProficiencies.end())
+    return;
+
+  if (!player->HasSpell(itr->second))
+    player->addSpell(itr->second, SPEC_MASK_ALL, true);
+}
 
 void GrantStartingWeaponSkills(Player* player)
 {

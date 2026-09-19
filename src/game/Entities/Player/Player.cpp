@@ -617,9 +617,10 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
   LearnDefaultSkills();
   LearnCustomSpells();
 
-  // Arenacraft: hand the class its weapon proficiencies (maxed), a mount with
-  // riding, First Aid and full hunter pet stable slots at creation rather than
-  // through a first-login script.
+  // Arenacraft: hand the class its armor and weapon proficiencies (maxed), a
+  // mount with riding, First Aid and full hunter pet stable slots at creation
+  // rather than through a first-login script.
+  arenacraft::GrantStartingArmorProficiencies(this);
   arenacraft::GrantStartingWeaponSkills(this);
   arenacraft::GrantStartingMount(this);
   arenacraft::GrantStartingFirstAid(this);

@@ -435,9 +435,10 @@ void WorldSession::HandleLogoutRequestOpcode(WorldPackets::Character::LogoutRequ
   if (ObjectGuid lguid = GetPlayer()->GetLootGUID())
     DoLootRelease(lguid);
 
-  bool instantLogout = ((GetSecurity() >= 0 && uint32(GetSecurity()) >= sWorld->getIntConfig(CONFIG_INSTANT_LOGOUT)) ||
-                        (GetPlayer()->HasPlayerFlag(PLAYER_FLAGS_RESTING) && !GetPlayer()->IsInCombat())) ||
-                       GetPlayer()->IsInFlight();
+  // Arenacraft: on this instant-80 server anyone out of combat logs out
+  // immediately, not just resting players or staff.
+  bool instantLogout = !GetPlayer()->IsInCombat() || GetPlayer()->IsInFlight() ||
+                       uint32(GetSecurity()) >= sWorld->getIntConfig(CONFIG_INSTANT_LOGOUT);
 
   bool preventAfkSanctuaryLogout = sWorld->getIntConfig(CONFIG_AFK_PREVENT_LOGOUT) == 1 && GetPlayer()->isAFK() &&
                                    sAreaTableStore.LookupEntry(GetPlayer()->GetAreaId())->IsSanctuary();

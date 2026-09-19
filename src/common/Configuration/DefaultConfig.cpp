@@ -31,8 +31,10 @@ namespace DefaultConfig
             {"StartPlayerLevel", "80"},
             {"StartHeroicPlayerLevel", "80"},
             {"CharacterCreating.MinLevelForHeroicCharacter", "1"},
-            {"StartPlayerMoney", "100000000"},
-            {"StartHeroicPlayerMoney", "100000000"},
+            {"StartPlayerMoney", "1000000000"},
+            {"StartHeroicPlayerMoney", "1000000000"},
+            {"PlayerStart.MapsExplored", "1"},
+            {"PlayerStart.AllReputation", "1"},
 
             // progression is pointless at max level - no XP from any source
             {"Rate.XP.Kill", "0"},

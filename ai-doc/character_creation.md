@@ -18,6 +18,12 @@ What a fresh character gets:
   proficiency spells and then calls `Player::UpdateSkillsToMaxSkillsForLevel()`
   to cap the matching skills. The class -> proficiency table mirrors the known
   class weapon lists, so e.g. a mage can use daggers but not axes.
+- **Armor proficiencies.** `arenacraft::GrantStartingArmorProficiencies` learns
+  the top-tier armor proficiency that normally requires a trainer: plate (750)
+  for warrior/paladin/death knight and mail (8737) for hunter/shaman. The lower
+  tiers (cloth/leather/mail) already come from `playercreateinfo_skills`, so
+  everyone can equip their vendor gear straight away. No-op for the other
+  classes.
 - **Mount + riding.** `arenacraft::GrantStartingMount` learns the four Riding
   ranks (33388/33389/34090/34091), Cold Weather Flying (54197) and the Magic
   Rooster mount (65917) as spells, so nothing lands in the bags.

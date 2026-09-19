@@ -7,6 +7,11 @@ namespace arenacraft
 // Called from Player::Create (before the character enters the world), so a new
 // character is already complete when it is first seen - no first-login scripts.
 //
+// Learns the top-tier armor proficiency the class is entitled to (plate for
+// warrior/paladin/death knight, mail for hunter/shaman). The lower tiers come
+// from `playercreateinfo_skills`; this is a no-op for the other classes.
+void GrantStartingArmorProficiencies(Player* player);
+
 // Learns the weapon proficiencies the class is entitled to and raises the
 // matching weapon skills to the level cap.
 void GrantStartingWeaponSkills(Player* player);
