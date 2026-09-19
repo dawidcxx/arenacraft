@@ -233,26 +233,15 @@ export class RoomManager {
     if (!channel) return false;
     // Players without voice simply stay out of the rooms.
     if (!member.voice.channel) return false;
+    if (member.voice.channelId === channel.id) return true;
 
     try {
-      if (member.voice.channelId !== channel.id) await member.voice.setChannel(channel);
+      await member.voice.setChannel(channel);
+      return true;
     } catch (error) {
       logger.warn(`Failed to move ${member.user.username} into ${channel.name}`, error);
       return false;
     }
-
-    // Server-mute in the waiting room (so an idle lobby stays quiet) and
-    // un-mute in the game rooms (so the match can be communicated in).
-    const shouldMute = this.waitingRoom !== null && channel.id === this.waitingRoom.id;
-    if (member.voice.serverMute !== shouldMute) {
-      try {
-        await member.voice.setMute(shouldMute);
-      } catch (error) {
-        logger.warn(`Failed to ${shouldMute ? "mute" : "unmute"} ${member.user.username}`, error);
-      }
-    }
-
-    return true;
   }
 
   private async notify(message: string): Promise<void> {
