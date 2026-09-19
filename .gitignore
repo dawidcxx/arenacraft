@@ -119,4 +119,4 @@ zig-pkg
 /etc
 /*.log
 
-ac
+/ac
