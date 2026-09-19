@@ -1,0 +1,81 @@
+#include "CharacterCreation.hpp"
+
+#include "Player.h"
+#include "SharedDefines.h"
+
+#include <unordered_map>
+#include <vector>
+
+namespace arenacraft
+{
+namespace
+{
+// Weapon proficiency passives, by class. Only proficiencies the class is meant
+// to have are listed (a mage gets daggers/staves/wands/swords, not axes...).
+enum WeaponProficiency : uint32
+{
+  BLOCK        = 107,
+  BOWS         = 264,
+  CROSSBOWS    = 5011,
+  DAGGERS      = 1180,
+  FIST_WEAPONS = 15590,
+  GUNS         = 266,
+  ONE_H_AXES   = 196,
+  ONE_H_MACES  = 198,
+  ONE_H_SWORDS = 201,
+  POLEARMS     = 200,
+  SHOOT        = 5019,
+  STAVES       = 227,
+  TWO_H_AXES   = 197,
+  TWO_H_MACES  = 199,
+  TWO_H_SWORDS = 202,
+  WANDS        = 5009,
+  THROW_WAR    = 2567,
+};
+
+std::unordered_map<uint8, std::vector<uint32>> const ClassWeaponProficiencies = {
+    {CLASS_WARRIOR,
+     {THROW_WAR, TWO_H_SWORDS, TWO_H_MACES, TWO_H_AXES, STAVES, POLEARMS, ONE_H_SWORDS, ONE_H_MACES, ONE_H_AXES, GUNS,
+      FIST_WEAPONS, DAGGERS, CROSSBOWS, BOWS, BLOCK}},
+    {CLASS_PRIEST, {WANDS, STAVES, SHOOT, ONE_H_MACES, DAGGERS}},
+    {CLASS_PALADIN, {TWO_H_SWORDS, TWO_H_MACES, TWO_H_AXES, POLEARMS, ONE_H_SWORDS, ONE_H_MACES, ONE_H_AXES, BLOCK}},
+    {CLASS_ROGUE, {ONE_H_SWORDS, ONE_H_MACES, ONE_H_AXES, GUNS, FIST_WEAPONS, DAGGERS, CROSSBOWS, BOWS}},
+    {CLASS_DEATH_KNIGHT, {TWO_H_SWORDS, TWO_H_MACES, TWO_H_AXES, POLEARMS, ONE_H_SWORDS, ONE_H_MACES, ONE_H_AXES}},
+    {CLASS_MAGE, {WANDS, STAVES, SHOOT, ONE_H_SWORDS, DAGGERS}},
+    {CLASS_SHAMAN, {TWO_H_MACES, TWO_H_AXES, STAVES, ONE_H_MACES, ONE_H_AXES, FIST_WEAPONS, DAGGERS, BLOCK}},
+    {CLASS_HUNTER,
+     {THROW_WAR, TWO_H_SWORDS, TWO_H_AXES, STAVES, POLEARMS, ONE_H_SWORDS, ONE_H_AXES, GUNS, FIST_WEAPONS, DAGGERS,
+      CROSSBOWS, BOWS}},
+    {CLASS_DRUID, {TWO_H_MACES, STAVES, POLEARMS, ONE_H_MACES, FIST_WEAPONS, DAGGERS}},
+    {CLASS_WARLOCK, {WANDS, STAVES, SHOOT, ONE_H_SWORDS, DAGGERS}},
+};
+
+// Riding ranks (skill 762, ascending) + the Northrend flying unlock, plus a
+// ground mount. Learned as spells so nothing goes into the inventory.
+constexpr uint32 RidingSpells[]     = {33388, 33389, 34090, 34091, 54197};
+constexpr uint32 StartingMountSpell = 65917; // Magic Rooster
+} // namespace
+
+void GrantStartingWeaponSkills(Player* player)
+{
+  auto itr = ClassWeaponProficiencies.find(player->getClass());
+  if (itr == ClassWeaponProficiencies.end())
+    return;
+
+  for (uint32 spell : itr->second)
+    if (!player->HasSpell(spell))
+      player->addSpell(spell, SPEC_MASK_ALL, true);
+
+  player->UpdateSkillsToMaxSkillsForLevel();
+}
+
+void GrantStartingMount(Player* player)
+{
+  for (uint32 spell : RidingSpells)
+    if (!player->HasSpell(spell))
+      player->addSpell(spell, SPEC_MASK_ALL, true);
+
+  if (!player->HasSpell(StartingMountSpell))
+    player->addSpell(StartingMountSpell, SPEC_MASK_ALL, true);
+}
+} // namespace arenacraft

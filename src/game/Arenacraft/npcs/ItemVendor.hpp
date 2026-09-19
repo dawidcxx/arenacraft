@@ -39,6 +39,10 @@ struct GlyphEntry
 // vendor order.
 std::vector<GlyphEntry> const& AllGlyphs();
 
+// Flat enchant stock, defined in EnchantVendorItems.cpp. One shared list for
+// every player, already ordered by gear slot (head first, weapon last).
+std::vector<uint32> const& AllEnchants();
+
 // Vendor-list (gossip menu) names in display order, defined in
 // ItemVendorItems.cpp.
 std::vector<std::string_view> const& CategoryOrder();
@@ -54,6 +58,14 @@ public:
   static constexpr uint32 VendorEntryBase = 9000000;
   // Per-class glyph vendor lists, indexed by class id (see GlyphsForClass).
   static constexpr uint32 GlyphVendorEntryBase = 9000100;
+  // Shared enchant vendor list (see AllEnchants).
+  static constexpr uint32 EnchantVendorEntry = 9000200;
+
+  // Custom gossip actions for the utility options. Values only have to be
+  // distinct and outside the built-in Gossip_Option range.
+  static constexpr uint32 UtilResetTalents  = 9000001;
+  static constexpr uint32 UtilLearnDualSpec = 9000002;
+  static constexpr uint32 UtilLearnSpells   = 9000003;
 
   struct Category
   {
@@ -74,6 +86,8 @@ public:
   void OnCreatureAddWorld(Creature* creature) override;
 
   bool CanCreatureGossipHello(Player* player, Creature* creature) override;
+
+  bool CanCreatureGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override;
 };
 
 // Code-defined stock, one vendor list per category. Runs in OnStartup, after

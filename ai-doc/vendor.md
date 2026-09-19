@@ -75,6 +75,36 @@ arena guides come first (then the rest alphabetically); the guides and their
 glyphs are recorded in `ai-doc/class_guides.md`, and the priority block is
 regenerated from those notes.
 
+The menu also has a shared **Enchantments** option. `EnchantVendorItems.cpp`
+holds a flat `std::vector<uint32>` of permanent-enhancement item ids exposed as
+`AllEnchants()`, already ordered by gear slot (head first, weapon last); the
+option points at `EnchantVendorEntry`. The list is curated from the Wowhead
+WotLK per-spec PvP Arena Season 8 BiS guides, with the per-spec PvE "Enchants
+and Gems" guides supplying the remaining general alternatives (all recorded in
+`ai-doc/enchant_guides.md`): only recommended, non-profession enchants are kept
+(the server has no professions), excluding vanilla/BC filler and strictly
+dominated duplicates. Head/shoulder/leg rows are the applied
+Arcanum/Inscription/Spellthread/Leg Armor items, the rest are "Scroll of
+Enchant ..." consumables.
+
+Finally the menu has three utility options, handled in
+`ItemVendor::CanCreatureGossipSelect` (custom action ids; the vendor-list
+options fall through to the core handler):
+
+- **Reset Talents** - `Player::resetTalents(true)` (free), then
+  `SendTalentsInfoData`.
+- **Learn Dual Talent Specialization** - casts 63680/63624 like the core's
+  trainer option, if the player has one spec and is at
+  `CONFIG_MIN_DUALSPEC_LEVEL` or above.
+- **Learn Spells** - `SendTrainerList` on the NPC itself. The NPC is not a real
+  trainer: `ItemVendorStock::OnStartup` sets its template's trainer flag and
+  copies every class trainer's spell list into it (iterating
+  `GetCreatureTemplates()`), and `trainer_type` is set to `TRADESKILLS` so the
+  interaction check does not demand a matching `trainer_class`. The core filters
+  the merged list per class/race when it is sent, and
+  `Player::GetTrainerSpellState` rejects spells that do not fit the buyer, so the
+  merge does not leak cross-class spells.
+
 Item ids are checked against wotlk.evowow.com; skip anything tagged
 "Not available to players". No `npc_vendor` SQL is involved (`persist = false`).
 
