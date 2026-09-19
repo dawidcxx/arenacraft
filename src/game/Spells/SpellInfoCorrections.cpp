@@ -4440,6 +4440,11 @@ void SpellMgr::LoadSpellInfoCorrections()
           spellInfo->Speed = SPEED_CHARGE;
         }
         break;
+      // Arenacraft: enchant scrolls and glyphs apply instantly (QoL)
+      case SPELL_EFFECT_ENCHANT_ITEM:
+      case SPELL_EFFECT_APPLY_GLYPH:
+        spellInfo->CastTimeEntry = sSpellCastTimesStore.LookupEntry(1); // 0s
+        break;
       }
 
       // Xinef: i hope this will fix the problem with not working resurrection
