@@ -150,8 +150,17 @@ pub const AcGraph = struct {
         const install = bl.addInstallArtifact(exe, .{});
         cpp.addCompileCommands(exe);
 
+        // `zig build ac` - build only
         const step = bl.step("ac", "Build the ac master executable");
         step.dependOn(&install.step);
+
+        // `zig build run-ac [-- <args>]` - build and run, forwarding args
+        const run = bl.addRunArtifact(exe);
+        run.step.dependOn(&install.step);
+        if (bl.args) |args| run.addArgs(args);
+
+        const run_step = bl.step("run-ac", "Build and run the ac master executable");
+        run_step.dependOn(&run.step);
     }
 };
 

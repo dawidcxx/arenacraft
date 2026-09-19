@@ -2,6 +2,33 @@
 
 Custom mmo core based off [AzerothCore](https://github.com/azerothcore/azerothcore-wotlk)
 
+# Module structure
+
+The build is a layered set of static libraries (see `zig-build/Src.zig`), each
+linking its parent and re-exposing its include paths:
+
+```
+ac (executable, src/ac/main.cpp)
+├── worldserver ── game ── shared ── database ── common
+├── auth ──────── shared ── database ── common
+└── tools ─────── common
+```
+
+- `common` — root: utilities, logging, crypto, networking. No internal deps.
+- `database` → common, `shared` → database, `auth` → shared, `tools` → common.
+- `game` — all gameplay, **including scripts** (`src/game/Scripts/`). Scripts
+  are plain game code compiled into the `game` library: no separate module, no
+  dynamic loading. New script loaders are registered by hand in
+  `src/game/Scripts/ScriptLoader.cpp`.
+- `worldserver` → game.
+- `ac` is the single unified executable; it links worldserver + auth + tools and
+  routes subcommands (`ac worldserver`, `ac authserver`, ...).
+- There are deliberately no `modules`/`scripts` build nodes; custom gameplay
+  lives directly in `src/game/`.
+
+Build the executable with `zig build ac`, or build + run it with
+`zig build run-ac` (args are forwarded: `zig build run-ac -- worldserver`).
+
 # Install
 
 Dependencies: `nix` `podman` (or docker) `wow-3.3.5a-client-files`
