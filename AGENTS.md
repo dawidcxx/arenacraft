@@ -51,6 +51,10 @@ script/plugin layer.
 - Idempotent SQL (REPLACE INTO etc.) may go in `data/sql/custom/` (gitignored).
 - `data/dbc|maps|vmaps[,mmaps]` come from `scripts/extract_assets` — generated,
   never commit or hand-edit.
+- Reading DBCs: use `bun scripts/src/dbc_dump.ts <DbcName|path> -n <nameField>`
+  (e.g. `Faction -n 23 --search cenarion`); the WDBC reader is
+  `scripts/src/lib/dbc.ts`. Don't write throwaway parsers — the name field
+  index differs per DBC (Faction = 23), pass it with `-n`.
 
 ## Where gameplay code goes
 
