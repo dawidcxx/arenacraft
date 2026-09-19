@@ -627,6 +627,7 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
   arenacraft::GrantStartingFirstAid(this);
   arenacraft::GrantStartingStableSlots(this);
   arenacraft::GrantStartingDeathKnightSpells(this);
+  arenacraft::GrantStartingSpells(this);
 
   // original action bar
   for (PlayerCreateInfoActions::const_iterator action_itr = info->action.begin(); action_itr != info->action.end();
@@ -12035,6 +12036,10 @@ void Player::resetSpells()
   LearnDefaultSkills();
   LearnCustomSpells();
   learnQuestRewardedSpells();
+
+  // Arenacraft: a spell reset must not strip the class's auto-learned ability
+  // set, or an instant-80 character is left without its core spells.
+  arenacraft::GrantStartingSpells(this);
 }
 
 void Player::LearnCustomSpells()
