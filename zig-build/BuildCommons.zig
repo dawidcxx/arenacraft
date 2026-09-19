@@ -108,7 +108,7 @@ pub const AcGraph = struct {
         step.dependOn(&run.step);
     }
 
-    /// The `ac` master executable: an argparse router (src/main.cpp) that
+    /// The `ac` master executable: an argparse router (src/ac/main.cpp) that
     /// forwards arguments 1:1 to the ported sub programs. Sub programs live in
     /// the src modules (auth, tools); the router only needs their entry points.
     fn buildAc(self: *Self, b: BuildRequest) !void {
@@ -122,11 +122,11 @@ pub const AcGraph = struct {
             .link_libcpp = true,
         });
 
-        // src root (subcommands.h)
-        module.addIncludePath(bl.path("src"));
+        // co-located with subcommands.h
+        module.addIncludePath(bl.path("src/ac"));
 
         module.addCSourceFiles(.{
-            .root = bl.path("src"),
+            .root = bl.path("src/ac"),
             .files = &.{"main.cpp"},
             .language = .cpp,
             .flags = &Src.core_cflags,
@@ -135,7 +135,7 @@ pub const AcGraph = struct {
         const deps = &self.deps;
         const src = &self.src;
 
-        // linkWorldserver cascades: modules/scripts -> game -> shared -> database -> common
+        // linkWorldserver cascades: worldserver -> game -> shared -> database -> common
         try src.linkWorldserver(bl, module);
         try src.linkAuth(bl, module);
         try src.linkTools(bl, module);

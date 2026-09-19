@@ -27,7 +27,6 @@ EndScriptData */
 #include "GameTime.h"
 #include "GitRevision.h"
 #include "Log.h"
-#include "ModuleMgr.h"
 #include "MotdMgr.h"
 #include "MySQLThreading.h"
 #include "Realm.h"
@@ -233,16 +232,6 @@ public:
     handler->PSendSysMessage("LoginDatabase queue size: {}", LoginDatabase.QueueSize());
     handler->PSendSysMessage("CharacterDatabase queue size: {}", CharacterDatabase.QueueSize());
     handler->PSendSysMessage("WorldDatabase queue size: {}", WorldDatabase.QueueSize());
-
-    if (Acore::Module::GetEnableModulesList().empty())
-      handler->PSendSysMessage("No modules are enabled");
-    else
-      handler->PSendSysMessage("List of enabled modules:");
-
-    for (auto const& modName : Acore::Module::GetEnableModulesList())
-    {
-      handler->PSendSysMessage("|- {}", modName);
-    }
 
     return true;
   }

@@ -18,6 +18,7 @@
 #include "ScriptMgr.h"
 #include "AllScriptsObjects.h"
 #include "InstanceScript.h"
+#include "ScriptLoader.h"
 #include "ScriptSystem.h"
 #include "SmartAI.h"
 #include "SpellMgr.h"
@@ -42,10 +43,7 @@ struct TSpellSummary
   uint8 Effects; // set of enum SelectEffect
 }* SpellSummary;
 
-ScriptMgr::ScriptMgr()
-    : _scriptCount(0), _scheduledScripts(0), _script_loader_callback(nullptr), _modules_loader_callback(nullptr)
-{
-}
+ScriptMgr::ScriptMgr() : _scriptCount(0), _scheduledScripts(0) {}
 
 ScriptMgr::~ScriptMgr() {}
 
@@ -62,12 +60,7 @@ void ScriptMgr::Initialize()
 
   AddSC_SmartScripts();
 
-  ASSERT(_script_loader_callback, "Script loader callback wasn't registered!");
-
-  ASSERT(_modules_loader_callback, "Modules loader callback wasn't registered!");
-
-  _script_loader_callback();
-  _modules_loader_callback();
+  AddScripts();
 
   ScriptRegistry<AccountScript>::InitEnabledHooksIfNeeded(ACCOUNTHOOK_END);
   ScriptRegistry<AchievementScript>::InitEnabledHooksIfNeeded(ACHIEVEMENTHOOK_END);

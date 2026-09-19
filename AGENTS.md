@@ -37,15 +37,17 @@ script/plugin layer.
 - Write custom systems directly in the core (`src/game/`). For event hooks use
   the script registries in `src/game/Scripting/ScriptDefines/` (PlayerScript,
   AllCreatureScript, ArenaScript, ...).
-- Player lifecycle (login/level-80 flow): `src/modules/mod-arenacraft/MyPlayer.cpp`.
+- Custom player lifecycle (login/level-80 flow): write plain core code in
+  `src/game/`.
 - Spell fixes:
   - runtime DBC-level corrections → `src/game/Spells/SpellInfoCorrections.cpp`
     (`ApplySpellFix(...)`)
-  - scripted behavior → `src/scripts/Spells/spell_<class>.cpp` with
+  - scripted behavior → `src/game/Scripts/Spells/spell_<class>.cpp` with
     `RegisterSpellScript`, bound via `spell_script_names` DB table
 - Vendor items: `npc_vendor` rows.
-- Loaders are hand-maintained — edit directly, no globs:
-  `src/scripts/ScriptLoader.cpp`, `src/modules/ModulesLoader.cpp`.
+- Scripts are plain game code, compiled into the `game` library (no separate
+  module, no dynamic loading). The registry is hand-maintained — edit directly,
+  no globs: `src/game/Scripts/ScriptLoader.cpp`.
 
 ## Conventions & traps
 

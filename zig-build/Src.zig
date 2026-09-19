@@ -54,11 +54,6 @@ pub const Src = struct {
         library: *Build.Step.Compile = undefined,
     } = .{},
 
-    scripts: struct {
-        module: *Build.Module = undefined,
-        library: *Build.Step.Compile = undefined,
-    } = .{},
-
     worldserver: struct {
         module: *Build.Module = undefined,
         library: *Build.Step.Compile = undefined,
@@ -75,7 +70,6 @@ pub const Src = struct {
         try self.buildAuth(b);
         try self.buildTools(b);
         try self.buildGame(b);
-        try self.buildScripts(b);
         try self.buildWorldserver(b);
     }
 
@@ -121,16 +115,10 @@ pub const Src = struct {
         try self.linkShared(b, mod);
     }
 
-    pub fn linkScripts(self: *Self, b: *Build, mod: *Build.Module) !void {
-        mod.linkLibrary(self.scripts.library);
-        try cpp.addFlatIncludes(b, "src/scripts", mod);
-        try self.linkGame(b, mod);
-    }
-
     pub fn linkWorldserver(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.worldserver.library);
         try cpp.addFlatIncludes(b, "src/worldserver", mod);
-        try self.linkScripts(b, mod);
+        try self.linkGame(b, mod);
     }
 
     //
@@ -439,51 +427,6 @@ pub const Src = struct {
         isolated.dependOn(&library.step);
     }
 
-    fn buildScripts(self: *Self, build_request: BuildRequest) !void {
-        const b = build_request[0];
-        const target = build_request[1];
-        const optimize = build_request[2];
-
-        const module = b.createModule(.{
-            .target = target,
-            .optimize = optimize,
-            .link_libcpp = true,
-        });
-
-        try cpp.addFlatIncludes(b, "src/scripts", module);
-
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/scripts", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
-
-        module.addCSourceFiles(.{
-            .files = sources.get(),
-            .language = .cpp,
-            .flags = &core_cflags,
-        });
-
-        try self.linkGame(b, module);
-        // game headers pull in boost/fmt/g3dlite/detour (no transitive propagation)
-        const deps = &self.back_reference.deps;
-        deps.linkFmt(module);
-        deps.linkBoost(module);
-        deps.linkG3DLite(module);
-        deps.linkDetour(module);
-
-        const library = b.addLibrary(.{
-            .name = "scripts",
-            .root_module = module,
-            .linkage = .static,
-        });
-
-        library.installHeadersDirectory(b.path("src/scripts"), "", cpp.header_install_options);
-
-        // update graph at the end
-        self.scripts.module = module;
-        self.scripts.library = library;
-    }
-
     fn buildWorldserver(self: *Self, build_request: BuildRequest) !void {
         const b = build_request[0];
         const target = build_request[1];
@@ -508,7 +451,7 @@ pub const Src = struct {
             .flags = &core_cflags,
         });
 
-        try self.linkScripts(b, module);
+        try self.linkGame(b, module);
 
         const deps = &self.back_reference.deps;
         deps.linkGsoap(module);

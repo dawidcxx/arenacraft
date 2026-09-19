@@ -51,7 +51,6 @@
 #include "LootScript.h"
 #include "MailScript.h"
 #include "MiscScript.h"
-#include "ModuleScript.h"
 #include "MovementHandlerScript.h"
 #include "OutdoorPvPScript.h"
 #include "PetScript.h"

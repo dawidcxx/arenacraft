@@ -36,7 +36,6 @@
 #include "IoContext.h"
 #include "MapMgr.h"
 #include "Metric.h"
-#include "ModuleMgr.h"
 #include "MySQLThreading.h"
 #include "OpenSSLCrypto.h"
 #include "OutdoorPvPMgr.h"
@@ -44,7 +43,6 @@
 #include "RASession.h"
 #include "RealmList.h"
 #include "Resolver.h"
-#include "ScriptLoader.h"
 #include "ScriptMgr.h"
 #include "SecretMgr.h"
 #include "SharedDefines.h"
@@ -281,8 +279,6 @@ int worldserver_main(int argc, char** argv)
   SetProcessPriority("server.worldserver", sConfigMgr->GetOption<int32>(CONFIG_PROCESSOR_AFFINITY, 0),
                      sConfigMgr->GetOption<bool>(CONFIG_HIGH_PRIORITY, true));
 
-  sScriptMgr->SetScriptLoader(AddScripts);
-
   std::shared_ptr<void> sScriptMgrHandle(nullptr,
                                          [](void*)
                                          {
@@ -325,8 +321,6 @@ int worldserver_main(int argc, char** argv)
                                         METRIC_EVENT("events", "Worldserver shutdown", "");
                                         sMetric->Unload();
                                       });
-
-  Acore::Module::SetEnableModulesList("mod-arenacraft,mod-duel-reset,");
 
   ///- Initialize the World
   sSecretMgr->Initialize();
