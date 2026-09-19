@@ -221,6 +221,14 @@ void Arena::EndBattleground(TeamId winnerTeamId)
     ArenaTeam* loserArenaTeam = sArenaTeamMgr->GetArenaTeamById(
         GetArenaTeamIdForTeam(winnerTeamId == TEAM_NEUTRAL ? TEAM_ALLIANCE : GetOtherTeamId(winnerTeamId)));
 
+    // Arenacraft: solo-queue arenas are rated but not backed by an ArenaTeam.
+    // Skip the arena-team rating/logging block instead of dereferencing null.
+    if (!winnerArenaTeam || !loserArenaTeam)
+    {
+      Battleground::EndBattleground(winnerTeamId);
+      return;
+    }
+
     auto SaveArenaLogs = [&]()
     {
       // pussywizard: arena logs in database

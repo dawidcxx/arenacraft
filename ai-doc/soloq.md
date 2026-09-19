@@ -1,0 +1,208 @@
+# Solo Queue (soloq)
+
+Living notes for the arena solo-queue subsystem. Code lives in
+`src/game/Arenacraft/soloq/` under `arenacraft::soloq`.
+
+Status: the isolated queue/matchmaker, the post-match rating adjustment and the
+arena pop are implemented. A temporary NPC front-end exists for end-to-end
+testing; players get the client "in queue" badge and, when a match forms, the
+rated 5v5 arena invite ("Enter Battle") dialog. The queue/badge track is 5v5
+(an otherwise unused core track, so real 3v3 arena teams keep working), but the
+arena instance spawned for the match is created as **3v3**, so inside the game
+the match is played, scored and ready-checked as 3v3 (6/6). The player's
+persistent team is a 5v5 `ArenaTeam`.
+
+To get the badge, join/leave registers the player in the real 5v5 battleground
+queue. `SoloqBattlegroundScript` returns `false` from `OnQueueUpdateValidity` for
+rated 5v5, so the core's own matchmaking never creates an arena from those
+entries (this globally disables core rated 5v5 matchmaking - intended, as soloq
+occupies that track). When soloq finds a match it creates the arena itself and
+invites the six players (see `CreateArenaForMatch`).
+
+## Files
+
+| File | Purpose |
+| --- | --- |
+| `Types.hpp` | `Role`, `QueuedPlayer`, `Team`, `Match`, `playersOf`, tuning constants |
+| `Roles.hpp/.cpp` | `roleFor(Classes, specIndex) -> optional<Role>` |
+| `SoloqQueue.hpp/.cpp` | the queue container + exhaustive best-fit matchmaker |
+| `Outcome.hpp/.cpp` | `resolveMatch(Match, MatchResult)` - post-match Elo adjustment |
+| `SoloqService.hpp/.cpp` | singleton: queue + pending arenas + `tick`/`registerMatch`/`takeMatch` |
+| `SoloqTeam.hpp/.cpp` | the player's real 5v5 `ArenaTeam` (visible in the PvP pane, persisted in the characters DB) |
+| `SoloqArenaQueue.hpp/.cpp` | registers/removes players in the real 5v5 battleground queue (client badge) and creates/invites a 3v3 arena for a match |
+| `SoloqNpc.hpp/.cpp` | `SoloqNpc` (gossip menu on entry 20810), `SoloqDriver` (world tick) and `SoloqBattlegroundScript` (suppresses core 5v5 matchmaking) |
+| `*_test.cpp` | doctest unit tests (co-located, auto-discovered by the game test target) |
+
+The pure logic (`Types`/`Roles`/`SoloqQueue`/`Outcome`) only depends on the core
+`Classes` enum from `SharedDefines.h`. It never touches `Player`, which keeps the
+tests fast and isolated. The core-facing pieces (`SoloqService` NPC glue,
+`SoloqNpc`, `SoloqDriver`) are the only ones compiled against the game.
+
+## Data model
+
+```cpp
+using PlayerId = uint64_t;                 // raw ObjectGuid
+enum class Role : uint8_t { Melee, Caster, Healer };
+
+struct QueuedPlayer { PlayerId id; Classes classId; uint8_t specIndex; uint32_t rating; uint32_t mmr; TeamId teamId; };
+struct Team  { QueuedPlayer melee, caster, healer; };   // named slots encode composition
+struct Match { Team a, b; };
+```
+
+`specIndex` is the tab page the player had the most talent points in at queue
+time (`Player::GetMostPointsTalentTree()`). `rating` starts at 1400 and `mmr` at
+1500 (constants in `namespace tuning`). `teamId` is the player's faction.
+
+## Role table (`roleFor`)
+
+| Class | spec 0 | spec 1 | spec 2 |
+| --- | --- | --- | --- |
+| Warrior | Melee | Melee | Melee |
+| Paladin | Healer | Melee | Melee |
+| Hunter | Melee | Melee | Caster |
+| Rogue | Melee | Melee | Melee |
+| Priest | Healer | Healer | Caster |
+| Death Knight | Melee | Melee | Melee |
+| Shaman | Caster | Melee | Healer |
+| Mage | Caster | Caster | Caster |
+| Warlock | Caster | Caster | Caster |
+| Druid | Caster | Melee | Healer |
+
+Hunter BM/MM count as Melee, Survival as Caster. Tank specs are allowed and
+treated as Melee. Unknown class / spec outside 0..2 returns `nullopt` and is
+rejected by the queue.
+
+## Matchmaking (`SoloqQueue`)
+
+A team is `{melee, healer, caster}`; a match is two teams (2 of each role). Needs
+at least 2 of every role.
+
+- Time is injected via `update(std::chrono::milliseconds elapsed)` - never read
+  from the wall clock - so tests are deterministic.
+- Each queued player accumulates wait time. Their acceptable MMR window is
+  `min(MaxWindow, MmrStep * floor(waited / StepInterval))`, symmetric around
+  their MMR (`MmrStep = 50`, `StepInterval = 30s`, `MaxWindow = 500`).
+- A candidate six-set is **valid** only if every pair satisfies
+  `gap <= max(window_i, window_j)` (the more-patient player's window governs).
+- **No mixed-faction teams**: while `tuning::EnforceTeamFaction` is set, a
+  partition is only eligible if each team's three players share a `TeamId`.
+  Opposing teams may be different factions (normal Alliance vs Horde arena);
+  what is rejected is an Alliance+Horde *teammate* mix. This means a match needs
+  either a 3/3 or a 6/0 faction split across the six.
+- **No class stacking per team**: a partition where team A or team B would field
+  the same class twice is rejected (e.g. Shadow Priest caster + Discipline
+  Priest healer). If no partition of the six avoids it, the candidate is skipped
+  entirely. `makeCandidate` returns `nullopt` in that case.
+- Exhaustive best-fit: enumerate all `(2 melee, 2 caster, 2 healer)` valid sets,
+  try the 4 ways to split them into two teams (keeping only class-distinct
+  teams), and score by `team imbalance -> MMR spread -> longest total wait ->
+  insertion order`. Emit the best match, remove those six, repeat until nothing
+  valid remains.
+- `update` returns the drained `std::vector<Match>`; matched players are removed.
+
+## Post-match adjustment (`resolveMatch`)
+
+Pure function: given a `Match` and `MatchResult::{TeamAWin,TeamBWin}` it returns
+six `RatingUpdate{id, mmr, rating, delta}` (team A first, then team B).
+
+- Elo expected score with `EloScale = 400`, `KFactor = 16`.
+- The winner gains and the loser loses the same amount (zero-sum); an underdog
+  win is worth more than a favourite win.
+- `mmr`/`rating` both move by `delta` and clamp at 0.
+
+`CreateArenaForMatch` registers the arena instance id -> `Match` in
+`SoloqService`. `SoloqBattlegroundScript::OnBattlegroundEnd` looks it up, maps
+the winning `TeamId` to `MatchResult`, calls `resolveMatch`, writes the new
+rating/MMR onto each player's 5v5 `ArenaTeam` (`SaveToDB` + `NotifyStatsChanged`)
+and sys-messages them. `OnBattlegroundDestroy` forgets the entry if the arena
+never ended (all invites declined).
+
+## Service and the soloq team
+
+`SoloqService::instance()` is a single global (single writer, no locking) and
+owns only the queue plus pending arenas:
+
+- `join(id, classId, specIndex, teamId, rating, mmr)` - enqueues a snapshot.
+- `leave(id)` - dequeues.
+- `tick(elapsed)` - advances the queue, returns drained matches.
+- `registerMatch(bgInstanceId, match)` / `takeMatch(...)` / `forgetMatch(...)`.
+- `queueSize`, `inQueue`, `waitingPlayers`.
+
+The player's rating/MMR is **not** stored here - it lives in a real 5v5
+`ArenaTeam` (`SoloqTeam.hpp`): `FindSoloqTeam`, `CreateSoloqTeam` (starting
+1400/1500, named `<name>'s SoloQ`), `DeleteSoloqTeam` (disbands), and
+`GetSoloqTeamInfo`. Because it is an arena team, it shows in the client's PvP
+pane and persists in the characters DB across restarts.
+
+## Temporary NPC
+
+`SoloqNpc` hijacks creature entry **20810** ("Mehrdad"), giving it
+`UNIT_NPC_FLAG_GOSSIP` and this menu:
+
+- **Join SoloQ** - requires a team; enqueues and reports the queue size.
+- **Leave SoloQ** - dequeues.
+- **Create SoloQ Team** - creates the 5v5 `ArenaTeam` at 1400 rating / 1500 MMR
+  (shows in the PvP pane immediately).
+- **Delete SoloQ Team** - disbands the team (resets rating/MMR).
+- **SoloQ Status** - shows the player's rating, MMR, in-queue state and queue size.
+
+Joining also calls `EnterArenaQueue` (`SoloqArenaQueue`): it adds the player to
+the real `BATTLEGROUND_QUEUE_5v5` queue and sends `SMSG_BATTLEFIELD_STATUS`
+(`STATUS_WAIT_QUEUE`, rated 5v5), which is what makes the client show the eye
+badge and re-request it on login/map change. Leaving (NPC, `Delete Team`, or the
+client's own "Leave Queue") removes the entry and clears the badge.
+The player's persistent `SoloqTeam` is a **5v5** `ArenaTeam` (so it lives in the
+5v5 PvP tab); only the match instance itself is 3v3.
+
+`SoloqDriver` (`WorldScript::OnUpdate`) ticks the service every world update and
+logs any formed match to the `server` log. Each tick it also drops anyone who
+left the 5v5 queue through the client or logged out.
+
+On a match, `CreateArenaForMatch` (`SoloqArenaQueue`) creates a rated 3v3 arena
+via `BattlegroundMgr::CreateNewBattleground`, then calls
+`BattlegroundQueue::InviteGroupToBG` for each of the six solo queue entries (team
+A = `TEAM_ALLIANCE`, team B = `TEAM_HORDE`) and `StartBattleground`. That sends
+`STATUS_WAIT_JOIN` to each player, which is the "Enter Battle" dialog; accepting
+ports them into the instance. If the match can no longer be turned into an arena
+(a player vanished), the six are dropped and told to requeue.
+
+The arena instance itself is rated but has **no ArenaTeam** (`ArenaTeamId = 0`)
+- the six players' own soloq 5v5 teams are not the match participants. So
+`Arena::EndBattleground` is guarded to skip the arena-team rating/log block when
+there is no team, instead of dereferencing null. `SoloqBattlegroundScript`
+suppresses the core's rated-5v5 matchmaking so the core never creates a second
+arena for the same queue.
+
+The matchmaker builds 3-player teams. The queue is 5v5, but the arena instance is
+created with `ARENA_TYPE_3v3`, so the match itself (scoreboard, ready check 6/6)
+is treated as 3v3 while the queue badge stays on the 5v5 track.
+
+## Debug command
+
+`src/game/Scripts/Commands/cs_soloq.cpp` (registered in `cs_script_loader.cpp`),
+admin-only:
+
+- `.soloq status` - total queued, per-role and per-faction role counts, pending
+  arenas, and a verdict on whether a match can form (including a warning when the
+  per-team faction restriction is what is blocking it).
+- `.soloq list` - every queued player: id, class, spec, role, faction, rating,
+  MMR, wait time. Use this to confirm you have 2/2/2.
+- `.soloq pending` - arenas waiting for a result (instance id + both teams).
+- `.soloq clear` - dequeue everyone and clear their badges.
+- `.soloq crossfaction on|off` - runtime toggle for `EnforceTeamFaction`. `on`
+  allows mixed-faction teammates (they can be hostile to each other); `off`
+  (default) requires each team to be a single faction.
+
+## Wiring
+
+- Scripts are registered in `AddArenacraftScripts()` (`ArenacraftScripts.cpp`).
+- Unit tests run with `zig build run-game-test` (the `game` target).
+- Nothing uses `npc_vendor`/SQL; the whole system is code-defined.
+
+## Out of scope / next sprints
+
+- Friendly mixed-faction teammates (rather than the per-team faction rule).
+- Class-stacking rules across the whole match rather than per team, if desired.
+- Block talent/spec changes while queued (cheat prevention).
+- Queue-count queries and richer NPC/UI feedback.
+- Thread safety once there is more than one writer.

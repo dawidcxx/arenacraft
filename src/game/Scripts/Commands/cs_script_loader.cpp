@@ -54,6 +54,7 @@ void AddSC_reload_commandscript();
 void AddSC_reset_commandscript();
 void AddSC_send_commandscript();
 void AddSC_server_commandscript();
+void AddSC_soloq_commandscript();
 void AddSC_spectator_commandscript();
 void AddSC_tele_commandscript();
 void AddSC_ticket_commandscript();
@@ -105,6 +106,7 @@ void AddCommandsScripts()
   AddSC_reset_commandscript();
   AddSC_send_commandscript();
   AddSC_server_commandscript();
+  AddSC_soloq_commandscript();
   AddSC_spectator_commandscript();
   AddSC_tele_commandscript();
   AddSC_ticket_commandscript();

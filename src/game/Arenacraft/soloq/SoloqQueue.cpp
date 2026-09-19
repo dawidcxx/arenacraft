@@ -52,6 +52,29 @@ bool SoloqQueue::contains(PlayerId id) const
   return std::any_of(_entries.begin(), _entries.end(), [id](Entry const& entry) { return entry.player.id == id; });
 }
 
+std::vector<PlayerId> SoloqQueue::waitingPlayers() const
+{
+  std::vector<PlayerId> ids;
+  ids.reserve(_entries.size());
+  for (Entry const& entry : _entries)
+    ids.push_back(entry.player.id);
+  return ids;
+}
+
+void SoloqQueue::setEnforceTeamFaction(bool value) { _enforceTeamFaction = value; }
+
+bool SoloqQueue::enforceTeamFaction() const { return _enforceTeamFaction; }
+
+std::vector<SoloqQueue::QueueSnapshot> SoloqQueue::snapshot() const
+{
+  std::vector<QueueSnapshot> result;
+  result.reserve(_entries.size());
+  for (Entry const& entry : _entries)
+    result.push_back(QueueSnapshot{entry.player.id, entry.player.classId, entry.player.specIndex, entry.role,
+                                   entry.player.rating, entry.player.mmr, entry.player.teamId, entry.waited});
+  return result;
+}
+
 uint32_t SoloqQueue::windowFor(Entry const& entry)
 {
   uint64_t const steps =
@@ -67,7 +90,7 @@ bool SoloqQueue::compatible(Entry const& left, Entry const& right)
   return gap <= std::max(windowFor(left), windowFor(right));
 }
 
-bool SoloqQueue::allCompatible(std::array<Entry const*, 6> const& six)
+bool SoloqQueue::allCompatible(std::array<Entry const*, 6> const& six) const
 {
   for (std::size_t i = 0; i < six.size(); ++i)
     for (std::size_t j = i + 1; j < six.size(); ++j)
@@ -77,7 +100,7 @@ bool SoloqQueue::allCompatible(std::array<Entry const*, 6> const& six)
   return true;
 }
 
-SoloqQueue::Candidate SoloqQueue::makeCandidate(std::array<Entry const*, 6> const& six)
+std::optional<SoloqQueue::Candidate> SoloqQueue::makeCandidate(std::array<Entry const*, 6> const& six) const
 {
   Candidate candidate{};
   for (std::size_t i = 0; i < six.size(); ++i)
@@ -90,26 +113,43 @@ SoloqQueue::Candidate SoloqQueue::makeCandidate(std::array<Entry const*, 6> cons
   QueuedPlayer const& h0 = candidate.players[4];
   QueuedPlayer const& h1 = candidate.players[5];
 
-  uint64_t const                total = static_cast<uint64_t>(m0.mmr) + m1.mmr + c0.mmr + c1.mmr + h0.mmr + h1.mmr;
-  std::array<uint64_t, 4> const sumsA = {
-      static_cast<uint64_t>(m0.mmr) + c0.mmr + h0.mmr,
-      static_cast<uint64_t>(m0.mmr) + c0.mmr + h1.mmr,
-      static_cast<uint64_t>(m0.mmr) + c1.mmr + h0.mmr,
-      static_cast<uint64_t>(m0.mmr) + c1.mmr + h1.mmr,
-  };
+  uint64_t const total = static_cast<uint64_t>(m0.mmr) + m1.mmr + c0.mmr + c1.mmr + h0.mmr + h1.mmr;
 
-  uint64_t    bestImbalance = UINT64_MAX;
+  // partition p: team A = {m0, caster[p], healer[p]}, team B takes the rest.
+  // Only partitions where neither team stacks a class are eligible.
+  bool        found         = false;
+  uint64_t    bestImbalance = 0;
   std::size_t bestPartition = 0;
-  for (std::size_t i = 0; i < sumsA.size(); ++i)
+  for (std::size_t p = 0; p < 4; ++p)
   {
-    uint64_t const doubled   = 2 * sumsA[i];
+    QueuedPlayer const& casterA = (p == 0 || p == 1) ? c0 : c1;
+    QueuedPlayer const& healerA = (p == 0 || p == 2) ? h0 : h1;
+    QueuedPlayer const& casterB = (p == 0 || p == 1) ? c1 : c0;
+    QueuedPlayer const& healerB = (p == 0 || p == 2) ? h1 : h0;
+
+    if (m0.classId == casterA.classId || m0.classId == healerA.classId || casterA.classId == healerA.classId)
+      continue;
+    if (m1.classId == casterB.classId || m1.classId == healerB.classId || casterB.classId == healerB.classId)
+      continue;
+
+    if (_enforceTeamFaction && (m0.teamId != casterA.teamId || m0.teamId != healerA.teamId ||
+                                m1.teamId != casterB.teamId || m1.teamId != healerB.teamId))
+      continue;
+
+    uint64_t const sumA      = static_cast<uint64_t>(m0.mmr) + casterA.mmr + healerA.mmr;
+    uint64_t const doubled   = 2 * sumA;
     uint64_t const imbalance = doubled > total ? doubled - total : total - doubled;
-    if (imbalance < bestImbalance)
+
+    if (!found || imbalance < bestImbalance)
     {
+      found         = true;
       bestImbalance = imbalance;
-      bestPartition = i;
+      bestPartition = p;
     }
   }
+
+  if (!found)
+    return std::nullopt;
 
   candidate.partition   = bestPartition;
   candidate.imbalance   = bestImbalance;
@@ -194,8 +234,8 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::findBestMatch() const
               if (!allCompatible(six))
                 continue;
 
-              Candidate candidate = makeCandidate(six);
-              if (!best || betterThan(candidate, *best))
+              std::optional<Candidate> const candidate = makeCandidate(six);
+              if (candidate && (!best || betterThan(*candidate, *best)))
                 best = candidate;
             }
 
