@@ -1,7 +1,7 @@
-#include "vendor_scripts.hpp"
+#include "ItemVendor.hpp"
 
 void AddArenacraftScripts()
 {
-  new arenacraft::vendors::ShaulyPoreVendor();
-  new arenacraft::vendors::VendorStock();
+  new arenacraft::ItemVendor();
+  new arenacraft::ItemVendorStock();
 }

@@ -37,6 +37,56 @@ Core reference for how NPC vendors work and how to change them from C++.
   code-driven stock from `WorldScript::OnStartup`, which runs after world data
   is loaded.
 
+## Multi-vendor (gossip menu)
+
+One NPC can offer several lists: give it `GOSSIP | VENDOR`, show a gossip menu,
+and make each entry a `GOSSIP_OPTION_VENDOR` option whose `GossipActionMenuId`
+is a *vendor entry* (any unused id). Selecting it calls
+`SendListInventory(guid, vendorEntry)`, which reads
+`sObjectMgr->GetNpcVendorItemList(vendorEntry)`; stock those entries with
+`AddVendorItem` like any other.
+
+Menus can be built without SQL by overriding
+`AllCreatureScript::CanCreatureGossipHello`: fill
+`player->PlayerTalkClass->GetGossipMenu()` (`AddMenuItem` +
+`AddGossipMenuItemData`) and return `true` so the core skips its DB menu. See
+`src/game/Arenacraft/npcs/ItemVendor.hpp` for a working example.
+
+### Code-driven stock list (arenacraft multi-vendor)
+
+`src/game/Arenacraft/npcs/` splits the working example into:
+
+- `ItemVendor.hpp` - `ItemVendor` (gossip menu) and `ItemVendorStock`
+  (`OnStartup` flush), plus the `ItemEntry` row type.
+- `ItemVendor.cpp` - groups the flat list into categories (cached
+  `unordered_map<category, vector<itemId>>`) and drives the gossip/stock code.
+- `ItemVendorItems.cpp` - the flat `{Category, itemId}` list and
+  `CategoryOrder()`. Edit this to add items: every row has a trailing comment
+  naming the item. Add a name to `CategoryOrder()` to create a new gossip
+  option / vendor list (menu index `i` maps to `VendorEntryBase + i`).
+
+The menu also has a class-dependent **Glyphs** option. It is not part of the
+item list: `GlyphVendorItems.cpp` holds a flat `{CLASS_X, itemId}` list (one row
+per glyph, grouped/ordered by class, trailing comment naming it) exposed as
+`AllGlyphs()`; `ItemVendor::GlyphsForClass(classId)` filters it per class and the
+option points at `GlyphVendorEntryBase + classId`. Row order inside a class is
+the vendor order. Within each class the glyphs recommended by the Wowhead PvP
+arena guides come first (then the rest alphabetically); the guides and their
+glyphs are recorded in `ai-doc/class_guides.md`, and the priority block is
+regenerated from those notes.
+
+Item ids are checked against wotlk.evowow.com; skip anything tagged
+"Not available to players". No `npc_vendor` SQL is involved (`persist = false`).
+
+Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
+(264 belts/wrists/rings), Trinkets (264 ICC + 258/245 ToC), ICC Set & Weapons
+(264 tier + 264-277 weapons), ICC Offparts (264 belts/wrists/rings) and ICC
+Offset (264 non-tier main pieces).
+
+Arena-point items ship with `BuyPrice = 0` (would be free), so `ItemVendorStock`
+sets a small fallback gold price on any 0-price stock. `extendedCost = 0` on the
+vendor entry is what removes the rating/arena-point requirement.
+
 ## Pitfalls
 
 - `.reload npc_vendor` reloads from the DB and drops code-added stock.
