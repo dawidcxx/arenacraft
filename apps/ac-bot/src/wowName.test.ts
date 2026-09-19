@@ -1,26 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { normalizeAccountName, WOW_NAME_PATTERN } from "./wowName";
+import { normalizeAccountName } from "./wowName";
 
 describe("normalizeAccountName", () => {
-  test("uppercases valid alphanumeric names", () => {
+  test("passes the Discord username through, uppercased", () => {
     expect(normalizeAccountName("john99")).toBe("JOHN99");
     expect(normalizeAccountName("Alpha")).toBe("ALPHA");
     expect(normalizeAccountName("john_doe")).toBe("JOHN_DOE");
-  });
-
-  test("rejects names that are not supportable as Wow accounts", () => {
-    expect(normalizeAccountName("john.doe")).toBeNull();
-    expect(normalizeAccountName("john-doe")).toBeNull();
-    expect(normalizeAccountName("with space")).toBeNull();
-    expect(normalizeAccountName("j")).toBeNull();
-    expect(normalizeAccountName("a".repeat(21))).toBeNull();
-    expect(normalizeAccountName("_")).toBeNull();
-  });
-
-  test("exposes the pattern", () => {
-    expect(WOW_NAME_PATTERN.test("Abc123")).toBe(true);
-    expect(WOW_NAME_PATTERN.test("john_doe")).toBe(true);
-    expect(WOW_NAME_PATTERN.test("bad.name")).toBe(false);
+    expect(normalizeAccountName("john.doe")).toBe("JOHN.DOE");
+    expect(normalizeAccountName("john-doe")).toBe("JOHN-DOE");
   });
 });

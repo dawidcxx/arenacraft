@@ -619,12 +619,14 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
 
   // Arenacraft: hand the class its armor and weapon proficiencies (maxed), a
   // mount with riding, First Aid and full hunter pet stable slots at creation
-  // rather than through a first-login script.
+  // rather than through a first-login script. Death knights also get their
+  // Acherus abilities (Horn of Winter rank 1, Runeforging) up front.
   arenacraft::GrantStartingArmorProficiencies(this);
   arenacraft::GrantStartingWeaponSkills(this);
   arenacraft::GrantStartingMount(this);
   arenacraft::GrantStartingFirstAid(this);
   arenacraft::GrantStartingStableSlots(this);
+  arenacraft::GrantStartingDeathKnightSpells(this);
 
   // original action bar
   for (PlayerCreateInfoActions::const_iterator action_itr = info->action.begin(); action_itr != info->action.end();

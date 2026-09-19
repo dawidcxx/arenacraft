@@ -22,14 +22,6 @@ export async function handleRegister(interaction: ChatInputCommandInteraction, a
   // Acknowledge within Discord's 3s window; the DB/SRP work below can be slower.
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  if (!accountName) {
-    await interaction.editReply(
-      `Your Discord name \`${discordUsername}\` can't be used as an ArenaCraft account name.\n` +
-        "Supported names are 2-20 letters, digits or underscores (no dots, dashes or spaces).",
-    );
-    return;
-  }
-
   if (await authDb.accountExists(accountName)) {
     await interaction.editReply(
       `An account named \`${accountName}\` is already registered. If you lost your password, ask an admin.`,

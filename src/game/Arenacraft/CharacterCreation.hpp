@@ -29,4 +29,8 @@ void GrantStartingTotems(Player* player);
 
 // Unlocks every hunter pet stable slot. No-op for other classes.
 void GrantStartingStableSlots(Player* player);
+
+// Learns death knight baseline abilities that normally come from the Acherus
+// quest line (Horn of Winter rank 1, Runeforging). No-op for other classes.
+void GrantStartingDeathKnightSpells(Player* player);
 } // namespace arenacraft

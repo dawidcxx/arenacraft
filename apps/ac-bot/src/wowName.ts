@@ -1,14 +1,8 @@
-// Discord handles may contain '.', '_' and digits; letters, digits and
-// underscores are usable as ArenaCraft account names. We reject everything else
-// as "unsupported".
-export const WOW_NAME_PATTERN = /^[A-Za-z0-9_]{2,20}$/;
-
 /**
- * Normalizes a Discord username into an ArenaCraft account name.
- * Returns null when the name is not supported.
+ * Uses the Discord username verbatim as the ArenaCraft account name. The auth
+ * core uppercases account names, so we uppercase here to keep the SRP6 verifier
+ * consistent with what the client sends at login.
  */
-export function normalizeAccountName(discordUsername: string): string | null {
-  const name = discordUsername.trim();
-  if (!WOW_NAME_PATTERN.test(name)) return null;
-  return name.toUpperCase();
+export function normalizeAccountName(discordUsername: string): string {
+  return discordUsername.trim().toUpperCase();
 }

@@ -71,6 +71,13 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassWeaponProficiencies = 
 // ground mount. Learned as spells so nothing goes into the inventory.
 constexpr uint32 RidingSpells[]     = {33388, 33389, 34090, 34091, 54197};
 constexpr uint32 StartingMountSpell = 65917; // Magic Rooster
+
+// Death knight baseline abilities that come from the runeforging quest line /
+// Acherus rather than the class trainer.
+constexpr uint32 DeathKnightSpells[] = {
+    57330, // Horn of Winter (rank 1)
+    53428, // Runeforging
+};
 } // namespace
 
 void GrantStartingArmorProficiencies(Player* player)
@@ -131,5 +138,15 @@ void GrantStartingStableSlots(Player* player)
   // MaxStabledPets is persisted in characters.stableSlots and restored by
   // Player::_LoadPetStable, so this survives relogs.
   player->GetOrInitPetStable().MaxStabledPets = MAX_PET_STABLES;
+}
+
+void GrantStartingDeathKnightSpells(Player* player)
+{
+  if (player->getClass() != CLASS_DEATH_KNIGHT)
+    return;
+
+  for (uint32 spell : DeathKnightSpells)
+    if (!player->HasSpell(spell))
+      player->addSpell(spell, SPEC_MASK_ALL, true);
 }
 } // namespace arenacraft
