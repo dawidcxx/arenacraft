@@ -1,8 +1,10 @@
 # Character creation (arenacraft)
 
-A new character is fully set up in `Player::Create`
-(`src/game/Entities/Player/Player.cpp`) so nothing has to run on first login
-(no `PlayerScript::OnFirstLogin` animations/scripts).
+A new character is set up in `Player::Create`
+(`src/game/Entities/Player/Player.cpp`) so almost nothing has to run on first
+login (no `PlayerScript::OnFirstLogin` animations/scripts). The one exception is
+reputations (see below), which are still seeded in the `AT_LOGIN_FIRST` branch of
+`WorldSession::HandlePlayerLogin`.
 
 What a fresh character gets:
 
@@ -38,6 +40,17 @@ What a fresh character gets:
   hunter stable slots (`PetStable::MaxStabledPets`, persisted in
   `characters.stableSlots`). No-op for other classes. See
   `ai-doc/hunter_pets.md`.
+- **Reputations.** On first login (`AT_LOGIN_FIRST`, config
+  `PlayerStart.AllReputation`) a curated set of WotLK factions - Cenarion
+  Expedition, the Northrend quarters (Kirin Tor, Wyrmrest Accord, Ebon Blade,
+  Argent Crusade, Sons of Hodir, Kalu'ak, Frenzyheart/Oracles, Ashen Verdict)
+  and the character's own capital cities + expedition subfactions - is set to
+  Exalted (42999). The standings are then sent as a single
+  `SMSG_INITIALIZE_FACTIONS` re-send (`ReputationMgr::SendInitialReputations`)
+  rather than a burst of `SMSG_SET_FACTION_STANDING` packets, and persisted by
+  the normal `SaveToDB` so relogs need no special handling. The curated ID lists
+  live in `WorldSession::HandlePlayerLogin`
+  (`src/game/Handlers/CharacterHandler.cpp`).
 
 The helpers are called from `Player::Create` right after
 `LearnDefaultSkills()` / `LearnCustomSpells()`, except `GrantStartingTotems`,

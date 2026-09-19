@@ -1061,12 +1061,16 @@ void WorldSession::HandlePlayerLoginFromDB(LoginQueryHolder const& holder)
       }
     }
 
-    // Reputations if "StartAllReputation" is enabled, -- TODO: Fix this in a better way
+    // Seed a curated set of WotLK reputations at Exalted if "StartAllReputation"
+    // is enabled. Set the standings silently (SetVisible's packet is still
+    // suppressed while loading) and then re-send the one initial-factions
+    // packet so the client learns the new standings without a flood of
+    // per-faction SMSG_SET_FACTION_STANDING / reputation-gain animations.
     if (sWorld->getBoolConfig(CONFIG_START_ALL_REP))
     {
       ReputationMgr& repMgr = pCurrChar->GetReputationMgr();
 
-      auto SendFullReputation = [&repMgr](std::initializer_list<uint32> factionsList)
+      auto SetExalted = [&repMgr](std::initializer_list<uint32> factionsList)
       {
         for (auto const& itr : factionsList)
         {
@@ -1074,22 +1078,52 @@ void WorldSession::HandlePlayerLoginFromDB(LoginQueryHolder const& holder)
         }
       };
 
-      SendFullReputation({942,  935,  936,  1011, 970,  967,  989,  932,  934,  1038,
-                          1077, 1106, 1104, 1090, 1098, 1156, 1073, 1105, 1119, 1091});
+      // Northrend factions a level-80 character actually deals with.
+      SetExalted({942,  // Cenarion Expedition
+                  1090, // Kirin Tor
+                  1091, // The Wyrmrest Accord
+                  1098, // Knights of the Ebon Blade
+                  1106, // Argent Crusade
+                  1119, // The Sons of Hodir
+                  1073, // The Kalu'ak
+                  1104, // Frenzyheart Tribe
+                  1105, // The Oracles
+                  1156} // The Ashen Verdict
+      );
 
       switch (pCurrChar->GetFaction())
       {
       case ALLIANCE:
-        SendFullReputation({72, 47, 69, 930, 730, 978, 54, 946, 1037, 1068, 1126, 1094, 1050});
+        SetExalted({72,   // Stormwind
+                    47,   // Ironforge
+                    69,   // Darnassus
+                    930,  // Exodar
+                    54,   // Gnomeregan Exiles
+                    1037, // Alliance Vanguard
+                    1050, // Valiance Expedition
+                    1068, // Explorers' League
+                    1126, // The Frostborn
+                    1094} // The Silver Covenant
+        );
         break;
       case HORDE:
-        SendFullReputation({76, 68, 81, 911, 729, 941, 530, 947, 1052, 1067, 1124, 1064, 1085});
+        SetExalted({76,   // Orgrimmar
+                    68,   // Undercity
+                    81,   // Thunder Bluff
+                    911,  // Silvermoon City
+                    530,  // Darkspear Trolls
+                    1052, // Horde Expedition
+                    1085, // Warsong Offensive
+                    1067, // The Hand of Vengeance
+                    1064, // The Taunka
+                    1124} // The Sunreavers
+        );
         break;
       default:
         break;
       }
 
-      repMgr.SendStates();
+      repMgr.SendInitialReputations();
     }
   }
 
