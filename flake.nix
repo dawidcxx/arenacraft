@@ -63,6 +63,7 @@
                   pkgs.zlib
                   pkgs.readline
                   pkgs.jemalloc
+                  pkgs.doctest # header-only unit testing framework
                 ]
               }:${pkgs.mysql84}/include/mysql"
               export LIBRARY_PATH="${

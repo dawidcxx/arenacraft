@@ -63,6 +63,19 @@ pub const Src = struct {
 
     const Self = @This();
 
+    /// Query a module's `.cpp` sources, excluding unit-test translation units:
+    /// the `Tests.cpp` entrypoint and co-located `*_test.cpp` files belong to
+    /// the test harness (TestHarness.zig), never to the module library.
+    fn queryModuleSources(self: *Self, dir: []const u8) cpp.SourceSet {
+        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, dir, .{
+            .extensions = cpp.Exts.JUST_CPP,
+            .recursive = true,
+        });
+        sources.filterOutByGlob("*/Tests.cpp");
+        sources.filterOutByGlob("*_test.cpp");
+        return sources;
+    }
+
     pub fn build(self: *Self, b: BuildRequest) !void {
         try self.buildCommon(b);
         try self.buildDatabase(b);
@@ -155,10 +168,7 @@ pub const Src = struct {
         revision_header.addValue("_MYSQL_EXECUTABLE", []const u8, "");
         module.addConfigHeader(revision_header);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/common", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
+        var sources = self.queryModuleSources("src/common");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -207,10 +217,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/database", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/database", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
+        var sources = self.queryModuleSources("src/database");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -255,10 +262,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/shared", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/shared", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
+        var sources = self.queryModuleSources("src/shared");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -303,10 +307,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/auth", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/auth", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
+        var sources = self.queryModuleSources("src/auth");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -345,10 +346,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/tools", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/tools", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
+        var sources = self.queryModuleSources("src/tools");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -390,10 +388,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/game", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/game", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
+        var sources = self.queryModuleSources("src/game");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -440,10 +435,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/worldserver", module);
 
-        var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, "src/worldserver", .{
-            .extensions = cpp.Exts.JUST_CPP,
-            .recursive = true,
-        });
+        var sources = self.queryModuleSources("src/worldserver");
 
         module.addCSourceFiles(.{
             .files = sources.get(),

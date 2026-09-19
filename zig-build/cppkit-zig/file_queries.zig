@@ -80,11 +80,26 @@ pub const SourceSet = struct {
     }
 
     pub fn filterOutByGlob(self: *SourceSet, glob: []const u8) void {
-        for (self.srcs.items, 0..) |src, i| {
-            if (internalMatchGlob(glob, src)) {
-                _ = self.srcs.swapRemove(i);
+        var kept: usize = 0;
+        for (self.srcs.items) |src| {
+            if (!internalMatchGlob(glob, src)) {
+                self.srcs.items[kept] = src;
+                kept += 1;
             }
         }
+        self.srcs.items.len = kept;
+    }
+
+    /// Keep only the sources matching `glob` (in-place, leaks the rest).
+    pub fn filterToGlob(self: *SourceSet, glob: []const u8) void {
+        var kept: usize = 0;
+        for (self.srcs.items) |src| {
+            if (internalMatchGlob(glob, src)) {
+                self.srcs.items[kept] = src;
+                kept += 1;
+            }
+        }
+        self.srcs.items.len = kept;
     }
 
     pub fn debugPrint(self: SourceSet) void {

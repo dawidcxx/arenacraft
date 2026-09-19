@@ -3,6 +3,7 @@ const Build = std.Build;
 
 const Deps = @import("./Deps.zig").Deps;
 const Src = @import("./Src.zig").Src;
+const TestHarness = @import("./TestHarness.zig").TestHarness;
 const cpp = @import("./cppkit-zig/build.zig");
 
 // zig 0.16 ships a ubsan runtime that aborts in Debug; the legacy codebase
@@ -19,6 +20,7 @@ pub const AcGraph = struct {
 
     deps: Deps = .{},
     src: Src = .{},
+    tests: TestHarness = .{},
 
     const Self = @This();
 
@@ -30,6 +32,7 @@ pub const AcGraph = struct {
         };
         instance.deps.back_reference = instance;
         instance.src.back_reference = instance;
+        instance.tests.back_reference = instance;
         return instance;
     }
 
@@ -55,6 +58,20 @@ pub const AcGraph = struct {
         try self.buildSrc(build_request);
         try self.buildTestBinary(build_request);
         try self.buildAc(build_request);
+        try self.buildUnitTests(build_request);
+    }
+
+    /// Unit tests, convention-over-configuration (see TestHarness.zig).
+    /// `zig build test` builds and runs every enabled target's tests.
+    fn buildUnitTests(self: *Self, b: BuildRequest) !void {
+        const bl = b[0];
+
+        const common_run = try self.tests.build(b, .common);
+        const game_run = try self.tests.build(b, .game);
+
+        const test_step = bl.step("test", "Build and run all unit tests");
+        test_step.dependOn(common_run);
+        test_step.dependOn(game_run);
     }
 
     fn buildDeps(self: *Self, b: BuildRequest) !void {
