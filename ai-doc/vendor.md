@@ -96,22 +96,28 @@ options fall through to the core handler):
 - **Learn Dual Talent Specialization** - casts 63680/63624 like the core's
   trainer option, if the player has one spec and is at
   `CONFIG_MIN_DUALSPEC_LEVEL` or above.
-- **Learn Spells** - `SendTrainerList` on the NPC itself. The NPC is not a real
-  trainer: `ItemVendorStock::OnStartup` sets its template's trainer flag and
-  copies every class trainer's spell list into it (iterating
-  `GetCreatureTemplates()`), and `trainer_type` is set to `TRADESKILLS` so the
-  interaction check does not demand a matching `trainer_class`. The core filters
-  the merged list per class/race when it is sent, and
-  `Player::GetTrainerSpellState` rejects spells that do not fit the buyer, so the
-  merge does not leak cross-class spells.
+- **Learn Spells** - `SendTrainerList` on the vendor itself, but the core is
+  patched so the trainer data comes from the player's *real* class trainer list
+  (`arenacraft::ClassTrainerSpellsFor`, `src/game/Arenacraft/ClassTrainer.cpp`):
+  `WorldSession::SendTrainerList` and `HandleTrainerBuySpellOpcode` ask
+  `ClassTrainerSpellsFor(unit, player)` first and only fall back to
+  `unit->GetTrainerSpells()`. Because the served list only ever contains the
+  player's class spells, another class's spells can never appear (a merged
+  all-class list leaked them, so don't go back to that). The vendor has the
+  trainer flag but `trainer_type = TRADESKILLS` (set in `OnStartup`) so the
+  interaction check does not reject it for the player's class and it has no
+  trainer spells of its own.
 
 Item ids are checked against wotlk.evowow.com; skip anything tagged
 "Not available to players". No `npc_vendor` SQL is involved (`persist = false`).
 
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
-(264 belts/wrists/rings), Trinkets (264 ICC + 258/245 ToC), ICC Set & Weapons
-(264 tier + 264-277 weapons), ICC Offparts (264 belts/wrists/rings) and ICC
-Offset (264 non-tier main pieces).
+(264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator
+rings), Trinkets (264 ICC + 258/245 ToC), ICC Set & Weapons (264 tier + 277
+weapons; the weaker 264/271 PvE weapon drops are not stocked, except the 264
+thrown Gluth's Fetching Knife, which has no 277 version), ICC Offparts (264
+necks/cloaks/boots/belts/wrists/rings plus the 272 ToGC tribute-chest cloaks) and
+ICC Offset (264 non-tier main pieces).
 
 Arena-point items ship with `BuyPrice = 0` (would be free), so `ItemVendorStock`
 sets a small fallback gold price on any 0-price stock. `extendedCost = 0` on the

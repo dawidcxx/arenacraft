@@ -17,6 +17,7 @@
 
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
+#include "ClassTrainer.hpp"
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "GameGraveyard.h"
@@ -116,7 +117,10 @@ void WorldSession::SendTrainerList(ObjectGuid guid, const std::string& strTitle)
     return;
   }
 
-  TrainerSpellData const* trainer_spells = unit->GetTrainerSpells();
+  // The arenacraft multi-vendor serves the player's real class trainer list.
+  TrainerSpellData const* trainer_spells = arenacraft::ClassTrainerSpellsFor(unit, GetPlayer());
+  if (!trainer_spells)
+    trainer_spells = unit->GetTrainerSpells();
   if (!trainer_spells)
   {
     LOG_DEBUG("network", "WORLD: SendTrainerList - Training spells not found for creature ({})", guid.ToString());
@@ -235,7 +239,9 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recvData)
     GetPlayer()->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);
 
   // check present spell in trainer spell list
-  TrainerSpellData const* trainer_spells = unit->GetTrainerSpells();
+  TrainerSpellData const* trainer_spells = arenacraft::ClassTrainerSpellsFor(unit, GetPlayer());
+  if (!trainer_spells)
+    trainer_spells = unit->GetTrainerSpells();
   if (!trainer_spells)
     return;
 

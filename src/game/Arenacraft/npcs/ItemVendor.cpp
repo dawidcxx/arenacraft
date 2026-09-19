@@ -1,6 +1,5 @@
 #include "ItemVendor.hpp"
 
-#include "SpellMgr.h"
 #include "World.h"
 #include "WorldSession.h"
 
@@ -153,6 +152,8 @@ bool ItemVendor::CanCreatureGossipSelect(Player* player, Creature* creature, uin
     }
     return true;
   case UtilLearnSpells:
+    // The core serves this from the player's real class trainer list (see
+    // ClassTrainer.hpp / NPCHandler.cpp), so only their class's spells exist.
     player->GetSession()->SendTrainerList(creature->GetGUID());
     return true;
   default:
@@ -178,39 +179,11 @@ void ItemVendorStock::OnStartup()
   for (uint32 item : AllEnchants())
     StockItem(ItemVendor::EnchantVendorEntry, item);
 
-  // Merge every class trainer's spell list into this NPC so "Learn Spells" can
-  // open the player's class trainer without a real trainer creature. The core
-  // filters the merged list down to the player's class/race when it is sent.
+  // "Learn Spells" is served from the player's real class trainer list (see
+  // ClassTrainer.hpp). The vendor only needs a non-class trainer_type so the
+  // trainer interaction check does not reject it for the player's class; it has
+  // no trainer spells of its own.
   if (CreatureTemplate* proto = const_cast<CreatureTemplate*>(sObjectMgr->GetCreatureTemplate(ItemVendor::Entry)))
-  {
-    proto->npcflag |= UNIT_NPC_FLAG_TRAINER;
-    // Deliberately not TRAINER_TYPE_CLASS: the interaction check would then
-    // demand trainer_class match the player, which one shared NPC cannot do
-    // for every class.
     proto->trainer_type = TRAINER_TYPE_TRADESKILLS;
-
-    uint32 mergedSpells = 0;
-    for (auto const& [trainerEntry, trainer] : *sObjectMgr->GetCreatureTemplates())
-    {
-      if (trainer.trainer_type != TRAINER_TYPE_CLASS || trainer.trainer_class == 0)
-        continue;
-
-      TrainerSpellData const* spells = sObjectMgr->GetNpcTrainerSpells(trainerEntry);
-      if (!spells)
-        continue;
-
-      for (auto const& entry : spells->spellList)
-      {
-        TrainerSpell const& trainerSpell = entry.second;
-        sObjectMgr->AddSpellToTrainer(ItemVendor::Entry, trainerSpell.spell, trainerSpell.spellCost,
-                                      trainerSpell.reqSkill, trainerSpell.reqSkillValue, trainerSpell.reqLevel,
-                                      trainerSpell.reqSpell);
-        ++mergedSpells;
-      }
-    }
-
-    LOG_INFO("server.loading", ">> arenacraft: merged {} class trainer spells into vendor {}", mergedSpells,
-             ItemVendor::Entry);
-  }
 }
 } // namespace arenacraft

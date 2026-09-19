@@ -189,6 +189,18 @@ std::vector<ItemEntry> const& AllItems()
       {WrathfulOffparts, 51374}, // Wrathful Gladiator's Waistguard of Dominance (mail)
       {WrathfulOffparts, 51359}, // Wrathful Gladiator's Girdle of Salvation (plate)
       {WrathfulOffparts, 51362}, // Wrathful Gladiator's Girdle of Triumph (plate)
+      // Feet
+      {WrathfulOffparts, 51328}, // Wrathful Gladiator's Treads of Dominance (cloth)
+      {WrathfulOffparts, 51338}, // Wrathful Gladiator's Treads of Alacrity (cloth)
+      {WrathfulOffparts, 51366}, // Wrathful Gladiator's Treads of Salvation (cloth)
+      {WrathfulOffparts, 51341}, // Wrathful Gladiator's Boots of Salvation (leather)
+      {WrathfulOffparts, 51344}, // Wrathful Gladiator's Boots of Dominance (leather)
+      {WrathfulOffparts, 51369}, // Wrathful Gladiator's Boots of Triumph (leather)
+      {WrathfulOffparts, 51351}, // Wrathful Gladiator's Sabatons of Triumph (mail)
+      {WrathfulOffparts, 51372}, // Wrathful Gladiator's Sabatons of Salvation (mail)
+      {WrathfulOffparts, 51375}, // Wrathful Gladiator's Sabatons of Dominance (mail)
+      {WrathfulOffparts, 51360}, // Wrathful Gladiator's Greaves of Salvation (plate)
+      {WrathfulOffparts, 51363}, // Wrathful Gladiator's Greaves of Triumph (plate)
       // Wrists
       {WrathfulOffparts, 51329}, // Wrathful Gladiator's Cuffs of Dominance (cloth)
       {WrathfulOffparts, 51339}, // Wrathful Gladiator's Cuffs of Alacrity (cloth)
@@ -204,6 +216,25 @@ std::vector<ItemEntry> const& AllItems()
       // Rings
       {WrathfulOffparts, 51336}, // Wrathful Gladiator's Band of Dominance (spell)
       {WrathfulOffparts, 51358}, // Wrathful Gladiator's Band of Triumph (melee)
+      {WrathfulOffparts, 42118}, // Relentless Gladiator's Band of Ascendancy
+      {WrathfulOffparts, 42119}, // Relentless Gladiator's Band of Victory
+      // Neck
+      {WrathfulOffparts, 51331}, // Wrathful Gladiator's Pendant of Dominance
+      {WrathfulOffparts, 51333}, // Wrathful Gladiator's Pendant of Subjugation
+      {WrathfulOffparts, 51335}, // Wrathful Gladiator's Pendant of Ascendancy
+      {WrathfulOffparts, 51347}, // Wrathful Gladiator's Pendant of Salvation
+      {WrathfulOffparts, 51349}, // Wrathful Gladiator's Pendant of Deliverance
+      {WrathfulOffparts, 51353}, // Wrathful Gladiator's Pendant of Sundering
+      {WrathfulOffparts, 51355}, // Wrathful Gladiator's Pendant of Triumph
+      {WrathfulOffparts, 51357}, // Wrathful Gladiator's Pendant of Victory
+      // Back
+      {WrathfulOffparts, 51330}, // Wrathful Gladiator's Cloak of Dominance
+      {WrathfulOffparts, 51332}, // Wrathful Gladiator's Cloak of Subjugation
+      {WrathfulOffparts, 51334}, // Wrathful Gladiator's Cloak of Ascendancy
+      {WrathfulOffparts, 51346}, // Wrathful Gladiator's Cloak of Salvation
+      {WrathfulOffparts, 51348}, // Wrathful Gladiator's Cloak of Deliverance
+      {WrathfulOffparts, 51354}, // Wrathful Gladiator's Cloak of Triumph
+      {WrathfulOffparts, 51356}, // Wrathful Gladiator's Cloak of Victory
 
       // == Trinkets ==
       // ICC, ilvl 264
@@ -346,27 +377,8 @@ std::vector<ItemEntry> const& AllItems()
       {ICCSetWeapons, 51213}, // Sanctified Ymirjar Lord's Gauntlets
       {ICCSetWeapons, 51217}, // Sanctified Ymirjar Lord's Handguards
 
-      // == ICC / Lich King weapons (ilvl 264-277) ==
+      // == ICC / Lich King weapons (ilvl 277) ==
       // One-Hand
-      {ICCSetWeapons, 51846}, // Bloodsipper
-      {ICCSetWeapons, 50412}, // Bloodvenom Blade
-      {ICCSetWeapons, 51938}, // Bone Warden's Splitter
-      {ICCSetWeapons, 51937}, // Bonebreaker Scepter
-      {ICCSetWeapons, 51868}, // Flesh-Carving Scalpel
-      {ICCSetWeapons, 51916}, // Frost Giant's Cleaver
-      {ICCSetWeapons, 51893}, // Gutbuster
-      {ICCSetWeapons, 49982}, // Heartpierce
-      {ICCSetWeapons, 50179}, // Last Word
-      {ICCSetWeapons, 50183}, // Lungbreaker
-      {ICCSetWeapons, 50016}, // Rib Spreader
-      {ICCSetWeapons, 50411}, // Scourgeborne Waraxe
-      {ICCSetWeapons, 51858}, // Soulbreaker
-      {ICCSetWeapons, 51869}, // The Facelifter
-      {ICCSetWeapons, 50012}, // Havoc's Call, Blade of Lordaeron Kings
-      {ICCSetWeapons, 50426}, // Heaven's Fall, Kryss of a Thousand Lies
-      {ICCSetWeapons, 49997}, // Mithrios, Bronzebeard's Legacy
-      {ICCSetWeapons, 51942}, // Stormfury, Black Blade of the Betrayer
-      {ICCSetWeapons, 51947}, // Troggbane, Axe of the Frostborne King
       {ICCSetWeapons, 50672}, // Bloodvenom Blade
       {ICCSetWeapons, 50641}, // Heartpierce
       {ICCSetWeapons, 50708}, // Last Word
@@ -374,49 +386,13 @@ std::vector<ItemEntry> const& AllItems()
       {ICCSetWeapons, 50676}, // Rib Spreader
       {ICCSetWeapons, 50654}, // Scourgeborne Waraxe
       // Shield
-      {ICCSetWeapons, 49976}, // Bulwark of Smouldering Steel
-      {ICCSetWeapons, 50065}, // Icecrown Glacial Wall
-      {ICCSetWeapons, 51812}, // Lost Pavise of the Blue Flight
-      {ICCSetWeapons, 51909}, // Neverending Winter
       {ICCSetWeapons, 50616}, // Bulwark of Smouldering Steel
       {ICCSetWeapons, 50729}, // Icecrown Glacial Wall
       // Ranged
-      {ICCSetWeapons, 50033}, // Corpse-Impaling Spike
-      {ICCSetWeapons, 51834}, // Dreamhunter's Carbine
-      {ICCSetWeapons, 51838}, // Lana'thel's Bloody Nail
-      {ICCSetWeapons, 50472}, // Nightmare Ender
-      {ICCSetWeapons, 51927}, // Njorndar Bone Bow
-      {ICCSetWeapons, 50444}, // Rowan's Rifle of Silver Bullets
-      {ICCSetWeapons, 51845}, // Stakethrower
-      {ICCSetWeapons, 51852}, // Wand of Ruby Claret
-      {ICCSetWeapons, 50034}, // Zod's Repeating Longbow
-      {ICCSetWeapons, 49981}, // Fal'inrush, Defender of Quel'thalas
-      {ICCSetWeapons, 51940}, // Windrunner's Heartseeker
       {ICCSetWeapons, 50684}, // Corpse-Impaling Spike
       {ICCSetWeapons, 50631}, // Nightmare Ender
       {ICCSetWeapons, 50638}, // Zod's Repeating Longbow
       // Two-Hand
-      {ICCSetWeapons, 51887}, // Abracadaver
-      {ICCSetWeapons, 50178}, // Bloodfall
-      {ICCSetWeapons, 50415}, // Bryntroll, the Bone Arbiter
-      {ICCSetWeapons, 51936}, // Citadel Enforcer's Claymore
-      {ICCSetWeapons, 49919}, // Cryptmaker
-      {ICCSetWeapons, 50040}, // Distant Land
-      {ICCSetWeapons, 50181}, // Dying Light
-      {ICCSetWeapons, 51857}, // Hersir's Greatspear
-      {ICCSetWeapons, 51898}, // Mag'hari Chieftain's Staff
-      {ICCSetWeapons, 49992}, // Nibelung
-      {ICCSetWeapons, 51833}, // Oxheart
-      {ICCSetWeapons, 51905}, // Ramaladni's Blade of Culling
-      {ICCSetWeapons, 49888}, // Shadow's Edge
-      {ICCSetWeapons, 51881}, // Shaft of Glacial Ice
-      {ICCSetWeapons, 51828}, // Sister Svalna's Aether Staff
-      {ICCSetWeapons, 50429}, // Archus, Greatstaff of Antonidas
-      {ICCSetWeapons, 50070}, // Glorenzelg, High-Blade of the Silver Hand
-      {ICCSetWeapons, 51943}, // Halion, Staff of Forgotten Love
-      {ICCSetWeapons, 50425}, // Oathbinder, Charge of the Ranger-General
-      {ICCSetWeapons, 51945}, // Tainted Twig of Nordrassil
-      {ICCSetWeapons, 51946}, // Warmace of Menethil
       {ICCSetWeapons, 50727}, // Bloodfall
       {ICCSetWeapons, 50709}, // Bryntroll, the Bone Arbiter
       {ICCSetWeapons, 50603}, // Cryptmaker
@@ -424,37 +400,17 @@ std::vector<ItemEntry> const& AllItems()
       {ICCSetWeapons, 50725}, // Dying Light
       {ICCSetWeapons, 50648}, // Nibelung
       // Main Hand
-      {ICCSetWeapons, 51876}, // Abomination Knuckles
-      {ICCSetWeapons, 50035}, // Black Bruise
-      {ICCSetWeapons, 51815}, // Bleak Coldarra Carver
-      {ICCSetWeapons, 51932}, // Frost Needle
-      {ICCSetWeapons, 49968}, // Frozen Bonespike
-      {ICCSetWeapons, 51875}, // Lockjaw
-      {ICCSetWeapons, 51910}, // Midnight Sun
-      {ICCSetWeapons, 50068}, // Rigormortis
-      {ICCSetWeapons, 50028}, // Trauma
-      {ICCSetWeapons, 50427}, // Bloodsurge, Kel'Thuzad's Blade of Agony
-      {ICCSetWeapons, 51941}, // Pugius, Fist of Defiance
-      {ICCSetWeapons, 50428}, // Royal Scepter of Terenas II
-      {ICCSetWeapons, 51939}, // Tel'thas, Dagger of the Blood King
-      {ICCSetWeapons, 51944}, // Valius, Gavel of the Lightbringer
       {ICCSetWeapons, 50692}, // Black Bruise
       {ICCSetWeapons, 50608}, // Frozen Bonespike
       {ICCSetWeapons, 50704}, // Rigormortis
       {ICCSetWeapons, 50685}, // Trauma
       // Off Hand
-      {ICCSetWeapons, 50184}, // Keleseth's Seducer
-      {ICCSetWeapons, 51819}, // Splintershard
       {ICCSetWeapons, 50710}, // Keleseth's Seducer
       // Held In Off-Hand
-      {ICCSetWeapons, 51922}, // Scourgelord's Baton
-      {ICCSetWeapons, 50173}, // Shadow Silk Spindle
-      {ICCSetWeapons, 50423}, // Sundial of Eternal Dusk
       {ICCSetWeapons, 50719}, // Shadow Silk Spindle
       {ICCSetWeapons, 50635}, // Sundial of Eternal Dusk
       // Thrown
       {ICCSetWeapons, 51880}, // Gluth's Fetching Knife
-      {ICCSetWeapons, 50474}, // Shrapnel Star
 
       // == ICC relics (ilvl 264) ==
       {ICCSetWeapons, 50454}, // Idol of the Black Willow
@@ -469,7 +425,26 @@ std::vector<ItemEntry> const& AllItems()
       {ICCSetWeapons, 50463}, // Totem of the Avalanche
       {ICCSetWeapons, 50464}, // Totem of the Surging Sea
 
-      // == ICC offparts (ilvl 264) ==
+      // == ICC offparts (ilvl 264; + ToGC 272 cloaks) ==
+      // Neck
+      {ICCOffparts, 49989}, // Ahn'kahar Onyx Neckguard
+      {ICCOffparts, 50005}, // Amulet of the Silent Eulogy
+      {ICCOffparts, 50023}, // Bile-Encrusted Medallion
+      {ICCOffparts, 50182}, // Blood Queen's Crimson Choker
+      {ICCOffparts, 49975}, // Bone Sentinel's Amulet
+      {ICCOffparts, 51871}, // Choker of Filthy Diamonds
+      {ICCOffparts, 51842}, // Collar of Haughty Disdain
+      {ICCOffparts, 50061}, // Holiday's Grace
+      {ICCOffparts, 51867}, // Infected Choker
+      {ICCOffparts, 50180}, // Lana'thel's Chain of Flagellation
+      {ICCOffparts, 51934}, // Marrowgar's Scratching Choker
+      {ICCOffparts, 50195}, // Noose of Malachite
+      {ICCOffparts, 51863}, // Pendant of Split Veins
+      {ICCOffparts, 51890}, // Precious's Putrid Collar
+      {ICCOffparts, 51822}, // Rimetooth Pendant
+      {ICCOffparts, 50421}, // Sindragosa's Cruel Claw
+      {ICCOffparts, 51894}, // Soulcleave Pendant
+      {ICCOffparts, 50452}, // Wodin's Lucky Necklace
       // Waist
       {ICCOffparts, 50067}, // Astrylian's Sutured Cinch
       {ICCOffparts, 50993}, // Band of the Night Raven
@@ -501,6 +476,34 @@ std::vector<ItemEntry> const& AllItems()
       {ICCOffparts, 50991}, // Verdigris Chain Belt
       {ICCOffparts, 50992}, // Waistband of Despair
       {ICCOffparts, 50010}, // Waistband of Righteous Fury
+      // Feet
+      {ICCOffparts, 51931}, // Ancient Skeletal Boots
+      {ICCOffparts, 49894}, // Blessed Cenarion Boots
+      {ICCOffparts, 49983}, // Blood-Soaked Saronite Stompers
+      {ICCOffparts, 51915}, // Bone Drake's Enameled Boots
+      {ICCOffparts, 49907}, // Boots of Kingly Upheaval
+      {ICCOffparts, 51920}, // Boots of the Frozen Seed
+      {ICCOffparts, 50416}, // Boots of the Funeral March
+      {ICCOffparts, 50009}, // Boots of Unnatural Growth
+      {ICCOffparts, 49890}, // Deathfrost Boots
+      {ICCOffparts, 49896}, // Earthsoul Boots
+      {ICCOffparts, 49895}, // Footpads of Impending Death
+      {ICCOffparts, 49950}, // Frostbitten Fur Boots
+      {ICCOffparts, 50190}, // Grinning Skull Greatboots
+      {ICCOffparts, 49906}, // Hellfrozen Bonegrinders
+      {ICCOffparts, 51899}, // Icecrown Spire Sandals
+      {ICCOffparts, 49993}, // Necrophotic Greaves
+      {ICCOffparts, 51850}, // Pale Corpse Boots
+      {ICCOffparts, 50062}, // Plague Scientist's Boots
+      {ICCOffparts, 49905}, // Protectors of Life
+      {ICCOffparts, 49897}, // Rock-Steady Treads
+      {ICCOffparts, 49893}, // Sandals of Consecration
+      {ICCOffparts, 51816}, // Scourge Fanged Stompers
+      {ICCOffparts, 51873}, // Shuffling Shoes
+      {ICCOffparts, 51856}, // Taldaram's Soft Slippers
+      {ICCOffparts, 51891}, // Taldron's Long Neglected Boots
+      {ICCOffparts, 50071}, // Treads of the Wasteland
+      {ICCOffparts, 51818}, // Wyrmwing Treads
       // Wrists
       {ICCOffparts, 50030}, // Bloodsunder's Bracers
       {ICCOffparts, 51918}, // Bracers of Dark Blessings
@@ -544,6 +547,33 @@ std::vector<ItemEntry> const& AllItems()
       {ICCOffparts, 49999}, // Skeleton Lord's Circle
       {ICCOffparts, 51855}, // Thrice Fanged Signet
       {ICCOffparts, 50170}, // Valanar's Other Signet Ring
+      // Back
+      {ICCOffparts, 51888}, // Cloak of Many Skins
+      {ICCOffparts, 50468}, // Drape of the Violet Tower
+      {ICCOffparts, 50205}, // Frostbinder's Shredded Cape
+      {ICCOffparts, 50014}, // Greatcloak of the Turned Champion
+      {ICCOffparts, 51848}, // Heartsick Mender's Cape
+      {ICCOffparts, 51826}, // Lich Wrappings
+      {ICCOffparts, 50467}, // Might of the Ocean Serpent
+      {ICCOffparts, 50470}, // Recovered Scarlet Onslaught Cape
+      {ICCOffparts, 50074}, // Royal Crimson Cloak
+      {ICCOffparts, 51912}, // Saronite Gargoyle Cloak
+      {ICCOffparts, 50466}, // Sentinel's Winter Cloak
+      {ICCOffparts, 49998}, // Shadowvault Slayer's Cloak
+      {ICCOffparts, 51933}, // Shawl of Nerubian Silk
+      {ICCOffparts, 50469}, // Volde's Cloak of the Night Sky
+      {ICCOffparts, 50019}, // Winding Sheet
+      // Back (ToGC 272)
+      {ICCOffparts, 47545}, // Vereesa's Dexterity
+      {ICCOffparts, 47546}, // Sylvanas' Cunning
+      {ICCOffparts, 47547}, // Varian's Furor
+      {ICCOffparts, 47548}, // Garrosh's Rage
+      {ICCOffparts, 47549}, // Magni's Resolution
+      {ICCOffparts, 47550}, // Cairne's Endurance
+      {ICCOffparts, 47551}, // Aethas' Intensity
+      {ICCOffparts, 47552}, // Jaina's Radiance
+      {ICCOffparts, 47553}, // Bolvar's Devotion
+      {ICCOffparts, 47554}, // Lady Liadrin's Conviction
 
       // == ICC offset: non-set main pieces (ilvl 264) ==
       // Head
