@@ -82,6 +82,7 @@ public:
   static constexpr uint32 UtilResetTalents  = 9000001;
   static constexpr uint32 UtilLearnDualSpec = 9000002;
   static constexpr uint32 UtilLearnSpells   = 9000003;
+  static constexpr uint32 UtilGetPet        = 9000004;
 
   struct Category
   {

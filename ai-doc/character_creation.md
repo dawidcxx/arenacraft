@@ -28,6 +28,10 @@ What a fresh character gets:
   totems - Earth (5175), Fire (5176), Water (5177), Air (5178) - into the bags
   (the totem quests are skipped on a level-80-only server). No-op for other
   classes.
+- **Pet stable slots.** `arenacraft::GrantStartingStableSlots` unlocks all four
+  hunter stable slots (`PetStable::MaxStabledPets`, persisted in
+  `characters.stableSlots`). No-op for other classes. See
+  `ai-doc/hunter_pets.md`.
 
 The helpers are called from `Player::Create` right after
 `LearnDefaultSkills()` / `LearnCustomSpells()`, except `GrantStartingTotems`,

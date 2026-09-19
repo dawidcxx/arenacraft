@@ -21,4 +21,7 @@ void GrantStartingFirstAid(Player* player);
 // Puts the four starting shaman totems into the bags (the totem quests are
 // skipped on a level-80-only server). No-op for other classes.
 void GrantStartingTotems(Player* player);
+
+// Unlocks every hunter pet stable slot. No-op for other classes.
+void GrantStartingStableSlots(Player* player);
 } // namespace arenacraft

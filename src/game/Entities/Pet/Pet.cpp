@@ -317,7 +317,8 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
     ReplaceAllUnitFlags(UNIT_FLAG_PLAYER_CONTROLLED);
     // this enables popup window (pet abandon, cancel)
     SetMaxPower(POWER_HAPPINESS, GetCreatePowers(POWER_HAPPINESS));
-    SetPower(POWER_HAPPINESS, petInfo->Happiness);
+    // Arenacraft: pets are always fully happy, their saved happiness is ignored.
+    SetPower(POWER_HAPPINESS, GetMaxPower(POWER_HAPPINESS));
     setPowerType(POWER_FOCUS);
     break;
   default:
@@ -640,10 +641,7 @@ void Pet::setDeathState(DeathState s,
       ReplaceAllDynamicFlags(UNIT_DYNFLAG_NONE);
       RemoveUnitFlag(UNIT_FLAG_SKINNABLE);
 
-      // lose happiness when died and not in BG/Arena
-      MapEntry const* mapEntry = sMapStore.LookupEntry(GetMapId());
-      if (!mapEntry || (mapEntry->map_type != MAP_ARENA && mapEntry->map_type != MAP_BATTLEGROUND))
-        ModifyPower(POWER_HAPPINESS, -HAPPINESS_LEVEL_SIZE);
+      // Arenacraft: no happiness loss on death, pets stay permanently happy.
 
       // SetUnitFlag(UNIT_FLAG_STUNNED);
     }
@@ -866,13 +864,7 @@ void Pet::Update(uint32 diff)
 
 void Pet::LoseHappiness()
 {
-  uint32 curValue = GetPower(POWER_HAPPINESS);
-  if (curValue <= 0)
-    return;
-  int32 addvalue = 670; // value is 70/35/17/8/4 (per min) * 1000 / 8 (timer 7.5 secs)
-  if (IsInCombat())     // we know in combat happiness fades faster, multiplier guess
-    addvalue = int32(addvalue * 1.5f);
-  ModifyPower(POWER_HAPPINESS, -addvalue);
+  // Arenacraft: pets stay permanently happy, happiness does not decay.
 }
 
 HappinessState Pet::GetHappinessState()

@@ -1,5 +1,6 @@
 #include "ItemVendor.hpp"
 
+#include "HunterPets.hpp"
 #include "World.h"
 #include "WorldSession.h"
 
@@ -80,7 +81,10 @@ std::vector<uint32> const& ItemVendor::GlyphsForClass(uint8 classId)
 void ItemVendor::OnCreatureAddWorld(Creature* creature)
 {
   if (creature->GetEntry() == Entry)
-    creature->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_VENDOR | UNIT_NPC_FLAG_TRAINER);
+    // Stablemaster so the hunter-only "Pet Stable" option can drive the
+    // client's stable window (CheckStableMaster requires the flag).
+    creature->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_VENDOR | UNIT_NPC_FLAG_TRAINER |
+                                 UNIT_NPC_FLAG_STABLEMASTER);
 }
 
 bool ItemVendor::CanCreatureGossipHello(Player* player, Creature* creature)
@@ -129,6 +133,20 @@ bool ItemVendor::CanCreatureGossipHello(Player* player, Creature* creature)
   menu.AddGossipMenuItemData(menuIndex, MetaGemVendorEntry, 0);
   ++menuIndex;
 
+  // Hunter-only pet options. "Pet Stable" uses the client-native stable
+  // option type and falls through to the core handler; "Get Pet" opens the
+  // custom pet family submenu (see HunterPets.hpp).
+  if (player->IsClass(CLASS_HUNTER, CLASS_CONTEXT_PET))
+  {
+    menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_INTERACT_1, "Pet Stable", 0, GOSSIP_OPTION_STABLEPET, "", 0, false);
+    menu.AddGossipMenuItemData(menuIndex, 0, 0);
+    ++menuIndex;
+
+    menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_INTERACT_1, "Get Pet", 0, UtilGetPet, "", 0, false);
+    menu.AddGossipMenuItemData(menuIndex, 0, 0);
+    ++menuIndex;
+  }
+
   // Utility actions, handled in CanCreatureGossipSelect.
   menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_TRAINER, "Reset Talents", 0, UtilResetTalents, "", 0, false);
   menu.AddGossipMenuItemData(menuIndex, 0, 0);
@@ -174,8 +192,9 @@ bool ItemVendor::CanCreatureGossipSelect(Player* player, Creature* creature, uin
     player->GetSession()->SendTrainerList(creature->GetGUID());
     return true;
   default:
-    // Vendor-list options fall through to the core handler.
-    return false;
+    // Pet submenu actions first, then vendor-list options fall through to the
+    // core handler.
+    return HandleHunterPetAction(player, creature, action);
   }
 }
 

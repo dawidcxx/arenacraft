@@ -1,5 +1,6 @@
 #include "CharacterCreation.hpp"
 
+#include "PetDefines.h"
 #include "Player.h"
 #include "SharedDefines.h"
 
@@ -94,5 +95,15 @@ void GrantStartingTotems(Player* player)
   static constexpr uint32 Totems[] = {5175, 5176, 5177, 5178}; // Earth/Fire/Water/Air
   for (uint32 totem : Totems)
     player->StoreNewItemInBestSlots(totem, 1);
+}
+
+void GrantStartingStableSlots(Player* player)
+{
+  if (!player->IsClass(CLASS_HUNTER, CLASS_CONTEXT_PET))
+    return;
+
+  // MaxStabledPets is persisted in characters.stableSlots and restored by
+  // Player::_LoadPetStable, so this survives relogs.
+  player->GetOrInitPetStable().MaxStabledPets = MAX_PET_STABLES;
 }
 } // namespace arenacraft

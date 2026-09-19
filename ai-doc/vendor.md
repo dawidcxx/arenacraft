@@ -109,6 +109,12 @@ skipped), and the special non-ordinary WotLK gems (jewelcrafting-only unique
 Dragon's Eye cuts, Stormjewel, Kharmaa's Grace, prismatic Nightmare Tear) are
 excluded. Every id was checked available to players on evowow.
 
+Hunters also get two pet options (see `ai-doc/hunter_pets.md`): **Pet Stable**
+(the client-native `GOSSIP_OPTION_STABLEPET` option type, which falls through to
+the core and needs the `UNIT_NPC_FLAG_STABLEMASTER` flag the vendor carries) and
+**Get Pet**, which opens a custom pet family submenu (`HunterPets.hpp/.cpp`,
+actions `PetFamilyActionBase + i`).
+
 Finally the menu has three utility options, handled in
 `ItemVendor::CanCreatureGossipSelect` (custom action ids; the vendor-list
 options fall through to the core handler):
