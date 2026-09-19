@@ -65,6 +65,7 @@ pub const AcGraph = struct {
         try self.src.build(b);
     }
 
+    // Smoke test for our build system itself
     fn buildTestBinary(self: *Self, b: BuildRequest) !void {
         const bl = b[0];
         const target = b[1];

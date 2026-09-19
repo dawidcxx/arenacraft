@@ -39,7 +39,6 @@ void AddScripts()
 {
     // Default scripts
     AddCommandsScripts();
-    AddCustomScripts();
     AddEventsScripts();
     AddOutdoorPvPScripts();
     AddPetScripts();

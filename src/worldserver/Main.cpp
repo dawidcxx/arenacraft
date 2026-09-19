@@ -37,7 +37,6 @@
 #include "MapMgr.h"
 #include "Metric.h"
 #include "ModuleMgr.h"
-#include "ModulesScriptLoader.h"
 #include "MySQLThreading.h"
 #include "OpenSSLCrypto.h"
 #include "OutdoorPvPMgr.h"
@@ -283,7 +282,6 @@ int worldserver_main(int argc, char** argv)
                      sConfigMgr->GetOption<bool>(CONFIG_HIGH_PRIORITY, true));
 
   sScriptMgr->SetScriptLoader(AddScripts);
-  sScriptMgr->SetModulesLoader(AddModulesScripts);
 
   std::shared_ptr<void> sScriptMgrHandle(nullptr,
                                          [](void*)
