@@ -130,6 +130,12 @@ std::vector<ItemEntry> const& AllItems()
       {WrathfulSetWeapons, 51395}, // Wrathful Gladiator's Recurve
       {WrathfulSetWeapons, 51412}, // Wrathful Gladiator's Repeater
       {WrathfulSetWeapons, 51450}, // Wrathful Gladiator's Shotgun
+      {WrathfulSetWeapons, 51410}, // Wrathful Gladiator's Touch of Defeat
+      {WrathfulSetWeapons, 51451}, // Wrathful Gladiator's Wand of Alacrity
+      {WrathfulSetWeapons, 51531}, // Wrathful Gladiator's Piercing Touch
+      {WrathfulSetWeapons, 51532}, // Wrathful Gladiator's Baton of Light
+      // Thrown
+      {WrathfulSetWeapons, 51535}, // Wrathful Gladiator's War Edge
       // Two-Hand
       {WrathfulSetWeapons, 51403}, // Wrathful Gladiator's Acute Staff
       {WrathfulSetWeapons, 51393}, // Wrathful Gladiator's Claymore
