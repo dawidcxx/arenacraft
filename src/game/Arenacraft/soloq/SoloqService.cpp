@@ -30,8 +30,6 @@ std::optional<Match> SoloqService::takeMatch(uint32 bgInstanceId)
   return match;
 }
 
-void SoloqService::forgetMatch(uint32 bgInstanceId) { _pendingMatches.erase(bgInstanceId); }
-
 std::size_t SoloqService::queueSize() const { return _queue.size(); }
 
 bool SoloqService::inQueue(PlayerId id) const { return _queue.contains(id); }

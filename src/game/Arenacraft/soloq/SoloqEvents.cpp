@@ -282,4 +282,44 @@ MatchupEvent makeMatchupEvent(Match const& match, Battleground const* arena)
 
   return event;
 }
+
+std::string buildMatchupEndedPayload(MatchupEndedEvent const& event)
+{
+  std::string out;
+  out.reserve(1024);
+  out += "{\"event\":\"";
+  out += MatchupEndedEventName;
+  out += "\",\"instanceId\":";
+  out += std::to_string(event.bgInstanceId);
+  out += ",\"finished\":";
+  out += event.finished ? "true" : "false";
+  out += ",\"players\":[";
+  for (std::size_t i = 0; i < event.participants.size(); ++i)
+  {
+    if (i)
+      out += ',';
+    AppendPlayer(out, event.participants[i]);
+  }
+  out += "]}";
+  return out;
+}
+
+bool publishMatchupEnded(MatchupEndedEvent const& event)
+{
+  return sRedisConn.publish(MatchupEndedChannel, buildMatchupEndedPayload(event));
+}
+
+MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished)
+{
+  MatchupEndedEvent event{};
+  event.bgInstanceId = arena ? arena->GetInstanceID() : 0;
+  event.finished     = finished;
+
+  std::array<QueuedPlayer const*, 6> const players = playersOf(match);
+  std::array<Role, 3> const                roles   = {Role::Melee, Role::Caster, Role::Healer};
+  for (std::size_t i = 0; i < players.size(); ++i)
+    event.participants[i] = ResolveParticipant(*players[i], roles[i % 3]);
+
+  return event;
+}
 } // namespace arenacraft::soloq

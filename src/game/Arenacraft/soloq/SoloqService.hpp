@@ -27,7 +27,6 @@ public:
   // result can be fed back through resolveMatch.
   void                 registerMatch(uint32 bgInstanceId, Match const& match);
   std::optional<Match> takeMatch(uint32 bgInstanceId);
-  void                 forgetMatch(uint32 bgInstanceId);
 
   struct PendingArena
   {

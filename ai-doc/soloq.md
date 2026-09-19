@@ -115,8 +115,9 @@ six `RatingUpdate{id, mmr, rating, delta}` (team A first, then team B).
 `SoloqService`. `SoloqBattlegroundScript::OnBattlegroundEnd` looks it up, maps
 the winning `TeamId` to `MatchResult`, calls `resolveMatch`, writes the new
 rating/MMR onto each player's 5v5 `ArenaTeam` (`SaveToDB` + `NotifyStatsChanged`)
-and sys-messages them. `OnBattlegroundDestroy` forgets the entry if the arena
-never ended (all invites declined).
+and sys-messages them. `OnBattlegroundDestroy` takes the still-pending entry if
+the arena never finished (all invites declined) and emits a non-finished
+`soloq-matchup-ended` event.
 
 ## Service and the soloq team
 
@@ -126,7 +127,7 @@ owns only the queue plus pending arenas:
 - `join(id, classId, specIndex, teamId, rating, mmr)` - enqueues a snapshot.
 - `leave(id)` - dequeues.
 - `tick(elapsed)` - advances the queue, returns drained matches.
-- `registerMatch(bgInstanceId, match)` / `takeMatch(...)` / `forgetMatch(...)`.
+- `registerMatch(bgInstanceId, match)` / `takeMatch(...)`.
 - `queueSize`, `inQueue`, `waitingPlayers`.
 
 The player's rating/MMR is **not** stored here - it lives in a real 5v5
@@ -219,8 +220,22 @@ Payload (`event = "soloq.matchup"`, see `SoloqEvents.hpp`):
   `teamAverageMmr`/`teamAverageRating`/`winningRatingDelta`).
 - `SoloqEvents_test.cpp` covers the pure `buildMatchupPayload` serializer.
 
-`arena-ended` is **not** emitted yet; when a consumer needs to close a session
-keyed by `instanceId`, add it from `SoloqBattlegroundScript::OnBattlegroundEnd`.
+When the arena ends (or is destroyed without finishing) the core publishes
+`soloq-matchup-ended` from `SoloqBattlegroundScript`:
+
+```json
+{
+  "event": "soloq.matchup.ended",
+  "instanceId": 1234,
+  "finished": true,
+  "players": [ /* same shape as above, so consumers can recover a lost room by account name */ ]
+}
+```
+
+`finished` is `true` when a winner ended the arena, `false` when it was destroyed
+(invites declined). Both events are emitted exactly once per popped matchup:
+`OnBattlegroundEnd` takes the pending match (normal path) and
+`OnBattlegroundDestroy` takes it only if it is still pending (abort path).
 
 ## Debug command
 
@@ -251,4 +266,3 @@ admin-only:
 - Block talent/spec changes while queued (cheat prevention).
 - Queue-count queries and richer NPC/UI feedback.
 - Thread safety once there is more than one writer.
-- Emit `arena-ended` (instance id) so event consumers can close sessions.

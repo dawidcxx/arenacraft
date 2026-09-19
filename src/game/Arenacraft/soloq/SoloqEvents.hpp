@@ -12,8 +12,10 @@ namespace arenacraft::soloq
 {
 // Redis channel and `event` discriminator for a popped matchup. This is a
 // public contract consumed outside the core; keep it stable and additive.
-inline constexpr char const* MatchupChannel   = "soloq-matchup";
-inline constexpr char const* MatchupEventName = "soloq.matchup";
+inline constexpr char const* MatchupChannel        = "soloq-matchup";
+inline constexpr char const* MatchupEventName      = "soloq.matchup";
+inline constexpr char const* MatchupEndedChannel   = "soloq-matchup-ended";
+inline constexpr char const* MatchupEndedEventName = "soloq.matchup.ended";
 
 // Fully-resolved participant snapshot for a matchup event. Character/account
 // data is filled from the live player at pop time, so consumers never have to
@@ -56,4 +58,22 @@ bool publishMatchup(MatchupEvent const& event);
 // character/account names from the live players (falling back to the character
 // cache). Missing players yield empty names instead of failing.
 MatchupEvent makeMatchupEvent(Match const& match, Battleground const* arena);
+
+struct MatchupEndedEvent
+{
+  uint32_t bgInstanceId;
+  // true when the arena ended with a winner, false when it was destroyed
+  // without ever finishing (invites declined, aborted).
+  bool                           finished;
+  std::array<ParticipantInfo, 6> participants;
+};
+
+// Pure serializer for the ended event. Unit-tested.
+std::string buildMatchupEndedPayload(MatchupEndedEvent const& event);
+
+// Serializes and publishes the ended event. Best-effort like publishMatchup.
+bool publishMatchupEnded(MatchupEndedEvent const& event);
+
+// Resolves the finished/aborted match into a MatchupEndedEvent.
+MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished);
 } // namespace arenacraft::soloq

@@ -9,6 +9,7 @@
 #include "Outcome.hpp"
 #include "SharedDefines.h"
 #include "SoloqArenaQueue.hpp"
+#include "SoloqEvents.hpp"
 #include "SoloqService.hpp"
 #include "SoloqTeam.hpp"
 
@@ -187,6 +188,8 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
   if (!match)
     return;
 
+  publishMatchupEnded(makeMatchupEndedEvent(*match, bg, true));
+
   MatchResult const                 result  = winner == TEAM_ALLIANCE ? MatchResult::TeamAWin : MatchResult::TeamBWin;
   std::array<RatingUpdate, 6> const updates = resolveMatch(*match, result);
 
@@ -219,7 +222,13 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
 
 void SoloqBattlegroundScript::OnBattlegroundDestroy(Battleground* bg)
 {
-  if (bg)
-    SoloqService::instance().forgetMatch(bg->GetInstanceID());
+  if (!bg)
+    return;
+
+  // If the arena was destroyed without ever finishing (invites declined), the
+  // match is still pending here - notify consumers so they can free the room.
+  std::optional<Match> const match = SoloqService::instance().takeMatch(bg->GetInstanceID());
+  if (match)
+    publishMatchupEnded(makeMatchupEndedEvent(*match, bg, false));
 }
 } // namespace arenacraft::soloq

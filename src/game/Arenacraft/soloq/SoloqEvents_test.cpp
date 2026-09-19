@@ -4,7 +4,9 @@
 
 #include <string>
 
+using arenacraft::soloq::buildMatchupEndedPayload;
 using arenacraft::soloq::buildMatchupPayload;
+using arenacraft::soloq::MatchupEndedEvent;
 using arenacraft::soloq::MatchupEvent;
 using arenacraft::soloq::ParticipantInfo;
 using arenacraft::soloq::Role;
@@ -88,4 +90,23 @@ TEST_CASE("buildMatchupPayload emits empty strings for missing names")
   std::string const json = buildMatchupPayload(event);
   CHECK(json.find("\"characterName\":\"\"") != std::string::npos);
   CHECK(json.find("\"accountName\":\"\"") != std::string::npos);
+}
+
+TEST_CASE("buildMatchupEndedPayload reports instance, finished flag and players")
+{
+  MatchupEvent const source = MakeEvent();
+
+  MatchupEndedEvent event{};
+  event.bgInstanceId = source.bgInstanceId;
+  event.finished     = false;
+  event.participants = source.participants;
+
+  std::string const json = buildMatchupEndedPayload(event);
+  CHECK(json.find("\"event\":\"soloq.matchup.ended\"") != std::string::npos);
+  CHECK(json.find("\"instanceId\":77") != std::string::npos);
+  CHECK(json.find("\"finished\":false") != std::string::npos);
+  CHECK(json.find("\"accountName\":\"acc-delta\"") != std::string::npos);
+
+  event.finished = true;
+  CHECK(buildMatchupEndedPayload(event).find("\"finished\":true") != std::string::npos);
 }
