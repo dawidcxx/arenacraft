@@ -29,7 +29,7 @@
           default = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
             nativeBuildInputs = with pkgs; [
               # Dev tools
-              zig
+              zig_0_16 # keep in sync with Dockerfile ZIG_VERSION (libc detection)
               zls
               pkg-config # zig uses this for .linkSystemLibrary()
               clang-tools
@@ -40,13 +40,11 @@
               netcat
 
               # Libraries
-              minizip
               zlib
               doctest
               jemalloc
               openssl
               hiredis
-              bzip2
               readline
               ncurses
               mysql84
@@ -54,15 +52,27 @@
 
             shellHook = ''
               unset NIX_CFLAGS_COMPILE
-              export MYSQL_INCLUDE_DIR="${pkgs.mysql84}/include/mysql"
-              export MYSQL_LIB_DIR="${pkgs.mysql84}/lib"
-              export FLAKE_INCLUDES="${
+              # Standard compiler env vars, honoured by zig natively, so the
+              # build graph carries no pkg-config include/link plumbing:
+              # CPATH for headers (mysql.h sits in include/mysql, not include)
+              # and LIBRARY_PATH for the final link (mysqlclient has no .pc).
+              export CPATH="${
                 composeIncludePath [
-                  pkgs.minizip
-                  pkgs.zlib
-                  pkgs.expat
-                  pkgs.doctest
+                  pkgs.openssl
                   pkgs.hiredis
+                  pkgs.zlib
+                  pkgs.readline
+                  pkgs.jemalloc
+                ]
+              }:${pkgs.mysql84}/include/mysql"
+              export LIBRARY_PATH="${
+                composeLibraryPath [
+                  pkgs.openssl
+                  pkgs.hiredis
+                  pkgs.zlib
+                  pkgs.readline
+                  pkgs.jemalloc
+                  pkgs.mysql84
                 ]
               }"
             '';

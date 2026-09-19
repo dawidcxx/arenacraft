@@ -137,59 +137,23 @@ pub const Deps = struct {
         }
     }
 
-    // unvendored libraries, provided by nix and resolved through pkg-config
-    pub fn includeOpenSSL(self: *Self, mod: *Build.Module) void {
-        _ = self;
-        pkgConfigIncludeDirs(mod, "openssl");
-    }
-
-    pub fn includeHiredis(self: *Self, mod: *Build.Module) void {
-        _ = self;
-        pkgConfigIncludeDirs(mod, "hiredis");
-    }
-
-    pub fn includeMysqlClient(self: *Self, mod: *Build.Module) void {
-        _ = self;
-        // real libmysqlclient from the nix mysql84 package (mariadb-connector
-        // poisons __cpp_nontype_template_args and lacks mysql_ssl_mode);
-        // paths are exported by the flake shellHook, no pkg-config available
-        mysqlIncludeDirs(mod);
-    }
-
-    pub fn includeZlib(self: *Self, mod: *Build.Module) void {
-        _ = self;
-        pkgConfigIncludeDirs(mod, "zlib");
-    }
-
-    pub fn includeBzip2(self: *Self, mod: *Build.Module) void {
-        _ = self;
-        pkgConfigIncludeDirs(mod, "bzip2");
-    }
-
-    pub fn includeReadline(self: *Self, mod: *Build.Module) void {
-        _ = self;
-        pkgConfigIncludeDirs(mod, "readline");
-    }
-
     pub fn linkGsoap(self: *Self, mod: *Build.Module) void {
         mod.linkLibrary(self.gsoap.library);
     }
 
-    /// Links every system library. Final executables only (ac) - module
-    /// static libs carry include paths via the include* helpers instead.
+    /// Links every unvendored system library. Final executables only (ac):
+    /// on intermediate static libs zig bakes the .so into the archive as a
+    /// member and lld rejects it. Headers come from CPATH, link dirs from the
+    /// standard LIBRARY_PATH (both set by the flake / Dockerfile builder).
     pub fn linkSystemLibraries(self: *Self, mod: *Build.Module) void {
         _ = self;
         mod.linkSystemLibrary("openssl", .{});
         mod.linkSystemLibrary("hiredis", .{});
         mod.linkSystemLibrary("zlib", .{});
-        mod.linkSystemLibrary("bzip2", .{});
         mod.linkSystemLibrary("readline", .{});
         mod.linkSystemLibrary("jemalloc", .{});
-        const env = &mod.owner.graph.environ_map;
-        mysqlIncludeDirs(mod);
-        if (env.get("MYSQL_LIB_DIR")) |lib_dir| {
-            mod.addLibraryPath(.{ .cwd_relative = lib_dir });
-        }
+        // unusable/absent .pc; resolved from the default lib dirs (Docker) or
+        // LIBRARY_PATH (nix)
         mod.linkSystemLibrary("mysqlclient", .{ .use_pkg_config = .no });
     }
 
@@ -428,8 +392,20 @@ pub const Deps = struct {
             .flags = &.{ "-std=gnu99", BuildCommons.no_ubsan },
         });
 
-        self.includeZlib(module);
-        self.includeBzip2(module);
+        // bzip2 is the one dependency with no .pc file anywhere, and its
+        // sources are already vendored upstream for Windows. Building them
+        // into libmpq keeps Linux/Windows on one code path and avoids adding
+        // libbz2 back to the builder and runtime images. libmpq is the only
+        // bzlib consumer.
+        module.addIncludePath(b.path("deps/bzip2"));
+        var bz_sources = cpp.querySources(alloc, io, "deps/bzip2", .{
+            .extensions = cpp.Exts.JUST_C,
+            .recursive = false,
+        });
+        module.addCSourceFiles(.{
+            .files = bz_sources.get(),
+            .flags = &.{ "-std=gnu99", BuildCommons.no_ubsan },
+        });
 
         const library = b.addLibrary(.{
             .name = "mpq",
@@ -551,8 +527,6 @@ pub const Deps = struct {
             .language = .cpp,
             .flags = &.{ "-std=c++20", BuildCommons.no_ubsan },
         });
-
-        self.includeZlib(module);
 
         const library = b.addLibrary(.{
             .name = "g3dlite",
@@ -687,52 +661,4 @@ fn boostIncludeDirUsed(include_dir: Build.Module.IncludeDir, owner: *Build, io: 
         }
     }
     return false;
-}
-
-// system libraries are linked only on final executables: on intermediate
-// static libs zig bakes them into the archive as members, which lld rejects
-// ("archive member ... is neither ET_REL nor LLVM bitcode")
-// MYSQL_INCLUDE_DIR points at the directory holding mysql.h. Oracle/nix layouts
-// also keep a nested mysql/ subdir there that internal headers include as
-// "mysql/...", but Debian/Ubuntu flatten those headers and drop the subdir, so
-// mysql_com.h's `#include "mysql/udf_registration_types.h"` stops resolving.
-// Add the directory that holds the mysql/ component as a *system* include path
-// too (a regular path around /usr/include would shadow zig's bundled libc).
-fn mysqlIncludeDirs(mod: *Build.Module) void {
-    const env = &mod.owner.graph.environ_map;
-    const inc_dir = env.get("MYSQL_INCLUDE_DIR") orelse return;
-    mod.addIncludePath(.{ .cwd_relative = inc_dir });
-    if (std.fs.path.dirname(inc_dir)) |parent|
-        mod.addSystemIncludePath(.{ .cwd_relative = parent });
-}
-
-var pkg_config_cflags_cache: ?std.StringHashMapUnmanaged(?[]const u8) = null;
-
-fn pkgConfigIncludeDirs(mod: *Build.Module, pkg: []const u8) void {
-    const gpa = mod.owner.allocator;
-    if (pkg_config_cflags_cache == null)
-        pkg_config_cflags_cache = .empty;
-
-    const gop = pkg_config_cflags_cache.?.getOrPut(gpa, pkg) catch return;
-    if (!gop.found_existing) {
-        gop.value_ptr.* = null;
-        const res = std.process.run(gpa, mod.owner.graph.io, .{
-            .argv = &.{ "pkg-config", "--cflags-only-I", pkg },
-        }) catch return;
-        switch (res.term) {
-            .exited => |code| if (code == 0) {
-                gop.value_ptr.* = res.stdout;
-            },
-            else => {},
-        }
-    }
-
-    const cflags = gop.value_ptr.* orelse return;
-    var it = std.mem.tokenizeScalar(u8, cflags, ' ');
-    while (it.next()) |tok| {
-        if (std.mem.startsWith(u8, tok, "-I") and tok.len > 2)
-            // system include path: on Docker these resolve to /usr/include,
-            // which must not shadow zig's bundled libc/libc++ headers
-            mod.addSystemIncludePath(.{ .cwd_relative = std.mem.trim(u8, tok[2..], "\n") });
-    }
 }

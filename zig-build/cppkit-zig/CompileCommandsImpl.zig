@@ -262,6 +262,10 @@ fn gatherCompileStep(step: *std.Build.Step.Compile, gather: *Gather) !void {
         else => {},
     };
 
+    // The compiler honours CPATH, but it never lands in a module's include
+    // dirs; mirror it so clangd resolves the same headers the build does.
+    try appendEnvIncludes(b, &shared);
+
     for (graph_modules) |mod| for (mod.link_objects.items) |link_object| switch (link_object) {
         .c_source_file => |csf| {
             const file_abs = try lazyPathAbsolute(b, csf.file, asking);
@@ -353,6 +357,20 @@ fn appendIncludeFlag(
 ) !void {
     try out.append(b.allocator, flag);
     try out.append(b.allocator, try lazyPathAbsolute(b, lazy_path, asking));
+}
+
+/// The compiler honours the CPATH environment variable for include search, but
+/// it is not part of any module's include_dirs, so clangd would otherwise miss
+/// those headers. Mirror it into the generated entry flags.
+fn appendEnvIncludes(b: *std.Build, out: *std.ArrayListUnmanaged([]const u8)) !void {
+    const cpath = b.graph.environ_map.get("CPATH") orelse return;
+    var it = std.mem.tokenizeScalar(u8, cpath, ':');
+    while (it.next()) |dir| {
+        // CPATH has -I semantics; emitted after the module include dirs so
+        // vendored headers keep precedence.
+        try out.append(b.allocator, "-I");
+        try out.append(b.allocator, dir);
+    }
 }
 
 /// Append the compile relevant flags of a linked compile step (include dirs,

@@ -38,6 +38,15 @@ pub const AcGraph = struct {
     }
 
     pub fn build(self: *Self, b: *Build) !void {
+        // Third-party headers arrive via CPATH, supplied by `nix develop` /
+        // the Dockerfile builder stage. Fail fast with a useful message rather
+        // than deep inside a translation unit with a bare "file not found".
+        const env = &b.graph.environ_map;
+        if (env.get("CPATH") == null) {
+            std.log.err("missing build environment variable CPATH; run inside `nix develop` or the Dockerfile builder stage", .{});
+            return error.MissingBuildEnvironment;
+        }
+
         const target = b.standardTargetOptions(.{});
         const optimize = b.standardOptimizeOption(.{});
         const build_request: BuildRequest = .{ b, target, optimize };
