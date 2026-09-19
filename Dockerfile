@@ -57,9 +57,14 @@ COPY zig-build zig-build
 COPY src src
 COPY deps deps
 
-RUN --mount=type=cache,target=/app/.zig-cache \
-    --mount=type=cache,target=/app/zig-pkg \
-    --mount=type=cache,target=/root/.cache/zig \
+# The three caches are owned by buildah/podman, not by the host checkout: the
+# explicit ids give them a stable, project-scoped key so a nix host's
+# .zig-cache can never be reused by this ubuntu build (and vice versa). On a
+# podman builder they live under $TMPDIR/buildah-cache-$UID, so point TMPDIR at
+# a persistent disk when building on an ephemeral/small machine.
+RUN --mount=type=cache,id=arenacraft-zig-cache,target=/app/.zig-cache \
+    --mount=type=cache,id=arenacraft-zig-pkg,target=/app/zig-pkg \
+    --mount=type=cache,id=arenacraft-zig-global,target=/root/.cache/zig \
     zig build -Doptimize=ReleaseFast ac
 
 # --- runtime ---------------------------------------------------------------

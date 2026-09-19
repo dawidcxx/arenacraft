@@ -3,8 +3,14 @@
 .env*
 .flake.lock.orig
 **/node_modules
-zig-cache
+# host build/cache state: never ship it into the ubuntu build context (the
+# Dockerfile keeps its own caches via --mount=type=cache)
+.zig-cache
+zig-pkg
 zig-out
+.direnv
+.cache
+compile_commands.json
 /data
 /backups
 *.log
