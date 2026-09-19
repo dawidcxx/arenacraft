@@ -8,7 +8,9 @@ spirit/mp5 options, etc.). Only enchants those guides recommend are kept;
 vanilla/BC-era filler, strictly-dominated duplicates and anything needing a
 profession to apply are dropped (the server has no professions).
 Head/shoulder/leg rows are the applied Arcanum/Inscription/Spellthread/Leg Armor
-items; the rest are `Scroll of Enchant ...` consumables. Item ids were checked on
+items; the waist and weapon sections also hold the applied Eternal Belt Buckle
+and Titanium Weapon Chain; the rest are `Scroll of Enchant ...` consumables. Item
+ids were checked on
 wotlk.evowow.com; the one duplicate tagged "Not available to players" was skipped
 in favour of its available counterpart.
 
@@ -157,6 +159,12 @@ by the shared **Enchantments** gossip option.
 | Scroll of Enchant Gloves - Precision | 38953 | Permanently enchant gloves to increase hit rating by 20. Requires a level 60 or higher item. |
 | Scroll of Enchant Gloves - Threat | 38885 | Permanently enchant gloves to increase threat from all attacks and spells by 2%. |
 
+### Waist
+
+| Item | ID | Effect |
+| --- | --- | --- |
+| Eternal Belt Buckle | 41611 | Permanently attach an eternal belt buckle onto a belt, adding a socket to the belt. Attaching the belt buckle causes the item to become soulbound. |
+
 ### Legs
 
 | Item | ID | Effect |
@@ -202,3 +210,4 @@ by the shared **Enchantments** gossip option.
 | Scroll of Enchant Weapon - Mongoose | 38925 | Permanently enchant a melee weapon to occasionally increase Agility by 120 and attack speed slightly. Requires a level 35 or higher item. |
 | Scroll of Enchant Weapon - Blood Draining | 46098 | Permanently enchants your weapon to sometimes grant Blood Reserve when striking an enemy or inflicting damage with bleed attacks. When you fall below 35% health, Blood Reserve restores 360 to 440 health. Lasts 20 sec and stacks up to 5 times. This enchantment requires the wielder is at least level 75. |
 | Scroll of Enchant Weapon - Major Intellect | 38918 | Permanently enchant a melee weapon to increase Intellect by 30. Requires a level 35 or higher item. |
+| Titanium Weapon Chain | 41976 | Attaches a chain to your weapon, reducing the duration of Disarm effects by 50% and increasing your hit rating by 28. Does not stack with other similar effects. Attaching the weapon chain causes the weapon to become soulbound. |

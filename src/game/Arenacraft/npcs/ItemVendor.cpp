@@ -112,8 +112,17 @@ bool ItemVendor::CanCreatureGossipHello(Player* player, Creature* creature)
   menu.AddMenuItem(int32(enchantMenuIndex), GOSSIP_ICON_VENDOR, "Enchantments", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
   menu.AddGossipMenuItemData(enchantMenuIndex, EnchantVendorEntry, 0);
 
+  // Ordinary WotLK epic gems (grouped by colour), then the WotLK meta gems.
+  uint32 const gemsMenuIndex = enchantMenuIndex + 1;
+  menu.AddMenuItem(int32(gemsMenuIndex), GOSSIP_ICON_VENDOR, "Gems", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(gemsMenuIndex, GemVendorEntry, 0);
+
+  uint32 const metaGemsMenuIndex = gemsMenuIndex + 1;
+  menu.AddMenuItem(int32(metaGemsMenuIndex), GOSSIP_ICON_VENDOR, "Meta Gems", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(metaGemsMenuIndex, MetaGemVendorEntry, 0);
+
   // Utility actions, handled in CanCreatureGossipSelect.
-  uint32 const resetTalentsIndex = enchantMenuIndex + 1;
+  uint32 const resetTalentsIndex = metaGemsMenuIndex + 1;
   menu.AddMenuItem(int32(resetTalentsIndex), GOSSIP_ICON_TRAINER, "Reset Talents", 0, UtilResetTalents, "", 0, false);
   menu.AddGossipMenuItemData(resetTalentsIndex, 0, 0);
 
@@ -178,6 +187,12 @@ void ItemVendorStock::OnStartup()
   // Shared enchant list, opened by the "Enchantments" option.
   for (uint32 item : AllEnchants())
     StockItem(ItemVendor::EnchantVendorEntry, item);
+
+  // Shared gem lists, opened by the "Gems" / "Meta Gems" options.
+  for (uint32 item : AllGems())
+    StockItem(ItemVendor::GemVendorEntry, item);
+  for (uint32 item : AllMetaGems())
+    StockItem(ItemVendor::MetaGemVendorEntry, item);
 
   // "Learn Spells" is served from the player's real class trainer list (see
   // ClassTrainer.hpp). The vendor only needs a non-class trainer_type so the

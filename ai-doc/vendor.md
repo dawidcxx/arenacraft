@@ -87,6 +87,19 @@ dominated duplicates. Head/shoulder/leg rows are the applied
 Arcanum/Inscription/Spellthread/Leg Armor items, the rest are "Scroll of
 Enchant ..." consumables.
 
+The menu then has two gem options. `GemVendorItems.cpp` holds two flat
+`std::vector<uint32>` lists exposed as `AllGems()` and `AllMetaGems()`, served by
+the **Gems** and **Meta Gems** options. `AllGems()` is the ordinary WotLK epic
+socketables - the cut gems of the six WotLK epic families (Cardinal Ruby,
+Majestic Zircon, King's Amber, Dreadstone, Ametrine, Eye of Zul) - grouped by
+socket colour in that order. `AllMetaGems()` is every WotLK-tier (level 80) meta
+gem. Both are curated from the wotlk.evowow.com gem listings (`?items=3` for the
+coloured gems, `?items=3.6` for the metas): only quality-epic WotLK gems are
+kept (rare WotLK gems, all BC-era gems and all other pre-WotLK gems are
+skipped), and the special non-ordinary WotLK gems (jewelcrafting-only unique
+Dragon's Eye cuts, Stormjewel, Kharmaa's Grace, prismatic Nightmare Tear) are
+excluded. Every id was checked available to players on evowow.
+
 Finally the menu has three utility options, handled in
 `ItemVendor::CanCreatureGossipSelect` (custom action ids; the vendor-list
 options fall through to the core handler):

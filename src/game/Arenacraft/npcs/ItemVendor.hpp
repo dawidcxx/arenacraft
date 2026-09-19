@@ -43,6 +43,13 @@ std::vector<GlyphEntry> const& AllGlyphs();
 // every player, already ordered by gear slot (head first, weapon last).
 std::vector<uint32> const& AllEnchants();
 
+// Flat gem stock, defined in GemVendorItems.cpp. AllGems() is the ordinary
+// WotLK epic socketables grouped by socket colour (red, blue, yellow, purple,
+// orange, green); AllMetaGems() is every WotLK-tier meta gem. One shared list
+// each, in vendor order.
+std::vector<uint32> const& AllGems();
+std::vector<uint32> const& AllMetaGems();
+
 // Vendor-list (gossip menu) names in display order, defined in
 // ItemVendorItems.cpp.
 std::vector<std::string_view> const& CategoryOrder();
@@ -60,6 +67,9 @@ public:
   static constexpr uint32 GlyphVendorEntryBase = 9000100;
   // Shared enchant vendor list (see AllEnchants).
   static constexpr uint32 EnchantVendorEntry = 9000200;
+  // Shared gem vendor lists (see AllGems / AllMetaGems).
+  static constexpr uint32 GemVendorEntry     = 9000300;
+  static constexpr uint32 MetaGemVendorEntry = 9000301;
 
   // Custom gossip actions for the utility options. Values only have to be
   // distinct and outside the built-in Gossip_Option range.
