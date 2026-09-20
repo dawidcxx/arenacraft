@@ -57,5 +57,6 @@ public:
 
   void OnBattlegroundEnd(Battleground* bg, TeamId winner) override;
   void OnBattlegroundDestroy(Battleground* bg) override;
+  void OnBattlegroundRemovePlayerAtLeave(Battleground* bg, Player* player) override;
 };
 } // namespace arenacraft::soloq

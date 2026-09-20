@@ -26,6 +26,16 @@ void SendMessage(Player* player, std::string const& message)
   if (player && player->GetSession())
     ChatHandler(player->GetSession()).SendSysMessage(message);
 }
+
+// The soloq badge/queue track is 5v5, but the match instance is created as 3v3.
+// The core's leave cleanup therefore drops the (unused) 3v3 queue id and leaves
+// the 5v5 one set, keeping the player "in queue" and blocking requeue. Clear it
+// explicitly when the match ends and when a player leaves the arena.
+void ClearSoloqQueueId(Player* player)
+{
+  if (player && player->InBattlegroundQueueForBattlegroundQueueType(BATTLEGROUND_QUEUE_5v5))
+    player->RemoveBattlegroundQueueId(BATTLEGROUND_QUEUE_5v5);
+}
 } // namespace
 
 void SoloqNpc::OnCreatureAddWorld(Creature* creature)
@@ -199,6 +209,8 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
     if (!player)
       continue;
 
+    ClearSoloqQueueId(player);
+
     if (ArenaTeam* team = FindSoloqTeam(player))
     {
       ArenaTeamStats stats = team->GetStats();
@@ -230,5 +242,13 @@ void SoloqBattlegroundScript::OnBattlegroundDestroy(Battleground* bg)
   std::optional<Match> const match = SoloqService::instance().takeMatch(bg->GetInstanceID());
   if (match)
     publishMatchupEnded(makeMatchupEndedEvent(*match, bg, false));
+}
+
+void SoloqBattlegroundScript::OnBattlegroundRemovePlayerAtLeave(Battleground* bg, Player* player)
+{
+  if (!bg || !bg->isArena())
+    return;
+
+  ClearSoloqQueueId(player);
 }
 } // namespace arenacraft::soloq

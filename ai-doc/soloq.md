@@ -119,6 +119,13 @@ and sys-messages them. `OnBattlegroundDestroy` takes the still-pending entry if
 the arena never finished (all invites declined) and emits a non-finished
 `soloq-matchup-ended` event.
 
+Because the queue/badge track is 5v5 but the arena instance is 3v3, the core's
+`Battleground::RemovePlayerAtLeave` cleanup removes `BATTLEGROUND_QUEUE_3v3`,
+leaving the player's 5v5 queue id set. That keeps the client badge and blocks
+requeueing. `SoloqBattlegroundScript` clears the 5v5 id itself:
+`OnBattlegroundEnd` for every rated participant and
+`OnBattlegroundRemovePlayerAtLeave` for anyone leaving a started match early.
+
 ## Service and the soloq team
 
 `SoloqService::instance()` is a single global (single writer, no locking) and
