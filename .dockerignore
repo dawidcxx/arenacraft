@@ -17,3 +17,9 @@ compile_commands.json
 OLD_SCRIPTS.md
 Dockerfile
 docker-compose.yml
+# host-only tooling, never COPYed into the image (the 200MB+ debug `ac` at the
+# repo root would otherwise be uploaded as build context on every build)
+/ac
+/apps
+/scripts
+/ai-doc

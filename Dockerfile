@@ -18,8 +18,10 @@ ARG UBUNTU_VERSION=22.04
 ARG ZIG_VERSION=0.16.0
 
 # --- builder ---------------------------------------------------------------
-FROM ubuntu:${UBUNTU_VERSION} AS builder
+FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS builder
 ARG ZIG_VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 # gcc is only here so zig can introspect the host libc: when link_libc is set
 # and a native C compiler is present, zig uses the system libc (/usr/include
@@ -68,7 +70,9 @@ RUN --mount=type=cache,id=arenacraft-zig-cache,target=/app/.zig-cache \
     zig build -Doptimize=ReleaseFast ac
 
 # --- runtime ---------------------------------------------------------------
-FROM ubuntu:${UBUNTU_VERSION} AS runtime
+FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libssl3 libhiredis0.14 zlib1g \

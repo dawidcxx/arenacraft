@@ -73,7 +73,7 @@ services:
   auth:
     profiles: [full]
     build: { context: ., dockerfile: Dockerfile }
-    image: arenacraft-core:latest
+    image: arenacraft:local
     command: [ac, authserver]
     environment:
       AC_LOGIN_DATABASE_INFO: "db;3306;acore;acore;acore_auth"
@@ -95,7 +95,7 @@ services:
   # kept on localhost because the protocol is plaintext
   world:
     profiles: [full]
-    image: arenacraft-core:latest
+    image: arenacraft:local
     command: [ac, worldserver]
     environment:
       AC_LOGIN_DATABASE_INFO: "db;3306;acore;acore;acore_auth"
