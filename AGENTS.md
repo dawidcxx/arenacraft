@@ -17,6 +17,15 @@ guarded as needed). Reach for the script registry only when the core already
 exposes the right hook; otherwise change the core. This fork is ours — there is
 no upstream to protect.
 
+**Static C++ over SQL/DB data.** Server behavior the user dictates (arena
+rotation, disabled features, balance tweaks, ...) belongs in C++ as a static
+change — hardcode or inline it in the core, even if it feels crude. Do NOT
+implement such rules as SQL migrations, `disables`/`battleground_template` rows,
+or other DB/config content. `data/sql` is for schema and upstream content
+parity only; new migrations are for real content fixes, not gameplay rules.
+If a DB table mechanism exists for something (e.g. `DisableMgr`), ignore it and
+patch the code path instead when the rule is ours.
+
 ## Build & run
 
 - `nix develop` (or direnv) for the toolchain: zig, clang-tools, bun, mysql84, ...

@@ -946,6 +946,11 @@ BattlegroundTypeId BattlegroundMgr::GetRandomBG(BattlegroundTypeId bgTypeId, uin
 
       if (BattlegroundTemplate const* bg = GetBattlegroundTemplateByMapId(mapId))
       {
+        // Arenacraft: the "all arenas" pool only ever rolls Nagrand, Ruins of
+        // Lordaeron and Blade's Edge. Dalaran Sewers and Ring of Valor are out.
+        if (bgTypeId == BATTLEGROUND_AA && (bg->Id == BATTLEGROUND_DS || bg->Id == BATTLEGROUND_RV))
+          continue;
+
         if (bg->MinLevel <= minLevel)
         {
           ids.push_back(bg->Id);
