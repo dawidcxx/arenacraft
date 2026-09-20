@@ -1529,7 +1529,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27124, // rank 5
          43008, // rank 6
          12051, // Evocation
-         12355, // Impact
                 // Arcane Brilliance
          23028, // rank 1
          27127, // rank 2

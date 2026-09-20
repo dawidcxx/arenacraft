@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /**
- * deploy - build the core image for the arm server here and load it on the
- * target's local podman. No registry: the thin multi-stage image is streamed
- * over ssh as `podman save | gzip | ssh ... 'gunzip | podman load'`, and only
- * that final image is sent (zig/build caches live in build mounts).
+ * deploy - build the core image for the arm server and load it on the target's
+ * local container engine. No registry: the thin multi-stage image is streamed
+ * over ssh as `save | gzip | ssh ... 'gunzip | load'`, and only that final image
+ * is sent (zig/build caches live in build mounts).
  *
- * The build runs under binfmt/qemu emulation (linux/arm64 by default), which is
- * slow the first time; the caches persist, so later builds are incremental.
+ * Works with podman or docker (auto-detected, override with --engine). Native
+ * arm64 (e.g. an Apple Silicon mac) builds directly; a cross-arch build on
+ * Linux falls back to binfmt/qemu emulation, which is slow but cached.
  *
  *   scripts/deploy                                  # build + ship (the normal one)
  *   scripts/deploy --skip-build                     # ship what's already here
@@ -23,12 +24,18 @@ const DEFAULTS = {
   target: "dawid@hetznerbox",
   image: "arenacraft:local",
   platform: "linux/arm64",
+  remoteEngine: "podman" as const, // the target runs podman + podman compose
 };
+
+const ENGINES = ["podman", "docker"] as const;
+type Engine = (typeof ENGINES)[number];
 
 interface Options {
   target: string;
   image: string;
   platform: string;
+  engine: string | undefined;
+  remoteEngine: string;
   skipBuild: boolean;
   ship: boolean;
   up: boolean;
@@ -39,13 +46,15 @@ interface Options {
 const program = new Command();
 program
   .name("deploy")
-  .description("Build the core image here (qemu-emulated) and load it on the target's podman.")
+  .description("Build the core image and load it on the target's container engine (podman/docker).")
   .option("--target <user@host>", "ssh target", DEFAULTS.target)
   .option("--image <ref>", "image to build and load", DEFAULTS.image)
   .option("--platform <os/arch>", "target platform", DEFAULTS.platform)
+  .option("--engine <podman|docker>", "local engine (default: podman, else docker)")
+  .option("--remote-engine <podman|docker>", "engine on the target", DEFAULTS.remoteEngine)
   .option("--skip-build", "reuse the local image", false)
   .option("--no-ship", "build and verify only, no transfer")
-  .option("--up", "also run 'podman compose up -d --no-build' on the target", false)
+  .option("--up", "also run 'up -d --no-build' via the target's compose", false)
   .option("--remote-dir <dir>", "target dir holding docker-compose.yml (for --up)")
   .option("--dry-run", "print commands without running them", false)
   .parse(process.argv);
@@ -54,6 +63,7 @@ const opts = program.opts<Options>();
 const dockerfile = join(repoRoot, "Dockerfile");
 const fmt = "{{.Architecture}}";
 const targetArch = (opts.platform.split("/")[1] ?? opts.platform).trim();
+const crossArch = targetArch !== hostArch();
 
 function fail(message: string): never {
   console.error(message);
@@ -62,6 +72,13 @@ function fail(message: string): never {
 
 function quote(s: string): string {
   return `'${s.replaceAll("'", `'\\''`)}'`;
+}
+
+function asEngine(value: string, flag: string): Engine {
+  if (!(ENGINES as readonly string[]).includes(value)) {
+    fail(`${flag} must be one of: ${ENGINES.join(", ")} (got '${value}')`);
+  }
+  return value as Engine;
 }
 
 /** surface a ShellError's exit code instead of a stack trace */
@@ -111,10 +128,11 @@ const BINFMT_NAME: Record<string, string> = {
 /**
  * NixOS registers qemu binfmt without the F (fix binary) flag, so the
  * interpreter is resolved inside the container. Bind-mounting it (and the
- * /nix/store shim target) lets emulated RUN steps exec. No-op everywhere else.
+ * /nix/store shim target) lets emulated RUN steps exec. Podman-only; docker
+ * buildx brings its own emulation. No-op when the target is the host arch.
  */
 async function qemuMounts(): Promise<string[]> {
-  if (targetArch === hostArch()) return [];
+  if (!crossArch) return [];
   const name = BINFMT_NAME[targetArch];
   if (!name) return [];
   const entry = `/proc/sys/fs/binfmt_misc/${name}`;
@@ -127,20 +145,33 @@ async function qemuMounts(): Promise<string[]> {
   return mounts;
 }
 
-if (!Bun.which("podman")) fail("podman not found in PATH");
+const engine: Engine = opts.engine
+  ? asEngine(opts.engine, "--engine")
+  : Bun.which("podman")
+    ? "podman"
+    : Bun.which("docker")
+      ? "docker"
+      : fail("neither podman nor docker found in PATH");
+const remoteEngine = asEngine(opts.remoteEngine, "--remote-engine");
+
 if (opts.ship && !Bun.which("ssh")) fail("ssh not found in PATH");
 if (opts.up && !opts.remoteDir) fail("--up requires --remote-dir <dir>");
 if (!existsSync(dockerfile)) fail(`Dockerfile not found: ${dockerfile}`);
 
-const mounts = await qemuMounts();
+// only podman needs the host bind-mounts; docker buildx embeds its own qemu
+const mounts = engine === "podman" ? await qemuMounts() : [];
+// docker saves a docker-archive by default; podman needs it spelled out
+const saveArgs = engine === "podman" ? ["--format", "docker-archive"] : [];
+const remoteLoad = `gunzip | ${remoteEngine} load`;
 
 if (!opts.skipBuild) {
-  console.log(`building ${opts.image} for ${opts.platform} (emulated; first run is slow)`);
+  const note = crossArch ? " (emulated; first run is slow)" : "";
+  console.log(`building ${opts.image} for ${opts.platform} with ${engine}${note}`);
   if (opts.dryRun) {
-    console.log(`+ podman build --platform ${opts.platform} ${mounts.map(quote).join(" ")} -f ${quote(dockerfile)} -t ${quote(opts.image)} ${quote(repoRoot)}`);
+    console.log(`+ ${engine} build --platform ${opts.platform} ${mounts.map(quote).join(" ")} -f ${quote(dockerfile)} -t ${quote(opts.image)} ${quote(repoRoot)}`);
   } else {
-    await shell("podman build", () =>
-      $`podman build --platform ${opts.platform} ${mounts} -f ${dockerfile} -t ${opts.image} ${repoRoot}`,
+    await shell(`${engine} build`, () =>
+      $`${engine} build --platform ${opts.platform} ${mounts} -f ${dockerfile} -t ${opts.image} ${repoRoot}`,
     );
   }
 } else {
@@ -148,26 +179,25 @@ if (!opts.skipBuild) {
 }
 
 if (opts.dryRun) {
-  console.log(`+ podman image inspect --format ${quote(fmt)} ${quote(opts.image)}`);
+  console.log(`+ ${engine} image inspect --format ${quote(fmt)} ${quote(opts.image)}`);
 } else {
-  const arch = await capture("podman image inspect", () =>
-    $`podman image inspect --format ${fmt} ${opts.image}`.text(),
+  const arch = await capture(`${engine} image inspect`, () =>
+    $`${engine} image inspect --format ${fmt} ${opts.image}`.text(),
   );
   if (arch !== targetArch) fail(`refusing to ship: ${opts.image} is ${arch}, want ${targetArch}`);
   console.log(`built ${opts.image} (${arch})`);
 }
 
 if (opts.ship) {
-  console.log(`shipping ${opts.image} -> ${opts.target}`);
-  const remoteLoad = "gunzip | podman load";
+  console.log(`shipping ${opts.image} -> ${opts.target} (${remoteEngine})`);
   if (opts.dryRun) {
-    console.log(`+ podman save --format docker-archive ${quote(opts.image)} | gzip -1 | ssh ${quote(opts.target)} ${quote(remoteLoad)}`);
+    console.log(`+ ${engine} save ${saveArgs.join(" ")} ${quote(opts.image)} | gzip -1 | ssh ${quote(opts.target)} ${quote(remoteLoad)}`);
   } else {
     await shell("ship", () =>
-      $`podman save --format docker-archive ${opts.image} | gzip -1 | ssh ${opts.target} ${remoteLoad}`,
+      $`${engine} save ${saveArgs} ${opts.image} | gzip -1 | ssh ${opts.target} ${remoteLoad}`,
     );
     const arch = await capture("remote inspect", () =>
-      $`ssh ${opts.target} podman image inspect --format ${fmt} ${opts.image}`.text(),
+      $`ssh ${opts.target} ${remoteEngine} image inspect --format ${fmt} ${opts.image}`.text(),
     );
     if (arch !== targetArch) fail(`target has the wrong arch: ${arch}, want ${targetArch}`);
     console.log(`loaded on ${opts.target} (${arch})`);
@@ -176,12 +206,12 @@ if (opts.ship) {
 
 if (opts.up && opts.remoteDir) {
   console.log(`restarting on ${opts.target} in ${opts.remoteDir}`);
-  const remoteUp = `cd ${opts.remoteDir} && podman compose up -d --no-build`;
+  const remoteUp = `cd ${opts.remoteDir} && ${remoteEngine} compose up -d --no-build`;
   if (opts.dryRun) {
     console.log(`+ ssh ${quote(opts.target)} ${quote(remoteUp)}`);
   } else {
     await shell("compose up", () => $`ssh ${opts.target} ${remoteUp}`);
   }
 } else if (opts.ship && !opts.dryRun) {
-  console.log(`\nnext: ssh ${opts.target} 'podman compose up -d --no-build'   # from the docker-compose.yml dir`);
+  console.log(`\nnext: ssh ${opts.target} '${remoteEngine} compose up -d --no-build'   # from the docker-compose.yml dir`);
 }

@@ -6,6 +6,27 @@
 
 State as of: 2026-09-20 (host `geekombox`, x86_64, NixOS 26.05pre).
 
+## UPDATE (2026-09-20, later)
+
+- **Emulated cross-build on x86 was abandoned** in favour of building natively
+  on an Apple Silicon mac, where it builds and caches properly at native speed.
+- `scripts/deploy` is now **engine-agnostic**: auto-detects `podman`/`docker`
+  (`--engine`), and ships to the target's engine (`--remote-engine`, default
+  `podman`). Docker uses plain `docker save`; podman uses `--format docker-archive`.
+  The podman-only binfmt mounts are skipped for docker (buildx has its own qemu).
+- **Caching was proven healthy on x86/podman** with a minimal probe:
+  - a no-rebuild re-run reported `Using cache …` on the `RUN --mount=type=cache`
+    step (layer cache works);
+  - changing an `ARG` invalidated the layer but the cache-mount contents persisted
+    (`run T=1` still present on the next run).
+  So the slow emulated runs were simply because no build ever **completed** —
+  the layer cache only helps after one successful build.
+- On x86 the remaining options (not needed now) were: cross-compile to aarch64
+  instead of emulating, or just accept one long first build; the `.zig-cache`
+  (5.6 GB at `/var/tmp/buildah-cache-1000/ea562abaa939e7f0`) persists across runs.
+
+The rest of this file documents the x86/NixOS path and is kept for reference.
+
 ## Goal
 
 `scripts/deploy` (Bun) builds the core image for the **arm server** on a fast
