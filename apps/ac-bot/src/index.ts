@@ -4,6 +4,7 @@ import type { InteractionReplyOptions } from "discord.js";
 import { AuthDb } from "./authDb";
 import { getConfig } from "./config";
 import { logger } from "./logger";
+import { PING_COMMAND, handlePing } from "./pingCommand";
 import { startEventSubscriber } from "./redisEvents";
 import { handleRegister, REGISTER_COMMAND } from "./registerCommand";
 import { RoomManager } from "./voiceRooms";
@@ -20,7 +21,10 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   try {
     const guild = await readyClient.guilds.fetch(config.DISCORD_GUILD_ID);
-    await guild.commands.set([REGISTER_COMMAND]);
+    // Wipe leftover global commands so stale ones do not linger next to the
+    // guild commands we actually implement.
+    await readyClient.application.commands.set([]);
+    await guild.commands.set([REGISTER_COMMAND, PING_COMMAND]);
     await guild.members.fetch();
 
     const rooms = new RoomManager(guild, config);
@@ -45,12 +49,13 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand() || interaction.commandName !== "register") return;
+  if (!interaction.isChatInputCommand()) return;
 
   try {
-    await handleRegister(interaction, authDb);
+    if (interaction.commandName === "register") await handleRegister(interaction, authDb);
+    else if (interaction.commandName === "ping") await handlePing(interaction);
   } catch (error) {
-    logger.error("Failed to handle /register", error);
+    logger.error(`Failed to handle /${interaction.commandName}`, error);
     const reply: InteractionReplyOptions = { content: "Something went wrong, try again later.", flags: MessageFlags.Ephemeral };
     if (interaction.replied || interaction.deferred) await interaction.followUp(reply).catch(() => {});
     else await interaction.reply(reply).catch(() => {});
