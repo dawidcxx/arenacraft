@@ -349,7 +349,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          53600, // rank 1
          61411, // rank 2
          53601, // Sacred Shield
-         53651, // Light's Beacon
          53736, // Seal of Corruption
          54428, // Divine Plea
          62124, // Hand of Reckoning
@@ -507,13 +506,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27045, // rank 3
          49071, // rank 4
          20736, // Distracting Shot
-                // Wyvern Sting
-         24131, // rank 1
-         24134, // rank 2
-         24135, // rank 3
-         27069, // rank 4
-         49009, // rank 5
-         49010, // rank 6
          34026, // Kill Command
          34074, // Aspect of the Viper
          34477, // Misdirection
@@ -901,7 +893,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48112, // rank 2
          48113, // rank 3
          34433, // Shadowfiend
-         34919, // Vampiric Touch
                 // Mind Sear
          48045, // rank 1
          53023, // rank 2
@@ -972,10 +963,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          49923, // rank 4
          49924, // rank 5
          50842, // Pestilence
-                // Will of the Necropolis
-         52284, // rank 1
-         52285, // rank 2
-         52286, // rank 3
          53323, // Rune of Swordshattering
          53331, // Rune of Lichbane
          53341, // Rune of Cinderglacier
@@ -1273,9 +1260,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          58746, // rank 5
          58749, // rank 6
          20608, // Reincarnation
-         30824, // Shamanistic Rage
          32182, // Heroism
-         36591, // Spirit Weapons
          36936, // Totemic Recall
                 // Lava Burst
          51505, // rank 1
@@ -2128,13 +2113,11 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48451, // rank 3
          33786, // Cyclone
                 // Mangle (Cat)
-         33876, // rank 1
          33982, // rank 2
          33983, // rank 3
          48565, // rank 4
          48566, // rank 5
                 // Mangle (Bear)
-         33878, // rank 1
          33986, // rank 2
          33987, // rank 3
          48563, // rank 4

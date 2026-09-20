@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Restart just the world service, picking up the image ./scripts/deploy loaded.
+# Run on the server (where docker-compose.yml lives).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec docker compose up -d --no-deps world

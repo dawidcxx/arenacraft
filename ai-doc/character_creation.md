@@ -26,6 +26,15 @@ What a fresh character gets:
   tiers (cloth/leather/mail) already come from `playercreateinfo_skills`, so
   everyone can equip their vendor gear straight away. No-op for the other
   classes.
+- **Class ability set.** `arenacraft::GrantStartingSpells`
+  (`src/game/Arenacraft/StartingSpells.cpp`) learns the class's complete level-80
+  kit (every rank) so an instant-80 character never visits a trainer. Talents
+  are deliberately excluded from `ClassSpells` - the player is meant to pick
+  them up with talent points. Note that a talent's real ability is often a
+  *triggered* spell, not the rank spell itself (e.g. Impact, Mangle
+  (Cat/Bear), Shamanistic Rage), so `GetTalentSpellPos` alone is not enough to
+  catch one. The custom class trainer rows (`npc_trainer`, ids `2000xx`) are the
+  authority for what a class may otherwise train for free.
 - **Mount + riding.** `arenacraft::GrantStartingMount` learns the four Riding
   ranks (33388/33389/34090/34091), Cold Weather Flying (54197) and the Magic
   Rooster mount (65917) as spells, so nothing lands in the bags.
@@ -55,4 +64,6 @@ What a fresh character gets:
 The helpers are called from `Player::Create` right after
 `LearnDefaultSkills()` / `LearnCustomSpells()`, except `GrantStartingTotems`,
 which runs after the starting bags are equipped so the items have somewhere to
-go. Extend the tables in `CharacterCreation.cpp` to change what classes get.
+go. Extend the tables in `CharacterCreation.cpp` (proficiencies, mount, totems)
+or the `ClassSpells` table in `StartingSpells.cpp` (learned abilities) to change
+what classes get.

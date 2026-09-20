@@ -38,6 +38,10 @@ scripts/deploy --skip-build    # ship the image already on this machine
 scripts/deploy --up --remote-dir ~/arenacraft   # also (re)start the stack there
 ```
 
+On the server, after a deploy, `scripts/restart_world` recreates only the
+`world` container from the freshly loaded image (`docker compose up -d --no-deps
+world`), leaving db/valkey/auth untouched.
+
 Works with **podman or docker** (auto-detected; override with `--engine`). The
 target runs podman, so the remote side defaults to `--remote-engine podman`.
 Building on a native arm64 machine (Apple Silicon) is direct and fast; a
