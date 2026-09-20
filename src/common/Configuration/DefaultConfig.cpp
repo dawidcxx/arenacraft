@@ -36,6 +36,10 @@ namespace DefaultConfig
             {"PlayerStart.MapsExplored", "1"},
             {"PlayerStart.AllReputation", "1"},
 
+            // single-faction-less server: both factions share chat and channels
+            {"AllowTwoSide.Interaction.Chat", "1"},
+            {"AllowTwoSide.Interaction.Channel", "1"},
+
             // progression is pointless at max level - no XP from any source
             {"Rate.XP.Kill", "0"},
             {"Rate.XP.Quest", "0"},

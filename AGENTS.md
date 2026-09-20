@@ -9,6 +9,14 @@ Gameplay loop: player logs in at level 80, gears up via vendors (gear templates
 planned), plays arena. Custom gameplay is plain core code in `src/game/`, not a
 script/plugin layer.
 
+**Strong preference: patch the core directly.** Do NOT put custom behavior in a
+plugin/module layer, a separate patch file, or a "wrapper" namespace built to
+keep our code out of the core. When a core function needs to behave differently
+for us, edit that core function in place (inline the arenacraft-specific bit,
+guarded as needed). Reach for the script registry only when the core already
+exposes the right hook; otherwise change the core. This fork is ours — there is
+no upstream to protect.
+
 ## Build & run
 
 - `nix develop` (or direnv) for the toolchain: zig, clang-tools, bun, mysql84, ...

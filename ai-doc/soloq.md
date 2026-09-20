@@ -81,8 +81,11 @@ at least 2 of every role.
 - Time is injected via `update(std::chrono::milliseconds elapsed)` - never read
   from the wall clock - so tests are deterministic.
 - Each queued player accumulates wait time. Their acceptable MMR window is
-  `min(MaxWindow, MmrStep * floor(waited / StepInterval))`, symmetric around
-  their MMR (`MmrStep = 50`, `StepInterval = 30s`, `MaxWindow = 500`).
+  `min(MaxWindow, InitialWindow + MmrStep * floor(waited / StepInterval))`,
+  symmetric around their MMR (`InitialWindow = 150`, `MmrStep = 50`,
+  `StepInterval = 30s`, `MaxWindow = 500`). The nonzero base means a fresh
+  player already searches ±150 instead of requiring an exact MMR match, so a
+  slightly diverged pool still pops instead of stalling.
 - A candidate six-set is **valid** only if every pair satisfies
   `gap <= max(window_i, window_j)` (the more-patient player's window governs).
 - **No mixed-faction teams**: while `tuning::EnforceTeamFaction` is set, a

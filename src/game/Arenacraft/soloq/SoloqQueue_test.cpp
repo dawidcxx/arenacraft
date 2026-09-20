@@ -155,17 +155,21 @@ TEST_CASE("update forms multiple matches in a single call")
   CHECK(queue.empty());
 }
 
+TEST_CASE("matching tolerance starts at the initial window")
+{
+  SoloqQueue queue;
+  addSet(queue, 100, 1500, 1500, 1650); // 150 gap == InitialWindow
+
+  CHECK(queue.update(0ms).size() == 1);
+  CHECK(queue.empty());
+}
+
 TEST_CASE("matching tolerance grows by 50 every 30 seconds up to the cap")
 {
   SoloqQueue queue;
-  queue.playerAddToQueue(melee(1, 1500));
-  queue.playerAddToQueue(melee(2, 1500));
-  queue.playerAddToQueue(caster(3, 1500));
-  queue.playerAddToQueue(caster(4, 1500));
-  queue.playerAddToQueue(healer(5, 1500));
-  queue.playerAddToQueue(healer(6, 2000));
+  addSet(queue, 100, 1500, 1500, 1700); // 200 gap: 150 base + one step
 
-  CHECK(queue.update(299s).empty());
+  CHECK(queue.update(29s).empty());
   CHECK(queue.size() == 6);
   CHECK(queue.update(1s).size() == 1);
   CHECK(queue.empty());
@@ -174,28 +178,9 @@ TEST_CASE("matching tolerance grows by 50 every 30 seconds up to the cap")
 TEST_CASE("matching tolerance never exceeds the cap")
 {
   SoloqQueue queue;
-  queue.playerAddToQueue(melee(1, 1500));
-  queue.playerAddToQueue(melee(2, 1500));
-  queue.playerAddToQueue(caster(3, 1500));
-  queue.playerAddToQueue(caster(4, 1500));
-  queue.playerAddToQueue(healer(5, 1500));
-  queue.playerAddToQueue(healer(6, 2100));
+  addSet(queue, 100, 1500, 1500, 2200); // 700 gap > MaxWindow
 
   CHECK(queue.update(1h).empty());
-  CHECK(queue.size() == 6);
-}
-
-TEST_CASE("matching never crosses the tolerance for a freshly queued player")
-{
-  SoloqQueue queue;
-  queue.playerAddToQueue(melee(1, 1500));
-  queue.playerAddToQueue(melee(2, 1500));
-  queue.playerAddToQueue(caster(3, 1500));
-  queue.playerAddToQueue(caster(4, 1500));
-  queue.playerAddToQueue(healer(5, 1500));
-  queue.playerAddToQueue(healer(6, 1600));
-
-  CHECK(queue.update(0ms).empty());
   CHECK(queue.size() == 6);
 }
 

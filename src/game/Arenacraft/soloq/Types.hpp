@@ -49,6 +49,10 @@ namespace tuning
 {
 inline constexpr uint32_t InitialRating = 1400;
 inline constexpr uint32_t InitialMmr    = 1500;
+
+// Fresh players already search a sane MMR spread instead of requiring an exact
+// match, so a slightly diverged pool still pops quickly instead of stalling.
+inline constexpr uint32_t InitialWindow = 150;
 inline constexpr uint32_t MmrStep       = 50;
 inline constexpr uint32_t MaxWindow     = 500;
 inline constexpr uint32_t EloScale      = 400;

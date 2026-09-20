@@ -141,9 +141,14 @@ Item ids are checked against wotlk.evowow.com; skip anything tagged
 Soul Shards (`6265`) are made stackable (stack size 20) by the world migration
 `data/sql/updates/db_world/2026_09_19_00.sql` (applied by `scripts/db_sync`).
 
+The vendor creature (entry 20921 "Shauly Pore") gets a guild-style `subname`
+("<THE Vendor>", set in `ItemVendorStock::OnStartup`) so players recognise it as
+the official gear source; NPCs cannot carry a real guild.
+
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator
-rings), Trinkets (264 ICC + 258/245 ToC), ICC Set & Weapons (264 tier + 277
+rings), Trinkets (264 ICC + 258/245 ToC + the five ilvl-245 Battlemaster PvP
+trinkets), ICC Set & Weapons (264 tier + 277
 weapons; the weaker 264/271 PvE weapon drops are not stocked, except the 264
 thrown Gluth's Fetching Knife, which has no 277 version), ICC Offparts (264
 necks/cloaks/boots/belts/wrists/rings plus the 272 ToGC tribute-chest cloaks) and

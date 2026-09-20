@@ -262,6 +262,12 @@ std::vector<ItemEntry> const& AllItems()
       {Trinkets, 50362}, // Deathbringer's Will
       {Trinkets, 51377}, // Medallion of the Alliance (PvP)
       {Trinkets, 51378}, // Medallion of the Horde (PvP)
+      // Battlemaster (PvP), ilvl 245: resilience + one secondary stat
+      {Trinkets, 42133}, // Battlemaster's Fury (crit)
+      {Trinkets, 42134}, // Battlemaster's Precision (hit)
+      {Trinkets, 42135}, // Battlemaster's Vivacity (haste)
+      {Trinkets, 42136}, // Battlemaster's Rage (attack power)
+      {Trinkets, 42137}, // Battlemaster's Ruination (spell power)
       // Trial of the Grand Crusader 25, ilvl 258
       {Trinkets, 47059}, // Solace of the Defeated
       {Trinkets, 47088}, // Satrina's Impeding Scarab

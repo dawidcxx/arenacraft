@@ -225,11 +225,16 @@ void ItemVendorStock::OnStartup()
   for (uint32 item : AllGeneralGoods())
     StockItem(ItemVendor::GeneralGoodsVendorEntry, item);
 
-  // "Learn Spells" is served from the player's real class trainer list (see
-  // ClassTrainer.hpp). The vendor only needs a non-class trainer_type so the
-  // trainer interaction check does not reject it for the player's class; it has
-  // no trainer spells of its own.
   if (CreatureTemplate* proto = const_cast<CreatureTemplate*>(sObjectMgr->GetCreatureTemplate(ItemVendor::Entry)))
+  {
+    // Guild-style subtitle so players can tell this is the official gear source.
+    proto->SubName = "THE Vendor";
+
+    // "Learn Spells" is served from the player's real class trainer list (see
+    // ClassTrainer.hpp). The vendor only needs a non-class trainer_type so the
+    // trainer interaction check does not reject it for the player's class; it
+    // has no trainer spells of its own.
     proto->trainer_type = TRAINER_TYPE_TRADESKILLS;
+  }
 }
 } // namespace arenacraft

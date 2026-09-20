@@ -79,7 +79,7 @@ uint32_t SoloqQueue::windowFor(Entry const& entry)
 {
   uint64_t const steps =
       static_cast<uint64_t>(entry.waited.count()) / static_cast<uint64_t>(tuning::StepIntervalMs.count());
-  uint64_t const window = steps * static_cast<uint64_t>(tuning::MmrStep);
+  uint64_t const window = static_cast<uint64_t>(tuning::InitialWindow) + steps * static_cast<uint64_t>(tuning::MmrStep);
   return static_cast<uint32_t>(std::min<uint64_t>(window, tuning::MaxWindow));
 }
 
