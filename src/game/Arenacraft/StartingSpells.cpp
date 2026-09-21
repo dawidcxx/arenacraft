@@ -138,15 +138,12 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          25289, // rank 7
          2048,  // rank 8
          47436, // rank 9
-         7376,  // Defensive Stance Passive
-         7381,  // Berserker Stance Passive
          7384,  // Overpower
          7386,  // Sunder Armor
          12678, // Stance Mastery
          18499, // Berserker Rage
          20230, // Retaliation
          20252, // Intercept
-         21156, // Battle Stance Passive
          23920, // Spell Reflection
          // Shield Slam
          23922, // rank 1
@@ -2081,7 +2078,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          26994, // rank 6
          48477, // rank 7
          20719, // Feline Grace
-         21178, // Bear Form (Passive2)
                 // Gift of the Wild
          21849, // rank 1
          21850, // rank 2
