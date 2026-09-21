@@ -168,10 +168,27 @@ bool ItemVendor::CanCreatureGossipSelect(Player* player, Creature* creature, uin
   switch (action)
   {
   case UtilResetTalents:
+  {
+    // Ask first: resetting talents is destructive and easy to misclick.
+    player->PlayerTalkClass->ClearMenus();
+    GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
+    menu.SetMenuId(GossipMenuId);
+
+    menu.AddMenuItem(0, GOSSIP_ICON_INTERACT_1, "Yes, reset my talents", 0, UtilResetTalentsConfirm, "", 0, false);
+    menu.AddGossipMenuItemData(0, 0, 0);
+    menu.AddMenuItem(1, GOSSIP_ICON_CHAT, "No, keep my talents", 0, UtilResetTalentsCancel, "", 0, false);
+    menu.AddGossipMenuItemData(1, 0, 0);
+
+    SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
+    return true;
+  }
+  case UtilResetTalentsConfirm:
     player->PlayerTalkClass->SendCloseGossip();
     if (player->resetTalents(true))
       player->SendTalentsInfoData(false);
     return true;
+  case UtilResetTalentsCancel:
+    return CanCreatureGossipHello(player, creature);
   case UtilLearnDualSpec:
     player->PlayerTalkClass->SendCloseGossip();
     if (player->GetSpecsCount() == 1 && player->GetLevel() >= sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))

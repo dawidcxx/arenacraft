@@ -32,6 +32,7 @@ invites the six players (see `CreateArenaForMatch`).
 | `SoloqArenaQueue.hpp/.cpp` | registers/removes players in the real 5v5 battleground queue (client badge) and creates/invites a 3v3 arena for a match |
 | `SoloqNpc.hpp/.cpp` | `SoloqNpc` (gossip menu on entry 20810), `SoloqDriver` (world tick) and `SoloqBattlegroundScript` (suppresses core 5v5 matchmaking) |
 | `SoloqEvents.hpp/.cpp` | builds and publishes the `soloq-matchup` Redis event when a match pops |
+| `CharacterCheck.hpp/.cpp` | pure character readiness check (talents, gear, enchants, gems, glyphs) + `Player` snapshot |
 | `*_test.cpp` | doctest unit tests (co-located, auto-discovered by the game test target) |
 
 The pure logic (`Types`/`Roles`/`SoloqQueue`/`Outcome`) only depends on the core
@@ -129,6 +130,34 @@ requeueing. `SoloqBattlegroundScript` clears the 5v5 id itself:
 `OnBattlegroundEnd` for every rated participant and
 `OnBattlegroundRemovePlayerAtLeave` for anyone leaving a started match early.
 
+## Character readiness gate
+
+Before a player is enqueued, `SoloqService::characterProblem(Player*)` runs a
+one-off sanity check so unfinished characters are not queued by accident. It
+rejects, in order:
+
+- unspent talent points (`Player::GetFreeTalentPoints() > 0`),
+- any empty required gear slot (`RequiredEquipmentSlots` in `CharacterCheck.hpp`:
+  head, neck, shoulders, chest, waist, legs, feet, wrists, hands, both rings,
+  both trinkets, back, mainhand),
+- a required enchant missing on any of `RequiredEnchantedSlots` (head,
+  shoulders, chest, bracers, hands, legs, boots); the item must carry a
+  permanent enchant (`PERM_ENCHANTMENT_SLOT`),
+- any equipped item with a built-in gem socket that has no gem,
+- any *enabled* glyph slot (`PLAYER_GLYPHS_ENABLED` bit set) without a glyph.
+
+Cosmetic slots (shirt, tabard) and the optional offhand/ranged slots are not
+required: two-handers and many casters legitimately leave them empty. The check
+is deliberately static: it does not validate gem colour, enchant quality or
+which glyph is socketed.
+
+The check is potentially costly, so a character that passes is remembered in
+`SoloqService::_validatedCharacters` for the process lifetime; later gear or
+talent changes are ignored. This is an anti-footgun aid, not cheat prevention.
+The pure logic lives in `checkCharacter(CharacterSnapshot const&)` and is unit
+tested in `CharacterCheck_test.cpp`; `snapshotCharacter(Player*)` builds the
+snapshot from the live player.
+
 ## Service and the soloq team
 
 `SoloqService::instance()` is a single global (single writer, no locking) and
@@ -139,6 +168,8 @@ owns only the queue plus pending arenas:
 - `tick(elapsed)` - advances the queue, returns drained matches.
 - `registerMatch(bgInstanceId, match)` / `takeMatch(...)`.
 - `queueSize`, `inQueue`, `waitingPlayers`.
+- `characterProblem(player)` - cached character readiness gate (see above);
+  `_validatedCharacters` remembers the ids that passed.
 
 The player's rating/MMR is **not** stored here - it lives in a real 5v5
 `ArenaTeam` (`SoloqTeam.hpp`): `FindSoloqTeam`, `CreateSoloqTeam` (starting
@@ -151,7 +182,8 @@ pane and persists in the characters DB across restarts.
 `SoloqNpc` hijacks creature entry **20810** ("Mehrdad"), giving it
 `UNIT_NPC_FLAG_GOSSIP` and this menu:
 
-- **Join SoloQ** - requires a team; enqueues and reports the queue size.
+- **Join SoloQ** - requires a team; passes the character readiness gate; enqueues
+  and reports the queue size.
 - **Leave SoloQ** - dequeues.
 - **Create SoloQ Team** - creates the 5v5 `ArenaTeam` at 1400 rating / 1500 MMR
   (shows in the PvP pane immediately).

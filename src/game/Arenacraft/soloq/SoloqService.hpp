@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CharacterCheck.hpp"
 #include "SoloqQueue.hpp"
 #include "Types.hpp"
 
@@ -7,6 +8,7 @@
 #include <cstddef>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace arenacraft::soloq
@@ -20,6 +22,11 @@ public:
 
   bool join(PlayerId id, Classes classId, uint8_t specIndex, TeamId teamId, uint32_t rating, uint32_t mmr);
   bool leave(PlayerId id);
+
+  // Runs the character readiness check at most once per character per process:
+  // a character that passes is remembered in _validatedCharacters. Returns the
+  // reason the character cannot queue, or nullopt when it is ready.
+  [[nodiscard]] std::optional<CharacterProblem> characterProblem(Player* player);
 
   std::vector<Match> tick(std::chrono::milliseconds elapsed);
 
@@ -48,5 +55,6 @@ private:
 
   SoloqQueue                        _queue;
   std::unordered_map<uint32, Match> _pendingMatches;
+  std::unordered_set<PlayerId>      _validatedCharacters;
 };
 } // namespace arenacraft::soloq

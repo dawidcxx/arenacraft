@@ -2,6 +2,7 @@
 
 #include "ArenaTeam.h"
 #include "Battleground.h"
+#include "CharacterCheck.hpp"
 #include "Chat.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
@@ -110,6 +111,8 @@ bool SoloqNpc::CanCreatureGossipSelect(Player* player, Creature* creature, uint3
       SendMessage(player, "SoloQ: you are already in the queue.");
     else if (player->InBattlegroundQueue())
       SendMessage(player, "SoloQ: leave your current battleground or arena queue first.");
+    else if (std::optional<CharacterProblem> const problem = service.characterProblem(player))
+      SendMessage(player, std::string("SoloQ: ") + describeCharacterProblem(*problem));
     else if (!service.join(id, static_cast<Classes>(player->getClass()), player->GetMostPointsTalentTree(),
                            player->GetTeamId(), team->rating, team->mmr))
       SendMessage(player, "SoloQ: could not join the queue.");

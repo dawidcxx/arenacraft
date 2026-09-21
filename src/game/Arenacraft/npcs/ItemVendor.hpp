@@ -81,10 +81,12 @@ public:
 
   // Custom gossip actions for the utility options. Values only have to be
   // distinct and outside the built-in Gossip_Option range.
-  static constexpr uint32 UtilResetTalents  = 9000001;
-  static constexpr uint32 UtilLearnDualSpec = 9000002;
-  static constexpr uint32 UtilLearnSpells   = 9000003;
-  static constexpr uint32 UtilGetPet        = 9000004;
+  static constexpr uint32 UtilResetTalents        = 9000001;
+  static constexpr uint32 UtilLearnDualSpec       = 9000002;
+  static constexpr uint32 UtilLearnSpells         = 9000003;
+  static constexpr uint32 UtilGetPet              = 9000004;
+  static constexpr uint32 UtilResetTalentsConfirm = 9000005;
+  static constexpr uint32 UtilResetTalentsCancel  = 9000006;
 
   struct Category
   {

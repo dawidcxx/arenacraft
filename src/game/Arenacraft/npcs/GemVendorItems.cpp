@@ -10,8 +10,9 @@
 // gems, ?items=3.6 for the metas). Only quality-epic (q4) WotLK gems are kept:
 // the rare WotLK gems, every BC-era gem and the other pre-WotLK gems are
 // skipped. Also skipped are the special non-ordinary WotLK gems - the
-// jewelcrafting-only unique Dragon's Eye cuts, Stormjewel, Kharmaa's Grace and
-// the prismatic Nightmare Tear - so the list stays the standard cut gems.
+// jewelcrafting-only unique Dragon's Eye cuts, Stormjewel and Kharmaa's Grace -
+// so the list stays the standard cut gems. The prismatic Nightmare Tear is
+// included in the meta list (it matches any socket).
 // Every id was checked on evowow and is available to players.
 //
 // Vendor order follows row order, so moving a row up moves it up in the vendor.
@@ -137,6 +138,7 @@ std::vector<uint32> const& AllMetaGems()
       44087, // Persistent Earthshatter Diamond
       44088, // Powerful Earthshatter Diamond
       44089, // Trenchant Earthshatter Diamond
+      49110, // Nightmare Tear (prismatic, matches any socket)
   };
   return metas;
 }

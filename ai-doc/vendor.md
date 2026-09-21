@@ -110,8 +110,9 @@ gem. Both are curated from the wotlk.evowow.com gem listings (`?items=3` for the
 coloured gems, `?items=3.6` for the metas): only quality-epic WotLK gems are
 kept (rare WotLK gems, all BC-era gems and all other pre-WotLK gems are
 skipped), and the special non-ordinary WotLK gems (jewelcrafting-only unique
-Dragon's Eye cuts, Stormjewel, Kharmaa's Grace, prismatic Nightmare Tear) are
-excluded. Every id was checked available to players on evowow.
+Dragon's Eye cuts, Stormjewel, Kharmaa's Grace) are excluded. The one exception
+is the prismatic Nightmare Tear, which is stocked in `AllMetaGems()` because it
+matches any socket. Every id was checked available to players on evowow.
 
 Hunters also get two pet options (see `ai-doc/hunter_pets.md`): **Pet Stable**
 (the client-native `GOSSIP_OPTION_STABLEPET` option type, which falls through to
@@ -123,7 +124,9 @@ Finally the menu has three utility options, handled in
 `ItemVendor::CanCreatureGossipSelect` (custom action ids; the vendor-list
 options fall through to the core handler):
 
-- **Reset Talents** - `Player::resetTalents(true)` (free), then
+- **Reset Talents** - opens a "Yes/No" confirmation gossip submenu (the core's
+  built-in talent-wipe confirm only works for class trainers, this vendor is
+  `TRADESKILLS`), then on "Yes" `Player::resetTalents(true)` (free), then
   `SendTalentsInfoData`.
 - **Learn Dual Talent Specialization** - casts 63680/63624 like the core's
   trainer option, if the player has one spec and is at

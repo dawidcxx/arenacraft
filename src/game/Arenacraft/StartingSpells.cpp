@@ -473,7 +473,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          14322, // rank 6
          25296, // rank 7
          27044, // rank 8
-         13481, // Tame Beast
                 // Immolation Trap
          13795, // rank 1
          14302, // rank 2

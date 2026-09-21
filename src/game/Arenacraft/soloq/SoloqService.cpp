@@ -15,6 +15,22 @@ bool SoloqService::join(PlayerId id, Classes classId, uint8_t specIndex, TeamId 
 
 bool SoloqService::leave(PlayerId id) { return _queue.playerRemoveFromQueue(id); }
 
+std::optional<CharacterProblem> SoloqService::characterProblem(Player* player)
+{
+  if (!player)
+    return std::nullopt;
+
+  PlayerId const id = player->GetGUID().GetRawValue();
+  if (_validatedCharacters.contains(id))
+    return std::nullopt;
+
+  std::optional<CharacterProblem> const problem = checkCharacter(snapshotCharacter(player));
+  if (!problem)
+    _validatedCharacters.insert(id);
+
+  return problem;
+}
+
 std::vector<Match> SoloqService::tick(std::chrono::milliseconds elapsed) { return _queue.update(elapsed); }
 
 void SoloqService::registerMatch(uint32 bgInstanceId, Match const& match) { _pendingMatches[bgInstanceId] = match; }
