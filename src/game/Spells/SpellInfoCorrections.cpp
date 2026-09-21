@@ -4609,19 +4609,9 @@ void SpellMgr::LoadSpellInfoCorrections()
       const_cast<LockEntry*>(sLockStore.LookupEntry(36)); // 3366 Opening, allows to open without proper key
   key->Type[2] = LOCK_KEY_NONE;
 
-  // ---------------------------------------------------------------------------
-  // Arenacraft server-side balance adjustments.
-  // Static balance tweaks that intentionally diverge from client DBC values (no
-  // client update). Tracked in ai-doc/server_side_balance.md - keep both in sync
-  // and mark each entry so it can be reverted later.
-  // ---------------------------------------------------------------------------
-
-  // Rogue: Cloak of Shadows - spell avoidance 90% -> 100%
   ApplySpellFix({31224}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = -101; });
-
-  // Warrior: Improved Mortal Strike (rank 3) - Mortal Strike damage bonus 10% -> 20%
-  // (compensation for imperfect charge pathing)
-  ApplySpellFix({35449}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = 19; });
+  ApplySpellFix({35449}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = 14; });
+  ApplySpellFix({53385}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_2].BasePoints = 129; });
 
   LOG_INFO("server.loading", ">> Loading spell dbc data corrections  in {} ms", GetMSTimeDiffToNow(oldMSTime));
   LOG_INFO("server.loading", " ");

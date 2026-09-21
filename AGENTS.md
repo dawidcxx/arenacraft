@@ -83,7 +83,8 @@ patch the code path instead when the rule is ours.
   `src/game/`.
 - Spell fixes:
   - runtime DBC-level corrections → `src/game/Spells/SpellInfoCorrections.cpp`
-    (`ApplySpellFix(...)`)
+    (`ApplySpellFix(...)`); our server-side balance one-liners there are tracked
+    in `ai-doc/server_side_balance.md`
   - scripted behavior → `src/game/Scripts/Spells/spell_<class>.cpp` with
     `RegisterSpellScript`, bound via `spell_script_names` DB table
 - Vendor items: `npc_vendor` rows or code-driven stock (see `ai-doc/vendor.md`).

@@ -8,23 +8,29 @@ edit, so the in-game tooltip may show the old value. We accept that mismatch.
 
 - Balance tweaks go directly in the core as static C++, never in SQL/DB content
   (see `AGENTS.md`).
-- Spell-value changes live in the clearly marked **Arenacraft server-side balance
-  adjustments** block at the end of `SpellMgr::LoadSpellInfoCorrections()`
-  (`src/game/Spells/SpellInfoCorrections.cpp`).
-- Every change MUST be listed in the table below so it can be found and reverted
-  later (these are tuning knobs, not permanent fixes).
+- Spell-value changes are bare `ApplySpellFix(...)` one-liners appended at the end
+  of `SpellMgr::LoadSpellInfoCorrections()`
+  (`src/game/Spells/SpellInfoCorrections.cpp`), right before its closing
+  `LOG_INFO`. No comments in the C++ - this doc is the only registry.
+- Every change MUST be listed in the table below (with its exact code line) so it
+  can be found and reverted later. These are tuning knobs, not permanent fixes.
 - Do NOT touch client DBC/tooltips for balance reasons.
-- Removing a change = delete its `ApplySpellFix` line in the block + its row
-  here. The original behavior is the untouched DBC value.
+- Removing a change = delete its `ApplySpellFix` line + its row here. Original
+  behavior is the untouched DBC value.
 
 ## Entries
 
-| Spell ID | Name | Class | Field | Old | New | Reason | Date |
-|----------|------|-------|-------|-----|-----|--------|------|
-| 31224 | Cloak of Shadows | Rogue | `Effects[EFFECT_0].BasePoints` (aura 186, attacker spell hit chance) | `-91` (−90% hit) | `-101` (−100% hit) | Full spell avoidance during the window as a balance change | 2026-09-21 |
-| 35449 | Improved Mortal Strike (rank 3) | Warrior | `Effects[EFFECT_0].BasePoints` (aura 108, `ADD_PCT_MODIFIER` on Mortal Strike) | `9` (+10% dmg) | `19` (+20% dmg) | Compensate warriors for imperfect charge pathing | 2026-09-21 |
+| Spell ID | Name | Change | Code line | Reason | Date |
+|----------|------|--------|-----------|--------|------|
+| 31224 | Cloak of Shadows (Rogue) | spell avoidance 90% -> 100% | `ApplySpellFix({31224}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = -101; });` | Full spell avoidance during the window | 2026-09-21 |
+| 35449 | Improved Mortal Strike rank 3 (Warrior) | Mortal Strike dmg bonus 10% -> 15% | `ApplySpellFix({35449}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = 14; });` | Compensate warriors for imperfect charge pathing | 2026-09-21 |
+| 53385 | Divine Storm (Paladin) | weapon damage 110% -> 130% | `ApplySpellFix({53385}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_2].BasePoints = 129; });` | Buff Divine Storm damage | 2026-09-21 |
 
-Notes on value encoding: percent auras are stored as `BasePoints + 1`, so
-`-91` = 90% and `-101` = 100%. The same spell also exists as 39666 and 65961,
-but rogues are granted 31224 (`src/game/Arenacraft/StartingSpells.cpp`), so only
-that one is changed.
+### Notes
+
+- Percent values encode as `BasePoints + 1`: `-91` = 90%, `-101` = 100%,
+  `9` = 10%, `14` = 15%, `109` = 110%, `129` = 130%.
+- `31224` also exists as unpublished duplicates `39666`/`65961`; only `31224` is
+  granted to rogues (`src/game/Arenacraft/StartingSpells.cpp`).
+- `53385`: `EFFECT_2` is `SPELL_EFFECT_WEAPON_PERCENT_DAMAGE`; `EFFECT_1` (25%
+  heal) and the unused `EFFECT_0` dummy are left alone.
