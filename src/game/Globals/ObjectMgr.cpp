@@ -6550,6 +6550,16 @@ GossipText const* ObjectMgr::GetGossipText(uint32 Text_ID) const
   return nullptr;
 }
 
+void ObjectMgr::AddOrUpdateGossipText(uint32 Text_ID, std::string const& text)
+{
+  GossipText& gText = _gossipTextStore[Text_ID];
+  gText             = GossipText{};
+
+  gText.Options[0].Text_0      = text;
+  gText.Options[0].Text_1      = text;
+  gText.Options[0].Probability = 1.0f;
+}
+
 void ObjectMgr::LoadGossipText()
 {
   uint32 oldMSTime = getMSTime();

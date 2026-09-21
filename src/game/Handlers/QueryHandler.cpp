@@ -274,16 +274,8 @@ void WorldSession::HandleCorpseQueryOpcode(WorldPacket& /*recvData*/)
   SendPacket(&data);
 }
 
-void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recvData)
+void WorldSession::SendNpcTextUpdate(uint32 textID)
 {
-  uint32     textID;
-  ObjectGuid guid;
-
-  recvData >> textID;
-  LOG_DEBUG("network", "WORLD: CMSG_NPC_TEXT_QUERY TextId: {}", textID);
-
-  recvData >> guid;
-
   GossipText const* gossip = sObjectMgr->GetGossipText(textID);
 
   WorldPacket data(SMSG_NPC_TEXT_UPDATE, 100); // guess size
@@ -358,6 +350,19 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recvData)
   SendPacket(&data);
 
   LOG_DEBUG("network", "WORLD: Sent SMSG_NPC_TEXT_UPDATE");
+}
+
+void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recvData)
+{
+  uint32     textID;
+  ObjectGuid guid;
+
+  recvData >> textID;
+  LOG_DEBUG("network", "WORLD: CMSG_NPC_TEXT_QUERY TextId: {}", textID);
+
+  recvData >> guid;
+
+  SendNpcTextUpdate(textID);
 }
 
 /// Only _static_ data is sent in this packet !!!

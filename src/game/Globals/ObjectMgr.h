@@ -891,6 +891,10 @@ public:
 
   [[nodiscard]] GossipText const* GetGossipText(uint32 Text_ID) const;
 
+  // Registers/overwrites an in-memory gossip text (never persisted to the DB),
+  // for text that is built at runtime from live server state.
+  void AddOrUpdateGossipText(uint32 Text_ID, std::string const& text);
+
   [[nodiscard]] AreaTrigger const* GetAreaTrigger(uint32 trigger) const
   {
     AreaTriggerContainer::const_iterator itr = _areaTriggerStore.find(trigger);

@@ -7,12 +7,14 @@
 #include "Log.h"
 #include "ObjectAccessor.h"
 #include "ObjectGuid.h"
+#include "ObjectMgr.h"
 #include "Outcome.hpp"
 #include "SharedDefines.h"
 #include "SoloqArenaQueue.hpp"
 #include "SoloqEvents.hpp"
 #include "SoloqService.hpp"
 #include "SoloqTeam.hpp"
+#include "WorldSession.h"
 
 #include <chrono>
 #include <string>
@@ -66,9 +68,16 @@ bool SoloqNpc::CanCreatureGossipHello(Player* player, Creature* creature)
   addOption(GOSSIP_ICON_CHAT, "Leave SoloQ", ActionLeave);
   addOption(GOSSIP_ICON_INTERACT_1, "Create SoloQ Team", ActionCreate);
   addOption(GOSSIP_ICON_INTERACT_1, "Delete SoloQ Team", ActionDelete);
-  addOption(GOSSIP_ICON_TALK, "SoloQ Status", ActionStatus);
 
-  SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
+  // The gossip page text is built at runtime and shows both faction queues, so
+  // players learn that each faction has its own queue. It is cached/registered
+  // in ObjectMgr under a custom id and pushed to the client explicitly because
+  // the client caches npc text by id and would otherwise show stale counts.
+  std::array<RoleCounts, 2> const& counts = SoloqService::instance().factionRoleCounts();
+  sObjectMgr->AddOrUpdateGossipText(StatsTextId, formatQueueStats(counts[TEAM_HORDE], counts[TEAM_ALLIANCE]));
+  player->GetSession()->SendNpcTextUpdate(StatsTextId);
+
+  SendGossipMenuFor(player, StatsTextId, creature);
   return true;
 }
 
@@ -129,17 +138,6 @@ bool SoloqNpc::CanCreatureGossipSelect(Player* player, Creature* creature, uint3
     LeaveArenaQueue(player);
     SendMessage(player, service.leave(id) ? "SoloQ: left the queue." : "SoloQ: you were not in the queue.");
     break;
-  case ActionStatus:
-  {
-    std::optional<SoloqTeamInfo> const team = GetSoloqTeamInfo(player);
-    if (!team)
-      SendMessage(player, "SoloQ: no team. Create one first.");
-    else
-      SendMessage(player, "SoloQ: rating " + std::to_string(team->rating) + ", MMR " + std::to_string(team->mmr) +
-                              (service.inQueue(id) ? " - in queue, " : " - not queued, ") +
-                              std::to_string(service.queueSize()) + " waiting.");
-    break;
-  }
   default:
     return false;
   }

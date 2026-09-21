@@ -2,6 +2,18 @@
 
 namespace arenacraft::soloq
 {
+std::string formatQueueStats(RoleCounts const& horde, RoleCounts const& alliance)
+{
+  auto line = [](char const* faction, RoleCounts const& counts)
+  {
+    return std::string(faction) + ": Melee (" + std::to_string(counts.melee) + ") Caster (" +
+           std::to_string(counts.caster) + ") Healer (" + std::to_string(counts.healer) + ")";
+  };
+
+  return std::string("SoloQ Queue Status\n-----------------------\n\n") + line("[H]", horde) + "\n\n" +
+         line("[A]", alliance);
+}
+
 SoloqService& SoloqService::instance()
 {
   static SoloqService service;
@@ -10,10 +22,45 @@ SoloqService& SoloqService::instance()
 
 bool SoloqService::join(PlayerId id, Classes classId, uint8_t specIndex, TeamId teamId, uint32_t rating, uint32_t mmr)
 {
-  return _queue.playerAddToQueue(QueuedPlayer{id, classId, specIndex, rating, mmr, teamId});
+  bool const added = _queue.playerAddToQueue(QueuedPlayer{id, classId, specIndex, rating, mmr, teamId});
+  if (added)
+    refreshFactionRoleCounts();
+  return added;
 }
 
-bool SoloqService::leave(PlayerId id) { return _queue.playerRemoveFromQueue(id); }
+bool SoloqService::leave(PlayerId id)
+{
+  bool const removed = _queue.playerRemoveFromQueue(id);
+  if (removed)
+    refreshFactionRoleCounts();
+  return removed;
+}
+
+void SoloqService::refreshFactionRoleCounts()
+{
+  _factionRoleCounts = {};
+
+  for (SoloqQueue::QueueSnapshot const& entry : _queue.snapshot())
+  {
+    if (entry.teamId != TEAM_ALLIANCE && entry.teamId != TEAM_HORDE)
+      continue;
+
+    RoleCounts& counts = _factionRoleCounts[static_cast<std::size_t>(entry.teamId)];
+
+    switch (entry.role)
+    {
+    case Role::Melee:
+      ++counts.melee;
+      break;
+    case Role::Caster:
+      ++counts.caster;
+      break;
+    case Role::Healer:
+      ++counts.healer;
+      break;
+    }
+  }
+}
 
 std::optional<CharacterProblem> SoloqService::characterProblem(Player* player)
 {
@@ -31,7 +78,13 @@ std::optional<CharacterProblem> SoloqService::characterProblem(Player* player)
   return problem;
 }
 
-std::vector<Match> SoloqService::tick(std::chrono::milliseconds elapsed) { return _queue.update(elapsed); }
+std::vector<Match> SoloqService::tick(std::chrono::milliseconds elapsed)
+{
+  std::vector<Match> matches = _queue.update(elapsed);
+  if (!matches.empty())
+    refreshFactionRoleCounts();
+  return matches;
+}
 
 void SoloqService::registerMatch(uint32 bgInstanceId, Match const& match) { _pendingMatches[bgInstanceId] = match; }
 

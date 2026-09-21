@@ -415,6 +415,10 @@ public:
   // testvalue);
   void SendNameQueryOpcode(ObjectGuid guid);
 
+  // Sends SMSG_NPC_TEXT_UPDATE for the given text id, refreshing the client's
+  // npc-text cache. Used for gossip pages whose text is built at runtime.
+  void SendNpcTextUpdate(uint32 textID);
+
   void SendTrainerList(ObjectGuid guid);
   void SendTrainerList(ObjectGuid guid, std::string const& strTitle);
   void SendListInventory(ObjectGuid guid, uint32 vendorEntry = 0);

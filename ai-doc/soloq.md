@@ -170,6 +170,12 @@ owns only the queue plus pending arenas:
 - `queueSize`, `inQueue`, `waitingPlayers`.
 - `characterProblem(player)` - cached character readiness gate (see above);
   `_validatedCharacters` remembers the ids that passed.
+- `factionRoleCounts()` - `{alliance, horde}` `RoleCounts` recomputed on every
+  queue mutation (`join`/`leave`/matching `tick`), so the gossip handler can
+  read it without walking the queue.
+
+`formatQueueStats(horde, alliance)` renders the two-line stats block shown as
+the NPC gossip page text (pure; unit-tested in `SoloqService_test.cpp`).
 
 The player's rating/MMR is **not** stored here - it lives in a real 5v5
 `ArenaTeam` (`SoloqTeam.hpp`): `FindSoloqTeam`, `CreateSoloqTeam` (starting
@@ -188,7 +194,26 @@ pane and persists in the characters DB across restarts.
 - **Create SoloQ Team** - creates the 5v5 `ArenaTeam` at 1400 rating / 1500 MMR
   (shows in the PvP pane immediately).
 - **Delete SoloQ Team** - disbands the team (resets rating/MMR).
-- **SoloQ Status** - shows the player's rating, MMR, in-queue state and queue size.
+
+Opening the menu also replaces the NPC's default gossip page text with the live
+per-faction queue counts:
+
+```
+SoloQ Queue Status
+-----------------------
+
+[H]: Melee (1) Caster (5) Healer (0)
+
+[A]: Melee (2) Caster (0) Healer (5)
+```
+
+This teaches players that each faction has its own queue. The text is built
+from `SoloqService::factionRoleCounts()` and registered in memory via
+`ObjectMgr::AddOrUpdateGossipText` under the custom id `StatsTextId` (9100002;
+no DB row). Because the client caches npc text by id, `WorldSession::SendNpcTextUpdate`
+is called first to push the fresh text (`SMSG_NPC_TEXT_UPDATE`) before the
+gossip menu references it. `AddOrUpdateGossipText` / `SendNpcTextUpdate` are
+general core additions (nothing soloq-specific in them).
 
 Joining also calls `EnterArenaQueue` (`SoloqArenaQueue`): it adds the player to
 the real `BATTLEGROUND_QUEUE_5v5` queue and sends `SMSG_BATTLEFIELD_STATUS`

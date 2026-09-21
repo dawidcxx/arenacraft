@@ -18,12 +18,14 @@ class SoloqNpc : public AllCreatureScript
 public:
   static constexpr uint32 Entry        = 20810;
   static constexpr uint32 GossipMenuId = 9100001;
+  // Runtime npc_text id for the per-faction queue stats shown as the gossip
+  // page text (see CanCreatureGossipHello). Never persisted to the DB.
+  static constexpr uint32 StatsTextId = 9100002;
 
   static constexpr uint32 ActionJoin   = 9100010;
   static constexpr uint32 ActionLeave  = 9100011;
   static constexpr uint32 ActionCreate = 9100012;
   static constexpr uint32 ActionDelete = 9100013;
-  static constexpr uint32 ActionStatus = 9100014;
 
   SoloqNpc() : AllCreatureScript("arenacraft::soloq::SoloqNpc") {}
 
