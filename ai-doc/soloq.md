@@ -117,11 +117,22 @@ six `RatingUpdate{id, mmr, rating, delta}` (team A first, then team B).
 
 `CreateArenaForMatch` registers the arena instance id -> `Match` in
 `SoloqService`. `SoloqBattlegroundScript::OnBattlegroundEnd` looks it up, maps
-the winning `TeamId` to `MatchResult`, calls `resolveMatch`, writes the new
-rating/MMR onto each player's 5v5 `ArenaTeam` (`SaveToDB` + `NotifyStatsChanged`)
-and sys-messages them. `OnBattlegroundDestroy` takes the still-pending entry if
+the winning `TeamId` to `MatchResult`, calls `resolveMatch`, then applies each
+result to the player's 5v5 `ArenaTeam` via `ApplySoloqResult` and sys-messages
+them. `OnBattlegroundDestroy` takes the still-pending entry if
 the arena never finished (all invites declined) and emits a non-finished
 `soloq-matchup-ended` event.
+
+`ApplySoloqResult` (`SoloqTeam.hpp/.cpp`) is what keeps the "fake" 5v5 soloq
+team in sync with the actual results. It writes the Elo rating/MMR from
+`resolveMatch` (not the core's own `ArenaTeam::WonAgainst` formula), bumps the
+team's `WeekGames`/`SeasonGames`/wins and the member's equivalent counters,
+updates `MaxMMR`, recomputes `Rank` like `ArenaTeam::FinishGame`, and refreshes
+the player's `PLAYER_FIELD_ARENA_TEAM_INFO_1_1` fields
+(`ARENA_TEAM_GAMES_WEEK`, `ARENA_TEAM_GAMES_SEASON`, `ARENA_TEAM_WINS_SEASON`,
+`ARENA_TEAM_PERSONAL_RATING`) so the client PvP pane shows the new personal
+rating and record without a relog. Finally it persists via `SaveToDB(true)` and
+`NotifyStatsChanged()`.
 
 Because the queue/badge track is 5v5 but the arena instance is 3v3, the core's
 `Battleground::RemovePlayerAtLeave` cleanup removes `BATTLEGROUND_QUEUE_3v3`,
@@ -179,9 +190,12 @@ the NPC gossip page text (pure; unit-tested in `SoloqService_test.cpp`).
 
 The player's rating/MMR is **not** stored here - it lives in a real 5v5
 `ArenaTeam` (`SoloqTeam.hpp`): `FindSoloqTeam`, `CreateSoloqTeam` (starting
-1400/1500, named `<name>'s SoloQ`), `DeleteSoloqTeam` (disbands), and
-`GetSoloqTeamInfo`. Because it is an arena team, it shows in the client's PvP
-pane and persists in the characters DB across restarts.
+1400/1500, named `<name>'s SoloQ`), `DeleteSoloqTeam` (disbands),
+`GetSoloqTeamInfo` and `ApplySoloqResult` (records a finished match; see the
+post-match section). Because it is an arena team, it shows in the client's PvP
+pane and persists in the characters DB across restarts. `CreateSoloqTeam` and
+`ApplySoloqResult` both refresh the player's `PLAYER_FIELD_ARENA_TEAM_INFO_1_1`
+fields, since `ArenaTeam::AddMember` only sets the team id/type.
 
 ## Temporary NPC
 

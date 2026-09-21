@@ -17,6 +17,7 @@
 #include "WorldSession.h"
 
 #include <chrono>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -204,29 +205,17 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
   MatchResult const                 result  = winner == TEAM_ALLIANCE ? MatchResult::TeamAWin : MatchResult::TeamBWin;
   std::array<RatingUpdate, 6> const updates = resolveMatch(*match, result);
 
-  for (RatingUpdate const& update : updates)
+  for (std::size_t i = 0; i < updates.size(); ++i)
   {
-    Player* player = ObjectAccessor::FindPlayer(ObjectGuid{update.id});
+    RatingUpdate const& update = updates[i];
+    Player*             player = ObjectAccessor::FindPlayer(ObjectGuid{update.id});
     if (!player)
       continue;
 
     ClearSoloqQueueId(player);
 
-    if (ArenaTeam* team = FindSoloqTeam(player))
-    {
-      ArenaTeamStats stats = team->GetStats();
-      stats.Rating         = static_cast<uint16>(update.rating);
-      team->SetArenaTeamStats(stats);
-
-      if (ArenaTeamMember* member = team->GetMember(player->GetGUID()))
-      {
-        member->PersonalRating   = static_cast<uint16>(update.rating);
-        member->MatchMakerRating = static_cast<uint16>(update.mmr);
-      }
-
-      team->SaveToDB(true);
-      team->NotifyStatsChanged();
-    }
+    bool const won = (result == MatchResult::TeamAWin) == (i < 3);
+    ApplySoloqResult(player, update.rating, update.mmr, won);
 
     SendMessage(player, "SoloQ: rating " + std::to_string(update.rating) + " (" + (update.delta >= 0 ? "+" : "") +
                             std::to_string(update.delta) + "), MMR " + std::to_string(update.mmr) + ".");

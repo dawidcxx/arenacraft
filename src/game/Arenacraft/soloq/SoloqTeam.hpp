@@ -26,4 +26,10 @@ bool CreateSoloqTeam(Player* player);
 bool DeleteSoloqTeam(Player* player);
 
 std::optional<SoloqTeamInfo> GetSoloqTeamInfo(Player* player);
+
+// Records a finished soloq match on the player's 5v5 soloq team: writes the new
+// rating/MMR, bumps the team's and member's games/wins counters, refreshes the
+// client's arena-team info fields (personal rating, games, season wins) and
+// persists the team. This is what makes the PvP pane show soloq results.
+void ApplySoloqResult(Player* player, uint32_t rating, uint32_t mmr, bool won);
 } // namespace arenacraft::soloq
