@@ -1,9 +1,10 @@
 # ac-bot
 
-Rewritten ArenaCraft Discord bot. Three jobs:
+Rewritten Arenacraft Discord bot. Three jobs:
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
+   Calling it again resets the existing account's password.
 2. **Greeting** - `/ping` greets the caller publicly in the channel.
 3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
    `soloq-matchup-ended` Redis events and moves players between the waiting room

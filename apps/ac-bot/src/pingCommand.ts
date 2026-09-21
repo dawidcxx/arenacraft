@@ -3,11 +3,11 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 export const PING_COMMAND = new SlashCommandBuilder()
   .setName("ping")
-  .setDescription("Say hi to the ArenaCraft bot")
+  .setDescription("Say hi to the Arenacraft bot")
   .toJSON();
 
 export function pingGreeting(mention: string): string {
-  return `Hello ${mention}! Welcome to ArenaCraft.`;
+  return `Hello ${mention}! Welcome to Arenacraft.`;
 }
 
 export async function handlePing(interaction: ChatInputCommandInteraction): Promise<void> {

@@ -57,4 +57,17 @@ export class AuthDb {
       connection.release();
     }
   }
+
+  /**
+   * Replaces an existing account's credentials. The caller must have verified
+   * the account exists. Matching is case-insensitive via the column collation.
+   */
+  async resetPassword(username: string, password: string): Promise<void> {
+    const { salt, verifier } = makeRegistrationData(username, password);
+    await this.pool.execute("UPDATE account SET salt = ?, verifier = ? WHERE username = ?", [
+      salt,
+      verifier,
+      username,
+    ]);
+  }
 }

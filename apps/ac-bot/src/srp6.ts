@@ -1,7 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 
 // Port of Acore::Crypto::SRP6::MakeRegistrationData (src/common/Cryptography).
-// Both username and password must already be uppercased before calling.
+// The auth core uppercases the client-sent login before SRP6 math
+// (src/auth/Server/AuthSession.cpp: Utf8ToUpperOnlyLatin), so both the
+// username and password are uppercased here before deriving the verifier --
+// regardless of how the name is stored in the DB.
 //
 //   salt     = 32 random bytes
 //   x        = SHA1(salt || SHA1(username || ":" || password))   (digest read LE)
@@ -49,8 +52,14 @@ export interface RegistrationData {
 }
 
 export function makeRegistrationData(username: string, password: string): RegistrationData {
+  const upperUser = username.toUpperCase();
+  const upperPass = password.toUpperCase();
   const salt = randomBytes(32);
-  const inner = sha1(Buffer.from(username, "utf8"), Buffer.from(":", "utf8"), Buffer.from(password, "utf8"));
+  const inner = sha1(
+    Buffer.from(upperUser, "utf8"),
+    Buffer.from(":", "utf8"),
+    Buffer.from(upperPass, "utf8"),
+  );
   const x = sha1(salt, inner);
   const verifier = modPow(G, bytesToBigIntLE(x), N);
   return { salt, verifier: bigIntToBytesLE(verifier, 32) };

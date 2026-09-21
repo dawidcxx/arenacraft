@@ -8,11 +8,11 @@ import { normalizeAccountName } from "./wowName";
 
 export const REGISTER_COMMAND = new SlashCommandBuilder()
   .setName("register")
-  .setDescription("Create your ArenaCraft login")
+  .setDescription("Create your Arenacraft login")
   .toJSON();
 
 function credentialsBlock(username: string, password: string): string {
-  return ["```", username, password, "```"].join("\n");
+  return [`**Username**  => \`${username}\``, `**Password**  => \`${password}\``].join("\n");
 }
 
 export async function handleRegister(interaction: ChatInputCommandInteraction, authDb: AuthDb): Promise<void> {
@@ -22,17 +22,13 @@ export async function handleRegister(interaction: ChatInputCommandInteraction, a
   // Acknowledge within Discord's 3s window; the DB/SRP work below can be slower.
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  if (await authDb.accountExists(accountName)) {
-    await interaction.editReply(
-      `An account named \`${accountName}\` is already registered. If you lost your password, ask an admin.`,
-    );
-    return;
-  }
-
+  const registered = await authDb.accountExists(accountName);
   const password = generatePassword();
-  await authDb.createAccount(accountName, password);
+  if (registered) await authDb.resetPassword(accountName, password);
+  else await authDb.createAccount(accountName, password);
 
-  const reply = `Welcome to ArenaCraft! Your login:\n${credentialsBlock(accountName, password)}`;
+  const greeting = registered ? "Password reset! Your new login:" : "Welcome to Arenacraft! Your login:";
+  const reply = `${greeting}\n\n${credentialsBlock(accountName, password)}`;
   await interaction.editReply(reply);
 
   try {
@@ -41,5 +37,5 @@ export async function handleRegister(interaction: ChatInputCommandInteraction, a
     logger.warn(`Could not DM credentials to ${discordUsername}`, error);
   }
 
-  logger.info(`Registered account ${accountName} for Discord user ${discordUsername}`);
+  logger.info(`${registered ? "Reset" : "Registered"} account ${accountName} for Discord user ${discordUsername}`);
 }
