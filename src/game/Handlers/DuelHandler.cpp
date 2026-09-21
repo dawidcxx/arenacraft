@@ -45,6 +45,9 @@ void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
   player->duel->State = DUEL_STATE_COUNTDOWN;
   target->duel->State = DUEL_STATE_COUNTDOWN;
 
+  player->RemoveArenaSpellCooldowns(true);
+  target->RemoveArenaSpellCooldowns(true);
+
   player->SendDuelCountdown(3000);
   target->SendDuelCountdown(3000);
 }
