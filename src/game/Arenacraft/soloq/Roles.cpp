@@ -29,7 +29,7 @@ std::optional<Role> roleFor(Classes classId, uint8_t specIndex)
   case CLASS_PALADIN:
     return fromSpec(specIndex, Role::Healer, Role::Melee, Role::Melee);
   case CLASS_HUNTER:
-    return fromSpec(specIndex, Role::Melee, Role::Melee, Role::Caster);
+    return fromSpec(specIndex, Role::Melee, Role::Melee, Role::Melee);
   case CLASS_ROGUE:
     return fromSpec(specIndex, Role::Melee, Role::Melee, Role::Melee);
   case CLASS_PRIEST:

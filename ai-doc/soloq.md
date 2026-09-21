@@ -61,7 +61,7 @@ time (`Player::GetMostPointsTalentTree()`). `rating` starts at 1400 and `mmr` at
 | --- | --- | --- | --- |
 | Warrior | Melee | Melee | Melee |
 | Paladin | Healer | Melee | Melee |
-| Hunter | Melee | Melee | Caster |
+| Hunter | Melee | Melee | Melee |
 | Rogue | Melee | Melee | Melee |
 | Priest | Healer | Healer | Caster |
 | Death Knight | Melee | Melee | Melee |
@@ -70,9 +70,8 @@ time (`Player::GetMostPointsTalentTree()`). `rating` starts at 1400 and `mmr` at
 | Warlock | Caster | Caster | Caster |
 | Druid | Caster | Melee | Healer |
 
-Hunter BM/MM count as Melee, Survival as Caster. Tank specs are allowed and
-treated as Melee. Unknown class / spec outside 0..2 returns `nullopt` and is
-rejected by the queue.
+All hunter specs count as Melee. Tank specs are allowed and treated as Melee.
+Unknown class / spec outside 0..2 returns `nullopt` and is rejected by the queue.
 
 ## Matchmaking (`SoloqQueue`)
 

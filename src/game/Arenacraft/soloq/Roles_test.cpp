@@ -20,7 +20,7 @@ TEST_CASE("roleFor maps each class and spec to its role")
   RoleCase const cases[] = {
       {CLASS_WARRIOR, 0, Role::Melee},      {CLASS_WARRIOR, 1, Role::Melee},      {CLASS_WARRIOR, 2, Role::Melee},
       {CLASS_PALADIN, 0, Role::Healer},     {CLASS_PALADIN, 1, Role::Melee},      {CLASS_PALADIN, 2, Role::Melee},
-      {CLASS_HUNTER, 0, Role::Melee},       {CLASS_HUNTER, 1, Role::Melee},       {CLASS_HUNTER, 2, Role::Caster},
+      {CLASS_HUNTER, 0, Role::Melee},       {CLASS_HUNTER, 1, Role::Melee},       {CLASS_HUNTER, 2, Role::Melee},
       {CLASS_ROGUE, 0, Role::Melee},        {CLASS_ROGUE, 1, Role::Melee},        {CLASS_ROGUE, 2, Role::Melee},
       {CLASS_PRIEST, 0, Role::Healer},      {CLASS_PRIEST, 1, Role::Healer},      {CLASS_PRIEST, 2, Role::Caster},
       {CLASS_DEATH_KNIGHT, 0, Role::Melee}, {CLASS_DEATH_KNIGHT, 1, Role::Melee}, {CLASS_DEATH_KNIGHT, 2, Role::Melee},
