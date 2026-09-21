@@ -54,6 +54,10 @@ std::vector<uint32> const& AllMetaGems();
 // list of everyday consumables/reagents, in vendor order.
 std::vector<uint32> const& AllGeneralGoods();
 
+// Adds one item to a code-defined vendor list, giving 0-price stock a small
+// gold fee so it is not handed out free. Defined in ItemVendor.cpp.
+void StockVendorItem(uint32 vendorEntry, uint32 item);
+
 // Vendor-list (gossip menu) names in display order, defined in
 // ItemVendorItems.cpp.
 std::vector<std::string_view> const& CategoryOrder();
@@ -74,8 +78,6 @@ public:
   // Shared gem vendor lists (see AllGems / AllMetaGems).
   static constexpr uint32 GemVendorEntry     = 9000300;
   static constexpr uint32 MetaGemVendorEntry = 9000301;
-  // Shared general-goods vendor list (see AllGeneralGoods).
-  static constexpr uint32 GeneralGoodsVendorEntry = 9000400;
 
   // Custom gossip actions for the utility options. Values only have to be
   // distinct and outside the built-in Gossip_Option range.

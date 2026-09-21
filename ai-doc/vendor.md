@@ -65,14 +65,18 @@ Menus can be built without SQL by overriding
   naming the item. Add a name to `CategoryOrder()` to create a new gossip
   option / vendor list (menu index `i` maps to `VendorEntryBase + i`).
 
-The first menu entry is **General goods**. `GeneralGoodsVendorItems.cpp` holds a
-flat `std::vector<uint32>` of everyday consumables/reagents (conjured mage food,
-Soul Shard, ammo, rogue poisons, class reagents, the best WotLK bandage) exposed
-as `AllGeneralGoods()`;
-the option points at `GeneralGoodsVendorEntry`. It is inserted before the
-categories, and because the gossip menu is a `std::map` keyed by menu item id it
-takes id 0 and shows first. Some entries are conjured and tagged "Not available
-to players" on evowow, but are intentionally stocked anyway.
+**General goods** is not a gossip option on the multi-vendor. It is a separate,
+standalone direct vendor: entry 20194 ("Dealer Dunar") is hijacked by
+`GeneralGoodsVendor`/`GeneralGoodsVendorStock` (`GeneralGoodsVendor.hpp/.cpp`) -
+`OnCreatureAddWorld` replaces its flags with `VENDOR | REPAIR` (no gossip, so a
+right-click goes straight to the vendor window) and `OnStartup` clears the
+`npc_vendor` stock the DB ships for the entry, stocks `AllGeneralGoods()`, and
+sets its subname to "General goods". `GeneralGoodsVendorItems.cpp` holds that
+list: a flat `std::vector<uint32>` of everyday consumables/reagents (conjured
+mage food, Soul Shard, ammo, rogue poisons, class reagents, the best WotLK
+bandage). Some entries are conjured and tagged "Not available to players" on
+evowow, but are intentionally stocked anyway. Shared stock helper:
+`StockVendorItem` (`ItemVendor.hpp`).
 
 The menu also has a class-dependent **Glyphs** option. It is not part of the
 item list: `GlyphVendorItems.cpp` holds a flat `{CLASS_X, itemId}` list (one row

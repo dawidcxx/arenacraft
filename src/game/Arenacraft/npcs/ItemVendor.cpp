@@ -13,18 +13,6 @@ namespace
 // Small gold fee (in copper) for stock that otherwise has a 0 BuyPrice.
 constexpr int32 VendorFallbackPrice = 10 * 10000; // 10 gold
 
-// Adds one item to a vendor list and gives 0-price stock a small gold fee.
-// Wrathful/tier/glyph items ship with BuyPrice 0 (arena points / inscription),
-// so without this they would be handed out free. The 0 extended cost is what
-// removes the rating/arena-point requirement.
-void StockItem(uint32 vendorEntry, uint32 item)
-{
-  sObjectMgr->AddVendorItem(vendorEntry, item, 0, 0, 0, false);
-
-  if (ItemTemplate* proto = const_cast<ItemTemplate*>(sObjectMgr->GetItemTemplate(item)); proto && proto->BuyPrice == 0)
-    proto->BuyPrice = VendorFallbackPrice;
-}
-
 // Cache of the flat item list grouped by category: category name -> item ids.
 // Built once on first use; Categories() stitches it together in menu order.
 std::unordered_map<std::string_view, std::vector<uint32>> const& ItemsByCategory()
@@ -52,6 +40,17 @@ std::unordered_map<uint8, std::vector<uint32>> const& GlyphsByClass()
   return byClass;
 }
 } // namespace
+
+// Wrathful/tier/glyph items ship with BuyPrice 0 (arena points / inscription),
+// so without a fallback they would be handed out free. The 0 extended cost is
+// what removes the rating/arena-point requirement.
+void StockVendorItem(uint32 vendorEntry, uint32 item)
+{
+  sObjectMgr->AddVendorItem(vendorEntry, item, 0, 0, 0, false);
+
+  if (ItemTemplate* proto = const_cast<ItemTemplate*>(sObjectMgr->GetItemTemplate(item)); proto && proto->BuyPrice == 0)
+    proto->BuyPrice = VendorFallbackPrice;
+}
 
 std::vector<ItemVendor::Category> const& ItemVendor::Categories()
 {
@@ -99,12 +98,8 @@ bool ItemVendor::CanCreatureGossipHello(Player* player, Creature* creature)
   menu.SetMenuId(GossipMenuId);
 
   // Menu items are kept in a std::map keyed by menu item id, so the ids are
-  // assigned in display order. "General goods" is deliberately the first entry.
+  // assigned in display order.
   uint32 menuIndex = 0;
-
-  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "General goods", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
-  menu.AddGossipMenuItemData(menuIndex, GeneralGoodsVendorEntry, 0);
-  ++menuIndex;
 
   for (uint32 i = 0; i < uint32(categories.size()); ++i, ++menuIndex)
   {
@@ -204,26 +199,22 @@ void ItemVendorStock::OnStartup()
 
   for (uint32 i = 0; i < uint32(categories.size()); ++i)
     for (uint32 item : categories[i].Items)
-      StockItem(ItemVendor::VendorEntryBase + i, item);
+      StockVendorItem(ItemVendor::VendorEntryBase + i, item);
 
   // One glyph list per class, opened by the class-dependent "Glyphs" option.
   for (uint32 classId = 1; classId < MAX_CLASSES; ++classId)
     for (uint32 item : ItemVendor::GlyphsForClass(uint8(classId)))
-      StockItem(ItemVendor::GlyphVendorEntryBase + classId, item);
+      StockVendorItem(ItemVendor::GlyphVendorEntryBase + classId, item);
 
   // Shared enchant list, opened by the "Enchantments" option.
   for (uint32 item : AllEnchants())
-    StockItem(ItemVendor::EnchantVendorEntry, item);
+    StockVendorItem(ItemVendor::EnchantVendorEntry, item);
 
   // Shared gem lists, opened by the "Gems" / "Meta Gems" options.
   for (uint32 item : AllGems())
-    StockItem(ItemVendor::GemVendorEntry, item);
+    StockVendorItem(ItemVendor::GemVendorEntry, item);
   for (uint32 item : AllMetaGems())
-    StockItem(ItemVendor::MetaGemVendorEntry, item);
-
-  // Shared general-goods list, opened by the "General goods" option.
-  for (uint32 item : AllGeneralGoods())
-    StockItem(ItemVendor::GeneralGoodsVendorEntry, item);
+    StockVendorItem(ItemVendor::MetaGemVendorEntry, item);
 
   if (CreatureTemplate* proto = const_cast<CreatureTemplate*>(sObjectMgr->GetCreatureTemplate(ItemVendor::Entry)))
   {

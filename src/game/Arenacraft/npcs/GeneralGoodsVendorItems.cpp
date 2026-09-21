@@ -2,9 +2,8 @@
 
 // Flat, code-defined "General goods" vendor stock: one row per everyday
 // consumable/reagent a level-80 character needs while gearing and playing
-// (conjured mage food, rogue poisons, ammo, class reagents). The single
-// "General goods" gossip option serves this whole list and is the first menu
-// entry.
+// (conjured mage food, rogue poisons, ammo, class reagents). It backs the
+// direct vendor `GeneralGoodsVendor` (entry 20194) via AllGeneralGoods().
 //
 // Item ids were checked on wotlk.evowow.com (and against the world DB for the
 // stack/price columns). Some entries are flagged "Not available to players" on
