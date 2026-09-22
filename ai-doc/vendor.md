@@ -161,11 +161,10 @@ Entry 19728 ("Mama Wheeler") is a separate, standalone gossip NPC hijacked by
 `QUESTGIVER` so the client opens our gossip instead of the quest menu) and
 `OnStartup` stocks the **Exotic mounts** vendor list
 (`CosmeticVendor::ExoticMountVendorEntry`) from `AllExoticMounts()`
-(`CosmeticVendorItems.cpp`, a flat `std::vector<uint32>`; currently just the
-`50818` placeholder), and sets its subname to "Cosmetics". The gossip menu also
-has a second, non-vendor option **Transmog (WIP)** (custom action) that is a
-placeholder until the transmog feature lands - it just prints a "coming soon"
-message for now.
+(`CosmeticVendorItems.cpp`, a flat `std::vector<uint32>`), and sets its subname
+to "Cosmetics". The gossip menu also drives the transmogrification system
+(**Transmog by item ID**, a coded gossip option, and **Clear Transmog**); see
+`ai-doc/transmog.md`.
 
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator

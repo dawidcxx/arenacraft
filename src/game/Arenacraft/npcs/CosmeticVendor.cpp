@@ -4,6 +4,10 @@
 #include "ItemVendor.hpp"
 #include "ObjectMgr.h"
 #include "ScriptedGossip.h"
+#include "StringConvert.h"
+#include "transmog/Transmogrification.hpp"
+
+#include <string>
 
 namespace arenacraft
 {
@@ -18,11 +22,8 @@ void CosmeticVendor::OnCreatureAddWorld(Creature* creature)
   creature->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_VENDOR);
 }
 
-bool CosmeticVendor::CanCreatureGossipHello(Player* player, Creature* creature)
+void CosmeticVendor::ShowMainMenu(Player* player, Creature* creature)
 {
-  if (creature->GetEntry() != Entry)
-    return false;
-
   player->PlayerTalkClass->ClearMenus();
   GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
   menu.SetMenuId(GossipMenuId);
@@ -30,10 +31,46 @@ bool CosmeticVendor::CanCreatureGossipHello(Player* player, Creature* creature)
   menu.AddMenuItem(0, GOSSIP_ICON_VENDOR, "Exotic mounts", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
   menu.AddGossipMenuItemData(0, ExoticMountVendorEntry, 0);
 
-  menu.AddMenuItem(1, GOSSIP_ICON_CHAT, "Transmog (WIP)", 0, ActionTransmog, "", 0, false);
+  // Coded option: the client pops the code-entry box straight away and returns
+  // what the player typed (see CanCreatureGossipSelectCode). The box message
+  // must stay empty - any text adds a separate "accept/cancel" confirm popup
+  // before the code prompt.
+  menu.AddMenuItem(1, GOSSIP_ICON_CHAT, "Transmog by item ID", 0, ActionTransmogById, "", 0, true);
   menu.AddGossipMenuItemData(1, 0, 0);
 
+  menu.AddMenuItem(2, GOSSIP_ICON_CHAT, "Clear Transmog", 0, ActionClearMenu, "", 0, false);
+  menu.AddGossipMenuItemData(2, 0, 0);
+
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
+}
+
+void CosmeticVendor::ShowClearMenu(Player* player, Creature* creature)
+{
+  player->PlayerTalkClass->ClearMenus();
+  GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
+  menu.SetMenuId(GossipMenuId);
+
+  uint32 index = 0;
+  for (transmog::Applied const& applied : transmog::AppliedFor(player))
+  {
+    menu.AddMenuItem(int32(index), GOSSIP_ICON_CHAT, transmog::EquipmentSlotName(applied.Slot), 0,
+                     ActionClearSlotBase + applied.Slot, "", 0, false);
+    menu.AddGossipMenuItemData(index, 0, 0);
+    ++index;
+  }
+
+  menu.AddMenuItem(int32(index), GOSSIP_ICON_TALK, "Back", 0, ActionBack, "", 0, false);
+  menu.AddGossipMenuItemData(index, 0, 0);
+
+  SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
+}
+
+bool CosmeticVendor::CanCreatureGossipHello(Player* player, Creature* creature)
+{
+  if (creature->GetEntry() != Entry)
+    return false;
+
+  ShowMainMenu(player, creature);
   return true;
 }
 
@@ -42,13 +79,55 @@ bool CosmeticVendor::CanCreatureGossipSelect(Player* player, Creature* creature,
   if (creature->GetEntry() != Entry)
     return false;
 
-  if (action != ActionTransmog)
-    // "Exotic mounts" is a vendor option; returning false lets the core open
-    // the vendor list (see PlayerGossip.cpp).
+  switch (action)
+  {
+  case ActionTransmogById: // empty submission: just show the menu again
+    ShowMainMenu(player, creature);
+    return true;
+  case ActionClearMenu:
+    if (transmog::AppliedFor(player).empty())
+    {
+      ChatHandler(player->GetSession()).SendSysMessage("You have no transmogs to clear.");
+      ShowMainMenu(player, creature);
+    }
+    else
+      ShowClearMenu(player, creature);
+    return true;
+  case ActionBack:
+    ShowMainMenu(player, creature);
+    return true;
+  default:
+    break;
+  }
+
+  if (action >= ActionClearSlotBase && action < ActionClearSlotBase + EQUIPMENT_SLOT_END)
+  {
+    transmog::ClearSlot(player, uint8(action - ActionClearSlotBase));
+    ChatHandler(player->GetSession()).SendSysMessage("Transmog cleared.");
+    ShowClearMenu(player, creature);
+    return true;
+  }
+
+  // "Exotic mounts" is a vendor option; returning false lets the core open the
+  // vendor list (see PlayerGossip.cpp).
+  return false;
+}
+
+bool CosmeticVendor::CanCreatureGossipSelectCode(Player* player, Creature* creature, uint32 /*sender*/, uint32 action,
+                                                 const char* code)
+{
+  if (creature->GetEntry() != Entry || action != ActionTransmogById)
     return false;
 
-  player->PlayerTalkClass->SendCloseGossip();
-  ChatHandler(player->GetSession()).SendSysMessage("Transmog is a work in progress - check back soon.");
+  std::string      message;
+  Optional<uint32> sourceEntry = Acore::StringTo<uint32>(code ? code : "");
+  if (!sourceEntry)
+    message = "That is not a valid item id.";
+  else if (!transmog::Apply(player, *sourceEntry, message))
+    message = "Could not transmogrify: " + message;
+
+  ChatHandler(player->GetSession()).SendSysMessage(message);
+  ShowMainMenu(player, creature);
   return true;
 }
 
