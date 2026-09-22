@@ -21,6 +21,9 @@ pub const Src = struct {
         //   AC DeadlineTimer/Socket wrappers inherit/use
         "-Wno-deprecated-literal-operator",
         "-Wno-deprecated-declarations",
+        // keep frame pointers so the crash handler's backtrace() can walk the
+        // stack even with optimized code
+        "-fno-omit-frame-pointer",
         BuildCommons.no_ubsan,
     };
 

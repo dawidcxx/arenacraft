@@ -107,6 +107,9 @@ local.properties
 
 .cache/
 
+# production crash reports (written by Acore::InstallCrashHandler)
+/crashes/
+
 compile_commands.json
 *.conf
 

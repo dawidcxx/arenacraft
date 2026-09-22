@@ -163,6 +163,9 @@ pub const AcGraph = struct {
             .name = "ac",
             .root_module = module,
         });
+        // export symbols into the dynamic table so the crash handler's
+        // backtrace_symbols()/backtrace_symbols_fd() can resolve function names
+        exe.rdynamic = true;
 
         const install = bl.addInstallArtifact(exe, .{});
         cpp.addCompileCommands(exe);

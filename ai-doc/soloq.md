@@ -332,6 +332,10 @@ admin-only:
 - `.soloq crossfaction on|off` - runtime toggle for `EnforceTeamFaction`. `on`
   allows mixed-faction teammates (they can be hostile to each other); `off`
   (default) requires each team to be a single faction.
+- `.soloq debug on|off` - runtime bypass of the character readiness gate
+  (`SoloqService::setSkipCharacterChecks`): while on, `Join SoloQ` skips the
+  gear/enchant/gem/talent/glyph checks entirely. `off` (default) enforces them.
+  Does not clear the per-character pass cache.
 
 ## Wiring
 

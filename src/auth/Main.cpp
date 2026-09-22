@@ -27,6 +27,7 @@
 #include "AuthSocketMgr.h"
 #include "Banner.h"
 #include "Config.h"
+#include "CrashHandler.h"
 #include "DatabaseEnv.h"
 #include "DatabaseLoader.h"
 #include "DeadlineTimer.h"
@@ -99,6 +100,8 @@ int authserver_main(int argc, char** argv)
   }
   else
     sConfigMgr->ApplyEnvFile(".env");
+
+  Acore::InstallCrashHandler("authserver");
 
   // Add args in config
   sConfigMgr->Configure();

@@ -28,6 +28,7 @@
 #include "CliRunnable.h"
 #include "Common.h"
 #include "Config.h"
+#include "CrashHandler.h"
 #include "DatabaseEnv.h"
 #include "DatabaseLoader.h"
 #include "DeadlineTimer.h"
@@ -146,6 +147,8 @@ int worldserver_main(int argc, char** argv)
   }
   else
     sConfigMgr->ApplyEnvFile(".env");
+
+  Acore::InstallCrashHandler("worldserver");
 
 #if AC_PLATFORM == AC_PLATFORM_WINDOWS
   if (configService.compare("install") == 0)
@@ -598,8 +601,14 @@ void ShutdownCLIThread(std::thread* cliThread)
 void WorldUpdateLoop()
 {
   uint32 minUpdateDiff = uint32(sConfigMgr->GetOption<int32>("MinWorldUpdateTime", 1));
-  uint32 realCurrTime  = 0;
-  uint32 realPrevTime  = getMSTime();
+
+  // With no clients connected the server is idle: back the loop off instead of
+  // spinning at MinWorldUpdateTime over empty maps. Normal cadence resumes as
+  // soon as somebody connects.
+  constexpr uint32 idleUpdateDiff = 250;
+
+  uint32 realCurrTime = 0;
+  uint32 realPrevTime = getMSTime();
 
   uint32 maxCoreStuckTime     = uint32(sConfigMgr->GetOption<int32>("MaxCoreStuckTime", 60)) * 1000;
   uint32 halfMaxCoreStuckTime = maxCoreStuckTime / 2;
@@ -617,9 +626,13 @@ void WorldUpdateLoop()
     realCurrTime = getMSTime();
 
     uint32 diff = getMSTimeDiff(realPrevTime, realCurrTime);
-    if (diff < minUpdateDiff)
+
+    uint32 currentMinUpdateDiff =
+        sWorld->GetActiveSessionCount() == 0 ? std::max(minUpdateDiff, idleUpdateDiff) : minUpdateDiff;
+
+    if (diff < currentMinUpdateDiff)
     {
-      uint32 sleepTime = minUpdateDiff - diff;
+      uint32 sleepTime = currentMinUpdateDiff - diff;
       if (sleepTime >= halfMaxCoreStuckTime)
         LOG_ERROR("server.worldserver", "WorldUpdateLoop() waiting for {} ms with MaxCoreStuckTime set to {} ms",
                   sleepTime, maxCoreStuckTime);
