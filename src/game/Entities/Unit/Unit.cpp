@@ -208,7 +208,7 @@ Unit::Unit(bool isWorldObject)
       movespline(new Movement::MoveSpline()), i_AI(nullptr), i_disabledAI(nullptr), m_realRace(0), m_race(0),
       m_AutoRepeatFirstCast(false), m_procDeep(0), m_removedAurasCount(0), i_motionMaster(new MotionMaster(this)),
       m_regenTimer(0), m_ThreatMgr(this), m_vehicle(nullptr), m_vehicleKit(nullptr), m_unitTypeMask(UNIT_MASK_NONE),
-      m_HostileRefMgr(this), m_comboTarget(nullptr), m_comboPoints(0)
+      m_HostileRefMgr(this), m_comboTarget(nullptr), m_comboPoints(0), m_markedToDeathBy(nullptr)
 {
 #ifdef _MSC_VER
 #pragma warning(default : 4355)
@@ -14910,7 +14910,8 @@ void Unit::setDeathState(DeathState s, bool despawn)
     // reset marked for death CD
     if (m_markedToDeathBy != nullptr)
     {
-      m_markedToDeathBy->ToPlayer()->RemoveSpellCooldown(90000, true);
+      if (Player* marker = m_markedToDeathBy->ToPlayer())
+        marker->RemoveSpellCooldown(90000, true);
       this->SetMarkedToDeathBy(nullptr);
     }
   }
