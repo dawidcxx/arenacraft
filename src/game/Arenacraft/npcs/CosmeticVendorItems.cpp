@@ -17,6 +17,8 @@ std::vector<uint32> const& AllExoticMounts()
       45586, // Ironforge Ram
       46747, // Turbostrider
       46746, // White Skeletal Warhorse
+      19872, // Swift Razzashi Raptor
+      23193, // Naxxramas Deathcharger Reins
   };
   return items;
 }
