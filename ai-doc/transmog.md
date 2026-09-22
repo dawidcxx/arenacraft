@@ -59,7 +59,7 @@ harmless; they are not currently pruned.
 ## Menus (CosmeticVendor)
 
 - main menu: **Exotic mounts** (vendor) + **Transmog by item ID** + **Clear
-  Transmog**
+  Transmog** + **Change Gender** + **Change Faction**
 - **Transmog by item ID** is a coded gossip option, so clicking it drops the
   player straight into the client's text box (no intermediate menu); the id is
   parsed and applied on submit

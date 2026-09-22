@@ -14,8 +14,8 @@ namespace arenacraft
 std::vector<uint32> const& AllExoticMounts();
 
 // Hijacks Mama Wheeler (entry 19728) into the cosmetics NPC. Right-clicking
-// opens a gossip menu with "Exotic mounts" (a vendor list) and "Transmog Item",
-// which opens the transmogrification submenus.
+// opens a gossip menu with "Exotic mounts" (a vendor list), "Transmog Item",
+// "Change Gender" and "Change Faction", which open the matching submenus.
 class CosmeticVendor : public AllCreatureScript
 {
 public:
@@ -25,10 +25,12 @@ public:
   static constexpr uint32 ExoticMountVendorEntry = 9200000;
 
   // Custom gossip actions (outside the built-in Gossip_Option range).
-  static constexpr uint32 ActionTransmogById = 9200011;
-  static constexpr uint32 ActionClearMenu    = 9200012;
-  static constexpr uint32 ActionBack         = 9200013;
-  static constexpr uint32 ActionChangeGender = 9200014;
+  static constexpr uint32 ActionTransmogById         = 9200011;
+  static constexpr uint32 ActionClearMenu            = 9200012;
+  static constexpr uint32 ActionBack                 = 9200013;
+  static constexpr uint32 ActionChangeGender         = 9200014;
+  static constexpr uint32 ActionChangeFaction        = 9200015;
+  static constexpr uint32 ActionChangeFactionConfirm = 9200016;
   // One action per equipment slot for the clear menu.
   static constexpr uint32 ActionClearSlotBase = 9200100;
 
@@ -46,6 +48,7 @@ public:
 private:
   static void ShowMainMenu(Player* player, Creature* creature);
   static void ShowClearMenu(Player* player, Creature* creature);
+  static void ShowFactionChangeMenu(Player* player, Creature* creature);
 };
 
 // Code-defined stock for the "Exotic mounts" list. Runs in OnStartup, after

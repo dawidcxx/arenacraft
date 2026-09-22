@@ -47,6 +47,23 @@ void CosmeticVendor::ShowMainMenu(Player* player, Creature* creature)
                    ActionChangeGender, "", 0, false);
   menu.AddGossipMenuItemData(3, 0, 0);
 
+  menu.AddMenuItem(4, GOSSIP_ICON_CHAT, "Change Faction", 0, ActionChangeFaction, "", 0, false);
+  menu.AddGossipMenuItemData(4, 0, 0);
+
+  SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
+}
+
+void CosmeticVendor::ShowFactionChangeMenu(Player* player, Creature* creature)
+{
+  player->PlayerTalkClass->ClearMenus();
+  GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
+  menu.SetMenuId(GossipMenuId);
+
+  menu.AddMenuItem(0, GOSSIP_ICON_INTERACT_1, "Yes, change my faction", 0, ActionChangeFactionConfirm, "", 0, false);
+  menu.AddGossipMenuItemData(0, 0, 0);
+  menu.AddMenuItem(1, GOSSIP_ICON_CHAT, "No, keep my faction", 0, ActionBack, "", 0, false);
+  menu.AddGossipMenuItemData(1, 0, 0);
+
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
 }
 
@@ -111,6 +128,17 @@ bool CosmeticVendor::CanCreatureGossipSelect(Player* player, Creature* creature,
     ChatHandler(player->GetSession())
         .SendSysMessage(newGender == GENDER_FEMALE ? "You are now female." : "You are now male.");
     ShowMainMenu(player, creature);
+    return true;
+  }
+  case ActionChangeFaction:
+    ShowFactionChangeMenu(player, creature);
+    return true;
+  case ActionChangeFactionConfirm:
+  {
+    player->PlayerTalkClass->SendCloseGossip();
+    player->SetAtLoginFlag(AT_LOGIN_CHANGE_FACTION);
+    ChatHandler(player->GetSession())
+        .SendSysMessage("Faction change enabled. Log out to the character screen and back in to pick your new race.");
     return true;
   }
   default:

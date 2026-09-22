@@ -173,6 +173,17 @@ the player's gender: "Change Gender (shnip snap)" when male -> female, "Change
 Gender (attach sausage)" when female -> male. It is free (no gold), unlike the
 barber.
 
+The **Change Faction** option opens a yes/no confirmation submenu; confirming
+arms `AT_LOGIN_CHANGE_FACTION` on the player (`SetAtLoginFlag`, saved on logout
+like `.character changefaction`). The faction change itself happens at the
+character-selection screen, so the player must log out and back in to pick the
+new faction. Faction change is free: the core gold cap
+(`CONFIG_CHANGE_FACTION_MAX_MONEY` / `CHAR_CREATE_CHARACTER_GOLD_LIMIT`) was
+removed in `CharacterHandler.cpp` for this PvP server. The core's homebind and
+position reset is skipped too, so the character keeps the arena-hub homebind
+(`Player::_LoadHomeBind`) and its saved position instead of being moved to the
+new faction's capital.
+
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator
 rings), Trinkets (264 ICC + 258/245 ToC + the five ilvl-245 Battlemaster PvP

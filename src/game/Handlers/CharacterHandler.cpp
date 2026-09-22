@@ -2061,7 +2061,6 @@ void WorldSession::HandleCharFactionOrRaceChangeCallback(std::shared_ptr<Charact
   Field*      fields         = result->Fetch();
   uint32      atLoginFlags   = fields[0].Get<uint16>();
   std::string knownTitlesStr = fields[1].Get<std::string>();
-  uint32      money          = fields[2].Get<uint32>();
 
   uint32 usedLoginFlag = (factionChangeInfo->FactionChange ? AT_LOGIN_CHANGE_FACTION : AT_LOGIN_CHANGE_RACE);
   if (!(atLoginFlags & usedLoginFlag))
@@ -2101,13 +2100,6 @@ void WorldSession::HandleCharFactionOrRaceChangeCallback(std::shared_ptr<Charact
     SendCharFactionChange(factionChangeInfo->FactionChange ? CHAR_CREATE_CHARACTER_SWAP_FACTION
                                                            : CHAR_CREATE_CHARACTER_RACE_ONLY,
                           factionChangeInfo.get());
-    return;
-  }
-
-  uint32 maxMoney = sWorld->getIntConfig(CONFIG_CHANGE_FACTION_MAX_MONEY);
-  if (maxMoney && money > maxMoney)
-  {
-    SendCharFactionChange(CHAR_CREATE_CHARACTER_GOLD_LIMIT, factionChangeInfo.get());
     return;
   }
 
@@ -2375,37 +2367,6 @@ void WorldSession::HandleCharFactionOrRaceChangeCallback(std::shared_ptr<Charact
 
       // Leave Arena Teams
       Player::LeaveAllArenaTeams(factionChangeInfo->Guid);
-
-      // Reset homebind and position
-      stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_PLAYER_HOMEBIND);
-      stmt->SetData(0, lowGuid);
-      trans->Append(stmt);
-
-      stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_PLAYER_HOMEBIND);
-      stmt->SetData(0, lowGuid);
-
-      WorldLocation loc;
-      uint16        zoneId = 0;
-
-      if (newTeam == TEAM_ALLIANCE)
-      {
-        loc.WorldRelocate(0, -8867.68f, 673.373f, 97.9034f, 0.0f);
-        zoneId = 1519;
-      }
-      else
-      {
-        loc.WorldRelocate(1, 1633.33f, -4439.11f, 15.7588f, 0.0f);
-        zoneId = 1637;
-      }
-
-      stmt->SetData(1, loc.GetMapId());
-      stmt->SetData(2, zoneId);
-      stmt->SetData(3, loc.GetPositionX());
-      stmt->SetData(4, loc.GetPositionY());
-      stmt->SetData(5, loc.GetPositionZ());
-      trans->Append(stmt);
-
-      Player::SavePositionInDB(loc, zoneId, factionChangeInfo->Guid, trans);
 
       // Achievement conversion
       for (auto const& [achiev_alliance, achiev_horde] : sObjectMgr->FactionChangeAchievements)
