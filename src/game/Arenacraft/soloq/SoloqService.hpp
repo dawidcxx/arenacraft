@@ -38,7 +38,8 @@ public:
 
   // Runs the character readiness check at most once per character per process:
   // a character that passes is remembered in _validatedCharacters. Returns the
-  // reason the character cannot queue, or nullopt when it is ready.
+  // reason the character cannot queue, or nullopt when it is ready. Always
+  // reports ready while skipCharacterChecks is set (debug bypass).
   [[nodiscard]] std::optional<CharacterProblem> characterProblem(Player* player);
 
   std::vector<Match> tick(std::chrono::milliseconds elapsed);
@@ -67,6 +68,11 @@ public:
   void               setEnforceTeamFaction(bool value);
   [[nodiscard]] bool enforceTeamFaction() const;
 
+  // Debug bypass for the item/enchant/talent/glyph readiness gate; see
+  // characterProblem. Does not clear _validatedCharacters.
+  void               setSkipCharacterChecks(bool value);
+  [[nodiscard]] bool skipCharacterChecks() const { return _skipCharacterChecks; }
+
 private:
   SoloqService() = default;
 
@@ -76,5 +82,6 @@ private:
   std::unordered_map<uint32, Match> _pendingMatches;
   std::unordered_set<PlayerId>      _validatedCharacters;
   std::array<RoleCounts, 2>         _factionRoleCounts{};
+  bool                              _skipCharacterChecks = false;
 };
 } // namespace arenacraft::soloq

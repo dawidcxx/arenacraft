@@ -64,7 +64,7 @@ void SoloqService::refreshFactionRoleCounts()
 
 std::optional<CharacterProblem> SoloqService::characterProblem(Player* player)
 {
-  if (!player)
+  if (!player || _skipCharacterChecks)
     return std::nullopt;
 
   PlayerId const id = player->GetGUID().GetRawValue();
@@ -110,6 +110,8 @@ std::vector<SoloqQueue::QueueSnapshot> SoloqService::snapshot() const { return _
 void SoloqService::setEnforceTeamFaction(bool value) { _queue.setEnforceTeamFaction(value); }
 
 bool SoloqService::enforceTeamFaction() const { return _queue.enforceTeamFaction(); }
+
+void SoloqService::setSkipCharacterChecks(bool value) { _skipCharacterChecks = value; }
 
 std::vector<SoloqService::PendingArena> SoloqService::pendingArenas() const
 {

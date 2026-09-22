@@ -5,6 +5,7 @@
  *   .soloq list     every queued player with role/class/spec/rating/MMR/wait
  *   .soloq pending  arenas waiting for a result
  *   .soloq clear    dequeue everyone (clears badges too)
+ *   .soloq debug    toggle bypass of the character readiness checks
  */
 
 #include "Chat.h"
@@ -74,6 +75,7 @@ public:
         {"pending", HandlePendingCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"clear", HandleClearCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"crossfaction", HandleCrossFactionCommand, SEC_ADMINISTRATOR, Console::Yes},
+        {"debug", HandleDebugCommand, SEC_ADMINISTRATOR, Console::Yes},
     };
     static ChatCommandTable commandTable = {{"soloq", soloqTable}};
     return commandTable;
@@ -188,6 +190,17 @@ public:
       handler->SendSysMessage("SoloQ: mixed-faction teams allowed (teammates may be hostile).");
     else
       handler->SendSysMessage("SoloQ: each team must be a single faction.");
+    return true;
+  }
+
+  static bool HandleDebugCommand(ChatHandler* handler, bool enable)
+  {
+    SoloqService::instance().setSkipCharacterChecks(enable);
+    if (enable)
+      handler->SendSysMessage(
+          "SoloQ: debug enabled - readiness checks (gear/enchants/gems/talents/glyphs) are skipped when queueing.");
+    else
+      handler->SendSysMessage("SoloQ: debug disabled - readiness checks are enforced again.");
     return true;
   }
 };
