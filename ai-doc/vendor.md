@@ -153,6 +153,20 @@ The vendor creature (entry 20921 "Shauly Pore") gets a guild-style `subname`
 ("<THE Vendor>", set in `ItemVendorStock::OnStartup`) so players recognise it as
 the official gear source; NPCs cannot carry a real guild.
 
+### Cosmetics NPC (hijack of 19728)
+
+Entry 19728 ("Mama Wheeler") is a separate, standalone gossip NPC hijacked by
+`CosmeticVendor`/`CosmeticVendorStock` (`CosmeticVendor.hpp/.cpp`).
+`OnCreatureAddWorld` replaces its flags with `GOSSIP | VENDOR` (dropping the DB
+`QUESTGIVER` so the client opens our gossip instead of the quest menu) and
+`OnStartup` stocks the **Exotic mounts** vendor list
+(`CosmeticVendor::ExoticMountVendorEntry`) from `AllExoticMounts()`
+(`CosmeticVendorItems.cpp`, a flat `std::vector<uint32>`; currently just the
+`50818` placeholder), and sets its subname to "Cosmetics". The gossip menu also
+has a second, non-vendor option **Transmog (WIP)** (custom action) that is a
+placeholder until the transmog feature lands - it just prints a "coming soon"
+message for now.
+
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator
 rings), Trinkets (264 ICC + 258/245 ToC + the five ilvl-245 Battlemaster PvP
