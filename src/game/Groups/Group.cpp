@@ -1971,7 +1971,6 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
     return ERR_BATTLEGROUND_JOIN_FAILED;
 
   uint32 arenaTeamId = reference->GetArenaTeamId(arenaSlot);
-  TeamId teamId      = reference->GetTeamId();
 
   BattlegroundQueueTypeId bgQueueTypeIdRandom = BattlegroundMgr::BGQueueTypeId(BATTLEGROUND_RB, 0);
 
@@ -1987,10 +1986,6 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
 
     if (!sScriptMgr->CanGroupJoinBattlegroundQueue(this, member, bgTemplate, MinPlayerCount, isRated, arenaSlot))
       return ERR_BATTLEGROUND_JOIN_FAILED;
-
-    // don't allow cross-faction groups to join queue
-    if (member->GetTeamId() != teamId && !sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP))
-      return ERR_BATTLEGROUND_JOIN_TIMED_OUT;
 
     // don't let join rated matches if the arena team id doesn't match
     if (isRated && member->GetArenaTeamId(arenaSlot) != arenaTeamId)

@@ -5,19 +5,16 @@
 using arenacraft::soloq::formatQueueStats;
 using arenacraft::soloq::RoleCounts;
 
-TEST_CASE("formatQueueStats renders the horde line before the alliance line")
+TEST_CASE("formatQueueStats renders the shared queue line with a total")
 {
-  RoleCounts const horde{1, 5, 0};
-  RoleCounts const alliance{2, 0, 5};
-  CHECK(formatQueueStats(horde, alliance) == "SoloQ Queue Status\n-----------------------\n\n"
-                                             "[H]: Melee (1) Caster (5) Healer (0)\n\n"
-                                             "[A]: Melee (2) Caster (0) Healer (5)");
+  RoleCounts const counts{1, 5, 0};
+  CHECK(formatQueueStats(counts) == "SoloQ Queue\n-----------------------\n\nPlayers in queue: 6\n\n"
+                                    "Melee (1) Caster (5) Healer (0)");
 }
 
-TEST_CASE("formatQueueStats renders empty queues as zeros")
+TEST_CASE("formatQueueStats renders an empty queue as zeros")
 {
   RoleCounts const empty{};
-  CHECK(formatQueueStats(empty, empty) == "SoloQ Queue Status\n-----------------------\n\n"
-                                          "[H]: Melee (0) Caster (0) Healer (0)\n\n"
-                                          "[A]: Melee (0) Caster (0) Healer (0)");
+  CHECK(formatQueueStats(empty) == "SoloQ Queue\n-----------------------\n\nPlayers in queue: 0\n\n"
+                                   "Melee (0) Caster (0) Healer (0)");
 }

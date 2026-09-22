@@ -28,7 +28,6 @@ public:
     Role                      role;
     uint32_t                  rating;
     uint32_t                  mmr;
-    TeamId                    teamId;
     std::chrono::milliseconds waited;
   };
 
@@ -37,9 +36,6 @@ public:
   [[nodiscard]] bool                       contains(PlayerId id) const;
   [[nodiscard]] std::vector<PlayerId>      waitingPlayers() const;
   [[nodiscard]] std::vector<QueueSnapshot> snapshot() const;
-
-  void               setEnforceTeamFaction(bool value);
-  [[nodiscard]] bool enforceTeamFaction() const;
 
 private:
   struct Entry
@@ -70,7 +66,6 @@ private:
   void removePlayers(std::array<PlayerId, 6> const& ids);
 
   std::vector<Entry> _entries;
-  uint64_t           _nextSequence       = 0;
-  bool               _enforceTeamFaction = tuning::EnforceTeamFaction;
+  uint64_t           _nextSequence = 0;
 };
 } // namespace arenacraft::soloq

@@ -61,17 +61,13 @@ std::vector<PlayerId> SoloqQueue::waitingPlayers() const
   return ids;
 }
 
-void SoloqQueue::setEnforceTeamFaction(bool value) { _enforceTeamFaction = value; }
-
-bool SoloqQueue::enforceTeamFaction() const { return _enforceTeamFaction; }
-
 std::vector<SoloqQueue::QueueSnapshot> SoloqQueue::snapshot() const
 {
   std::vector<QueueSnapshot> result;
   result.reserve(_entries.size());
   for (Entry const& entry : _entries)
     result.push_back(QueueSnapshot{entry.player.id, entry.player.classId, entry.player.specIndex, entry.role,
-                                   entry.player.rating, entry.player.mmr, entry.player.teamId, entry.waited});
+                                   entry.player.rating, entry.player.mmr, entry.waited});
   return result;
 }
 
@@ -130,10 +126,6 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeCandidate(std::array<Entry 
     if (m0.classId == casterA.classId || m0.classId == healerA.classId || casterA.classId == healerA.classId)
       continue;
     if (m1.classId == casterB.classId || m1.classId == healerB.classId || casterB.classId == healerB.classId)
-      continue;
-
-    if (_enforceTeamFaction && (m0.teamId != casterA.teamId || m0.teamId != healerA.teamId ||
-                                m1.teamId != casterB.teamId || m1.teamId != healerB.teamId))
       continue;
 
     uint64_t const sumA      = static_cast<uint64_t>(m0.mmr) + casterA.mmr + healerA.mmr;

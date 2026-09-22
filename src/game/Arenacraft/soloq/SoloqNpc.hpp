@@ -18,8 +18,8 @@ class SoloqNpc : public AllCreatureScript
 public:
   static constexpr uint32 Entry        = 20810;
   static constexpr uint32 GossipMenuId = 9100001;
-  // Runtime npc_text id for the per-faction queue stats shown as the gossip
-  // page text (see CanCreatureGossipHello). Never persisted to the DB.
+  // Runtime npc_text id for the queue stats shown as the gossip page text
+  // (see CanCreatureGossipHello). Never persisted to the DB.
   static constexpr uint32 StatsTextId = 9100002;
 
   static constexpr uint32 ActionJoin   = 9100010;

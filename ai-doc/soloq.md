@@ -53,7 +53,9 @@ struct Match { Team a, b; };
 
 `specIndex` is the tab page the player had the most talent points in at queue
 time (`Player::GetMostPointsTalentTree()`). `rating` starts at 1400 and `mmr` at
-1500 (constants in `namespace tuning`). `teamId` is the player's faction.
+1500 (constants in `namespace tuning`). `teamId` is the player's race faction,
+carried only as informational metadata for the Redis event; it is not a
+matchmaking input.
 
 ## Role table (`roleFor`)
 
@@ -88,11 +90,8 @@ at least 2 of every role.
   slightly diverged pool still pops instead of stalling.
 - A candidate six-set is **valid** only if every pair satisfies
   `gap <= max(window_i, window_j)` (the more-patient player's window governs).
-- **No mixed-faction teams**: while `tuning::EnforceTeamFaction` is set, a
-  partition is only eligible if each team's three players share a `TeamId`.
-  Opposing teams may be different factions (normal Alliance vs Horde arena);
-  what is rejected is an Alliance+Horde *teammate* mix. This means a match needs
-  either a 3/3 or a 6/0 faction split across the six.
+- **No faction input**: the queue is a single shared pool. Teams are formed from
+  role, class-distinctness and MMR only; a team may mix races freely.
 - **No class stacking per team**: a partition where team A or team B would field
   the same class twice is rejected (e.g. Shadow Priest caster + Discipline
   Priest healer). If no partition of the six avoids it, the candidate is skipped
@@ -180,11 +179,11 @@ owns only the queue plus pending arenas:
 - `queueSize`, `inQueue`, `waitingPlayers`.
 - `characterProblem(player)` - cached character readiness gate (see above);
   `_validatedCharacters` remembers the ids that passed.
-- `factionRoleCounts()` - `{alliance, horde}` `RoleCounts` recomputed on every
-  queue mutation (`join`/`leave`/matching `tick`), so the gossip handler can
-  read it without walking the queue.
+- `roleCounts()` - total `RoleCounts` recomputed on every queue mutation
+  (`join`/`leave`/matching `tick`), so the gossip handler can read it without
+  walking the queue.
 
-`formatQueueStats(horde, alliance)` renders the two-line stats block shown as
+`formatQueueStats(counts)` renders the single shared-queue stats block shown as
 the NPC gossip page text (pure; unit-tested in `SoloqService_test.cpp`).
 
 The player's rating/MMR is **not** stored here - it lives in a real 5v5
@@ -209,19 +208,19 @@ fields, since `ArenaTeam::AddMember` only sets the team id/type.
 - **Delete SoloQ Team** - disbands the team (resets rating/MMR).
 
 Opening the menu also replaces the NPC's default gossip page text with the live
-per-faction queue counts:
+queue counts:
 
 ```
-SoloQ Queue Status
+SoloQ Queue
 -----------------------
 
-[H]: Melee (1) Caster (5) Healer (0)
+Players in queue: 6
 
-[A]: Melee (2) Caster (0) Healer (5)
+Melee (1) Caster (5) Healer (0)
 ```
 
-This teaches players that each faction has its own queue. The text is built
-from `SoloqService::factionRoleCounts()` and registered in memory via
+There is a single queue for everyone. The text is built from
+`SoloqService::roleCounts()` and registered in memory via
 `ObjectMgr::AddOrUpdateGossipText` under the custom id `StatsTextId` (9100002;
 no DB row). Because the client caches npc text by id, `WorldSession::SendNpcTextUpdate`
 is called first to push the fresh text (`SMSG_NPC_TEXT_UPDATE`) before the
@@ -258,6 +257,27 @@ arena for the same queue.
 The matchmaker builds 3-player teams. The queue is 5v5, but the arena instance is
 created with `ARENA_TYPE_3v3`, so the match itself (scoreboard, ready check 6/6)
 is treated as 3v3 while the queue badge stays on the 5v5 track.
+
+## Team reaction (truce)
+
+Reaction between players is normally race-based, which does not work once a team
+can mix races. The core is patched directly
+(`src/game/Entities/Unit/Unit.cpp`):
+
+- `Unit::GetReactionTo`: two player-controlled units in the same battleground are
+  friendly when they share a battleground team and hostile otherwise, checked
+  before the race fallback. It reverts automatically when the arena ends
+  (`GetBattleground()` becomes null), so normal rules apply outside the match.
+- `Unit::PatchValuesUpdate`: same-team players are sent the viewer's faction
+  template plus the sanctuary byte, so the client shows green names and allows
+  follow, heal and resurrect. The opposing battleground team keeps its real
+  faction and stays attackable.
+
+Cross-faction groups are always allowed server-wide and the client party fake is
+unconditional, so the same behaviour applies to ordinary mixed parties.
+
+`CreateArenaForMatch` fixes the two sides: team A is battleground `TEAM_ALLIANCE`
+and team B is `TEAM_HORDE`.
 
 ## Redis matchup event
 
@@ -317,21 +337,25 @@ When the arena ends (or is destroyed without finishing) the core publishes
 `OnBattlegroundEnd` takes the pending match (normal path) and
 `OnBattlegroundDestroy` takes it only if it is still pending (abort path).
 
-## Debug command
+## Commands
 
-`src/game/Scripts/Commands/cs_soloq.cpp` (registered in `cs_script_loader.cpp`),
-admin-only:
+`src/game/Scripts/Commands/cs_soloq.cpp` (registered in `cs_script_loader.cpp`).
 
-- `.soloq status` - total queued, per-role and per-faction role counts, pending
-  arenas, and a verdict on whether a match can form (including a warning when the
-  per-team faction restriction is what is blocking it).
-- `.soloq list` - every queued player: id, class, spec, role, faction, rating,
-  MMR, wait time. Use this to confirm you have 2/2/2.
+Player command (SEC_PLAYER), so players can queue from anywhere in the world
+instead of walking back to the NPC:
+
+- `.soloq join` - creates the player's 5v5 soloq team if missing, then runs the
+  shared `JoinSoloqQueue` (see `SoloqArenaQueue`), which does the same validation
+  and enqueue as the NPC's "Join SoloQ" option (readiness gate, badge, messages).
+
+Admin commands:
+
+- `.soloq status` - total queued, per-role counts, pending arenas, and a verdict
+  on whether a match can form.
+- `.soloq list` - every queued player: id, class, spec, role, rating, MMR, wait
+  time. Use this to confirm you have 2/2/2.
 - `.soloq pending` - arenas waiting for a result (instance id + both teams).
 - `.soloq clear` - dequeue everyone and clear their badges.
-- `.soloq crossfaction on|off` - runtime toggle for `EnforceTeamFaction`. `on`
-  allows mixed-faction teammates (they can be hostile to each other); `off`
-  (default) requires each team to be a single faction.
 - `.soloq debug on|off` - runtime bypass of the character readiness gate
   (`SoloqService::setSkipCharacterChecks`): while on, `Join SoloQ` skips the
   gear/enchant/gem/talent/glyph checks entirely. `off` (default) enforces them.
@@ -345,7 +369,6 @@ admin-only:
 
 ## Out of scope / next sprints
 
-- Friendly mixed-faction teammates (rather than the per-team faction rule).
 - Class-stacking rules across the whole match rather than per team, if desired.
 - Block talent/spec changes while queued (cheat prevention).
 - Queue-count queries and richer NPC/UI feedback.

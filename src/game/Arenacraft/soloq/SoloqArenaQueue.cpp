@@ -3,15 +3,20 @@
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
 #include "BattlegroundQueue.h"
+#include "CharacterCheck.hpp"
+#include "Chat.h"
 #include "DBCStores.h"
 #include "Player.h"
 #include "SharedDefines.h"
 #include "SoloqEvents.hpp"
 #include "SoloqService.hpp"
+#include "SoloqTeam.hpp"
 #include "WorldPacket.h"
 
 #include <array>
 #include <cstddef>
+#include <optional>
+#include <string>
 
 namespace arenacraft::soloq
 {
@@ -26,6 +31,12 @@ constexpr uint8                   QueueArenaType = ARENA_TYPE_5v5;
 constexpr uint8                   MatchArenaType = ARENA_TYPE_3v3;
 
 constexpr std::size_t TeamSize = 3;
+
+void Notify(Player* player, std::string const& message)
+{
+  if (player && player->GetSession())
+    ChatHandler(player->GetSession()).SendSysMessage(message);
+}
 } // namespace
 
 bool InArenaQueue(Player* player) { return player && player->InBattlegroundQueueForBattlegroundQueueType(QueueType); }
@@ -74,6 +85,57 @@ void LeaveArenaQueue(Player* player)
   WorldPacket data;
   sBattlegroundMgr->BuildBattlegroundStatusPacket(&data, nullptr, queueSlot, STATUS_NONE, 0, 0, 0, TEAM_NEUTRAL);
   player->SendDirectMessage(&data);
+}
+
+bool JoinSoloqQueue(Player* player)
+{
+  if (!player)
+    return false;
+
+  PlayerId const id      = player->GetGUID().GetRawValue();
+  SoloqService&  service = SoloqService::instance();
+
+  if (service.inQueue(id))
+  {
+    Notify(player, "SoloQ: you are already in the queue.");
+    return false;
+  }
+
+  if (player->InBattlegroundQueue())
+  {
+    Notify(player, "SoloQ: leave your current battleground or arena queue first.");
+    return false;
+  }
+
+  if (std::optional<CharacterProblem> const problem = service.characterProblem(player))
+  {
+    Notify(player, std::string("SoloQ: ") + describeCharacterProblem(*problem));
+    return false;
+  }
+
+  std::optional<SoloqTeamInfo> const team = GetSoloqTeamInfo(player);
+  if (!team)
+  {
+    Notify(player, "SoloQ: create a team first.");
+    return false;
+  }
+
+  if (!service.join(id, static_cast<Classes>(player->getClass()), player->GetMostPointsTalentTree(),
+                    player->GetTeamId(), team->rating, team->mmr))
+  {
+    Notify(player, "SoloQ: could not join the queue.");
+    return false;
+  }
+
+  if (!EnterArenaQueue(player))
+  {
+    service.leave(id);
+    Notify(player, "SoloQ: could not join the queue right now.");
+    return false;
+  }
+
+  Notify(player, "SoloQ: joined the queue (" + std::to_string(service.queueSize()) + " waiting).");
+  return true;
 }
 
 bool CreateArenaForMatch(Match const& match)

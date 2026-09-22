@@ -139,10 +139,13 @@ uint32_t AverageMmr(std::array<ParticipantInfo, 6> const& participants, std::siz
 
 void AppendTeam(std::string& out, std::array<ParticipantInfo, 6> const& participants, std::size_t offset)
 {
+  // The two matchup sides are the battleground teams, not the players' races.
+  TeamId const side = offset == 0 ? TEAM_ALLIANCE : TEAM_HORDE;
+
   out += "{\"teamId\":";
-  out += std::to_string(static_cast<int>(participants[offset].teamId));
+  out += std::to_string(static_cast<int>(side));
   out += ",\"faction\":\"";
-  out += FactionName(participants[offset].teamId);
+  out += FactionName(side);
   out += "\",\"averageRating\":";
   out += std::to_string(AverageRating(participants, offset));
   out += ",\"averageMmr\":";

@@ -236,23 +236,25 @@ TEST_CASE("SoloqQueue does not stack a class within a team")
   CHECK(queue.size() == 6);
 }
 
-TEST_CASE("SoloqQueue allows cross-faction opponents but not mixed-faction teams")
+TEST_CASE("SoloqQueue builds teams without regard to faction")
 {
-  SoloqQueue split;
-  split.playerAddToQueue(melee(1));
-  split.playerAddToQueue(caster(2));
-  split.playerAddToQueue(healer(3));
-  split.playerAddToQueue(melee(4, InitialMmr, TEAM_HORDE));
-  split.playerAddToQueue(caster(5, InitialMmr, TEAM_HORDE));
-  split.playerAddToQueue(healer(6, InitialMmr, TEAM_HORDE));
+  // Faction is not a matchmaking input, so a team can freely mix races.
+  SoloqQueue mixed;
+  mixed.playerAddToQueue(melee(1, InitialMmr, TEAM_ALLIANCE));
+  mixed.playerAddToQueue(melee(2, InitialMmr, TEAM_ALLIANCE));
+  mixed.playerAddToQueue(caster(3, InitialMmr, TEAM_HORDE));
+  mixed.playerAddToQueue(caster(4, InitialMmr, TEAM_HORDE));
+  mixed.playerAddToQueue(healer(5, InitialMmr, TEAM_ALLIANCE));
+  mixed.playerAddToQueue(healer(6, InitialMmr, TEAM_ALLIANCE));
 
-  std::vector<Match> const matches = split.update(0ms);
+  std::vector<Match> const matches = mixed.update(0ms);
   REQUIRE(matches.size() == 1);
 
   for (SoloqTeam const* team : {&matches[0].a, &matches[0].b})
   {
-    CHECK(team->melee.teamId == team->caster.teamId);
-    CHECK(team->melee.teamId == team->healer.teamId);
+    CHECK(team->melee.teamId == TEAM_ALLIANCE);
+    CHECK(team->caster.teamId == TEAM_HORDE);
+    CHECK(team->healer.teamId == TEAM_ALLIANCE);
   }
 
   SoloqQueue sixHorde;
@@ -264,15 +266,4 @@ TEST_CASE("SoloqQueue allows cross-faction opponents but not mixed-faction teams
   sixHorde.playerAddToQueue(healer(6, InitialMmr, TEAM_HORDE));
 
   CHECK(sixHorde.update(0ms).size() == 1);
-
-  SoloqQueue fourTwo;
-  fourTwo.playerAddToQueue(melee(1));
-  fourTwo.playerAddToQueue(melee(2));
-  fourTwo.playerAddToQueue(caster(3));
-  fourTwo.playerAddToQueue(healer(4));
-  fourTwo.playerAddToQueue(caster(5, InitialMmr, TEAM_HORDE));
-  fourTwo.playerAddToQueue(healer(6, InitialMmr, TEAM_HORDE));
-
-  CHECK(fourTwo.update(0ms).empty());
-  CHECK(fourTwo.size() == 6);
 }

@@ -16,6 +16,12 @@ bool EnterArenaQueue(Player* player);
 // call when the player is not queued.
 void LeaveArenaQueue(Player* player);
 
+// Validates the player (current queue state, character readiness), enqueues them
+// into SoloqService and registers the client badge. Sends the outcome as a sys
+// message. Shared by the SoloQ NPC gossip menu and the .soloq join command.
+// Requires the player to already have a soloq team (see SoloqTeam.hpp).
+bool JoinSoloqQueue(Player* player);
+
 // True while the player is registered in the 5v5 queue (ours or otherwise).
 bool InArenaQueue(Player* player);
 

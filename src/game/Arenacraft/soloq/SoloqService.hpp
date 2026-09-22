@@ -4,7 +4,6 @@
 #include "SoloqQueue.hpp"
 #include "Types.hpp"
 
-#include <array>
 #include <chrono>
 #include <cstddef>
 #include <optional>
@@ -15,7 +14,7 @@
 
 namespace arenacraft::soloq
 {
-// Queued players of each role, per faction (indexed by TeamId).
+// Queued players per role. The queue is a single shared pool.
 struct RoleCounts
 {
   uint16_t melee  = 0;
@@ -23,8 +22,8 @@ struct RoleCounts
   uint16_t healer = 0;
 };
 
-// Pure: renders the two faction queue lines shown in the NPC gossip page.
-std::string formatQueueStats(RoleCounts const& horde, RoleCounts const& alliance);
+// Pure: renders the shared queue line shown in the NPC gossip page.
+std::string formatQueueStats(RoleCounts const& counts);
 
 // Owns the queue and the arenas waiting for a result. Player rating/MMR lives in
 // the player's 5v5 ArenaTeam (see SoloqTeam.hpp), not here.
@@ -61,12 +60,9 @@ public:
   [[nodiscard]] std::vector<SoloqQueue::QueueSnapshot> snapshot() const;
   [[nodiscard]] std::vector<PendingArena>              pendingArenas() const;
 
-  // Per-faction role counts cached from the last queue mutation; see
-  // refreshFactionRoleCounts. Cheap to read from the gossip handler.
-  [[nodiscard]] std::array<RoleCounts, 2> const& factionRoleCounts() const { return _factionRoleCounts; }
-
-  void               setEnforceTeamFaction(bool value);
-  [[nodiscard]] bool enforceTeamFaction() const;
+  // Total role counts cached from the last queue mutation; see refreshRoleCounts.
+  // Cheap to read from the gossip handler.
+  [[nodiscard]] RoleCounts const& roleCounts() const { return _roleCounts; }
 
   // Debug bypass for the item/enchant/talent/glyph readiness gate; see
   // characterProblem. Does not clear _validatedCharacters.
@@ -76,12 +72,12 @@ public:
 private:
   SoloqService() = default;
 
-  void refreshFactionRoleCounts();
+  void refreshRoleCounts();
 
   SoloqQueue                        _queue;
   std::unordered_map<uint32, Match> _pendingMatches;
   std::unordered_set<PlayerId>      _validatedCharacters;
-  std::array<RoleCounts, 2>         _factionRoleCounts{};
+  RoleCounts                        _roleCounts{};
   bool                              _skipCharacterChecks = false;
 };
 } // namespace arenacraft::soloq

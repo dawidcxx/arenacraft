@@ -76,12 +76,12 @@ bool SoloqNpc::CanCreatureGossipHello(Player* player, Creature* creature)
   addOption(GOSSIP_ICON_INTERACT_1, "Create SoloQ Team", ActionCreate);
   addOption(GOSSIP_ICON_INTERACT_1, "Delete SoloQ Team", ActionDelete);
 
-  // The gossip page text is built at runtime and shows both faction queues, so
-  // players learn that each faction has its own queue. It is cached/registered
-  // in ObjectMgr under a custom id and pushed to the client explicitly because
-  // the client caches npc text by id and would otherwise show stale counts.
-  std::array<RoleCounts, 2> const& counts = SoloqService::instance().factionRoleCounts();
-  sObjectMgr->AddOrUpdateGossipText(StatsTextId, formatQueueStats(counts[TEAM_HORDE], counts[TEAM_ALLIANCE]));
+  // The gossip page text is built at runtime from the shared queue. It is
+  // cached/registered in ObjectMgr under a custom id and pushed to the client
+  // explicitly because the client caches npc text by id and would otherwise show
+  // stale counts.
+  RoleCounts const& counts = SoloqService::instance().roleCounts();
+  sObjectMgr->AddOrUpdateGossipText(StatsTextId, formatQueueStats(counts));
   player->GetSession()->SendNpcTextUpdate(StatsTextId);
 
   SendGossipMenuFor(player, StatsTextId, creature);
@@ -119,28 +119,8 @@ bool SoloqNpc::CanCreatureGossipSelect(Player* player, Creature* creature, uint3
                                                 : "SoloQ: you do not have a team.");
     break;
   case ActionJoin:
-  {
-    std::optional<SoloqTeamInfo> const team = GetSoloqTeamInfo(player);
-    if (!team)
-      SendMessage(player, "SoloQ: create a team first.");
-    else if (service.inQueue(id))
-      SendMessage(player, "SoloQ: you are already in the queue.");
-    else if (player->InBattlegroundQueue())
-      SendMessage(player, "SoloQ: leave your current battleground or arena queue first.");
-    else if (std::optional<CharacterProblem> const problem = service.characterProblem(player))
-      SendMessage(player, std::string("SoloQ: ") + describeCharacterProblem(*problem));
-    else if (!service.join(id, static_cast<Classes>(player->getClass()), player->GetMostPointsTalentTree(),
-                           player->GetTeamId(), team->rating, team->mmr))
-      SendMessage(player, "SoloQ: could not join the queue.");
-    else if (!EnterArenaQueue(player))
-    {
-      service.leave(id);
-      SendMessage(player, "SoloQ: could not join the queue right now.");
-    }
-    else
-      SendMessage(player, "SoloQ: joined the queue (" + std::to_string(service.queueSize()) + " waiting).");
+    JoinSoloqQueue(player);
     break;
-  }
   case ActionLeave:
     LeaveArenaQueue(player);
     SendMessage(player, service.leave(id) ? "SoloQ: left the queue." : "SoloQ: you were not in the queue.");

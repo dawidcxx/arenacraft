@@ -760,8 +760,6 @@ void World::LoadConfigSettings(bool reload)
       sConfigMgr->GetOption<bool>("AllowTwoSide.Interaction.Chat", false);
   _bool_configs[CONFIG_ALLOW_TWO_SIDE_INTERACTION_CHANNEL] =
       sConfigMgr->GetOption<bool>("AllowTwoSide.Interaction.Channel", false);
-  _bool_configs[CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP] =
-      sConfigMgr->GetOption<bool>("AllowTwoSide.Interaction.Group", false);
   _bool_configs[CONFIG_ALLOW_TWO_SIDE_INTERACTION_GUILD] =
       sConfigMgr->GetOption<bool>("AllowTwoSide.Interaction.Guild", false);
   _bool_configs[CONFIG_ALLOW_TWO_SIDE_INTERACTION_ARENA] =

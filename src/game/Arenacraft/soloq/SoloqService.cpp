@@ -2,16 +2,13 @@
 
 namespace arenacraft::soloq
 {
-std::string formatQueueStats(RoleCounts const& horde, RoleCounts const& alliance)
+std::string formatQueueStats(RoleCounts const& counts)
 {
-  auto line = [](char const* faction, RoleCounts const& counts)
-  {
-    return std::string(faction) + ": Melee (" + std::to_string(counts.melee) + ") Caster (" +
-           std::to_string(counts.caster) + ") Healer (" + std::to_string(counts.healer) + ")";
-  };
+  uint16_t const total = counts.melee + counts.caster + counts.healer;
 
-  return std::string("SoloQ Queue Status\n-----------------------\n\n") + line("[H]", horde) + "\n\n" +
-         line("[A]", alliance);
+  return std::string("SoloQ Queue\n-----------------------\n\nPlayers in queue: ") + std::to_string(total) +
+         "\n\nMelee (" + std::to_string(counts.melee) + ") Caster (" + std::to_string(counts.caster) + ") Healer (" +
+         std::to_string(counts.healer) + ")";
 }
 
 SoloqService& SoloqService::instance()
@@ -24,7 +21,7 @@ bool SoloqService::join(PlayerId id, Classes classId, uint8_t specIndex, TeamId 
 {
   bool const added = _queue.playerAddToQueue(QueuedPlayer{id, classId, specIndex, rating, mmr, teamId});
   if (added)
-    refreshFactionRoleCounts();
+    refreshRoleCounts();
   return added;
 }
 
@@ -32,31 +29,26 @@ bool SoloqService::leave(PlayerId id)
 {
   bool const removed = _queue.playerRemoveFromQueue(id);
   if (removed)
-    refreshFactionRoleCounts();
+    refreshRoleCounts();
   return removed;
 }
 
-void SoloqService::refreshFactionRoleCounts()
+void SoloqService::refreshRoleCounts()
 {
-  _factionRoleCounts = {};
+  _roleCounts = {};
 
   for (SoloqQueue::QueueSnapshot const& entry : _queue.snapshot())
   {
-    if (entry.teamId != TEAM_ALLIANCE && entry.teamId != TEAM_HORDE)
-      continue;
-
-    RoleCounts& counts = _factionRoleCounts[static_cast<std::size_t>(entry.teamId)];
-
     switch (entry.role)
     {
     case Role::Melee:
-      ++counts.melee;
+      ++_roleCounts.melee;
       break;
     case Role::Caster:
-      ++counts.caster;
+      ++_roleCounts.caster;
       break;
     case Role::Healer:
-      ++counts.healer;
+      ++_roleCounts.healer;
       break;
     }
   }
@@ -82,7 +74,7 @@ std::vector<Match> SoloqService::tick(std::chrono::milliseconds elapsed)
 {
   std::vector<Match> matches = _queue.update(elapsed);
   if (!matches.empty())
-    refreshFactionRoleCounts();
+    refreshRoleCounts();
   return matches;
 }
 
@@ -106,10 +98,6 @@ bool SoloqService::inQueue(PlayerId id) const { return _queue.contains(id); }
 std::vector<PlayerId> SoloqService::waitingPlayers() const { return _queue.waitingPlayers(); }
 
 std::vector<SoloqQueue::QueueSnapshot> SoloqService::snapshot() const { return _queue.snapshot(); }
-
-void SoloqService::setEnforceTeamFaction(bool value) { _queue.setEnforceTeamFaction(value); }
-
-bool SoloqService::enforceTeamFaction() const { return _queue.enforceTeamFaction(); }
 
 void SoloqService::setSkipCharacterChecks(bool value) { _skipCharacterChecks = value; }
 

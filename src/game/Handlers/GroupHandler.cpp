@@ -103,13 +103,7 @@ void WorldSession::HandleGroupInviteOpcode(WorldPacket& recvData)
     return;
   }
 
-  // can't group with
-  if (!invitingPlayer->IsGameMaster() && !sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP) &&
-      invitingPlayer->GetTeamId() != invitedPlayer->GetTeamId())
-  {
-    SendPartyResult(PARTY_OP_INVITE, membername, ERR_PLAYER_WRONG_FACTION);
-    return;
-  }
+  // can't group with players in different instances
   if (invitingPlayer->GetInstanceId() != 0 && invitedPlayer->GetInstanceId() != 0 &&
       invitingPlayer->GetInstanceId() != invitedPlayer->GetInstanceId() &&
       invitingPlayer->GetMapId() == invitedPlayer->GetMapId())

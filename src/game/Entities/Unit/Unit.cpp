@@ -10296,6 +10296,23 @@ void Unit::SetFaction(uint32 faction)
     ToCreature()->UpdateMoveInLineOfSightState();
 }
 
+// Arenacraft: inside a battleground/arena the reaction between two players is
+// decided by their battleground team, not their race, so mixed-faction
+// teammates are friendly and same-faction opponents are hostile.
+static bool InSameBattleground(Player const* left, Player const* right)
+{
+  if (!left || !right || left == right)
+    return false;
+
+  Battleground const* bg = left->GetBattleground();
+  return bg && right->GetBattleground() == bg;
+}
+
+static bool IsBattlegroundTeammate(Player const* left, Player const* right)
+{
+  return InSameBattleground(left, right) && left->GetBgTeamId() == right->GetBgTeamId();
+}
+
 // function based on function Unit::UnitReaction from 13850 client
 ReputationRank Unit::GetReactionTo(Unit const* target, bool checkOriginalFaction /*= false*/) const
 {
@@ -10341,11 +10358,13 @@ ReputationRank Unit::GetReactionTo(Unit const* target, bool checkOriginalFaction
             selfPlayerOwner->duel->State == DUEL_STATE_IN_PROGRESS)
           return REP_HOSTILE;
 
-        // same group - checks dependant only on our faction - skip FFA_PVP for example
+        // battleground/arena: reaction follows the battleground team, not race
+        if (InSameBattleground(selfPlayerOwner, targetPlayerOwner))
+          return IsBattlegroundTeammate(selfPlayerOwner, targetPlayerOwner) ? REP_FRIENDLY : REP_HOSTILE;
+
+        // same group
         if (selfPlayerOwner->IsInRaidWith(targetPlayerOwner))
-          return REP_FRIENDLY; // return true to allow config option AllowTwoSide.Interaction.Group to work
-        // however client seems to allow mixed group parties, because in 13850 client it works like:
-        // return GetFactionReactionTo(GetFactionTemplateEntry(), target);
+          return REP_FRIENDLY;
       }
 
       // check FFA_PVP
@@ -21399,13 +21418,14 @@ void Unit::PatchValuesUpdate(ByteBuffer& valuesUpdateBuf, BuildValuesCachePosPoi
   // UNIT_FIELD_BYTES_2
   if (posPointers.UnitFieldBytes2Pos >= 0)
   {
-    if (IsControlledByPlayer() && target != this && sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP) &&
-        IsInRaidWith(target))
+    bool const battlegroundTeammate = IsBattlegroundTeammate(GetAffectingPlayer(), target->GetAffectingPlayer());
+
+    if (IsControlledByPlayer() && target != this && (IsInRaidWith(target) || battlegroundTeammate))
     {
       FactionTemplateEntry const* ft1 = GetFactionTemplateEntry();
       FactionTemplateEntry const* ft2 = target->GetFactionTemplateEntry();
       if (ft1 && ft2 && !ft1->IsFriendlyTo(*ft2))
-        // Allow targetting opposite faction in party when enabled in config
+        // Allow targetting same-group players of the other faction
         valuesUpdateBuf.put(posPointers.UnitFieldBytes2Pos,
                             (m_uint32Values[UNIT_FIELD_BYTES_2] &
                              ((UNIT_BYTE2_FLAG_SANCTUARY /*| UNIT_BYTE2_FLAG_AURAS | UNIT_BYTE2_FLAG_UNK5*/)
@@ -21424,8 +21444,9 @@ void Unit::PatchValuesUpdate(ByteBuffer& valuesUpdateBuf, BuildValuesCachePosPoi
   // UNIT_FIELD_FACTIONTEMPLATE
   if (posPointers.UnitFieldFactionTemplatePos >= 0)
   {
-    if (IsControlledByPlayer() && target != this && sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP) &&
-        IsInRaidWith(target))
+    bool const battlegroundTeammate = IsBattlegroundTeammate(GetAffectingPlayer(), target->GetAffectingPlayer());
+
+    if (IsControlledByPlayer() && target != this && (IsInRaidWith(target) || battlegroundTeammate))
     {
       FactionTemplateEntry const* ft1 = GetFactionTemplateEntry();
       FactionTemplateEntry const* ft2 = target->GetFactionTemplateEntry();
