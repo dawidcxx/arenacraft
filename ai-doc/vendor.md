@@ -163,8 +163,15 @@ Entry 19728 ("Mama Wheeler") is a separate, standalone gossip NPC hijacked by
 (`CosmeticVendor::ExoticMountVendorEntry`) from `AllExoticMounts()`
 (`CosmeticVendorItems.cpp`, a flat `std::vector<uint32>`), and sets its subname
 to "Cosmetics". The gossip menu also drives the transmogrification system
-(**Transmog by item ID**, a coded gossip option, and **Clear Transmog**); see
-`ai-doc/transmog.md`.
+(**Transmog by item ID**, a coded gossip option, and **Clear Transmog**; see
+`ai-doc/transmog.md`) and a **Change Gender** option.
+
+The **Change Gender** option flips the player's gender in place
+(`SetByteValue(UNIT_FIELD_BYTES_0, 2, ...)` + `PLAYER_BYTES_3` byte 0 +
+`InitDisplayIds`, the same core calls as `.modify gender`). Its label flips with
+the player's gender: "Change Gender (shnip snap)" when male -> female, "Change
+Gender (attach sausage)" when female -> male. It is free (no gold), unlike the
+barber.
 
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator

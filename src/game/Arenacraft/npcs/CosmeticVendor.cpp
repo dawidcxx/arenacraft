@@ -41,6 +41,12 @@ void CosmeticVendor::ShowMainMenu(Player* player, Creature* creature)
   menu.AddMenuItem(2, GOSSIP_ICON_CHAT, "Clear Transmog", 0, ActionClearMenu, "", 0, false);
   menu.AddGossipMenuItemData(2, 0, 0);
 
+  // Label flips with the player's current gender so it always names the swap.
+  bool const toFemale = player->getGender() == GENDER_MALE;
+  menu.AddMenuItem(3, GOSSIP_ICON_CHAT, toFemale ? "Change Gender (shnip snap)" : "Change Gender (attach sausage)", 0,
+                   ActionChangeGender, "", 0, false);
+  menu.AddGossipMenuItemData(3, 0, 0);
+
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
 }
 
@@ -96,6 +102,17 @@ bool CosmeticVendor::CanCreatureGossipSelect(Player* player, Creature* creature,
   case ActionBack:
     ShowMainMenu(player, creature);
     return true;
+  case ActionChangeGender:
+  {
+    Gender const newGender = player->getGender() == GENDER_MALE ? GENDER_FEMALE : GENDER_MALE;
+    player->SetByteValue(UNIT_FIELD_BYTES_0, 2, newGender);
+    player->SetByteValue(PLAYER_BYTES_3, 0, newGender);
+    player->InitDisplayIds();
+    ChatHandler(player->GetSession())
+        .SendSysMessage(newGender == GENDER_FEMALE ? "You are now female." : "You are now male.");
+    ShowMainMenu(player, creature);
+    return true;
+  }
   default:
     break;
   }

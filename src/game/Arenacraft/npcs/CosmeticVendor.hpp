@@ -28,6 +28,7 @@ public:
   static constexpr uint32 ActionTransmogById = 9200011;
   static constexpr uint32 ActionClearMenu    = 9200012;
   static constexpr uint32 ActionBack         = 9200013;
+  static constexpr uint32 ActionChangeGender = 9200014;
   // One action per equipment slot for the clear menu.
   static constexpr uint32 ActionClearSlotBase = 9200100;
 
