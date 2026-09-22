@@ -74,7 +74,8 @@ right-click goes straight to the vendor window) and `OnStartup` clears the
 sets its subname to "General goods". `GeneralGoodsVendorItems.cpp` holds that
 list: a flat `std::vector<uint32>` of everyday consumables/reagents (conjured
 mage food, Soul Shard, ammo, rogue poisons, class reagents, the best WotLK
-bandage). Some entries are conjured and tagged "Not available to players" on
+bandage), with the Hearthstone (`6948`) as the first entry. Some entries are
+conjured and tagged "Not available to players" on
 evowow, but are intentionally stocked anyway. Shared stock helper:
 `StockVendorItem` (`ItemVendor.hpp`).
 

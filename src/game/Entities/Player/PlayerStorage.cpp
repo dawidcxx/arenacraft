@@ -7224,11 +7224,20 @@ bool Player::_LoadHomeBind(PreparedQueryResult result)
 
   if (!ok)
   {
-    m_homebindMapId  = info->mapId;
-    m_homebindAreaId = info->areaId;
-    m_homebindX      = info->positionX;
-    m_homebindY      = info->positionY;
-    m_homebindZ      = info->positionZ;
+    // Arenacraft: every character is bound to the arena hub in Netherstorm.
+    // The area is reported as Eco-Dome Midrealm (not the hub) so the
+    // Hearthstone tooltip stays generic instead of naming the hub itself.
+    constexpr uint32 ArenaHubMapId = 530;
+    constexpr uint32 GenericAreaId = 3877; // Eco-Dome Midrealm
+    constexpr float  ArenaHubX     = 3369.4014f;
+    constexpr float  ArenaHubY     = 2882.7666f;
+    constexpr float  ArenaHubZ     = 143.8963f;
+
+    m_homebindMapId  = ArenaHubMapId;
+    m_homebindAreaId = GenericAreaId;
+    m_homebindX      = ArenaHubX;
+    m_homebindY      = ArenaHubY;
+    m_homebindZ      = ArenaHubZ;
 
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_PLAYER_HOMEBIND);
     stmt->SetData(0, GetGUID().GetCounter());

@@ -48,6 +48,12 @@ void SoloqNpc::OnCreatureAddWorld(Creature* creature)
     creature->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP);
 }
 
+void SoloqNpcSetup::OnStartup()
+{
+  if (CreatureTemplate* proto = const_cast<CreatureTemplate*>(sObjectMgr->GetCreatureTemplate(SoloqNpc::Entry)))
+    proto->SubName = "SoloQ Master";
+}
+
 bool SoloqNpc::CanCreatureGossipHello(Player* player, Creature* creature)
 {
   if (creature->GetEntry() != Entry)

@@ -17,6 +17,7 @@ namespace arenacraft
 std::vector<uint32> const& AllGeneralGoods()
 {
   static std::vector<uint32> const items = {
+      6948,  // Hearthstone
       43236, // Star's Sorrow
       43523, // Conjured Mana Strudel
       6265,  // Soul Shard

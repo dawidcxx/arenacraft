@@ -9,6 +9,7 @@ void AddArenacraftScripts()
   new arenacraft::GeneralGoodsVendor();
   new arenacraft::GeneralGoodsVendorStock();
   new arenacraft::soloq::SoloqNpc();
+  new arenacraft::soloq::SoloqNpcSetup();
   new arenacraft::soloq::SoloqDriver();
   new arenacraft::soloq::SoloqBattlegroundScript();
 }

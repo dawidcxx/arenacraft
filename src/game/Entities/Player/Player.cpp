@@ -651,6 +651,12 @@ bool Player::Create(ObjectGuid::LowType guidlow, CharacterCreateInfo* createInfo
       EquipNewItem(bagDest, startingBagItem, true);
   }
 
+  // Characters are created without the race/class outfit (see above), so the
+  // Hearthstone is handed out explicitly. It returns to the arena-hub homebind
+  // set in Player::_LoadHomeBind.
+  if (!GetItemByEntry(6948))
+    StoreNewItemInBestSlots(6948, 1);
+
   // Shamans get their four totems in the bags (after the bags exist).
   arenacraft::GrantStartingTotems(this);
 

@@ -36,6 +36,15 @@ public:
   bool CanCreatureGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override;
 };
 
+// Sets up the SoloQ NPC's shared creature template at startup.
+class SoloqNpcSetup : public WorldScript
+{
+public:
+  SoloqNpcSetup() : WorldScript("arenacraft::soloq::SoloqNpcSetup", {WORLDHOOK_ON_STARTUP}) {}
+
+  void OnStartup() override;
+};
+
 // Drives SoloqService::tick from the world update loop, keeps the real 5v5
 // battleground queue in sync, and drains any matches.
 class SoloqDriver : public WorldScript

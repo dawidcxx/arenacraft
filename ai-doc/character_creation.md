@@ -15,6 +15,14 @@ What a fresh character gets:
 - **Bags.** A Frostweave Bag (`41599`) is equipped into each of the four carried
   bag slots (`INVENTORY_SLOT_BAG_START..END`). Bank bags are not filled (bank
   bag slots must be purchased first).
+- **Hearthstone + homebind.** Because the start outfit is skipped, the
+  Hearthstone (`6948`) is added explicitly in `Player::Create`. The character's
+  default homebind - set in `Player::_LoadHomeBind` when no `character_homebind`
+  row exists - is the arena hub in Netherstorm (map 530,
+  `3369.4014 2882.7666 143.8963`), but it is reported as area `3877`
+  (Eco-Dome Midrealm) so the Hearthstone tooltip stays generic. Binding at an
+  innkeeper still overrides it, and the Hearthstone is also stocked first on the
+  general goods vendor.
 - **Weapon proficiencies.** `arenacraft::GrantStartingWeaponSkills`
   (`src/game/Arenacraft/CharacterCreation.cpp`) learns the class's weapon
   proficiency spells and then calls `Player::UpdateSkillsToMaxSkillsForLevel()`
