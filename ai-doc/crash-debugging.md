@@ -30,6 +30,13 @@ pid:      <pid>
 tid:      <thread id>
 report:   /app/crashes/worldserver_crash_..._<pid>.log
 
+fault address: 0x0
+si_code:       1 (SEGV_MAPERR (address not mapped))
+
+registers (x86_64):            # or aarch64 in production
+  rip: ... rsp: ... rbp: ...
+  ...
+
 raw addresses:
   #0  0x...
   ...
@@ -39,6 +46,21 @@ backtrace:
 ```
 
 The faulting thread id is useful because the world uses several threads.
+
+## Quick triage
+
+- `fault address: 0x0` (or a small offset like `0x8`, `0x18`) means a
+  null-based access. A defensive check at the call site is a valid hotfix —
+  but log it and find why the pointer was null (a `null` is usually a symptom:
+  missing row, failed lookup, uninitialized member, object not yet in world).
+- `fault address` non-zero and bogus with `SEGV_MAPERR` → wild pointer.
+  `SEGV_ACCERR` → the page exists but wasn't accessible (often a
+  use-after-free / dangling pointer). Don't just null-check those; they are
+  lifecycle bugs.
+- `si_code` for `SIGABRT` sent by `abort()`/`raise()` is `SI_TKILL`/`SI_USER`;
+  `si_addr` is then not a real fault address.
+- The register block is architecture specific: dev is usually `x86_64`,
+  production is `aarch64`.
 
 ## Reading the backtrace
 

@@ -24,6 +24,8 @@
 
 #include <atomic>
 #include <cerrno>
+#include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -35,6 +37,7 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 // Set next to the Crash() macro in Errors.cpp; holds the assertion text (if any)
@@ -89,7 +92,159 @@ void WriteAll(int fd, char const* data, size_t length)
   }
 }
 
-void CrashHandler(int sig, siginfo_t* /*info*/, void* /*context*/)
+char const* FaultCodeName(int sig, int code)
+{
+  if (sig == SIGSEGV)
+  {
+    if (code == SEGV_MAPERR)
+      return "SEGV_MAPERR (address not mapped)";
+    if (code == SEGV_ACCERR)
+      return "SEGV_ACCERR (invalid permissions)";
+  }
+  else if (sig == SIGBUS)
+  {
+    if (code == BUS_ADRALN)
+      return "BUS_ADRALN (invalid address alignment)";
+    if (code == BUS_ADRERR)
+      return "BUS_ADRERR (nonexistent physical address)";
+    if (code == BUS_OBJERR)
+      return "BUS_OBJERR (object-specific hardware error)";
+  }
+  else if (sig == SIGILL)
+  {
+    if (code == ILL_ILLOPC)
+      return "ILL_ILLOPC (illegal opcode)";
+    if (code == ILL_ILLOPN)
+      return "ILL_ILLOPN (illegal operand)";
+    if (code == ILL_ILLADR)
+      return "ILL_ILLADR (illegal addressing mode)";
+    if (code == ILL_PRVOPC)
+      return "ILL_PRVOPC (privileged opcode)";
+    if (code == ILL_PRVREG)
+      return "ILL_PRVREG (privileged register)";
+    if (code == ILL_COPROC)
+      return "ILL_COPROC (coprocessor error)";
+    if (code == ILL_BADSTK)
+      return "ILL_BADSTK (internal stack error)";
+  }
+  else if (sig == SIGFPE)
+  {
+    if (code == FPE_INTDIV)
+      return "FPE_INTDIV (integer divide by zero)";
+    if (code == FPE_INTOVF)
+      return "FPE_INTOVF (integer overflow)";
+    if (code == FPE_FLTDIV)
+      return "FPE_FLTDIV (floating point divide by zero)";
+    if (code == FPE_FLTOVF)
+      return "FPE_FLTOVF (floating point overflow)";
+    if (code == FPE_FLTUND)
+      return "FPE_FLTUND (floating point underflow)";
+    if (code == FPE_FLTRES)
+      return "FPE_FLTRES (floating point inexact result)";
+    if (code == FPE_FLTINV)
+      return "FPE_FLTINV (invalid floating point operation)";
+    if (code == FPE_FLTSUB)
+      return "FPE_FLTSUB (subscript out of range)";
+  }
+
+  if (code == SI_USER)
+    return "SI_USER (sent by kill/raise)";
+  if (code == SI_TKILL)
+    return "SI_TKILL (sent by tkill/tgkill)";
+  if (code == SI_KERNEL)
+    return "SI_KERNEL";
+
+  return "unknown";
+}
+
+// snprintf that appends at `offset` in `out` and returns the new length.
+size_t Append(char* out, size_t capacity, size_t offset, char const* fmt, ...)
+{
+  if (offset >= capacity)
+    return offset;
+
+  va_list args;
+  va_start(args, fmt);
+  int written = std::vsnprintf(out + offset, capacity - offset, fmt, args);
+  va_end(args);
+  if (written < 0)
+    return offset;
+
+  size_t n = static_cast<size_t>(written);
+  if (n > capacity - offset - 1)
+    n = capacity - offset - 1;
+  return offset + n;
+}
+
+// Fault address, siginfo code and the faulting CPU registers. The register
+// layout is architecture specific; production is aarch64 while dev machines
+// are usually x86_64, so both are covered.
+size_t AppendHardwareContext(char* out, size_t capacity, int sig, siginfo_t* info, void* context)
+{
+  size_t n = 0;
+
+  bool faultAddressMeaningful = sig == SIGSEGV || sig == SIGBUS || sig == SIGILL || sig == SIGFPE || sig == SIGTRAP;
+  if (faultAddressMeaningful && info)
+    n = Append(out, capacity, n, "fault address: 0x%llx\n", static_cast<unsigned long long>(
+                                                                   reinterpret_cast<uintptr_t>(info->si_addr)));
+  else
+    n = Append(out, capacity, n, "fault address: (n/a)\n");
+
+  if (info)
+    n = Append(out, capacity, n, "si_code:       %d (%s)\n", info->si_code, FaultCodeName(sig, info->si_code));
+
+#if defined(__x86_64__)
+  if (ucontext_t* uc = static_cast<ucontext_t*>(context))
+  {
+    greg_t* g = uc->uc_mcontext.gregs;
+    n = Append(out, capacity, n, "\nregisters (x86_64):\n");
+    n = Append(out, capacity, n, "  rip: %016llx  rsp: %016llx  rbp: %016llx\n",
+               static_cast<unsigned long long>(g[REG_RIP]), static_cast<unsigned long long>(g[REG_RSP]),
+               static_cast<unsigned long long>(g[REG_RBP]));
+    n = Append(out, capacity, n, "  rax: %016llx  rbx: %016llx  rcx: %016llx  rdx: %016llx\n",
+               static_cast<unsigned long long>(g[REG_RAX]), static_cast<unsigned long long>(g[REG_RBX]),
+               static_cast<unsigned long long>(g[REG_RCX]), static_cast<unsigned long long>(g[REG_RDX]));
+    n = Append(out, capacity, n, "  rsi: %016llx  rdi: %016llx  r8:  %016llx  r9:  %016llx\n",
+               static_cast<unsigned long long>(g[REG_RSI]), static_cast<unsigned long long>(g[REG_RDI]),
+               static_cast<unsigned long long>(g[REG_R8]), static_cast<unsigned long long>(g[REG_R9]));
+    n = Append(out, capacity, n, "  r10: %016llx  r11: %016llx  r12: %016llx  r13: %016llx\n",
+               static_cast<unsigned long long>(g[REG_R10]), static_cast<unsigned long long>(g[REG_R11]),
+               static_cast<unsigned long long>(g[REG_R12]), static_cast<unsigned long long>(g[REG_R13]));
+    n = Append(out, capacity, n, "  r14: %016llx  r15: %016llx  eflags: %llx\n",
+               static_cast<unsigned long long>(g[REG_R14]), static_cast<unsigned long long>(g[REG_R15]),
+               static_cast<unsigned long long>(g[REG_EFL]));
+  }
+#elif defined(__aarch64__)
+  if (ucontext_t* uc = static_cast<ucontext_t*>(context))
+  {
+    n = Append(out, capacity, n, "\nregisters (aarch64):\n");
+    n = Append(out, capacity, n, "  pc: %016llx  sp: %016llx  pstate: %016llx\n",
+               static_cast<unsigned long long>(uc->uc_mcontext.pc),
+               static_cast<unsigned long long>(uc->uc_mcontext.sp),
+               static_cast<unsigned long long>(uc->uc_mcontext.pstate));
+    for (int i = 0; i < 31; i += 4)
+    {
+      n = Append(out, capacity, n, "  x%d: %016llx", i, static_cast<unsigned long long>(uc->uc_mcontext.regs[i]));
+      if (i + 1 < 31)
+        n = Append(out, capacity, n, "  x%d: %016llx", i + 1,
+                   static_cast<unsigned long long>(uc->uc_mcontext.regs[i + 1]));
+      if (i + 2 < 31)
+        n = Append(out, capacity, n, "  x%d: %016llx", i + 2,
+                   static_cast<unsigned long long>(uc->uc_mcontext.regs[i + 2]));
+      if (i + 3 < 31)
+        n = Append(out, capacity, n, "  x%d: %016llx", i + 3,
+                   static_cast<unsigned long long>(uc->uc_mcontext.regs[i + 3]));
+      n = Append(out, capacity, n, "\n");
+    }
+  }
+#else
+  (void)context;
+#endif
+
+  return n;
+}
+
+void CrashHandler(int sig, siginfo_t* info, void* context)
 {
   if (g_handling.exchange(true))
   {
@@ -142,6 +297,14 @@ void CrashHandler(int sig, siginfo_t* /*info*/, void* /*context*/)
     emit("\n", 1);
     emit(AcoreAssertionFailedMessage, std::strlen(AcoreAssertionFailedMessage));
     emit("\n", 1);
+  }
+
+  char   hardware[4096];
+  size_t hardwareLength = AppendHardwareContext(hardware, sizeof(hardware), sig, info, context);
+  if (hardwareLength > 0)
+  {
+    emit("\n", 1);
+    emit(hardware, hardwareLength);
   }
 
   void* frames[MAX_CRASH_FRAMES];

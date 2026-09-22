@@ -43,9 +43,10 @@ TEST_CASE("Acore::InstallCrashHandler writes a report and re-raises the signal")
 
   if (pid == 0)
   {
-    // child: install the handler and fault on purpose
+    // child: install the handler and fault on purpose with a real null deref,
+    // so si_addr/registers are populated like a genuine crash
     Acore::InstallCrashHandler("crashhandler_test");
-    ::raise(SIGSEGV);
+    *((volatile int*)nullptr) = 0;
     ::_exit(0); // only reached if the handler failed to terminate us
   }
 
@@ -65,6 +66,7 @@ TEST_CASE("Acore::InstallCrashHandler writes a report and re-raises the signal")
     std::string   contents((std::istreambuf_iterator<char>(report)), std::istreambuf_iterator<char>());
 
     if (contents.find("crashhandler_test crashed") != std::string::npos &&
+        contents.find("fault address: 0x0") != std::string::npos && contents.find("si_code:") != std::string::npos &&
         contents.find("raw addresses:") != std::string::npos && contents.find("backtrace:") != std::string::npos)
     {
       foundReport = true;
