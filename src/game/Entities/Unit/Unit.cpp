@@ -15358,8 +15358,8 @@ DiminishingLevels Unit::GetDiminishing(DiminishingGroup group)
     if (!i->hitTime)
       return DIMINISHING_LEVEL_1;
 
-    // If last spell was casted more than 15 seconds ago - reset the count.
-    if (i->stack == 0 && getMSTimeDiff(i->hitTime, GameTime::GetGameTimeMS().count()) > 15000)
+    // If last spell was casted more than 18 seconds ago - reset the count.
+    if (i->stack == 0 && getMSTimeDiff(i->hitTime, GameTime::GetGameTimeMS().count()) > 18000)
     {
       i->hitCount = DIMINISHING_LEVEL_1;
       return DIMINISHING_LEVEL_1;
