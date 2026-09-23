@@ -4612,6 +4612,12 @@ void SpellMgr::LoadSpellInfoCorrections()
   ApplySpellFix({31224}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = -101; });
   ApplySpellFix({35449}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = 14; });
   ApplySpellFix({53385}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_2].BasePoints = 129; });
+  ApplySpellFix({29659},
+                [](SpellInfo* spellInfo)
+                {
+                  spellInfo->Attributes &= ~SPELL_ATTR0_AURA_IS_DEBUFF;
+                  spellInfo->StackAmount = 2;
+                });
 
   LOG_INFO("server.loading", ">> Loading spell dbc data corrections  in {} ms", GetMSTimeDiffToNow(oldMSTime));
   LOG_INFO("server.loading", " ");

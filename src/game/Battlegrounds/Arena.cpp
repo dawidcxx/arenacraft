@@ -105,6 +105,17 @@ uint8 ArenaSupplyForClass(uint8 playerClass)
     return ARENA_SUPPLY_COUNT;
   }
 }
+
+// Arenacraft: arena dampening. Five minutes after the gates open (which can be
+// sooner if both teams click their ready crystals) every player starts gaining
+// a stack of the repurposed "Positive Charge" buff (29659, see
+// SpellInfoCorrections) every two minutes, up to 2: +10% damage per stack,
+// +20% at the cap, that nudges stalled matches to a close. The buff is
+// permanent and undispellable, so it simply rides the match out.
+constexpr uint32 ARENA_DAMPENING_SPELL    = 29659;
+constexpr uint32 ARENA_DAMPENING_START_MS = 5 * MINUTE * IN_MILLISECONDS;
+constexpr uint32 ARENA_DAMPENING_STEP_MS  = 2 * MINUTE * IN_MILLISECONDS;
+constexpr uint32 ARENA_DAMPENING_MAX      = 2;
 } // namespace
 
 void ArenaScore::AppendToPacket(WorldPacket& data)
@@ -148,6 +159,38 @@ Arena::Arena()
   StartMessageIds[BG_STARTING_EVENT_SECOND] = ARENA_TEXT_START_THIRTY_SECONDS;
   StartMessageIds[BG_STARTING_EVENT_THIRD]  = ARENA_TEXT_START_FIFTEEN_SECONDS;
   StartMessageIds[BG_STARTING_EVENT_FOURTH] = ARENA_TEXT_START_BATTLE_HAS_BEGUN;
+}
+
+bool Arena::PreUpdateImpl(uint32 diff)
+{
+  // Dampening ticks against the in-progress clock only, so the countdown before
+  // the gates open (and any early start from ready crystals) does not count.
+  if (GetStatus() == STATUS_IN_PROGRESS)
+  {
+    m_DampeningElapsedMs += diff;
+
+    uint32 desired = 0;
+    if (m_DampeningElapsedMs >= ARENA_DAMPENING_START_MS)
+    {
+      desired = std::min<uint32>((m_DampeningElapsedMs - ARENA_DAMPENING_START_MS) / ARENA_DAMPENING_STEP_MS + 1,
+                                 ARENA_DAMPENING_MAX);
+    }
+
+    if (desired)
+    {
+      for (auto const& [guid, player] : GetPlayers())
+      {
+        Aura* aura = player->GetAura(ARENA_DAMPENING_SPELL);
+        if (!aura)
+          aura = player->AddAura(ARENA_DAMPENING_SPELL, player);
+
+        if (aura && aura->GetStackAmount() < desired)
+          aura->SetStackAmount(desired);
+      }
+    }
+  }
+
+  return true;
 }
 
 void Arena::AddPlayer(Player* player)

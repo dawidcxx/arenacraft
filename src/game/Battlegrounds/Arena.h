@@ -58,10 +58,17 @@ private:
   void CheckWinConditions() override;
   void EndBattleground(TeamId winnerTeamId) override;
 
+  // Arenacraft: runs the arena dampening clock (see Arena.cpp). No arena zone
+  // overrides this, so Arena's implementation reaches every arena map.
+  bool PreUpdateImpl(uint32 diff) override;
+
   // Arenacraft: starting-box supplies (mage Refreshment Table / warlock
   // Soulwell), tracked per team and per kind (0 = table, 1 = soulwell) so we
   // only ever drop one of each.
   bool m_TeamSuppliesSpawned[PVP_TEAMS_COUNT][2]{};
+
+  // Arenacraft: arena dampening, elapsed in-progress match time.
+  uint32 m_DampeningElapsedMs{0};
 };
 
 #endif // ACORE_ARENA_H
