@@ -3,4 +3,4 @@
 # Run on the server (where docker-compose.yml lives).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-exec docker compose up -d --no-deps world
+exec podman compose --profile full up -d --no-deps --force-recreate world
