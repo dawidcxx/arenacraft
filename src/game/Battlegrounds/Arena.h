@@ -62,6 +62,11 @@ private:
   void RemovePlayerAtLeave(Player* player) override;
   void CheckWinConditions() override;
   void EndBattleground(TeamId winnerTeamId) override;
+
+  // Arenacraft: starting-box supplies (mage Refreshment Table / warlock
+  // Soulwell), tracked per team and per kind (0 = table, 1 = soulwell) so we
+  // only ever drop one of each.
+  bool m_TeamSuppliesSpawned[PVP_TEAMS_COUNT][2]{};
 };
 
 #endif // ACORE_ARENA_H

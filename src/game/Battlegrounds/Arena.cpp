@@ -26,6 +26,86 @@
 #include "World.h"
 #include "WorldSession.h"
 // #include "WorldStatePackets.h"
+#include <cmath>
+
+namespace
+{
+// Arenacraft: hand each arena team its conjured supplies up front instead of
+// making the mage/warlock spend the preparation window casting. A mage brings
+// a Refreshment Table, a warlock a Soulwell. The object is owned by that
+// player, which is what keeps the enemy team out: the generic spellcaster
+// partyOnly check (GameObject::Use) and go_soulwell's own IsInSameRaidWith
+// check both resolve the owner against the user's group. The per-team BG group
+// built by AddPlayer is exactly the team, so this also works in cross-faction
+// soloq.
+enum ArenaSupply : uint8
+{
+  ARENA_SUPPLY_REFRESHMENT_TABLE = 0,
+  ARENA_SUPPLY_SOULWELL          = 1,
+  ARENA_SUPPLY_COUNT
+};
+
+constexpr uint32 ArenaSupplyEntries[ARENA_SUPPLY_COUNT] = {
+    193061, // Refreshment Table
+    193169, // Soulwell
+};
+
+// A tuned drop spot for a supply (world coords + orientation).
+struct ArenaSupplySpawn
+{
+  float x;
+  float y;
+  float z;
+  float o;
+};
+
+// Sideways offset (yards) from the team's start spot, used as the fallback for
+// arenas without hand-placed coords below. The sign flips table/soulwell to
+// opposite sides of the spawn so they never share a pixel.
+constexpr float ArenaSupplySideOffset[ARENA_SUPPLY_COUNT] = {3.0f, -3.0f};
+
+// Hand-placed supply spots, indexed [teamId][supply]. teamId 0 is
+// TEAM_ALLIANCE (gold), 1 is TEAM_HORDE (green). Arenas not listed fall back to
+// the start-position offset.
+ArenaSupplySpawn const* HardcodedArenaSupply(BattlegroundTypeId bgTypeId, TeamId teamId, uint8 supply)
+{
+  // Ruins of Lordaeron
+  static constexpr ArenaSupplySpawn RuinsOfLordaeron[PVP_TEAMS_COUNT][ARENA_SUPPLY_COUNT] = {
+      // TEAM_ALLIANCE (gold)
+      {
+          {1273.6768f, 1736.2134f, 31.603804f, 4.6f}, // Refreshment Table
+          {1282.6584f, 1737.77f, 31.603804f, 4.94f},  // Soulwell
+      },
+      // TEAM_HORDE (green)
+      {
+          {1290.0726f, 1593.9926f, 31.614182f, 1.5f}, // Refreshment Table
+          {1289.4697f, 1591.8739f, 31.614182f, 1.8f}, // Soulwell
+      },
+  };
+
+  switch (bgTypeId)
+  {
+  case BATTLEGROUND_RL:
+    return &RuinsOfLordaeron[teamId][supply];
+  default:
+    return nullptr;
+  }
+}
+
+// Returns ARENA_SUPPLY_COUNT for classes that do not bring a supply.
+uint8 ArenaSupplyForClass(uint8 playerClass)
+{
+  switch (playerClass)
+  {
+  case CLASS_MAGE:
+    return ARENA_SUPPLY_REFRESHMENT_TABLE;
+  case CLASS_WARLOCK:
+    return ARENA_SUPPLY_SOULWELL;
+  default:
+    return ARENA_SUPPLY_COUNT;
+  }
+}
+} // namespace
 
 void ArenaScore::AppendToPacket(WorldPacket& data)
 {
@@ -131,6 +211,35 @@ void Arena::AddPlayer(Player* player)
       {
         group->AddMember(member);
       }
+    }
+  }
+
+  // Arenacraft: drop the team's conjured supply as soon as the class that
+  // brings it is in. Owned by that player so only their own team can use it.
+  if (uint8 supply = ArenaSupplyForClass(player->getClass()); supply < ARENA_SUPPLY_COUNT)
+  {
+    TeamId teamId = player->GetBgTeamId();
+    if (!m_TeamSuppliesSpawned[teamId][supply])
+    {
+      m_TeamSuppliesSpawned[teamId][supply] = true;
+
+      ArenaSupplySpawn spot{};
+      if (ArenaSupplySpawn const* hardcoded = HardcodedArenaSupply(GetBgTypeID(), teamId, supply))
+      {
+        spot = *hardcoded;
+      }
+      else
+      {
+        Position const* start = GetTeamStartPosition(teamId);
+        spot.o                = start->GetOrientation();
+        spot.x                = start->GetPositionX() - std::sin(spot.o) * ArenaSupplySideOffset[supply];
+        spot.y                = start->GetPositionY() + std::cos(spot.o) * ArenaSupplySideOffset[supply];
+        spot.z                = start->GetPositionZ();
+      }
+
+      if (GameObject* go = GetBgMap()->SummonGameObject(ArenaSupplyEntries[supply], spot.x, spot.y, spot.z, spot.o,
+                                                        0.0f, 0.0f, 0.0f, 0.0f, 0, true))
+        go->SetOwnerGUID(player->GetGUID());
     }
   }
 }
