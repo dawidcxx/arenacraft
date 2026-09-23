@@ -101,6 +101,7 @@ std::vector<uint32> const& AllEnchants()
       38925, // Scroll of Enchant Weapon - Mongoose
       46098, // Scroll of Enchant Weapon - Blood Draining
       38918, // Scroll of Enchant Weapon - Major Intellect
+      38963, // Scroll of Enchant Weapon - Exceptional Spirit
       41976, // Titanium Weapon Chain
   };
   return enchants;
