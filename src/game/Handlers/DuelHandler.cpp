@@ -22,6 +22,12 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 
+namespace
+{
+// Netherstorm - the arenacraft starting hub (map 530, area 3877)
+constexpr uint32 ARENACRAFT_STARTING_AREA_ZONE = 3523;
+}
+
 void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
 {
   Player* player = GetPlayer();
@@ -45,8 +51,14 @@ void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
   player->duel->State = DUEL_STATE_COUNTDOWN;
   target->duel->State = DUEL_STATE_COUNTDOWN;
 
-  player->RemoveArenaSpellCooldowns(true);
-  target->RemoveArenaSpellCooldowns(true);
+  if (player->GetZoneId() == ARENACRAFT_STARTING_AREA_ZONE && target->GetZoneId() == ARENACRAFT_STARTING_AREA_ZONE)
+  {
+    player->RemoveArenaSpellCooldowns(true);
+    target->RemoveArenaSpellCooldowns(true);
+
+    player->ResetAllPowers();
+    target->ResetAllPowers();
+  }
 
   player->SendDuelCountdown(3000);
   target->SendDuelCountdown(3000);
