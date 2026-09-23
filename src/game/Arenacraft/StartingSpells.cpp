@@ -1786,7 +1786,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          47837, // rank 3
          47838, // rank 4
          29858, // Soulshatter
-         29886, // Create Soulwell
                 // Ritual of Souls
          29893, // rank 1
          58887, // rank 2
@@ -1795,7 +1794,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          61290, // rank 2
          48018, // Demonic Circle: Summon
          48020, // Demonic Circle: Teleport
-         58889, // Create Soulwell
      }},
     {CLASS_DRUID,
      {

@@ -31,11 +31,6 @@ enum ArenaBroadcastTexts
 
 enum ArenaSpellIds
 {
-  SPELL_ALLIANCE_GOLD_FLAG  = 32724,
-  SPELL_ALLIANCE_GREEN_FLAG = 32725,
-  SPELL_HORDE_GOLD_FLAG     = 35774,
-  SPELL_HORDE_GREEN_FLAG    = 35775,
-
   SPELL_LAST_MAN_STANDING = 26549 // Achievement Credit
 };
 

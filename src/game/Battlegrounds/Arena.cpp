@@ -155,21 +155,6 @@ void Arena::AddPlayer(Player* player)
   Battleground::AddPlayer(player);
   PlayerScores.emplace(player->GetGUID().GetCounter(), new ArenaScore(player->GetGUID(), player->GetBgTeamId()));
 
-  if (player->GetBgTeamId() == TEAM_ALLIANCE) // gold
-  {
-    if (player->GetTeamId() == TEAM_HORDE)
-      player->CastSpell(player, SPELL_HORDE_GOLD_FLAG, true);
-    else
-      player->CastSpell(player, SPELL_ALLIANCE_GOLD_FLAG, true);
-  }
-  else // green
-  {
-    if (player->GetTeamId() == TEAM_HORDE)
-      player->CastSpell(player, SPELL_HORDE_GREEN_FLAG, true);
-    else
-      player->CastSpell(player, SPELL_ALLIANCE_GREEN_FLAG, true);
-  }
-
   UpdateArenaWorldState();
 
   Group* group = player->GetGroup();
