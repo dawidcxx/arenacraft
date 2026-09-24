@@ -2130,8 +2130,8 @@ void World::SetInitialWorldSettings()
            "Loading World States..."); // must be loaded before battleground, outdoor PvP and conditions
   LoadWorldStates();
 
-  // LOG_INFO("server.loading", "Loading Conditions...");
-  // sConditionMgr->LoadConditions();
+  LOG_INFO("server.loading", "Loading Conditions...");
+  sConditionMgr->LoadConditions();
 
   LOG_INFO("server.loading", "Loading Faction Change Achievement Pairs...");
   sObjectMgr->LoadFactionChangeAchievements();
