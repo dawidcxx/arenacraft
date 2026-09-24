@@ -57,31 +57,55 @@ export async function loadTopRankers(deps: RankerDeps, limit: number = TOP_RANKE
   }));
 }
 
-const HEADERS = ["#", "Discord name", "Char Name", "Class", "Rating", "Stats"] as const;
+interface Column {
+  header: string;
+  align: "left" | "right";
+  value: (ranker: Ranker, index: number) => string;
+}
 
 function statLine(ranker: Ranker): string {
   const losses = Math.max(0, ranker.seasonGames - ranker.seasonWins);
   return `${ranker.seasonWins}-${losses}`;
 }
 
+// Discord renders no Markdown tables, so the table is drawn with box-drawing
+// characters inside a code block and wrapped in an embed.
+const COLUMNS: Column[] = [
+  { header: "#", align: "right", value: (_ranker, index) => String(index + 1) },
+  { header: "Discord", align: "left", value: (ranker) => ranker.discordName },
+  { header: "Character", align: "left", value: (ranker) => ranker.charName },
+  { header: "Class", align: "left", value: (ranker) => classDisplayName(ranker.classId) },
+  { header: "Rating", align: "right", value: (ranker) => String(ranker.rating) },
+  { header: "Stats", align: "left", value: (ranker) => statLine(ranker) },
+];
+
+/** Box-drawing table for the leaderboard, or an empty string when there are no rankers. */
 export function formatTopRankers(rankers: Ranker[]): string {
-  if (rankers.length === 0) return "No solo queue players are ranked yet.";
+  if (rankers.length === 0) return "";
 
-  const cells = rankers.map((ranker, index) => ({
-    "#": String(index + 1),
-    "Discord name": ranker.discordName,
-    "Char Name": ranker.charName,
-    Class: classDisplayName(ranker.classId),
-    Rating: String(ranker.rating),
-    Stats: statLine(ranker),
-  }));
+  const cells = rankers.map((ranker, index) => COLUMNS.map((column) => column.value(ranker, index)));
+  const widths = COLUMNS.map((column, i) => Math.max(column.header.length, ...cells.map((row) => row[i]!.length)));
 
-  const widths = HEADERS.map((header) => Math.max(header.length, ...cells.map((row) => row[header].length)));
-  const render = (values: string[]) => values.map((value, i) => value.padEnd(widths[i]!)).join("  ").trimEnd();
+  const border = (left: string, mid: string, right: string) =>
+    left + widths.map((width) => "─".repeat(width + 2)).join(mid) + right;
+  const renderRow = (values: string[]) =>
+    "│" +
+    values
+      .map((value, i) => {
+        const padded = COLUMNS[i]!.align === "right" ? value.padStart(widths[i]!) : value.padEnd(widths[i]!);
+        return ` ${padded} `;
+      })
+      .join("│") +
+    "│";
 
-  const lines = [render([...HEADERS]), ...cells.map((row) => render(HEADERS.map((header) => row[header])))];
-  return [`SoloQ Top ${TOP_RANKERS_LIMIT}`, "```", ...lines, "```"].join("\n");
+  const lines = [border("┌", "┬", "┐"), renderRow(COLUMNS.map((column) => column.header)), border("├", "┼", "┤")];
+  for (const row of cells) lines.push(renderRow(row));
+  lines.push(border("└", "┴", "┘"));
+
+  return lines.join("\n");
 }
+
+const EMBED_COLOR = 0x5865f2;
 
 export async function handleTopRankers(
   interaction: ChatInputCommandInteraction,
@@ -89,5 +113,15 @@ export async function handleTopRankers(
 ): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const rankers = await loadRankers();
-  await interaction.editReply(formatTopRankers(rankers));
+  const table = formatTopRankers(rankers);
+
+  await interaction.editReply({
+    embeds: [
+      {
+        title: `SoloQ Top ${TOP_RANKERS_LIMIT}`,
+        description: table ? "```\n" + table + "\n```" : "No solo queue players are ranked yet.",
+        color: EMBED_COLOR,
+      },
+    ],
+  });
 }

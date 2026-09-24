@@ -22,19 +22,20 @@ describe("classDisplayName", () => {
 });
 
 describe("formatTopRankers", () => {
-  test("renders a header plus one row per ranker", () => {
-    const text = formatTopRankers(rankers);
-    const lines = text.split("\n");
-
-    expect(lines[0]).toBe("SoloQ Top 10");
-    expect(lines[1]).toBe("```");
-    expect(lines[2]).toBe("#  Discord name  Char Name  Class    Rating  Stats");
-    expect(lines[3]!.trim().split(/\s+/)).toEqual(["1", "venruki", "Athene", "Rogue", "1462", "4-0"]);
-    expect(lines[4]!.trim().split(/\s+/)).toEqual(["2", "kalvish", "Whaazz", "Paladin", "1454", "5-2"]);
-    expect(lines[5]).toBe("```");
+  test("renders a box-drawing table with a row per ranker", () => {
+    expect(formatTopRankers(rankers)).toBe(
+      [
+        "┌───┬─────────┬───────────┬─────────┬────────┬───────┐",
+        "│ # │ Discord │ Character │ Class   │ Rating │ Stats │",
+        "├───┼─────────┼───────────┼─────────┼────────┼───────┤",
+        "│ 1 │ venruki │ Athene    │ Rogue   │   1462 │ 4-0   │",
+        "│ 2 │ kalvish │ Whaazz    │ Paladin │   1454 │ 5-2   │",
+        "└───┴─────────┴───────────┴─────────┴────────┴───────┘",
+      ].join("\n"),
+    );
   });
 
   test("handles an empty ladder", () => {
-    expect(formatTopRankers([])).toBe("No solo queue players are ranked yet.");
+    expect(formatTopRankers([])).toBe("");
   });
 });
