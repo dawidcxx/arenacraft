@@ -24,6 +24,19 @@ export class AuthDb {
     return rows.length > 0;
   }
 
+  /** Resolves account ids to usernames. Missing ids are simply absent from the map. */
+  async accountNames(ids: number[]): Promise<Map<number, string>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+
+    const placeholders = unique.map(() => "?").join(", ");
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT id, username FROM account WHERE id IN (${placeholders})`,
+      unique,
+    );
+    return new Map(rows.map((row) => [Number(row.id), String(row.username)]));
+  }
+
   /**
    * Creates a fresh account. The caller must have verified the account does not
    * exist. Writes only to the auth database (account + realm character counts).

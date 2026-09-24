@@ -4,6 +4,7 @@ const ConfigSchema = z.object({
   DISCORD_TOKEN: z.string().min(1),
   DISCORD_GUILD_ID: z.string().min(1),
   AUTH_DB_URL: z.string().min(1),
+  CHARACTER_DB_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default("redis://127.0.0.1:6379"),
   WAITING_ROOM_NAME: z.string().min(1).default("Waiting Room"),
   GAME_CHANNEL_PATTERN: z.string().min(1).default("^game-(\\d+)-(\\d+)$"),
