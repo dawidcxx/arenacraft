@@ -25,7 +25,7 @@ std::optional<CharacterProblem> checkCharacter(CharacterSnapshot const& snapshot
     if (item && item->filled < item->sockets)
       return CharacterProblem::EmptySocket;
 
-  for (uint8_t slot = 0; slot < MAX_GLYPH_SLOT_INDEX; ++slot)
+  for (uint8_t const slot : RequiredGlyphSlots)
     if ((snapshot.glyphSlotsEnabled & (1u << slot)) && !snapshot.glyphs[slot])
       return CharacterProblem::EmptyGlyphSlot;
 

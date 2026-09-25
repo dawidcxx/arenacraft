@@ -62,9 +62,14 @@ inline constexpr std::array<uint8_t, 7> RequiredEnchantedSlots = {
     EQUIPMENT_SLOT_HEAD,  EQUIPMENT_SLOT_SHOULDERS, EQUIPMENT_SLOT_CHEST, EQUIPMENT_SLOT_WRISTS,
     EQUIPMENT_SLOT_HANDS, EQUIPMENT_SLOT_LEGS,      EQUIPMENT_SLOT_FEET};
 
+// Glyph slots (0-based) that must hold a glyph. Only the three major slots are
+// required; minor glyphs are cosmetic and may be left empty. In GlyphSlot.dbc
+// the major slots (TypeFlags 0) are Order 1, 4 and 6 -> indices 0, 3 and 5.
+inline constexpr std::array<uint8_t, 3> RequiredGlyphSlots = {0, 3, 5};
+
 // Pure: returns the first problem found, or nullopt when the snapshot is ready.
 // Checked in the order talents -> max talent ranks -> missing gear -> missing
-// enchant -> empty gems -> empty glyphs.
+// enchant -> empty gems -> empty major glyphs.
 std::optional<CharacterProblem> checkCharacter(CharacterSnapshot const& snapshot);
 
 // Message fragment (no "SoloQ: " prefix) describing the problem.

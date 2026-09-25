@@ -182,7 +182,9 @@ rejects, in order:
   shoulders, chest, bracers, hands, legs, boots); the item must carry a
   permanent enchant (`PERM_ENCHANTMENT_SLOT`),
 - any equipped item with a built-in socket that has no gem,
-- any *enabled* glyph slot (`PLAYER_GLYPHS_ENABLED` bit set) without a glyph.
+- any *enabled major* glyph slot (`RequiredGlyphSlots` in `CharacterCheck.hpp`:
+  the GlyphSlot.dbc major slots, 0-based indices 0, 3 and 5) without a glyph.
+  Minor glyph slots are ignored: minor glyphs are cosmetic.
 
 The max-rank rule covers abilities whose rank 1 comes from the talent tree while
 the higher ranks are bought elsewhere (class trainer/vendor) - e.g. Penance

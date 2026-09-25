@@ -2,6 +2,7 @@
 
 #include "CharacterCheck.hpp"
 
+#include <algorithm>
 #include <cstdint>
 
 using arenacraft::soloq::CharacterProblem;
@@ -10,6 +11,7 @@ using arenacraft::soloq::checkCharacter;
 using arenacraft::soloq::EquippedItemInfo;
 using arenacraft::soloq::RequiredEnchantedSlots;
 using arenacraft::soloq::RequiredEquipmentSlots;
+using arenacraft::soloq::RequiredGlyphSlots;
 
 namespace
 {
@@ -114,9 +116,9 @@ TEST_CASE("checkCharacter accepts items whose sockets are all filled")
   CHECK_FALSE(checkCharacter(snapshot));
 }
 
-TEST_CASE("checkCharacter rejects every enabled but empty glyph slot")
+TEST_CASE("checkCharacter rejects every enabled but empty major glyph slot")
 {
-  for (uint8_t slot = 0; slot < MAX_GLYPH_SLOT_INDEX; ++slot)
+  for (uint8_t const slot : RequiredGlyphSlots)
   {
     CharacterSnapshot snapshot = readyCharacter();
     snapshot.glyphs[slot]      = false;
@@ -125,11 +127,25 @@ TEST_CASE("checkCharacter rejects every enabled but empty glyph slot")
   }
 }
 
-TEST_CASE("checkCharacter ignores glyph slots that are not enabled")
+TEST_CASE("checkCharacter ignores empty minor glyph slots")
+{
+  for (uint8_t slot = 0; slot < MAX_GLYPH_SLOT_INDEX; ++slot)
+  {
+    if (std::find(RequiredGlyphSlots.begin(), RequiredGlyphSlots.end(), slot) != RequiredGlyphSlots.end())
+      continue;
+
+    CharacterSnapshot snapshot = readyCharacter();
+    snapshot.glyphs[slot]      = false;
+
+    CHECK_FALSE(checkCharacter(snapshot));
+  }
+}
+
+TEST_CASE("checkCharacter ignores major glyph slots that are not enabled")
 {
   CharacterSnapshot snapshot = readyCharacter();
-  snapshot.glyphSlotsEnabled = (1u << MAX_GLYPH_SLOT_INDEX) - 2; // clear bit 0
-  snapshot.glyphs[0]         = false;
+  snapshot.glyphSlotsEnabled &= ~(1u << RequiredGlyphSlots[0]);
+  snapshot.glyphs[RequiredGlyphSlots[0]] = false;
 
   CHECK_FALSE(checkCharacter(snapshot));
 }

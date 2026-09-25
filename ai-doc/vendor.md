@@ -85,9 +85,9 @@ per glyph, grouped/ordered by class, trailing comment naming it) exposed as
 `AllGlyphs()`; `ItemVendor::GlyphsForClass(classId)` filters it per class and the
 option points at `GlyphVendorEntryBase + classId`. Row order inside a class is
 the vendor order. Within each class the glyphs recommended by the Wowhead PvP
-arena guides come first (then the rest alphabetically); the guides and their
-glyphs are recorded in `ai-doc/class_guides.md`, and the priority block is
-regenerated from those notes.
+arena guides come first (then the remaining major glyphs), and minor glyphs are
+always kept last; the guides and their glyphs are recorded in
+`ai-doc/class_guides.md`, and the priority block is regenerated from those notes.
 
 The menu also has a shared **Enchantments** option. `EnchantVendorItems.cpp`
 holds a flat `std::vector<uint32>` of permanent-enhancement item ids exposed as
