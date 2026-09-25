@@ -34,7 +34,7 @@ they can be found and reverted.
 
 | Area | Change | Code location | Reason | Date |
 |------|--------|---------------|--------|------|
-| Diminishing CC | A CC aura from a diminishing group cannot be applied over a player/pet target while the existing aura of the same group still has more than 50% of its duration left; the hit is rejected at application time (cast bar finishes) with `SPELL_FAILED_AURA_BOUNCED` and does not advance diminishing | `Spell::DoSpellHitOnUnit` (`src/game/Spells/Spell.cpp`) | Recasting a CC (e.g. Polymorph) must not replace the current aura with a shorter, diminishing one when the victim did not trinket; only time or a CC break may shorten/remove existing CC | 2026-09-25 |
+| Diminishing CC | Same-applicator CC cannot be re-applied over a player/pet target while the existing aura of the same diminishing group still has more than 50% of its duration left; the hit is rejected at application time (cast bar finishes) with `SPELL_FAILED_AURA_BOUNCED` and does not advance diminishing. Matching is by diminishing group **and** caster GUID, so a different player's CC of the same group still lands | `Spell::DoSpellHitOnUnit` (`src/game/Spells/Spell.cpp`) | Recasting your own CC (e.g. Polymorph) must not replace the current aura with a shorter, diminishing one when the victim did not trinket; only time or a CC break may shorten/remove existing CC | 2026-09-25 |
 
 ### Notes
 

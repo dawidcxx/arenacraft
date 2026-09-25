@@ -3199,7 +3199,8 @@ SpellMissInfo Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool scaleA
         continue;
 
       UnitAura* existingAura = static_cast<UnitAura*>(ownedAura.second);
-      if (existingAura->GetDiminishGroup() != m_diminishGroup || existingAura->IsPermanent())
+      if (existingAura->GetDiminishGroup() != m_diminishGroup || existingAura->IsPermanent() ||
+          existingAura->GetCasterGUID() != originalCaster->GetGUID())
         continue;
 
       if (existingAura->GetDuration() * 2 > existingAura->GetMaxDuration())
