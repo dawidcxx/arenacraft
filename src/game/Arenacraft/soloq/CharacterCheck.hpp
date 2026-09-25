@@ -1,10 +1,12 @@
 #pragma once
 
 #include "Player.h"
+#include "TalentRanks.hpp"
 
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <unordered_set>
 
 namespace arenacraft::soloq
 {
@@ -14,6 +16,7 @@ namespace arenacraft::soloq
 enum class CharacterProblem : uint8_t
 {
   UnspentTalents,
+  UnmaxedTalent,
   MissingEquipment,
   MissingEnchant,
   EmptySocket,
@@ -39,6 +42,9 @@ struct CharacterSnapshot
   uint32_t                                                        glyphSlotsEnabled = 0;
   std::array<bool, MAX_GLYPH_SLOT_INDEX>                          glyphs{};
   std::array<std::optional<EquippedItemInfo>, EQUIPMENT_SLOT_END> equipment{};
+  // Spell ids known by the character in the active spec. Used to enforce
+  // TalentRankRules (known rank 1 without the max rank).
+  std::unordered_set<uint32_t> knownSpells;
 };
 
 // Slots a queueing character must have filled. Cosmetic slots (shirt, tabard)
@@ -57,8 +63,8 @@ inline constexpr std::array<uint8_t, 7> RequiredEnchantedSlots = {
     EQUIPMENT_SLOT_HANDS, EQUIPMENT_SLOT_LEGS,      EQUIPMENT_SLOT_FEET};
 
 // Pure: returns the first problem found, or nullopt when the snapshot is ready.
-// Checked in the order talents -> missing gear -> missing enchant -> empty
-// gems -> empty glyphs.
+// Checked in the order talents -> max talent ranks -> missing gear -> missing
+// enchant -> empty gems -> empty glyphs.
 std::optional<CharacterProblem> checkCharacter(CharacterSnapshot const& snapshot);
 
 // Message fragment (no "SoloQ: " prefix) describing the problem.

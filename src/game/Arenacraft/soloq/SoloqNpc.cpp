@@ -2,6 +2,8 @@
 
 #include "ArenaTeam.h"
 #include "Battleground.h"
+#include "BattlegroundMgr.h"
+#include "BattlegroundQueue.h"
 #include "CharacterCheck.hpp"
 #include "Chat.h"
 #include "Log.h"
@@ -35,10 +37,24 @@ void SendMessage(Player* player, std::string const& message)
 // The core's leave cleanup therefore drops the (unused) 3v3 queue id and leaves
 // the 5v5 one set, keeping the player "in queue" and blocking requeue. Clear it
 // explicitly when the match ends and when a player leaves the arena.
+//
+// A player who was invited but never accepted the arena still has a real
+// m_QueuedPlayers entry at this point. Clearing only their client queue id would
+// strand that entry (and its scheduled removal event keys off the queue id, so it
+// would never clean it up). The next queue attempt then hits the AddGroup
+// duplicate-player assertion. Remove the real entry too.
 void ClearSoloqQueueId(Player* player)
 {
-  if (player && player->InBattlegroundQueueForBattlegroundQueueType(BATTLEGROUND_QUEUE_5v5))
-    player->RemoveBattlegroundQueueId(BATTLEGROUND_QUEUE_5v5);
+  if (!player)
+    return;
+
+  BattlegroundQueue& queue = sBattlegroundMgr->GetBattlegroundQueue(BATTLEGROUND_QUEUE_5v5);
+
+  GroupQueueInfo ginfo;
+  if (queue.GetPlayerGroupInfoData(player->GetGUID(), &ginfo))
+    queue.RemovePlayer(player->GetGUID(), true);
+
+  player->RemoveBattlegroundQueueId(BATTLEGROUND_QUEUE_5v5);
 }
 } // namespace
 

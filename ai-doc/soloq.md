@@ -33,6 +33,7 @@ invites the six players (see `CreateArenaForMatch`).
 | `SoloqNpc.hpp/.cpp` | `SoloqNpc` (gossip menu on entry 20810), `SoloqDriver` (world tick) and `SoloqBattlegroundScript` (suppresses core 5v5 matchmaking) |
 | `SoloqEvents.hpp/.cpp` | builds and publishes the `soloq-matchup` Redis event when a match pops |
 | `CharacterCheck.hpp/.cpp` | pure character readiness check (talents, gear, enchants, gems, glyphs) + `Player` snapshot |
+| `TalentRanks.hpp` | generated, curated `TalentRankRules` (rank 1 -> max rank) enforced by the readiness check |
 | `*_test.cpp` | doctest unit tests (co-located, auto-discovered by the game test target) |
 
 The pure logic (`Types`/`Roles`/`SoloqQueue`/`Outcome`) only depends on the core
@@ -139,6 +140,15 @@ requeueing. `SoloqBattlegroundScript` clears the 5v5 id itself:
 `OnBattlegroundEnd` for every rated participant and
 `OnBattlegroundRemovePlayerAtLeave` for anyone leaving a started match early.
 
+Clearing the 5v5 queue id must also drop the real `BattlegroundQueue` entry.
+A player who was invited but never accepted (e.g. the arena ended as a walkover
+when one team never ported) is still in `m_QueuedPlayers`; the core's scheduled
+`BGQueueRemoveEvent` keys off the queue id, so clearing the id alone would strand
+the entry forever and the next join would hit the `AddGroup`
+duplicate-player assertion (crash). `ClearSoloqQueueId` (`SoloqNpc.cpp`)
+therefore removes the entry via `GetPlayerGroupInfoData`/`RemovePlayer` before
+clearing the id.
+
 ## Character readiness gate
 
 Before a player is enqueued, `SoloqService::characterProblem(Player*)` runs a
@@ -146,14 +156,27 @@ one-off sanity check so unfinished characters are not queued by accident. It
 rejects, in order:
 
 - unspent talent points (`Player::GetFreeTalentPoints() > 0`),
+- a talent learned at rank 1 without its max rank (`TalentRankRules`, see below),
 - any empty required gear slot (`RequiredEquipmentSlots` in `CharacterCheck.hpp`:
   head, neck, shoulders, chest, waist, legs, feet, wrists, hands, both rings,
   both trinkets, back, mainhand),
 - a required enchant missing on any of `RequiredEnchantedSlots` (head,
   shoulders, chest, bracers, hands, legs, boots); the item must carry a
   permanent enchant (`PERM_ENCHANTMENT_SLOT`),
-- any equipped item with a built-in gem socket that has no gem,
+- any equipped item with a built-in socket that has no gem,
 - any *enabled* glyph slot (`PLAYER_GLYPHS_ENABLED` bit set) without a glyph.
+
+The max-rank rule covers abilities whose rank 1 comes from the talent tree while
+the higher ranks are bought elsewhere (class trainer/vendor) - e.g. Penance
+(`47540` -> `53007`). The list is `TalentRanks.hpp` (`TalentRankRules`), generated
+by `scripts/src/gen_talent_rank_rules.ts` from `Talent.dbc` + `spell_ranks`. It
+is deliberately conservative: only single-rank talents whose chain extends past
+that rank are included, so a legitimate partial multi-rank build (3/5) is never
+flagged, and a rule is only emitted when the max rank is actually sold by one of
+the class trainers (`ClassTrainerEntry`), so every violation is fixable at the
+vendor. It is a plain reviewable table; curate it by deleting rows. The rule is
+checked only when the character knows the first rank and not the max rank; a
+character with neither (or only the max) passes.
 
 Cosmetic slots (shirt, tabard) and the optional offhand/ranged slots are not
 required: two-handers and many casters legitimately leave them empty. The check

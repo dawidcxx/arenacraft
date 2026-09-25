@@ -39,6 +39,31 @@ TEST_CASE("checkCharacter rejects a character with unspent talents")
   CHECK(checkCharacter(snapshot) == CharacterProblem::UnspentTalents);
 }
 
+TEST_CASE("checkCharacter rejects a talent learned without its max rank")
+{
+  CharacterSnapshot snapshot = readyCharacter();
+  snapshot.knownSpells.insert(47540); // Penance rank 1
+
+  CHECK(checkCharacter(snapshot) == CharacterProblem::UnmaxedTalent);
+}
+
+TEST_CASE("checkCharacter accepts a talent learned at its max rank")
+{
+  CharacterSnapshot snapshot = readyCharacter();
+  snapshot.knownSpells.insert(47540); // Penance rank 1
+  snapshot.knownSpells.insert(53007); // Penance max rank
+
+  CHECK_FALSE(checkCharacter(snapshot));
+}
+
+TEST_CASE("checkCharacter ignores a max rank learned without the first rank")
+{
+  CharacterSnapshot snapshot = readyCharacter();
+  snapshot.knownSpells.insert(53007); // Penance max rank without the talent
+
+  CHECK_FALSE(checkCharacter(snapshot));
+}
+
 TEST_CASE("checkCharacter rejects any empty required gear slot")
 {
   for (uint8_t const slot : RequiredEquipmentSlots)
