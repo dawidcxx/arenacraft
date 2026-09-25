@@ -27,7 +27,7 @@ template <class T> class FleeingMovementGenerator : public MovementGeneratorMedi
 {
 public:
   explicit FleeingMovementGenerator(ObjectGuid fleeTargetGUID)
-      : _path(nullptr), _fleeTargetGUID(fleeTargetGUID), _timer(0), _interrupt(false), _shortPathsCount(0)
+      : _path(nullptr), _fleeTargetGUID(fleeTargetGUID), _timer(0), _interrupt(false), _invalidPathsCount(0)
   {
   }
 
@@ -46,7 +46,7 @@ private:
   ObjectGuid                     _fleeTargetGUID;
   TimeTracker                    _timer;
   bool                           _interrupt;
-  uint8                          _shortPathsCount;
+  uint8                          _invalidPathsCount;
 };
 
 class TimedFleeingMovementGenerator : public FleeingMovementGenerator<Creature>

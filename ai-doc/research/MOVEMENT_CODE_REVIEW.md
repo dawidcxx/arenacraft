@@ -141,6 +141,12 @@ Notes and exactness:
   (`Unit.cpp:18694`) or on a vehicle — during that window the client cannot move
   itself at all. Expected in arena (roots/stuns/fears), but each is
   client-visible snapping.
+  - **Fix applied:** `Unit::SetFeared` / `Unit::SetConfused` used to call
+    `SetClientControl` only when `m_movedByPlayer` (charmer/vehicle); a feared
+    player therefore kept client control and could fight the server flee spline,
+    showing up as *walking* instead of running. The `else` now revokes/restores
+    the player's own control, matching what `MovementHandler` already resends
+    after a teleport for FLEEING/CONFUSED.
 - **D.** Release build silently removes: `MOVEMENTFLAG_ROOT`; `HOVER` without
   `SPELL_AURA_HOVER`; `ASCENDING+DESCENDING`; `LEFT+RIGHT`;
   `STRAFE_LEFT+RIGHT`; `PITCH_UP+PITCH_DOWN`; `FORWARD+BACKWARD`;

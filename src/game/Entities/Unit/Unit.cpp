@@ -18690,10 +18690,16 @@ void Unit::SetFeared(bool apply, Unit* fearedBy /*= nullptr*/, bool isFear /*= f
   if (apply)
   {
     SetTarget();
+    // Arenacraft: hold the client-visible fear flag for the whole aura, not just
+    // while the flee generator happens to be alive. This flag is what makes the
+    // client play the fear pose (arms up) and disable self-movement.
+    SetUnitFlag(UNIT_FLAG_FLEEING);
     GetMotionMaster()->MoveFleeing(fearedBy, isFear ? 0 : sWorld->getIntConfig(CONFIG_CREATURE_FAMILY_FLEE_DELAY));
   }
   else
   {
+    RemoveUnitFlag(UNIT_FLAG_FLEEING);
+
     if (IsAlive())
     {
       if (GetMotionMaster()->GetMotionSlotType(MOTION_SLOT_CONTROLLED) == FLEEING_MOTION_TYPE)
@@ -18712,8 +18718,14 @@ void Unit::SetFeared(bool apply, Unit* fearedBy /*= nullptr*/, bool isFear /*= f
   {
     if (m_movedByPlayer)
       m_movedByPlayer->ToPlayer()->SetClientControl(this, !apply); // verified
-                                                                   // else
-    //   ToPlayer()->SetClientControl(this, !apply);
+    else if (!apply || GetMotionMaster()->GetMotionSlotType(MOTION_SLOT_CONTROLLED) == FLEEING_MOTION_TYPE)
+      // Arenacraft: a feared player must not keep client control; otherwise the
+      // client fights the server fear spline and can end up walking instead of
+      // running. Player::SetClientControl already forces the "no control" byte
+      // for FLEEING/CONFUSED targets; MovementHandler resends it after teleport
+      // for the same reason. Only revoke when the flee generator actually took
+      // over (a caster may be missing), so a stray fear cannot freeze the player.
+      ToPlayer()->SetClientControl(this, !apply);
   }
 }
 
@@ -18722,10 +18734,14 @@ void Unit::SetConfused(bool apply)
   if (apply)
   {
     SetTarget();
+    // Arenacraft: same as SetFeared - hold the client-visible flag for the aura.
+    SetUnitFlag(UNIT_FLAG_CONFUSED);
     GetMotionMaster()->MoveConfused();
   }
   else
   {
+    RemoveUnitFlag(UNIT_FLAG_CONFUSED);
+
     if (IsAlive())
     {
       if (GetMotionMaster()->GetMotionSlotType(MOTION_SLOT_CONTROLLED) == CONFUSED_MOTION_TYPE)
@@ -18744,8 +18760,10 @@ void Unit::SetConfused(bool apply)
   {
     if (m_movedByPlayer)
       m_movedByPlayer->ToPlayer()->SetClientControl(this, !apply); // verified
-                                                                   // else
-    //   ToPlayer()->SetClientControl(this, !apply);
+    else
+      // Arenacraft: same as SetFeared - confused players must not keep client
+      // control while the server drives the confusion spline.
+      ToPlayer()->SetClientControl(this, !apply);
   }
 }
 

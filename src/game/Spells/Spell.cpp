@@ -1451,7 +1451,12 @@ void Spell::SelectImplicitCasterDestTargets(SpellEffIndex effIndex, SpellImplici
       float tstX = 0.0f, tstY = 0.0f, tstZ = 0.0f, prevX = 0.0f, prevY = 0.0f, prevZ = 0.0f;
       float tstZ1 = 0.0f, tstZ2 = 0.0f, tstZ3 = 0.0f, destz1 = 0.0f, destz2 = 0.0f, destz3 = 0.0f, srange = 0.0f,
             srange1 = 0.0f, srange2 = 0.0f, srange3 = 0.0f;
-      float       maxtravelDistZ = 2.65f;
+      // Arenacraft: max ground rise the blink path tolerates per 2yd step
+      // (`step` below); past this the path is treated as a wall and the blink is
+      // cut short. Slightly raised from the stock 2.65 so ramps/uneven arena
+      // floors (e.g. Blade's Edge) don't turn Blink into a short hop. Still
+      // blocks near-vertical ledges.
+      float       maxtravelDistZ = 3.5f;
       float       overdistance   = 0.0f;
       float       totalpath      = 0.0f;
       float       beforewaterz   = 0.0f;

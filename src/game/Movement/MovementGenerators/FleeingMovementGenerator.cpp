@@ -26,6 +26,11 @@
 #define MIN_QUIET_DISTANCE 28.0f
 #define MAX_QUIET_DISTANCE 43.0f
 #define MIN_PATH_LENGTH    2.0f
+// Arenacraft: largest height drop a flee destination may have before we treat it
+// as an edge (bridge/ledge) and pick another point. MovePositionToFirstCollision
+// snaps the destination to the ground, so a point past an edge lands well below.
+#define MAX_FLEE_DROP  3.0f
+#define MAX_FLEE_TRIES 5
 
 template <class T> void FleeingMovementGenerator<T>::DoInitialize(T* owner)
 {
@@ -106,11 +111,21 @@ template <class T> void FleeingMovementGenerator<T>::SetTargetLocation(T* owner)
 
   owner->AddUnitState(UNIT_STATE_FLEEING_MOVE);
 
-  Position destination = owner->GetPosition();
-  GetPoint(owner, destination);
+  // Arenacraft: reject destinations that would send the unit off a ledge/bridge
+  // (a big height drop) or out of line of sight; retry a few times before
+  // giving up for this tick. Cheap and safe: it only discards candidate points.
+  Position destination;
+  bool     valid = false;
+  for (uint8 attempt = 0; attempt < MAX_FLEE_TRIES && !valid; ++attempt)
+  {
+    destination = owner->GetPosition();
+    GetPoint(owner, destination);
 
-  // Add LOS check for target point
-  if (!owner->IsWithinLOS(destination.GetPositionX(), destination.GetPositionY(), destination.GetPositionZ()))
+    valid = destination.GetPositionZ() >= owner->GetPositionZ() - MAX_FLEE_DROP &&
+            owner->IsWithinLOS(destination.GetPositionX(), destination.GetPositionY(), destination.GetPositionZ());
+  }
+
+  if (!valid)
   {
     _timer.Reset(200);
     return;
@@ -128,8 +143,14 @@ template <class T> void FleeingMovementGenerator<T>::SetTargetLocation(T* owner)
   _path->SetPathLengthLimit(30.0f);
   bool result =
       _path->CalculatePath(destination.GetPositionX(), destination.GetPositionY(), destination.GetPositionZ());
-  if (!result || (_path->GetPathType() & PathType(PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_FARFROMPOLY)))
+  if (!result || (_path->GetPathType() &
+                  PathType(PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_FARFROMPOLY | PATHFIND_NOT_USING_PATH)))
   {
+    if (_fleeTargetGUID)
+    {
+      ++_invalidPathsCount;
+    }
+
     _timer.Reset(100);
     return;
   }
@@ -139,14 +160,14 @@ template <class T> void FleeingMovementGenerator<T>::SetTargetLocation(T* owner)
   {
     if (_fleeTargetGUID)
     {
-      ++_shortPathsCount;
+      ++_invalidPathsCount;
     }
 
     _timer.Reset(100);
     return;
   }
 
-  _shortPathsCount = 0;
+  _invalidPathsCount = 0;
 
   Movement::MoveSplineInit init(owner);
   init.MovebyPath(_path->GetPath());
@@ -160,7 +181,7 @@ template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position
   float casterDistance = 0.f;
   float casterAngle    = 0.f;
   Unit* fleeTarget     = nullptr;
-  if (_shortPathsCount < 5)
+  if (_invalidPathsCount < 5)
     fleeTarget = ObjectAccessor::GetUnit(*owner, _fleeTargetGUID);
 
   if (fleeTarget)
