@@ -27,6 +27,15 @@ edit, so the in-game tooltip may show the old value. We accept that mismatch.
 | 53385 | Divine Storm (Paladin) | weapon damage 110% -> 130% | `ApplySpellFix({53385}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_2].BasePoints = 129; });` | Buff Divine Storm damage | 2026-09-21 |
 | 29659 | Positive Charge (arena dampening) | forced-debuff flag cleared (rendered as a buff); stack cap 99 -> 2 | `ApplySpellFix({29659}, [](SpellInfo* spellInfo) { spellInfo->Attributes &= ~SPELL_ATTR0_AURA_IS_DEBUFF; spellInfo->StackAmount = 2; });` | Arena dampening: from 5 min after gates open, +1 stack at 5 and 7 min, cap 2 (+20% damage) | 2026-09-23 |
 
+## Mechanic divergences
+
+Deliberate core behavior changes that are not DBC-value tweaks. Listed here so
+they can be found and reverted.
+
+| Area | Change | Code location | Reason | Date |
+|------|--------|---------------|--------|------|
+| Diminishing CC | A CC aura from a diminishing group cannot be applied over a player/pet target while the existing aura of the same group still has more than 50% of its duration left; the hit is rejected at application time (cast bar finishes) with `SPELL_FAILED_AURA_BOUNCED` and does not advance diminishing | `Spell::DoSpellHitOnUnit` (`src/game/Spells/Spell.cpp`) | Recasting a CC (e.g. Polymorph) must not replace the current aura with a shorter, diminishing one when the victim did not trinket; only time or a CC break may shorten/remove existing CC | 2026-09-25 |
+
 ### Notes
 
 - Percent values encode as `BasePoints + 1`: `-91` = 90%, `-101` = 100%,

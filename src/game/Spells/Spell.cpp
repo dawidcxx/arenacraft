@@ -3189,6 +3189,27 @@ SpellMissInfo Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool scaleA
   // Get Data Needed for Diminishing Returns, some effects may have multiple auras, so this must be done on spell hit,
   // not aura add Xinef: Do not increase diminishing level for self cast
   m_diminishGroup = GetDiminishingReturnsGroupForSpell(m_spellInfo, m_triggeredByAuraSpell.spellInfo);
+
+  if (m_diminishGroup != DIMINISHING_NONE && GetDiminishingReturnsGroupType(m_diminishGroup) != DRTYPE_NONE &&
+      unit != m_caster && unit->IsCharmedOwnedByPlayerOrPlayer())
+  {
+    for (auto const& ownedAura : unit->GetOwnedAuras())
+    {
+      if (ownedAura.second->GetType() != UNIT_AURA_TYPE)
+        continue;
+
+      UnitAura* existingAura = static_cast<UnitAura*>(ownedAura.second);
+      if (existingAura->GetDiminishGroup() != m_diminishGroup || existingAura->IsPermanent())
+        continue;
+
+      if (existingAura->GetDuration() * 2 > existingAura->GetMaxDuration())
+      {
+        SendCastResult(SPELL_FAILED_AURA_BOUNCED);
+        return SPELL_MISS_MISS;
+      }
+    }
+  }
+
   // xinef: do not increase diminish level for bosses (eg. Void Reaver silence is never diminished)
   if (((m_spellFlags & SPELL_FLAG_REFLECTED) && !(unit->HasReflectSpellsAura())) ||
       (aura_effmask && m_diminishGroup && unit != m_caster &&
