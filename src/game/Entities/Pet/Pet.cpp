@@ -40,7 +40,7 @@
 Pet::Pet(Player* owner, PetType type)
     : Guardian(nullptr, owner ? owner->GetGUID() : ObjectGuid::Empty, true), m_usedTalentCount(0), m_removed(false),
       m_owner(owner), m_happinessTimer(PET_LOSE_HAPPINES_INTERVAL), m_petType(type), m_duration(0),
-      m_auraRaidUpdateMask(0), m_loading(false), m_petRegenTimer(PET_FOCUS_REGEN_INTERVAL), m_tempspellTarget(nullptr),
+      m_auraRaidUpdateMask(0), m_loading(false), m_petRegenTimer(PET_FOCUS_REGEN_INTERVAL), m_tempspellTarget(),
       m_tempoldTarget(), m_tempspellIsPositive(false), m_tempspell(0)
 {
   ASSERT(m_owner && m_owner->IsPlayer());
@@ -724,8 +724,11 @@ void Pet::Update(uint32 diff)
 
     if (m_tempspell)
     {
-      Unit* tempspellTarget = m_tempspellTarget;
-      Unit* tempoldTarget   = nullptr;
+      Unit* tempspellTarget = nullptr;
+      if (!m_tempspellTarget.IsEmpty())
+        tempspellTarget = ObjectAccessor::GetUnit(*this, m_tempspellTarget);
+
+      Unit* tempoldTarget = nullptr;
 
       if (!m_tempoldTarget.IsEmpty())
         tempoldTarget = ObjectAccessor::GetUnit(*this, m_tempoldTarget);
@@ -766,7 +769,7 @@ void Pet::Update(uint32 diff)
 
             CastSpell(tempspellTarget, tempspell, false);
             m_tempspell       = 0;
-            m_tempspellTarget = nullptr;
+            m_tempspellTarget = ObjectGuid::Empty;
 
             if (tempspellIsPositive)
             {
@@ -806,7 +809,7 @@ void Pet::Update(uint32 diff)
       else
       {
         m_tempspell           = 0;
-        m_tempspellTarget     = nullptr;
+        m_tempspellTarget     = ObjectGuid::Empty;
         m_tempoldTarget       = ObjectGuid::Empty;
         m_tempspellIsPositive = false;
 
@@ -2449,7 +2452,7 @@ void Pet::CastWhenWillAvailable(uint32 spellid, Unit* spellTarget, ObjectGuid ol
   if (!spellTarget)
     return;
 
-  m_tempspellTarget     = spellTarget;
+  m_tempspellTarget     = spellTarget->GetGUID();
   m_tempspell           = spellid;
   m_tempspellIsPositive = spellIsPositive;
 
@@ -2461,7 +2464,7 @@ void Pet::ClearCastWhenWillAvailable()
 {
   m_tempspellIsPositive = false;
   m_tempspell           = 0;
-  m_tempspellTarget     = nullptr;
+  m_tempspellTarget     = ObjectGuid::Empty;
   m_tempoldTarget       = ObjectGuid::Empty;
 }
 

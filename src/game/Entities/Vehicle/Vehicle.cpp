@@ -583,12 +583,26 @@ bool Vehicle::IsVehicleInUse()
 
 void Vehicle::TeleportVehicle(float x, float y, float z, float ang)
 {
-  _me->GetMap()->LoadGrid(x, y);
-  _me->NearTeleportTo(x, y, z, ang, true);
+  Unit*                   base = _me;
+  Vehicle*                self = this;
+  std::vector<ObjectGuid> passengers;
+  passengers.reserve(Seats.size());
+  for (auto const& seat : Seats)
+    if (!seat.second.IsEmpty())
+      passengers.push_back(seat.second.Passenger.Guid);
 
-  for (SeatMap::const_iterator itr = Seats.begin(); itr != Seats.end(); ++itr)
-    if (Unit* passenger = ObjectAccessor::GetUnit(*GetBase(), itr->second.Passenger.Guid))
+  base->GetMap()->LoadGrid(x, y);
+  base->NearTeleportTo(x, y, z, ang, true, true);
+
+  if (base->GetVehicleKit() != self)
+    return;
+
+  for (ObjectGuid const& guid : passengers)
+    if (Unit* passenger = ObjectAccessor::GetUnit(*base, guid))
     {
+      if (!passenger->IsInWorld())
+        continue;
+
       if (passenger->IsPlayer())
       {
         passenger->ToPlayer()->SetMover(passenger);

@@ -79,22 +79,28 @@ void WaypointMovementGenerator<Creature>::OnArrived(Creature* creature)
   creature->ClearUnitState(UNIT_STATE_ROAMING_MOVE);
   m_isArrivalDone = true;
 
-  if (i_path->at(i_currentNode)->event_id && urand(0, 99) < i_path->at(i_currentNode)->event_chance)
+  // Read everything we need before scripts/AI run: they may invalidate i_path.
+  uint32 const waypointId  = i_currentNode;
+  uint32 const eventId     = i_path->at(i_currentNode)->event_id;
+  uint32 const eventChance = i_path->at(i_currentNode)->event_chance;
+  uint32 const delay       = i_path->at(i_currentNode)->delay;
+
+  if (eventId && urand(0, 99) < eventChance)
   {
-    LOG_DEBUG("maps.script", "Creature movement start script {} at point {} for {}.",
-              i_path->at(i_currentNode)->event_id, i_currentNode, creature->GetGUID().ToString());
+    LOG_DEBUG("maps.script", "Creature movement start script {} at point {} for {}.", eventId, waypointId,
+              creature->GetGUID().ToString());
     creature->ClearUnitState(UNIT_STATE_ROAMING_MOVE);
-    creature->GetMap()->ScriptsStart(sWaypointScripts, i_path->at(i_currentNode)->event_id, creature, nullptr);
+    creature->GetMap()->ScriptsStart(sWaypointScripts, eventId, creature, nullptr);
   }
 
   // Inform script
   MovementInform(creature);
-  creature->UpdateWaypointID(i_currentNode);
+  creature->UpdateWaypointID(waypointId);
 
-  if (i_path->at(i_currentNode)->delay)
+  if (delay)
   {
     creature->ClearUnitState(UNIT_STATE_ROAMING_MOVE);
-    Stop(i_path->at(i_currentNode)->delay);
+    Stop(delay);
   }
 }
 

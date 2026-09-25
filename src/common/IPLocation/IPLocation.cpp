@@ -105,9 +105,19 @@ void IpLocationStore::Load()
 
 IpLocationRecord const* IpLocationStore::GetLocationRecord(std::string const& ipAddress) const
 {
-  uint32 ip  = Acore::Net::address_to_uint(Acore::Net::make_address_v4(ipAddress));
-  auto   itr = std::upper_bound(_ipLocationStore.begin(), _ipLocationStore.end(), ip,
-                                [](uint32 ip, IpLocationRecord const& loc) { return ip < loc.IpTo; });
+  uint32 ip;
+
+  try
+  {
+    ip = Acore::Net::address_to_uint(Acore::Net::make_address_v4(ipAddress));
+  }
+  catch (boost::system::system_error const&)
+  {
+    return nullptr;
+  }
+
+  auto itr = std::upper_bound(_ipLocationStore.begin(), _ipLocationStore.end(), ip,
+                              [](uint32 ip, IpLocationRecord const& loc) { return ip < loc.IpTo; });
   if (itr == _ipLocationStore.end())
   {
     return nullptr;

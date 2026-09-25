@@ -249,7 +249,7 @@ void LootItemStorage::RemoveStoredLootItem(ObjectGuid containerGUID, uint32 item
 
   // loot with empty itemList but unlootedCount > 0
   // must be deleted manually by the player or traded
-  if (!loot->unlootedCount)
+  if (!loot->unlootedCount && !loot->gold)
     lootItemStore.erase(itr);
 }
 
@@ -270,7 +270,7 @@ void LootItemStorage::RemoveStoredLootMoney(ObjectGuid containerGUID, Loot* loot
 
   // loot with empty itemList but unlootedCount > 0
   // must be deleted manually by the player or traded
-  if (!loot->unlootedCount)
+  if (!loot->unlootedCount && !loot->gold)
     lootItemStore.erase(itr);
 }
 

@@ -305,11 +305,16 @@ void CreatureGroup::MemberEvaded(Creature* member)
     return;
   }
 
-  for (auto const& itr : m_members)
+  CreatureGroupMemberType members = m_members;
+
+  for (auto const& itr : members)
   {
     Creature* pMember = itr.first;
     // This should never happen
     if (!pMember)
+      continue;
+
+    if (pMember->GetFormation() != this)
       continue;
 
     if (pMember == member || pMember->IsInEvadeMode() ||
@@ -446,9 +451,11 @@ void CreatureGroup::LeaderMoveTo(float x, float y, float z, uint32 move_type)
 
 void CreatureGroup::RespawnFormation(bool force)
 {
-  for (auto const& itr : m_members)
+  CreatureGroupMemberType members = m_members;
+
+  for (auto const& itr : members)
   {
-    if (itr.first && !itr.first->IsAlive())
+    if (itr.first && itr.first->GetFormation() == this && !itr.first->IsAlive())
     {
       itr.first->Respawn(force);
     }

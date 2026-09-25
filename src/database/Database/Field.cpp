@@ -200,7 +200,7 @@ template <typename T> T Field::GetData() const
   if (data.raw)
     result = *reinterpret_cast<T const*>(data.value);
   else
-    result = Acore::StringTo<T>(data.value);
+    result = Acore::StringTo<T>(std::string_view(data.value, data.length));
 
   // Correct double fields... this undefined behavior :/
   if constexpr (std::is_same_v<T, double>)
@@ -208,7 +208,7 @@ template <typename T> T Field::GetData() const
     if (data.raw && !IsType(DatabaseFieldTypes::Decimal))
       result = *reinterpret_cast<double const*>(data.value);
     else
-      result = Acore::StringTo<float>(data.value);
+      result = Acore::StringTo<float>(std::string_view(data.value, data.length));
   }
 
   // Check -1 for *_dbc db tables
@@ -218,7 +218,7 @@ template <typename T> T Field::GetData() const
 
     if (!tableName.empty() && tableName.size() > 4)
     {
-      auto signedResult = Acore::StringTo<int32>(data.value);
+      auto signedResult = Acore::StringTo<int32>(std::string_view(data.value, data.length));
 
       if (signedResult && !result && tableName.substr(tableName.length() - 4) == "_dbc")
       {
