@@ -16,6 +16,7 @@
  */
 
 #include "MoveSplineInit.h"
+#include "Log.h"
 #include "MoveSpline.h"
 #include "MovementPacketBuilder.h"
 #include "Opcodes.h"
@@ -103,7 +104,15 @@ int32 MoveSplineInit::Launch()
 
   bool isOrientationOnly = args.path.size() == 2 && args.path[0] == args.path[1];
 
-  if ((moveFlags & MOVEMENTFLAG_ROOT) || isOrientationOnly)
+  if (moveFlags & MOVEMENTFLAG_ROOT) // This case should essentially never occur - hence the trace logging - hints to
+                                     // issues elsewhere
+  {
+    LOG_TRACE("movement", "Invalid movement during root. Entry: {} IsImmobilized {}, moveflags {}", unit->GetEntry(),
+              unit->IsImmobilizedState() ? "true" : "false", moveFlags);
+    moveFlags &= ~MOVEMENTFLAG_MASK_MOVING;
+  }
+
+  if (isOrientationOnly)
     moveFlags &= ~MOVEMENTFLAG_MASK_MOVING;
 
   if (!args.HasVelocity)

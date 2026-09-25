@@ -347,6 +347,10 @@ public:
 
   void ReadMovementInfo(WorldPacket& data, MovementInfo* mi);
   void WriteMovementInfo(WorldPacket* data, MovementInfo* mi);
+  void SynchronizeMovement(MovementInfo& movementInfo);
+  void HandleMoverRelocation(MovementInfo& movementInfo, Unit* mover);
+  bool VerifyMovementInfo(MovementInfo const& movementInfo, Player* plrMover, Unit* mover, Opcodes opcode) const;
+  bool ProcessMovementInfo(MovementInfo& movementInfo, Unit* mover, Player* plrMover, WorldPacket& recvData);
 
   void SendPacket(WorldPacket const* packet);
   void SendPetNameInvalid(uint32 error, std::string const& name, DeclinedName* declinedName);
@@ -530,6 +534,10 @@ public:
   void ResetTimeSync();
   void SendTimeSync();
 
+  // Movement packet order
+  uint32 GetOrderCounter() const { return _orderCounter; }
+  void   IncrementOrderCounter() { ++_orderCounter; }
+
 public:                                               // opcodes handlers
   void Handle_NULL(WorldPacket& null);                // not used
   void Handle_EarlyProccess(WorldPacket& recvPacket); // just mark packets processed in WorldSocket::OnRead
@@ -560,7 +568,6 @@ public:                                               // opcodes handlers
   void HandlePlayedTime(WorldPackets::Character::PlayedTimeClient& packet);
 
   // new
-  void HandleMoveUnRootAck(WorldPacket& recvPacket);
   void HandleMoveRootAck(WorldPacket& recvPacket);
 
   // new inspect
@@ -1178,8 +1185,9 @@ private:
   CircularBuffer<std::pair<int64, uint32>> _timeSyncClockDeltaQueue; // first member: clockDelta. Second member:
                                                                      // latency of the packet exchange that was used
                                                                      // to compute that clockDelta.
-  int64 _timeSyncClockDelta;
-  void  ComputeNewClockDelta();
+  int64  _timeSyncClockDelta;
+  uint32 _orderCounter;
+  void   ComputeNewClockDelta();
 
   std::map<uint32, uint32> _pendingTimeSyncRequests; // key: counter. value: server time when packet
                                                      // with that counter was sent.

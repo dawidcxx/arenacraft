@@ -380,88 +380,43 @@ void WorldSession::HandleMovementOpcodes(WorldPacket& recvData)
   movementInfo.guid = guid;
   ReadMovementInfo(recvData, &movementInfo);
 
-  // Stop emote on move
-  if (Player* plrMover = mover->ToPlayer())
-  {
-    if (plrMover->GetUInt32Value(UNIT_NPC_EMOTESTATE) != EMOTE_ONESHOT_NONE &&
-        movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING))
-    {
-      plrMover->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_ONESHOT_NONE);
-    }
-  }
-
-  if (!movementInfo.pos.IsPositionValid())
-  {
-    if (plrMover)
-    {
-      sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-    }
-
-    recvData.rfinish(); // prevent warnings spam
-    return;
-  }
-
-  if (!mover->movespline->Finalized())
+  if (!ProcessMovementInfo(movementInfo, mover, plrMover, recvData))
   {
     recvData.rfinish(); // prevent warnings spam
     return;
   }
 
-  // Xinef: do not allow to move with UNIT_FLAG_DISABLE_MOVE
-  if (mover->HasUnitFlag(UNIT_FLAG_DISABLE_MOVE))
-  {
-    // Xinef: skip moving packets
-    if (movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING))
-    {
-      if (plrMover)
-      {
-        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-      }
-      return;
-    }
-    movementInfo.pos.Relocate(mover->GetPositionX(), mover->GetPositionY(), mover->GetPositionZ());
+  /* process position-change */
+  WorldPacket data(opcode, recvData.size());
+  WriteMovementInfo(&data, &movementInfo);
+  mover->SendMessageToSet(&data, _player);
+}
 
-    if (mover->IsCreature())
-    {
-      movementInfo.transport.guid = mover->m_movementInfo.transport.guid;
-      movementInfo.transport.pos.Relocate(mover->m_movementInfo.transport.pos.GetPositionX(),
-                                          mover->m_movementInfo.transport.pos.GetPositionY(),
-                                          mover->m_movementInfo.transport.pos.GetPositionZ());
-      movementInfo.transport.seat = mover->m_movementInfo.transport.seat;
-    }
+void WorldSession::SynchronizeMovement(MovementInfo& movementInfo)
+{
+  int64 movementTime = (int64)movementInfo.time + _timeSyncClockDelta;
+  if (_timeSyncClockDelta == 0 || movementTime < 0 || movementTime > 0xFFFFFFFF)
+  {
+    LOG_INFO("misc", "The computed movement time using clockDelta is erronous. Using fallback instead");
+    movementInfo.time = getMSTime();
   }
-
-  if (movementInfo.HasMovementFlag(MOVEMENTFLAG_ONTRANSPORT))
+  else
   {
-    // We were teleported, skip packets that were broadcast before teleport
-    if (movementInfo.pos.GetExactDist2d(mover) > SIZE_OF_GRIDS)
-    {
-      if (plrMover)
-      {
-        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-        // LOG_INFO("anticheat", "MovementHandler:: 2 We were teleported, skip packets that were broadcast before
-        // teleport");
-      }
-      recvData.rfinish(); // prevent warnings spam
-      return;
-    }
+    movementInfo.time = (uint32)movementTime;
+  }
+}
 
-    if (!Acore::IsValidMapCoord(movementInfo.pos.GetPositionX() + movementInfo.transport.pos.GetPositionX(),
-                                movementInfo.pos.GetPositionY() + movementInfo.transport.pos.GetPositionY(),
-                                movementInfo.pos.GetPositionZ() + movementInfo.transport.pos.GetPositionZ(),
-                                movementInfo.pos.GetOrientation() + movementInfo.transport.pos.GetOrientation()))
-    {
-      if (plrMover)
-      {
-        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-      }
+void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo, Unit* mover)
+{
+  SynchronizeMovement(movementInfo);
 
-      recvData.rfinish(); // prevent warnings spam
-      return;
-    }
+  mover->UpdatePosition(movementInfo.pos);
+  mover->m_movementInfo = movementInfo;
 
+  if (mover->m_movementInfo.HasMovementFlag(MOVEMENTFLAG_ONTRANSPORT))
+  {
     // if we boarded a transport, add us to it
-    if (plrMover)
+    if (Player* plrMover = mover->ToPlayer())
     {
       if (!plrMover->GetTransport())
       {
@@ -499,13 +454,168 @@ void WorldSession::HandleMovementOpcodes(WorldPacket& recvData)
       }
     }
   }
-  else if (plrMover && plrMover->GetTransport()) // if we were on a transport, leave
+  else if (mover->IsPlayer())
   {
-    sScriptMgr->AnticheatSetUnderACKmount(plrMover); // just for safe
+    if (Player* plrMover = mover->ToPlayer())
+    {
+      if (plrMover->GetTransport()) // if we were on a transport, leave
+      {
+        sScriptMgr->AnticheatSetUnderACKmount(plrMover); // just for safe
 
-    plrMover->m_transport->RemovePassenger(plrMover);
-    plrMover->m_transport = nullptr;
-    movementInfo.transport.Reset();
+        plrMover->m_transport->RemovePassenger(plrMover);
+        plrMover->m_transport = nullptr;
+        movementInfo.transport.Reset();
+      }
+    }
+  }
+
+  // Some vehicles allow the passenger to turn by himself
+  if (Vehicle* vehicle = mover->GetVehicle())
+  {
+    if (VehicleSeatEntry const* seat = vehicle->GetSeatForPassenger(mover))
+    {
+      if (seat->m_flags & VEHICLE_SEAT_FLAG_ALLOW_TURNING &&
+          movementInfo.pos.GetOrientation() != mover->GetOrientation())
+      {
+        mover->SetOrientation(movementInfo.pos.GetOrientation());
+        mover->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TURNING);
+      }
+    }
+  }
+
+  if (Player* plrMover = mover->ToPlayer()) // nothing is charmed, or player charmed
+  {
+    if (plrMover->IsSitState() && (movementInfo.flags & (MOVEMENTFLAG_MASK_MOVING | MOVEMENTFLAG_MASK_TURNING)))
+      plrMover->SetStandState(UNIT_STAND_STATE_STAND);
+
+    if (movementInfo.pos.GetPositionZ() <
+        plrMover->GetMap()->GetMinHeight(movementInfo.pos.GetPositionX(), movementInfo.pos.GetPositionY()))
+    {
+      if (!plrMover->GetBattleground() || !plrMover->GetBattleground()->HandlePlayerUnderMap(_player))
+      {
+        if (plrMover->IsAlive())
+        {
+          plrMover->SetPlayerFlag(PLAYER_FLAGS_IS_OUT_OF_BOUNDS);
+          plrMover->EnvironmentalDamage(DAMAGE_FALL_TO_VOID, GetPlayer()->GetMaxHealth());
+          // player can be alive if GM
+          if (plrMover->IsAlive())
+            plrMover->KillPlayer();
+        }
+        else if (!plrMover->HasPlayerFlag(PLAYER_FLAGS_IS_OUT_OF_BOUNDS))
+        {
+          GraveyardStruct const* grave = sGraveyard->GetClosestGraveyard(plrMover, plrMover->GetTeamId());
+          if (grave)
+          {
+            plrMover->TeleportTo(grave->Map, grave->x, grave->y, grave->z, plrMover->GetOrientation());
+            plrMover->Relocate(grave->x, grave->y, grave->z, plrMover->GetOrientation());
+          }
+        }
+      }
+    }
+  }
+}
+
+bool WorldSession::VerifyMovementInfo(MovementInfo const& movementInfo, Player* plrMover, Unit* mover,
+                                      Opcodes opcode) const
+{
+  if (!movementInfo.pos.IsPositionValid())
+  {
+    if (plrMover)
+    {
+      sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
+    }
+
+    return false;
+  }
+
+  if (!mover->movespline->Finalized())
+    return false;
+
+  // Xinef: do not allow to move with UNIT_FLAG_DISABLE_MOVE
+  if (mover->HasUnitFlag(UNIT_FLAG_DISABLE_MOVE))
+  {
+    // Xinef: skip moving packets
+    if (movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING))
+    {
+      if (plrMover)
+      {
+        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
+      }
+      return false;
+    }
+  }
+
+  bool jumpopcode = false;
+  if (opcode == MSG_MOVE_JUMP)
+  {
+    jumpopcode = true;
+    if (plrMover && !sScriptMgr->AnticheatHandleDoubleJump(plrMover, mover))
+    {
+      LOG_WARN("anticheat", "Double jump detected for player {} - packet rejected (no kick)", plrMover->GetName());
+      return false;
+    }
+  }
+
+  /* start some hack detection */
+  if (plrMover && !sScriptMgr->AnticheatCheckMovementInfo(plrMover, movementInfo, mover, jumpopcode))
+  {
+    LOG_WARN("anticheat", "Movement info check failed for player {} (opcode {}) - packet rejected (no kick)",
+             plrMover->GetName(), GetOpcodeNameForLogging(opcode));
+    return false;
+  }
+
+  // rooted mover sent packet without root or moving AND root - ignore, due to client crash possibility
+  if (opcode != CMSG_FORCE_MOVE_UNROOT_ACK)
+    if (mover->IsRooted() &&
+        (!movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT) || movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING)))
+      return false;
+
+  if (movementInfo.HasMovementFlag(MOVEMENTFLAG_ONTRANSPORT))
+  {
+    // We were teleported, skip packets that were broadcast before teleport
+    if (movementInfo.pos.GetExactDist2d(mover) > SIZE_OF_GRIDS)
+    {
+      if (plrMover)
+      {
+        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
+      }
+      return false;
+    }
+
+    if (!Acore::IsValidMapCoord(movementInfo.pos.GetPositionX() + movementInfo.transport.pos.GetPositionX(),
+                                movementInfo.pos.GetPositionY() + movementInfo.transport.pos.GetPositionY(),
+                                movementInfo.pos.GetPositionZ() + movementInfo.transport.pos.GetPositionZ(),
+                                movementInfo.pos.GetOrientation() + movementInfo.transport.pos.GetOrientation()))
+    {
+      if (plrMover)
+      {
+        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
+      }
+
+      return false;
+    }
+  }
+  return true;
+}
+
+bool WorldSession::ProcessMovementInfo(MovementInfo& movementInfo, Unit* mover, Player* plrMover, WorldPacket& recvData)
+{
+  Opcodes opcode = (Opcodes)recvData.GetOpcode();
+  if (!VerifyMovementInfo(movementInfo, plrMover, mover, opcode))
+    return false;
+
+  if (mover->HasUnitFlag(UNIT_FLAG_DISABLE_MOVE))
+  {
+    movementInfo.pos.Relocate(mover->GetPositionX(), mover->GetPositionY(), mover->GetPositionZ());
+
+    if (mover->IsCreature())
+    {
+      movementInfo.transport.guid = mover->m_movementInfo.transport.guid;
+      movementInfo.transport.pos.Relocate(mover->m_movementInfo.transport.pos.GetPositionX(),
+                                          mover->m_movementInfo.transport.pos.GetPositionY(),
+                                          mover->m_movementInfo.transport.pos.GetPositionZ());
+      movementInfo.transport.seat = mover->m_movementInfo.transport.seat;
+    }
   }
 
   // fall damage generation (ignore in flight case that can be triggered also at lags in moment teleportation to another
@@ -542,121 +652,61 @@ void WorldSession::HandleMovementOpcodes(WorldPacket& recvData)
     sScriptMgr->OnPlayerMove(plrMover, movementInfo, opcode);
   }
 
-  bool jumpopcode = false;
-  if (opcode == MSG_MOVE_JUMP)
+  if (movementInfo.GetMovementFlags() & MOVEMENTFLAG_MASK_MOVING_OR_TURN)
   {
-    jumpopcode = true;
-    if (plrMover && !sScriptMgr->AnticheatHandleDoubleJump(plrMover, mover))
-    {
-      plrMover->GetSession()->KickPlayer();
-      return;
-    }
+    if (mover->IsStandState())
+      mover->SetStandState(UNIT_STAND_STATE_STAND);
+    mover->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_ONESHOT_NONE);
   }
 
-  /* start some hack detection */
-  if (plrMover && !sScriptMgr->AnticheatCheckMovementInfo(plrMover, movementInfo, mover, jumpopcode))
-  {
-    plrMover->GetSession()->KickPlayer();
-    return;
-  }
+  HandleMoverRelocation(movementInfo, mover);
 
-  /* process position-change */
-  WorldPacket data(opcode, recvData.size());
-  int64       movementTime = (int64)movementInfo.time + _timeSyncClockDelta;
-  if (_timeSyncClockDelta == 0 || movementTime < 0 || movementTime > 0xFFFFFFFF)
-  {
-    LOG_INFO("misc", "The computed movement time using clockDelta is erronous. Using fallback instead");
-    movementInfo.time = getMSTime();
-  }
-  else
-  {
-    movementInfo.time = (uint32)movementTime;
-  }
-
-  movementInfo.guid = mover->GetGUID();
-  WriteMovementInfo(&data, &movementInfo);
-  mover->SendMessageToSet(&data, _player);
-
-  mover->m_movementInfo = movementInfo;
-
-  // Some vehicles allow the passenger to turn by himself
-  if (Vehicle* vehicle = mover->GetVehicle())
-  {
-    if (VehicleSeatEntry const* seat = vehicle->GetSeatForPassenger(mover))
-    {
-      if (seat->m_flags & VEHICLE_SEAT_FLAG_ALLOW_TURNING &&
-          movementInfo.pos.GetOrientation() != mover->GetOrientation())
-      {
-        mover->SetOrientation(movementInfo.pos.GetOrientation());
-        mover->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TURNING);
-      }
-    }
-
-    return;
-  }
-
-  mover->UpdatePosition(movementInfo.pos);
-
-  if (plrMover) // nothing is charmed, or player charmed
-  {
-    if (plrMover->IsSitState() && (movementInfo.flags & (MOVEMENTFLAG_MASK_MOVING | MOVEMENTFLAG_MASK_TURNING)))
-      plrMover->SetStandState(UNIT_STAND_STATE_STAND);
-
+  if (plrMover && opcode != CMSG_MOVE_KNOCK_BACK_ACK)
     plrMover->UpdateFallInformationIfNeed(movementInfo, opcode);
 
-    if (movementInfo.pos.GetPositionZ() <
-        plrMover->GetMap()->GetMinHeight(movementInfo.pos.GetPositionX(), movementInfo.pos.GetPositionY()))
-      if (!plrMover->GetBattleground() || !plrMover->GetBattleground()->HandlePlayerUnderMap(_player))
-      {
-        if (plrMover->IsAlive())
-        {
-          plrMover->SetPlayerFlag(PLAYER_FLAGS_IS_OUT_OF_BOUNDS);
-          plrMover->EnvironmentalDamage(DAMAGE_FALL_TO_VOID, GetPlayer()->GetMaxHealth());
-          // player can be alive if GM
-          if (plrMover->IsAlive())
-            plrMover->KillPlayer();
-        }
-        else if (!plrMover->HasPlayerFlag(PLAYER_FLAGS_IS_OUT_OF_BOUNDS))
-        {
-          GraveyardStruct const* grave = sGraveyard->GetClosestGraveyard(plrMover, plrMover->GetTeamId());
-          if (grave)
-          {
-            plrMover->TeleportTo(grave->Map, grave->x, grave->y, grave->z, plrMover->GetOrientation());
-            plrMover->Relocate(grave->x, grave->y, grave->z, plrMover->GetOrientation());
-          }
-        }
-      }
-  }
+  return true;
 }
 
 void WorldSession::HandleForceSpeedChangeAck(WorldPacket& recvData)
 {
-  uint32 opcode = recvData.GetOpcode();
-  LOG_DEBUG("network", "WORLD: Recvd {} ({}, 0x{:X}) opcode",
-            GetOpcodeNameForLogging(static_cast<OpcodeClient>(opcode)), opcode, opcode);
+  Opcodes opcode = (Opcodes)recvData.GetOpcode();
+  LOG_DEBUG("network", "WORLD: Recvd {} ({}, 0x{:X}) opcode", GetOpcodeNameForLogging(opcode), opcode, opcode);
 
   /* extract packet */
-  ObjectGuid guid;
-  uint32     unk1;
-  float      newspeed;
+  ObjectGuid   guid;
+  uint32       counter;
+  MovementInfo movementInfo;
+  float        newspeed;
 
   recvData >> guid.ReadAsPacked();
+  recvData >> counter; // counter or moveEvent
+  movementInfo.guid = guid;
+  ReadMovementInfo(recvData, &movementInfo);
+  recvData >> newspeed;
+
+  Unit* mover = _player->m_mover;
 
   // pussywizard: special check, only player mover allowed here
-  if (guid != _player->m_mover->GetGUID() || guid != _player->GetGUID())
+  if (guid != mover->GetGUID() || guid != _player->GetGUID())
   {
     recvData.rfinish(); // prevent warnings spam
     return;
   }
 
-  // continue parse packet
-  recvData >> unk1; // counter or moveEvent
+  if (!ProcessMovementInfo(movementInfo, mover, _player, recvData))
+  {
+    recvData.rfinish(); // prevent warnings spam
+    return;
+  }
 
-  MovementInfo movementInfo;
-  movementInfo.guid = guid;
-  ReadMovementInfo(recvData, &movementInfo);
-
-  recvData >> newspeed;
+  if (opcode == CMSG_MOVE_SET_COLLISION_HGT_ACK)
+  {
+    WorldPacket data(MSG_MOVE_SET_COLLISION_HGT, 18);
+    WriteMovementInfo(&data, &movementInfo);
+    data << newspeed; // new collision height
+    mover->SendMessageToSet(&data, _player);
+    return;
+  }
 
   // client ACK send one packet for mounted/run case and need skip all except last from its
   // in other cases anti-cheat check can be fail in false case
@@ -711,6 +761,12 @@ void WorldSession::HandleForceSpeedChangeAck(WorldPacket& recvData)
 
   sScriptMgr->AnticheatSetUnderACKmount(_player);
 
+  SpeedOpcodePair const& speedOpcodes = SetSpeed2Opc_table[move_type];
+  WorldPacket            data(speedOpcodes[static_cast<size_t>(SpeedOpcodeIndex::ACK_RESPONSE)], 18);
+  WriteMovementInfo(&data, &movementInfo);
+  data << newspeed;
+  mover->SendMessageToSet(&data, _player);
+
   // skip all forced speed changes except last and unexpected
   // in run/mounted case used one ACK and it must be skipped.m_forced_speed_changes[MOVE_RUN} store both.
   if (_player->m_forced_speed_changes[force_move_type] > 0)
@@ -731,9 +787,9 @@ void WorldSession::HandleForceSpeedChangeAck(WorldPacket& recvData)
     }
     else // must be lesser - cheating
     {
-      LOG_INFO("network.opcode", "Player {} from account id {} kicked for incorrect speed (must be {} instead {})",
+      LOG_WARN("network.opcode",
+               "Player {} from account id {} reported incorrect speed (must be {} instead {}) - ignored (no kick)",
                _player->GetName(), GetAccountId(), _player->GetSpeed(move_type), newspeed);
-      KickPlayer("Incorrect speed");
     }
   }
 }
@@ -787,12 +843,13 @@ void WorldSession::HandleMoveKnockBackAck(WorldPacket& recvData)
 {
   LOG_DEBUG("network", "CMSG_MOVE_KNOCK_BACK_ACK");
 
+  Unit* mover = _player->m_mover;
+
   ObjectGuid guid;
   recvData >> guid.ReadAsPacked();
 
   // pussywizard: typical check for incomming movement packets
-  if (!_player->m_mover || !_player->m_mover->IsInWorld() || _player->m_mover->IsDuringRemoveFromWorld() ||
-      guid != _player->m_mover->GetGUID())
+  if (!mover || !mover->IsInWorld() || mover->IsDuringRemoveFromWorld() || guid != mover->GetGUID())
   {
     recvData.rfinish(); // prevent warnings spam
     return;
@@ -804,11 +861,17 @@ void WorldSession::HandleMoveKnockBackAck(WorldPacket& recvData)
   movementInfo.guid = guid;
   ReadMovementInfo(recvData, &movementInfo);
 
-  _player->m_mover->m_movementInfo = movementInfo;
+  if (!ProcessMovementInfo(movementInfo, mover, mover->ToPlayer(), recvData))
+  {
+    recvData.rfinish(); // prevent warnings spam
+    return;
+  }
+
+  if (mover->IsPlayer() && static_cast<Player*>(mover)->IsFreeFlying())
+    mover->SetCanFly(true);
 
   WorldPacket data(MSG_MOVE_KNOCK_BACK, 66);
-  data << guid.WriteAsPacked();
-  _player->m_mover->BuildMovementPacket(&data);
+  WriteMovementInfo(&data, &movementInfo);
   _player->SetCanTeleport(true);
   // knockback specific info
   data << movementInfo.jump.sinAngle;
@@ -985,8 +1048,15 @@ void WorldSession::ComputeNewClockDelta()
 
 void WorldSession::HandleMoveRootAck(WorldPacket& recvData)
 {
-  ObjectGuid guid;
+  LOG_DEBUG("network", "WORLD: {}", GetOpcodeNameForLogging((Opcodes)recvData.GetOpcode()));
+
+  ObjectGuid   guid;
+  uint32       counter;
+  MovementInfo movementInfo;
   recvData >> guid.ReadAsPacked();
+  recvData >> counter;
+  movementInfo.guid = guid;
+  ReadMovementInfo(recvData, &movementInfo);
 
   Unit* mover = _player->m_mover;
   if (!mover || guid != mover->GetGUID())
@@ -995,67 +1065,21 @@ void WorldSession::HandleMoveRootAck(WorldPacket& recvData)
     return;
   }
 
-  uint32 movementCounter;
-  recvData >> movementCounter;
-
-  MovementInfo movementInfo;
-  movementInfo.guid = guid;
-  ReadMovementInfo(recvData, &movementInfo);
-
-  /* process position-change */
-  int64 movementTime = (int64)movementInfo.time + _timeSyncClockDelta;
-  if (_timeSyncClockDelta == 0 || movementTime < 0 || movementTime > 0xFFFFFFFF)
+  if (recvData.GetOpcode() == CMSG_FORCE_MOVE_UNROOT_ACK) // unroot case
   {
-    LOG_INFO("misc", "The computed movement time using clockDelta is erronous. Using fallback instead");
-    movementInfo.time = getMSTime();
+    if (!mover->m_movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT))
+      return;
   }
-  else
+  else // root case
   {
-    movementInfo.time = (uint32)movementTime;
+    if (mover->m_movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT))
+      return;
   }
 
-  movementInfo.guid     = mover->GetGUID();
-  mover->m_movementInfo = movementInfo;
-  mover->UpdatePosition(movementInfo.pos);
-}
-
-void WorldSession::HandleMoveUnRootAck(WorldPacket& recvData)
-{
-  ObjectGuid guid;
-  recvData >> guid.ReadAsPacked();
-
-  Unit* mover = _player->m_mover;
-  if (!mover || guid != mover->GetGUID())
-  {
-    recvData.rfinish(); // prevent warnings spam
+  if (!ProcessMovementInfo(movementInfo, mover, _player, recvData))
     return;
-  }
 
-  uint32 movementCounter;
-  recvData >> movementCounter;
-
-  MovementInfo movementInfo;
-  movementInfo.guid = guid;
-  ReadMovementInfo(recvData, &movementInfo);
-
-  /* process position-change */
-  int64 movementTime = (int64)movementInfo.time + _timeSyncClockDelta;
-  if (_timeSyncClockDelta == 0 || movementTime < 0 || movementTime > 0xFFFFFFFF)
-  {
-    LOG_INFO("misc", "The computed movement time using clockDelta is erronous. Using fallback instead");
-    movementInfo.time = getMSTime();
-  }
-  else
-  {
-    movementInfo.time = (uint32)movementTime;
-  }
-
-  if (G3D::fuzzyEq(movementInfo.fallTime, 0.f))
-  {
-    movementInfo.RemoveMovementFlag(MOVEMENTFLAG_FALLING);
-  }
-
-  movementInfo.guid     = mover->GetGUID();
-  mover->m_movementInfo = movementInfo;
-  mover->UpdatePosition(movementInfo.pos);
+  WorldPacket data(recvData.GetOpcode() == CMSG_FORCE_MOVE_UNROOT_ACK ? MSG_MOVE_UNROOT : MSG_MOVE_ROOT);
+  WriteMovementInfo(&data, &movementInfo);
+  mover->SendMessageToSet(&data, _player);
 }

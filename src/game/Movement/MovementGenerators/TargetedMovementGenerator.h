@@ -43,7 +43,7 @@ class ChaseMovementGenerator : public MovementGeneratorMedium<T, ChaseMovementGe
 public:
   ChaseMovementGenerator(Unit* target, Optional<ChaseRange> range = {}, Optional<ChaseAngle> angle = {})
       : TargetedMovementGeneratorBase(target), i_leashExtensionTimer(1500), i_path(nullptr), i_recheckDistance(0),
-        i_recalculateTravel(true), _range(range), _angle(angle)
+        i_recalculateTravel(true), _range(range), _angle(angle), _fallbackPositioning(false)
   {
   }
   ~ChaseMovementGenerator() {}
@@ -73,8 +73,9 @@ private:
   Optional<Position>         _lastTargetPosition;
   Optional<ChaseRange> const _range;
   Optional<ChaseAngle> const _angle;
-  bool                       _movingTowards = true;
-  bool                       _mutualChase   = true;
+  bool                       _movingTowards       = true;
+  bool                       _mutualChase         = true;
+  bool                       _fallbackPositioning = false;
 };
 
 template <class T>

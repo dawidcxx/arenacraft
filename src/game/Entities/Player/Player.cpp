@@ -4451,12 +4451,6 @@ void Player::SetMovement(PlayerMovementType pType)
   WorldPacket data;
   switch (pType)
   {
-  case MOVE_ROOT:
-    data.Initialize(SMSG_FORCE_MOVE_ROOT, GetPackGUID().size() + 4);
-    break;
-  case MOVE_UNROOT:
-    data.Initialize(SMSG_FORCE_MOVE_UNROOT, GetPackGUID().size() + 4);
-    break;
   case MOVE_WATER_WALK:
     data.Initialize(SMSG_MOVE_WATER_WALK, GetPackGUID().size() + 4);
     break;
@@ -4510,10 +4504,8 @@ void Player::BuildPlayerRepop()
   SetHealth(1); // convert player body to ghost
   SetMovement(MOVE_WATER_WALK);
   SetWaterWalking(true);
-  if (!GetSession()->isLogingOut())
-  {
-    SetMovement(MOVE_UNROOT);
-  }
+  if (!IsImmobilizedState())
+    SendMoveRoot(false);
   RemoveUnitFlag(UNIT_FLAG_SKINNABLE); // BG - remove insignia related
   int32 corpseReclaimDelay = CalculateCorpseReclaimDelay();
   if (corpseReclaimDelay >= 0)
@@ -4547,7 +4539,7 @@ void Player::ResurrectPlayer(float restore_percent, bool applySickness)
 
   setDeathState(DeathState::Alive);
   SetMovement(MOVE_LAND_WALK);
-  SetMovement(MOVE_UNROOT);
+  SendMoveRoot(false);
   SetWaterWalking(false);
   m_deathTimer = 0;
 
@@ -4608,7 +4600,7 @@ void Player::KillPlayer()
   if (IsFlying() && !GetTransport())
     GetMotionMaster()->MoveFall();
 
-  SetMovement(MOVE_ROOT);
+  SendMoveRoot(true);
 
   StopMirrorTimers(); // disable timers(bars)
 
@@ -11878,18 +11870,9 @@ void Player::SendInitialPacketsAfterAddToMap()
   GetZoneAndAreaId(newzone, newarea);
   UpdateZone(newzone, newarea); // also call SendInitWorldStates();
 
-  if (HasStunAura())
-    SetMovement(MOVE_ROOT);
-
-  // manual send package (have code in HandleEffect(this, AURA_EFFECT_HANDLE_SEND_FOR_CLIENT, true); that must not be
-  // re-applied.
-  if (HasRootAura())
-  {
-    WorldPacket data2(SMSG_FORCE_MOVE_ROOT, 10);
-    data2 << GetPackGUID();
-    data2 << (uint32)2;
-    SendMessageToSet(&data2, true);
-  }
+  // Sync any immobilize which was applied before the unit entered the world.
+  if (HasStunAura() || HasRootAura())
+    SendMoveRoot(true);
 
   SendEnchantmentDurations(); // must be after add to map
   SendItemDurations();        // must be after add to map

@@ -654,6 +654,27 @@ typedef std::unordered_map<uint32, uint32> PacketCooldowns;
 
 struct SpellProcEventEntry; // used only privately
 
+enum class SpeedOpcodeIndex : uint32
+{
+  PC,
+  NPC,
+  ACK_RESPONSE,
+  MAX
+};
+
+typedef const Opcodes SpeedOpcodePair[static_cast<size_t>(SpeedOpcodeIndex::MAX)];
+SpeedOpcodePair       SetSpeed2Opc_table[MAX_MOVE_TYPE] = {
+    {SMSG_FORCE_WALK_SPEED_CHANGE, SMSG_SPLINE_SET_WALK_SPEED, MSG_MOVE_SET_WALK_SPEED},
+    {SMSG_FORCE_RUN_SPEED_CHANGE, SMSG_SPLINE_SET_RUN_SPEED, MSG_MOVE_SET_RUN_SPEED},
+    {SMSG_FORCE_RUN_BACK_SPEED_CHANGE, SMSG_SPLINE_SET_RUN_BACK_SPEED, MSG_MOVE_SET_RUN_BACK_SPEED},
+    {SMSG_FORCE_SWIM_SPEED_CHANGE, SMSG_SPLINE_SET_SWIM_SPEED, MSG_MOVE_SET_SWIM_SPEED},
+    {SMSG_FORCE_SWIM_BACK_SPEED_CHANGE, SMSG_SPLINE_SET_SWIM_BACK_SPEED, MSG_MOVE_SET_SWIM_BACK_SPEED},
+    {SMSG_FORCE_TURN_RATE_CHANGE, SMSG_SPLINE_SET_TURN_RATE, MSG_MOVE_SET_TURN_RATE},
+    {SMSG_FORCE_FLIGHT_SPEED_CHANGE, SMSG_SPLINE_SET_FLIGHT_SPEED, MSG_MOVE_SET_FLIGHT_SPEED},
+    {SMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE, SMSG_SPLINE_SET_FLIGHT_BACK_SPEED, MSG_MOVE_SET_FLIGHT_BACK_SPEED},
+    {SMSG_FORCE_PITCH_RATE_CHANGE, SMSG_SPLINE_SET_PITCH_RATE, MSG_MOVE_SET_PITCH_RATE},
+};
+
 class Unit : public WorldObject
 {
 public:
@@ -802,7 +823,7 @@ public:
   // Movement flags
   void                 AddUnitMovementFlag(uint32 f) { m_movementInfo.flags |= f; }
   void                 RemoveUnitMovementFlag(uint32 f) { m_movementInfo.flags &= ~f; }
-  [[nodiscard]] bool   HasUnitMovementFlag(uint32 f) const { return (m_movementInfo.flags & f) == f; }
+  [[nodiscard]] bool   HasUnitMovementFlag(uint32 f) const { return (m_movementInfo.flags & f) != 0; }
   [[nodiscard]] uint32 GetUnitMovementFlags() const { return m_movementInfo.flags; }
   void                 SetUnitMovementFlags(uint32 f) { m_movementInfo.flags = f; }
 
@@ -1887,6 +1908,17 @@ public:
     return m_movementInfo.HasMovementFlag(MOVEMENTFLAG_FLYING | MOVEMENTFLAG_DISABLE_GRAVITY);
   }
   [[nodiscard]] bool IsFalling() const;
+  [[nodiscard]] bool IsRooted() const { return m_movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT); }
+
+  // Client controlled by an active immobilize (server-side state, not the movement flag)
+  [[nodiscard]] bool IsImmobilizedState() const { return HasUnitState(UNIT_STATE_ROOT | UNIT_STATE_STUNNED); }
+
+  // Client controlled: check if unit currently is under client control (has active "mover"), optionally check for
+  // specific client (server-side)
+  bool IsClientControlled(Player const* exactClient = nullptr) const;
+  // Controlling client: server PoV on which client (player) controls movement of the unit at the moment, obtain "mover"
+  // (server-side)
+  Player const* GetClientControlling() const;
 
   [[nodiscard]] float GetHoverHeight() const { return IsHovering() ? GetFloatValue(UNIT_FIELD_HOVERHEIGHT) : 0.0f; }
 
@@ -1910,6 +1942,7 @@ public:
   [[nodiscard]] float GetSpeedRate(UnitMoveType mtype) const { return m_speed_rate[mtype]; }
   void                SetSpeed(UnitMoveType mtype, float rate, bool forced = false);
   void                SetSpeedRate(UnitMoveType mtype, float rate) { m_speed_rate[mtype] = rate; }
+  void                SendSpeedToController(UnitMoveType mtype, Player* target) const;
 
   void propagateSpeedChange() { GetMotionMaster()->propagateSpeedChange(); }
 
@@ -2337,7 +2370,8 @@ protected:
   void SetFeared(bool apply, Unit* fearedBy = nullptr, bool isFear = false);
   void SetConfused(bool apply);
   void SetStunned(bool apply);
-  void SetRooted(bool apply, bool isStun = false);
+  void SetRooted(bool apply, bool stun = false, bool logout = false);
+  void SendMoveRoot(bool apply);
 
   //----------- Protected variables ----------//
   UnitAI* i_AI;
@@ -2388,6 +2422,9 @@ protected:
 
   float m_speed_rate[MAX_MOVE_TYPE];
 
+  // snapshot of speed rates taken when SetCharmedBy() is called
+  float _charmStartSpeedRate[MAX_MOVE_TYPE]{};
+
   CharmInfo*       m_charmInfo;
   SharedVisionList m_sharedVision;
 
@@ -2409,8 +2446,6 @@ protected:
   // xinef: apply resilience
   bool m_applyResilience;
   bool _instantCast;
-
-  uint32 m_rootTimes;
 
 private:
   bool IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackType attType, bool isVictim, bool active,

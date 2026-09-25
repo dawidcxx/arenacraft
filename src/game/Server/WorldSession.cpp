@@ -113,7 +113,7 @@ WorldSession::WorldSession(uint32 id, std::string&& name, std::shared_ptr<WorldS
       m_playerSave(false), m_sessionDbcLocale(sWorld->GetDefaultDbcLocale()), m_sessionDbLocaleIndex(locale),
       m_latency(0), m_TutorialsChanged(false), recruiterId(recruiter), isRecruiter(isARecruiter),
       m_currentVendorEntry(0), _calendarEventCreationCooldown(0), _addonMessageReceiveCount(0),
-      _timeSyncClockDeltaQueue(6), _timeSyncClockDelta(0), _pendingTimeSyncRequests()
+      _timeSyncClockDeltaQueue(6), _timeSyncClockDelta(0), _orderCounter(0), _pendingTimeSyncRequests()
 {
   memset(m_Tutorials, 0, sizeof(m_Tutorials));
 
