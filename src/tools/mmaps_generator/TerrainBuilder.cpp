@@ -23,6 +23,7 @@
 #include "PathCommon.h"
 #include "VMapMgr2.h"
 #include <map>
+#include <string>
 #include <vector>
 
 // ******************************************
@@ -930,27 +931,42 @@ void TerrainBuilder::cleanVertices(G3D::Array<float>& verts, G3D::Array<int>& tr
 void TerrainBuilder::loadOffMeshConnections(uint32 mapID, uint32 tileX, uint32 tileY, MeshData& meshData,
                                             const char* offMeshFilePath)
 {
-  // no meshfile input given?
-  if (!offMeshFilePath)
-    return;
+  // Blade's Edge Arena (562): explicit off-mesh connections across the rope
+  // bridges. Without these the narrow ropes are not represented in the navmesh
+  // and players/mobs fall through or clip the arena edge.
+  static const std::vector<std::string> bladeEdgeArenaOffMesh = {
+      "562 31,20 (6234.474121 256.563721 11.063726) (6230.162598 251.681976 11.199670) 2.1",
+      "562 31,20 (6242.273926 266.697540 11.090456) (6246.688965 272.064819 11.235604) 2.1",
+  };
 
-  FILE* fp = fopen(offMeshFilePath, "rb");
-  if (!fp)
+  std::vector<std::string> offMeshLines = bladeEdgeArenaOffMesh;
+
+  if (offMeshFilePath)
   {
-    printf(" loadOffMeshConnections:: input file %s not found!\n", offMeshFilePath);
-    return;
+    FILE* fp = fopen(offMeshFilePath, "rb");
+    if (!fp)
+    {
+      printf(" loadOffMeshConnections:: input file %s not found!\n", offMeshFilePath);
+    }
+    else
+    {
+      // pretty silly thing, as we parse entire file and load only the tile we need
+      // but we don't expect this file to be too large
+      char* buf = new char[512];
+      while (fgets(buf, 512, fp))
+        offMeshLines.emplace_back(buf);
+      delete[] buf;
+      fclose(fp);
+    }
   }
 
-  // pretty silly thing, as we parse entire file and load only the tile we need
-  // but we don't expect this file to be too large
-  char* buf = new char[512];
-  while (fgets(buf, 512, fp))
+  for (const std::string& line : offMeshLines)
   {
     float  p0[3], p1[3];
     uint32 mid, tx, ty;
     float  size;
-    if (sscanf(buf, "%u %u,%u (%f %f %f) (%f %f %f) %f", &mid, &tx, &ty, &p0[0], &p0[1], &p0[2], &p1[0], &p1[1], &p1[2],
-               &size) != 10)
+    if (sscanf(line.c_str(), "%u %u,%u (%f %f %f) (%f %f %f) %f", &mid, &tx, &ty, &p0[0], &p0[1], &p0[2], &p1[0],
+               &p1[1], &p1[2], &size) != 10)
       continue;
 
     if (mapID == mid && tileX == tx && tileY == ty)
@@ -970,8 +986,5 @@ void TerrainBuilder::loadOffMeshConnections(uint32 mapID, uint32 tileX, uint32 t
       meshData.offMeshConnectionsFlags.append((unsigned short)0xFF); // all movement masks can make this path
     }
   }
-
-  delete[] buf;
-  fclose(fp);
 }
 } // namespace MMAP
