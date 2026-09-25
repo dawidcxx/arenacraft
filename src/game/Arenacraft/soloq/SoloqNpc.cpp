@@ -39,11 +39,17 @@ void SendMessage(Player* player, std::string const& message)
 // explicitly when the match ends and when a player leaves the arena.
 //
 // A player who was invited but never accepted the arena still has a real
-// m_QueuedPlayers entry at this point. Clearing only their client queue id would
-// strand that entry (and its scheduled removal event keys off the queue id, so it
-// would never clean it up). The next queue attempt then hits the AddGroup
-// duplicate-player assertion. Remove the real entry too.
-void ClearSoloqQueueId(Player* player)
+// m_QueuedPlayers entry at this point (its IsInvitedToBGInstanceGUID is this
+// arena). Clearing only their client queue id would strand that entry (and its
+// scheduled removal event keys off the queue id, so it would never clean it up).
+// The next queue attempt then hits the AddGroup duplicate-player assertion.
+// Remove the real entry too.
+//
+// A player who forfeited mid-match may have already requeued (a fresh 5v5
+// entry, not invited to this arena), so only touch entries that belong to
+// `bgInstanceId`; otherwise we would yank them out of their new queue when the
+// old match finally ends.
+void ClearSoloqQueueId(Player* player, uint32 bgInstanceId)
 {
   if (!player)
     return;
@@ -52,8 +58,16 @@ void ClearSoloqQueueId(Player* player)
 
   GroupQueueInfo ginfo;
   if (queue.GetPlayerGroupInfoData(player->GetGUID(), &ginfo))
-    queue.RemovePlayer(player->GetGUID(), true);
+  {
+    // Queued for a different arena (requeued after forfeiting): leave it alone.
+    if (ginfo.IsInvitedToBGInstanceGUID != bgInstanceId)
+      return;
 
+    // Invited to (but perhaps never entered) this arena: drop the entry.
+    queue.RemovePlayer(player->GetGUID(), true);
+  }
+
+  // No entry left for this arena: just clear the participant's stale badge.
   player->RemoveBattlegroundQueueId(BATTLEGROUND_QUEUE_5v5);
 }
 } // namespace
@@ -214,10 +228,12 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
     if (!player)
       continue;
 
-    ClearSoloqQueueId(player);
+    ClearSoloqQueueId(player, bg->GetInstanceID());
 
-    bool const won = (result == MatchResult::TeamAWin) == (i < 3);
-    ApplySoloqResult(player, update.rating, update.mmr, won);
+    bool const won     = (result == MatchResult::TeamAWin) == (i < 3);
+    bool const applied = ApplySoloqResult(player, update.rating, update.mmr, won);
+    if (!applied)
+      continue;
 
     SendMessage(player, "SoloQ: rating " + std::to_string(update.rating) + " (" + (update.delta >= 0 ? "+" : "") +
                             std::to_string(update.delta) + "), MMR " + std::to_string(update.mmr) + ".");
@@ -241,6 +257,6 @@ void SoloqBattlegroundScript::OnBattlegroundRemovePlayerAtLeave(Battleground* bg
   if (!bg || !bg->isArena())
     return;
 
-  ClearSoloqQueueId(player);
+  ClearSoloqQueueId(player, bg->GetInstanceID());
 }
 } // namespace arenacraft::soloq

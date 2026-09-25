@@ -31,5 +31,7 @@ std::optional<SoloqTeamInfo> GetSoloqTeamInfo(Player* player);
 // rating/MMR, bumps the team's and member's games/wins counters, refreshes the
 // client's arena-team info fields (personal rating, games, season wins) and
 // persists the team. This is what makes the PvP pane show soloq results.
-void ApplySoloqResult(Player* player, uint32_t rating, uint32_t mmr, bool won);
+// Returns false when the player has no soloq team (e.g. it was deleted while the
+// match was running), in which case nothing is written.
+bool ApplySoloqResult(Player* player, uint32_t rating, uint32_t mmr, bool won);
 } // namespace arenacraft::soloq

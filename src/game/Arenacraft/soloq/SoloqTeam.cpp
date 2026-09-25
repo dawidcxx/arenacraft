@@ -76,14 +76,14 @@ std::optional<SoloqTeamInfo> GetSoloqTeamInfo(Player* player)
   return SoloqTeamInfo{team->GetRating(), member ? member->MatchMakerRating : 0u};
 }
 
-void ApplySoloqResult(Player* player, uint32_t rating, uint32_t mmr, bool won)
+bool ApplySoloqResult(Player* player, uint32_t rating, uint32_t mmr, bool won)
 {
   if (!player)
-    return;
+    return false;
 
   ArenaTeam* team = FindSoloqTeam(player);
   if (!team)
-    return;
+    return false;
 
   ArenaTeamStats stats = team->GetStats();
   stats.Rating         = static_cast<uint16>(rating);
@@ -131,5 +131,6 @@ void ApplySoloqResult(Player* player, uint32_t rating, uint32_t mmr, bool won)
   team->SetArenaTeamStats(stats);
   team->SaveToDB(true);
   team->NotifyStatsChanged();
+  return true;
 }
 } // namespace arenacraft::soloq

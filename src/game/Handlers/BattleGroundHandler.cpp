@@ -634,7 +634,9 @@ void WorldSession::HandleBattlefieldLeaveOpcode(WorldPacket& recvData)
   // not allow leave battleground in combat
   if (_player->IsInCombat())
     if (Battleground* bg = _player->GetBattleground())
-      if (bg->GetStatus() != STATUS_WAIT_LEAVE)
+      // Arenacraft: arenas may be left (forfeited) while in combat. Plain
+      // battlegrounds still block it to prevent combat logging.
+      if (!bg->isArena() && bg->GetStatus() != STATUS_WAIT_LEAVE)
         return;
 
   _player->LeaveBattleground();

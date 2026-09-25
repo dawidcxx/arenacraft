@@ -145,9 +145,27 @@ A player who was invited but never accepted (e.g. the arena ended as a walkover
 when one team never ported) is still in `m_QueuedPlayers`; the core's scheduled
 `BGQueueRemoveEvent` keys off the queue id, so clearing the id alone would strand
 the entry forever and the next join would hit the `AddGroup`
-duplicate-player assertion (crash). `ClearSoloqQueueId` (`SoloqNpc.cpp`)
-therefore removes the entry via `GetPlayerGroupInfoData`/`RemovePlayer` before
-clearing the id.
+duplicate-player assertion (crash). `ClearSoloqQueueId(player, bgInstanceId)`
+(`SoloqNpc.cpp`) removes the entry via `GetPlayerGroupInfoData`/`RemovePlayer`
+before clearing the id, but only when the entry is actually for that arena
+(`ginfo.IsInvitedToBGInstanceGUID == bgInstanceId`). This matters because a
+player who forfeits mid-match can requeue immediately: when the old match
+finally ends, its cleanup must not yank them out of the new queue.
+
+A player can forfeit an arena mid-match, including while in combat
+(`HandleBattlefieldLeaveOpcode` allows combat-leave for `bg->isArena()` only;
+plain battlegrounds still block it). Both cleanup paths above run through
+`BattlegroundMap::RemovePlayerFromMap` -> `Battleground::RemovePlayerAtLeave`, so
+the soloq queue id is cleared and the match is resolved by `OnBattlegroundEnd`
+when the arena ends. `Arena::RemovePlayerAtLeave` also strips the arena
+dampening aura (29659), which is applied raw and would otherwise leak out of the
+match.
+
+The leaver's rating is still settled when the match ends (`OnBattlegroundEnd`):
+the result is applied to their persistent 5v5 team exactly like the other five,
+so if their side wins they gain rating. `ApplySoloqResult` returns false and
+nothing is written (no sys message) when the player no longer has a soloq team
+(e.g. they deleted it after leaving). Offline players are skipped entirely.
 
 ## Character readiness gate
 

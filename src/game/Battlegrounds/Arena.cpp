@@ -306,6 +306,10 @@ void Arena::HandleKillPlayer(Player* player, Player* killer)
 
 void Arena::RemovePlayerAtLeave(Player* player)
 {
+  // Arenacraft: the dampening buff is applied raw (see PreUpdateImpl), so it
+  // would otherwise ride out of the arena into the world / the next match.
+  player->RemoveAura(ARENA_DAMPENING_SPELL);
+
   if (isRated() && GetStatus() == STATUS_IN_PROGRESS)
   {
     if (auto const& member = Acore::Containers::MapGetValuePtr(m_Players, player->GetGUID()))
