@@ -668,8 +668,9 @@ public:
   void         BuildUpdate(UpdateDataMapType& data_map, UpdatePlayerSet& player_set) override;
   void         GetCreaturesWithEntryInRange(std::list<Creature*>& creatureList, float radius, uint32 entry);
 
-  void SetPositionDataUpdate();
-  void UpdatePositionData();
+  void               SetPositionDataUpdate();
+  void               UpdatePositionData();
+  [[nodiscard]] bool IsPositionDataUpdatePending() const { return _updatePositionData; }
 
   void AddToObjectUpdate() override;
   void RemoveFromObjectUpdate() override;
