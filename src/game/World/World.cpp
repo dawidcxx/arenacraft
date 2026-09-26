@@ -1659,6 +1659,17 @@ void World::LoadConfigSettings(bool reload)
 }
 
 /// Initialize the World
+// arenacraft: ask jemalloc to hand unused dirty/muzzy pages back to the OS.
+// Linking jemalloc already interposes malloc; this is a synchronous purge that
+// doesn't wait for the background decay thread.
+extern "C" int mallctl(char const* name, void* oldp, size_t* oldlenp, void* newp, size_t newlen);
+
+static void PurgeAllocator()
+{
+  mallctl("thread.tcache.flush", nullptr, nullptr, nullptr, 0);
+  mallctl("arena.4096.purge", nullptr, nullptr, nullptr, 0); // MALLCTL_ARENAS_ALL
+}
+
 void World::SetInitialWorldSettings()
 {
   ///- Server startup begin
@@ -2360,6 +2371,7 @@ void World::SetInitialWorldSettings()
   LOG_INFO("server.loading", " ");
   LOG_INFO("server.loading", "WORLD: World Initialized In {} Minutes {} Seconds", (startupDuration / 60000),
            ((startupDuration % 60000) / 1000)); // outError for red color in console
+  PurgeAllocator();
   LOG_INFO("server.loading", " ");
 
   METRIC_EVENT("events", "World initialized",

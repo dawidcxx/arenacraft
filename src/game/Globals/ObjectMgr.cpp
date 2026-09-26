@@ -2302,7 +2302,8 @@ void ObjectMgr::LoadCreatures()
           spawnMasks[i] |= (1 << k);
 
   _creatureDataStore.rehash(result->GetRowCount());
-  uint32 count = 0;
+  uint32 count   = 0;
+  uint32 skipped = 0;
   do
   {
     Field* fields = result->Fetch();
@@ -2311,6 +2312,17 @@ void ObjectMgr::LoadCreatures()
     uint32              id1     = fields[1].Get<uint32>();
     uint32              id2     = fields[2].Get<uint32>();
     uint32              id3     = fields[3].Get<uint32>();
+
+    // arenacraft: only load static spawns for the hub continent (Outland, map 530).
+    // Other continents and raid/dungeon instances are never entered, and we don't
+    // want their 100k+ spawns in memory. Tamed/controlled pets and spell summons
+    // are created from `creature_template` (loaded in full), not from world spawns,
+    // so they are unaffected by this filter.
+    if (fields[4].Get<uint16>() != 530)
+    {
+      ++skipped;
+      continue;
+    }
 
     CreatureTemplate const* cInfo = GetCreatureTemplate(id1);
     if (!cInfo)
@@ -2505,7 +2517,8 @@ void ObjectMgr::LoadCreatures()
     ++count;
   } while (result->NextRow());
 
-  LOG_INFO("server.loading", ">> Loaded {} Creatures in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
+  LOG_INFO("server.loading", ">> Loaded {} Creatures in {} ms ({} non-hub spawns skipped)", count,
+           GetMSTimeDiffToNow(oldMSTime), skipped);
   LOG_INFO("server.loading", " ");
 }
 
@@ -10529,46 +10542,10 @@ void ObjectMgr::LoadBroadcastTexts()
 
 void ObjectMgr::LoadBroadcastTextLocales()
 {
-  uint32 oldMSTime = getMSTime();
-
-  //                                               0   1       2         3
-  QueryResult result = WorldDatabase.Query("SELECT ID, locale, MaleText, FemaleText FROM broadcast_text_locale");
-
-  if (!result)
-  {
-    LOG_WARN("server.loading", ">> Loaded 0 broadcast text locales. DB table `broadcast_text_locale` is empty.");
-    LOG_INFO("server.loading", " ");
-    return;
-  }
-
-  uint32 locales_count = 0;
-  do
-  {
-    Field* fields = result->Fetch();
-
-    uint32 id = fields[0].Get<uint32>();
-
-    BroadcastTextContainer::iterator bct = _broadcastTextStore.find(id);
-    if (bct == _broadcastTextStore.end())
-    {
-      LOG_ERROR("sql.sql",
-                "BroadcastText (Id: {}) found in table `broadcast_text_locale` but does not exist in `broadcast_text`. "
-                "Skipped!",
-                id);
-      continue;
-    }
-
-    LocaleConstant locale = GetLocaleByName(fields[1].Get<std::string>());
-    if (locale == LOCALE_enUS)
-      continue;
-
-    AddLocaleString(fields[2].Get<std::string>(), locale, bct->second.MaleText);
-    AddLocaleString(fields[3].Get<std::string>(), locale, bct->second.FemaleText);
-    locales_count++;
-  } while (result->NextRow());
-
-  LOG_INFO("server.loading", ">> Loaded {} Broadcast Text Locales in {} ms", locales_count,
-           GetMSTimeDiffToNow(oldMSTime));
+  // arenacraft: enUS-only server — the enUS column lives in `broadcast_text` itself and
+  // GetLocaleString falls back to it for every other locale, so skip loading the
+  // 583k-row locale table entirely (~186 MB rss, ~1.1 s startup).
+  LOG_INFO("server.loading", ">> Skipping broadcast text locales (enUS-only server).");
   LOG_INFO("server.loading", " ");
 }
 
