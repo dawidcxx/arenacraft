@@ -97,6 +97,7 @@ public:
         {"lfg", HandleDebugDungeonFinderCommand, SEC_ADMINISTRATOR, Console::No},
         {"los", HandleDebugLoSCommand, SEC_ADMINISTRATOR, Console::No},
         {"moveflags", HandleDebugMoveflagsCommand, SEC_ADMINISTRATOR, Console::No},
+        {"movement", HandleDebugMovementCommand, SEC_PLAYER, Console::No},
         {"unitstate", HandleDebugUnitStateCommand, SEC_ADMINISTRATOR, Console::No},
         {"objectcount", HandleDebugObjectCountCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"dummy", HandleDebugDummyCommand, SEC_ADMINISTRATOR, Console::No}};
@@ -1317,6 +1318,64 @@ public:
 
     target->ClearUnitState(target->GetUnitState());
     target->AddUnitState(unitState);
+
+    return true;
+  }
+
+  // Dumps the server-side movement state of the selected unit (or the caller). Players may only
+  // inspect themselves; staff may inspect their selection. Intended to diagnose "stuck" reports.
+  static bool HandleDebugMovementCommand(ChatHandler* handler)
+  {
+    Unit*   selected = handler->getSelectedUnit();
+    Player* self     = handler->GetPlayer();
+
+    if (!selected || !self || handler->GetSession()->GetSecurity() < SEC_ADMINISTRATOR)
+      selected = self;
+
+    if (!selected)
+    {
+      handler->SendErrorMessage(LANG_SELECT_CHAR_OR_CREATURE);
+      return false;
+    }
+
+    Unit*               target = selected;
+    Player*             player = target->ToPlayer();
+    MovementInfo const& mi     = target->m_movementInfo;
+
+    handler->PSendSysMessage("Movement state for {} ({})", target->GetName(), target->GetGUID().ToString());
+    handler->PSendSysMessage("  map {} instance {} inWorld {} removing {} teleporting {}", target->GetMapId(),
+                             target->GetInstanceId(), target->IsInWorld(), target->IsDuringRemoveFromWorld(),
+                             player ? player->IsBeingTeleported() : false);
+    handler->PSendSysMessage("  pos ({:.2f}, {:.2f}, {:.2f}, {:.2f}) transport {} seat {}", target->GetPositionX(),
+                             target->GetPositionY(), target->GetPositionZ(), target->GetOrientation(),
+                             target->GetTransport() ? "yes" : "no", target->GetTransSeat());
+    handler->PSendSysMessage("  flags 0x{:X} flags2 0x{:X} fallTime {} pitch {:.2f}", mi.flags, mi.flags2, mi.fallTime,
+                             mi.pitch);
+    handler->PSendSysMessage("  rooted {} immobilized {} rootAura {} stunAura {} unitState 0x{:X} clientControlled {}",
+                             target->IsRooted(), target->IsImmobilizedState(), target->HasRootAura(),
+                             target->HasStunAura(), target->GetUnitState(), target->IsClientControlled());
+    handler->PSendSysMessage("  moving {} turning {} canFly {} flying {} falling {} onTransport {} spline {} ->{}",
+                             target->isMoving(), target->isTurning(), target->CanFly(), target->IsFlying(),
+                             target->IsFalling(), mi.HasMovementFlag(MOVEMENTFLAG_ONTRANSPORT),
+                             target->movespline->Initialized(), target->movespline->Finalized());
+    handler->PSendSysMessage("  speed run {:.2f} walk {:.2f} swim {:.2f} flight {:.2f} vehicle {}",
+                             target->GetSpeed(MOVE_RUN), target->GetSpeed(MOVE_WALK), target->GetSpeed(MOVE_SWIM),
+                             target->GetSpeed(MOVE_FLIGHT), target->GetVehicle() ? "yes" : "no");
+
+    if (player)
+    {
+      handler->PSendSysMessage("  mover {} orderCounter {} mapChangeCounter {} pendingFlight {}",
+                               player->m_mover ? player->m_mover->GetGUID().ToString() : "<none>",
+                               player->GetSession() ? player->GetSession()->GetOrderCounter() : 0,
+                               player->GetMapChangeOrderCounter(), player->GetPendingFlightChange());
+    }
+
+    LOG_INFO("movement",
+             "movement debug for {}: flags 0x{:X} flags2 0x{:X} rooted {} immobilized {} rootAura {} "
+             "stunAura {} unitState 0x{:X} inWorld {} teleporting {}",
+             target->GetName(), mi.flags, mi.flags2, target->IsRooted(), target->IsImmobilizedState(),
+             target->HasRootAura(), target->HasStunAura(), target->GetUnitState(), target->IsInWorld(),
+             player ? player->IsBeingTeleported() : false);
 
     return true;
   }

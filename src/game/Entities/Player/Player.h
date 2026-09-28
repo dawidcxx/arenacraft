@@ -2804,6 +2804,17 @@ public:
 
   void SendSystemMessage(std::string_view msg, bool escapeCharacters = false);
 
+  // Movement packet order bookkeeping: snapshot of the session order counter taken on a map change.
+  // Movement ACKs (root/speed/...) carrying a counter <= this value belong to the previous map and
+  // must not be applied, otherwise they corrupt the fresh movement state after a teleport.
+  void                 SetMapChangeOrderCounter() { _mapChangeOrderCounter = GetSession()->GetOrderCounter(); }
+  [[nodiscard]] uint32 GetMapChangeOrderCounter() const { return _mapChangeOrderCounter; }
+
+  // Movement order counter of the last flight-state packet we sent. Used to drop a stale CAN_FLY
+  // state after a map change / login when the corresponding ACK never made it back.
+  [[nodiscard]] uint32 GetPendingFlightChange() const { return _pendingFlightChangeCounter; }
+  void                 SetPendingFlightChange(uint32 counter) { _pendingFlightChangeCounter = counter; }
+
   std::string GetDebugInfo() const override;
 
 protected:
@@ -3178,6 +3189,11 @@ private:
   PlayerSettingMap m_charSettingsMap;
 
   Seconds m_creationTime;
+
+  // Session movement order counter snapshot taken on the last map change (see SetMapChangeOrderCounter)
+  uint32 _mapChangeOrderCounter = 0;
+  // Order counter of the last flight-state packet sent (see GetPendingFlightChange)
+  uint32 _pendingFlightChangeCounter = 0;
 };
 
 void AddItemsSetItem(Player* player, Item* item);

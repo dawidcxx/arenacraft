@@ -1615,13 +1615,18 @@ void WorldSession::HandleMoveSetCanFlyAckOpcode(WorldPacket& recv_data)
     return;
   }
 
-  recv_data.read_skip<uint32>(); // unk
+  uint32 counter;
+  recv_data >> counter; // movement counter
 
   MovementInfo movementInfo;
   movementInfo.guid = guid;
   ReadMovementInfo(recv_data, &movementInfo);
 
   recv_data.read_skip<float>(); // unk2
+
+  // The flight change has been acknowledged, so it is no longer pending across a map change.
+  if (_player->GetPendingFlightChange() == counter)
+    _player->SetPendingFlightChange(0);
 
   sScriptMgr->AnticheatSetCanFlybyServer(_player, movementInfo.HasMovementFlag(MOVEMENTFLAG_CAN_FLY));
 

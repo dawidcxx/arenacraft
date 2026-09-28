@@ -110,6 +110,13 @@ void WorldSession::HandleMoveWorldportAck()
   GetPlayer()->UpdatePositionData();
 
   GetPlayer()->SendInitialPacketsBeforeAddToMap();
+
+  // A flight state whose ACK was still in flight when the map changed must not leak onto the new
+  // map (the client resets its movement on NEW_WORLD, so a stale CAN_FLY would desync it).
+  if (GetPlayer()->GetPendingFlightChange() <= GetPlayer()->GetMapChangeOrderCounter() && GetSecurity() == SEC_PLAYER &&
+      !GetPlayer()->HasIncreaseMountedFlightSpeedAura() && !GetPlayer()->HasFlyAura())
+    GetPlayer()->m_movementInfo.RemoveMovementFlag(MOVEMENTFLAG_CAN_FLY);
+
   if (!GetPlayer()->GetMap()->AddPlayerToMap(GetPlayer()))
   {
     LOG_ERROR("network.opcode", "WORLD: failed to teleport player {} ({}) to map {} because of unknown reason!",
@@ -693,6 +700,14 @@ void WorldSession::HandleForceSpeedChangeAck(WorldPacket& recvData)
     return;
   }
 
+  // Old map - asynchronous ACK processing, ignore. A speed ACK in flight during a map change would
+  // otherwise relocate the player to its pre-teleport position (fall damage / stuck).
+  if (counter <= _player->GetMapChangeOrderCounter())
+  {
+    recvData.rfinish(); // prevent warnings spam
+    return;
+  }
+
   if (!ProcessMovementInfo(movementInfo, mover, _player, recvData))
   {
     recvData.rfinish(); // prevent warnings spam
@@ -1075,6 +1090,11 @@ void WorldSession::HandleMoveRootAck(WorldPacket& recvData)
     if (mover->m_movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT))
       return;
   }
+
+  // Old map - asynchronous ACK processing, ignore. A root ACK that was in flight when the player
+  // changed maps must not be applied, otherwise it corrupts the fresh movement state after teleport.
+  if (counter <= _player->GetMapChangeOrderCounter())
+    return;
 
   if (!ProcessMovementInfo(movementInfo, mover, _player, recvData))
     return;

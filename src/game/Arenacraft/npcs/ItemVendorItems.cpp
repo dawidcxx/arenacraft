@@ -411,6 +411,8 @@ std::vector<ItemEntry> const& AllItems()
       {ICCSetWeapons, 50695}, // Distant Land
       {ICCSetWeapons, 50725}, // Dying Light
       {ICCSetWeapons, 50648}, // Nibelung
+      {ICCSetWeapons, 49888}, // Shadow's Edge
+
       // Main Hand
       {ICCSetWeapons, 50692}, // Black Bruise
       {ICCSetWeapons, 50608}, // Frozen Bonespike
@@ -423,6 +425,7 @@ std::vector<ItemEntry> const& AllItems()
       {ICCSetWeapons, 50635}, // Sundial of Eternal Dusk
       // Thrown
       {ICCSetWeapons, 51880}, // Gluth's Fetching Knife
+      {ICCSetWeapons, 51852}, // Wand of Ruby Claret
 
       // == ICC relics (ilvl 264) ==
       {ICCSetWeapons, 50454}, // Idol of the Black Willow

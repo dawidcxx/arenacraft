@@ -11281,9 +11281,7 @@ bool RedirectSpellEvent::Execute(uint64 /*e_time*/, uint32 /*p_time*/)
 
 Unit* Unit::GetMagicHitRedirectTarget(Unit* victim, SpellInfo const* spellInfo)
 {
-  // Patch 1.2 notes: Spell Reflection no longer reflects abilities
-  if (spellInfo->HasAttribute(SPELL_ATTR0_IS_ABILITY) || spellInfo->HasAttribute(SPELL_ATTR1_NO_REDIRECTION) ||
-      spellInfo->HasAttribute(SPELL_ATTR0_NO_IMMUNITIES))
+  if (!spellInfo->CanBeRedirectedBySpellMagnet())
     return victim;
 
   Unit::AuraEffectList const& magnetAuras = victim->GetAuraEffectsByType(SPELL_AURA_SPELL_MAGNET);
@@ -16591,6 +16589,15 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
     if (i->aura->IsRemoved())
       continue;
 
+    // Don't consume stealth charges from friendly spells/procs (e.g. Sated, Tinnitus, Honor Among Thieves)
+    if (i->aura->GetSpellInfo()->HasAura(SPELL_AURA_MOD_STEALTH))
+    {
+      SpellInfo const* procSpell = eventInfo.GetSpellInfo();
+      Unit*            actor     = eventInfo.GetActor();
+      if (procSpell && actor && (procSpell->IsPositive() || !actor->IsHostileTo(this)))
+        continue;
+    }
+
     bool useCharges = i->aura->IsUsingCharges();
     // no more charges to use, prevent proc
     if (useCharges && !i->aura->GetCharges())
@@ -16735,7 +16742,8 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
           break;
         case SPELL_AURA_SPELL_MAGNET:
           // Skip Melee hits and targets with magnet aura
-          if (procSpellInfo && (triggeredByAura->GetBase()->GetUnitOwner()->ToUnit() == ToUnit())) // Magnet
+          if (procSpellInfo && (triggeredByAura->GetBase()->GetUnitOwner()->ToUnit() == ToUnit()) &&
+              procSpellInfo->CanBeRedirectedBySpellMagnet()) // Magnet
             takeCharges = true;
           break;
         case SPELL_AURA_MOD_POWER_COST_SCHOOL_PCT:

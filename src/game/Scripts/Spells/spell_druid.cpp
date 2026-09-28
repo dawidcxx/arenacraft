@@ -60,6 +60,8 @@ enum DruidSpells
   SPELL_DRUID_ENRAGE                      = 5229,
   SPELL_DRUID_ENRAGED_DEFENSE             = 70725,
   SPELL_DRUID_ITEM_T10_FERAL_4P_BONUS     = 70726,
+  SPELL_DRUID_BALANCE_T10_BONUS           = 70718,
+  SPELL_DRUID_BALANCE_T10_BONUS_PROC      = 70721,
 };
 
 enum DruidIcons
@@ -205,6 +207,11 @@ class spell_dru_omen_of_clarity : public AuraScript
 {
   PrepareAuraScript(spell_dru_omen_of_clarity);
 
+  bool Validate(SpellInfo const* /*spellInfo*/) override
+  {
+    return ValidateSpellInfo({SPELL_DRUID_BALANCE_T10_BONUS, SPELL_DRUID_BALANCE_T10_BONUS_PROC});
+  }
+
   bool CheckProc(ProcEventInfo& eventInfo)
   {
     SpellInfo const* spellInfo = eventInfo.GetSpellInfo();
@@ -253,7 +260,18 @@ class spell_dru_omen_of_clarity : public AuraScript
     return true;
   }
 
-  void Register() override { DoCheckProc += AuraCheckProcFn(spell_dru_omen_of_clarity::CheckProc); }
+  void HandleProc(AuraEffect const* aurEff, ProcEventInfo& /*eventInfo*/)
+  {
+    Unit* target = GetTarget();
+    if (target->HasAura(SPELL_DRUID_BALANCE_T10_BONUS))
+      target->CastSpell(nullptr, SPELL_DRUID_BALANCE_T10_BONUS_PROC, true, nullptr, aurEff);
+  }
+
+  void Register() override
+  {
+    DoCheckProc += AuraCheckProcFn(spell_dru_omen_of_clarity::CheckProc);
+    OnEffectProc += AuraEffectProcFn(spell_dru_omen_of_clarity::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+  }
 };
 
 // 50419 - Brambles

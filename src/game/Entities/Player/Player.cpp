@@ -1536,6 +1536,9 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
       RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_CHANGE_MAP | AURA_INTERRUPT_FLAG_MOVE |
                                     AURA_INTERRUPT_FLAG_TURNING);
 
+      // Remember the order counter at the map change so ACKs that were in flight for the old map can be ignored
+      SetMapChangeOrderCounter();
+
       if (!GetSession()->PlayerLogout())
       {
         // send transfer packets
@@ -11870,8 +11873,9 @@ void Player::SendInitialPacketsAfterAddToMap()
   GetZoneAndAreaId(newzone, newarea);
   UpdateZone(newzone, newarea); // also call SendInitWorldStates();
 
-  // Sync any immobilize which was applied before the unit entered the world.
-  if (HasStunAura() || HasRootAura())
+  // Sync any immobilize which was applied before the unit entered the world (state-based, so that a
+  // root/stun whose aura was removed by the teleport is still re-sent to the fresh client).
+  if (IsImmobilizedState())
     SendMoveRoot(true);
 
   SendEnchantmentDurations(); // must be after add to map
@@ -16170,10 +16174,16 @@ bool Player::SetCanFly(bool apply, bool packetOnly /*= false*/)
   if (!apply)
     SetFallInformation(GameTime::GetGameTime().count(), GetPositionZ());
 
+  // Remember the order counter so a flight state that crosses a map change without its ACK can be
+  // discarded on the new map (it would otherwise leave the client flying/falling incorrectly).
+  uint32 const counter = GetSession()->GetOrderCounter();
+  SetPendingFlightChange(counter);
+
   WorldPacket data(apply ? SMSG_MOVE_SET_CAN_FLY : SMSG_MOVE_UNSET_CAN_FLY, 12);
   data << GetPackGUID();
-  data << uint32(0); //! movement counter
+  data << counter; // movement counter
   SendDirectMessage(&data);
+  GetSession()->IncrementOrderCounter();
 
   data.Initialize(MSG_MOVE_UPDATE_CAN_FLY, 64);
   data << GetPackGUID();

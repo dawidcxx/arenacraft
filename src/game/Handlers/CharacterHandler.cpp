@@ -1260,6 +1260,12 @@ void WorldSession::HandlePlayerLoginToCharInWorld(Player* pCurrChar)
     pCurrChar->RemoveUnitFlag(UNIT_FLAG_STUNNED);
   }
 
+  // Drop a flight state whose ACK never arrived (e.g. disconnect while flying); otherwise the client
+  // would keep CAN_FLY on a map where the server no longer expects it.
+  if (pCurrChar->GetPendingFlightChange() <= pCurrChar->GetMapChangeOrderCounter() && GetSecurity() == SEC_PLAYER &&
+      !pCurrChar->HasIncreaseMountedFlightSpeedAura() && !pCurrChar->HasFlyAura())
+    pCurrChar->m_movementInfo.RemoveMovementFlag(MOVEMENTFLAG_CAN_FLY);
+
   pCurrChar->SendInitialPacketsBeforeAddToMap();
 
   // necessary actions from AddPlayerToMap:
