@@ -474,16 +474,6 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo, Unit* mover
 bool WorldSession::VerifyMovementInfo(MovementInfo const& movementInfo, Player* plrMover, Unit* mover,
                                       Opcodes opcode) const
 {
-  if (!movementInfo.pos.IsPositionValid())
-  {
-    if (plrMover)
-    {
-      sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-    }
-
-    return false;
-  }
-
   if (!mover->movespline->Finalized())
     return false;
 
@@ -493,64 +483,27 @@ bool WorldSession::VerifyMovementInfo(MovementInfo const& movementInfo, Player* 
     // Xinef: skip moving packets
     if (movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING))
     {
-      if (plrMover)
-      {
-        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-      }
       return false;
     }
-  }
-
-  bool jumpopcode = false;
-  if (opcode == MSG_MOVE_JUMP)
-  {
-    jumpopcode = true;
-    if (plrMover && !sScriptMgr->AnticheatHandleDoubleJump(plrMover, mover))
-    {
-      LOG_WARN("anticheat", "Double jump detected for player {} - packet rejected (no kick)", plrMover->GetName());
-      return false;
-    }
-  }
-
-  /* start some hack detection */
-  if (plrMover && !sScriptMgr->AnticheatCheckMovementInfo(plrMover, movementInfo, mover, jumpopcode))
-  {
-    LOG_WARN("anticheat", "Movement info check failed for player {} (opcode {}) - packet rejected (no kick)",
-             plrMover->GetName(), GetOpcodeNameForLogging(opcode));
-    return false;
   }
 
   // rooted mover sent packet without root or moving AND root - ignore, due to client crash possibility
   if (opcode != CMSG_FORCE_MOVE_UNROOT_ACK)
-    if (mover->IsRooted() &&
-        (!movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT) || movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING)))
-      return false;
-
-  if (movementInfo.HasMovementFlag(MOVEMENTFLAG_ONTRANSPORT))
-  {
-    // We were teleported, skip packets that were broadcast before teleport
-    if (movementInfo.pos.GetExactDist2d(mover) > SIZE_OF_GRIDS)
+    if (mover->IsRooted() && (!movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT) ||
+                              movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING))) [[unlikely]]
     {
-      if (plrMover)
-      {
-        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-      }
+      LOG_WARN(
+          "movement",
+          "VerifyMovementInfo: rejecting packet from rooted mover {} ({}) player {} creature {} clientControlled {} "
+          "opcode {} flags 0x{:X} flags2 0x{:X} rootFlag {} moving {} immobilized {} rootAura {} stunAura {}",
+          mover->GetName(), mover->GetGUID().ToString(), plrMover != nullptr, mover->IsCreature(),
+          mover->IsClientControlled(), GetOpcodeNameForLogging(opcode), movementInfo.GetMovementFlags(),
+          movementInfo.GetExtraMovementFlags(), movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT),
+          movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING) != 0, mover->IsImmobilizedState(),
+          mover->HasRootAura(), mover->HasStunAura());
       return false;
     }
 
-    if (!Acore::IsValidMapCoord(movementInfo.pos.GetPositionX() + movementInfo.transport.pos.GetPositionX(),
-                                movementInfo.pos.GetPositionY() + movementInfo.transport.pos.GetPositionY(),
-                                movementInfo.pos.GetPositionZ() + movementInfo.transport.pos.GetPositionZ(),
-                                movementInfo.pos.GetOrientation() + movementInfo.transport.pos.GetOrientation()))
-    {
-      if (plrMover)
-      {
-        sScriptMgr->AnticheatUpdateMovementInfo(plrMover, movementInfo);
-      }
-
-      return false;
-    }
-  }
   return true;
 }
 
