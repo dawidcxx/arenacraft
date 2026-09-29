@@ -18454,14 +18454,9 @@ void Unit::SetControlled(bool apply, UnitState state, Unit* source /*= nullptr*/
       SetStunned(false);
       break;
     case UNIT_STATE_ROOT:
-      // Prevent creature_template_movement rooted flag from being removed on aura expiration.
-      if (IsCreature())
-      {
-        if (ToCreature()->GetCreatureTemplate()->Movement.Rooted)
-        {
-          return;
-        }
-      }
+      // Prevent the DB rooted flag from being removed on aura expiration.
+      if (IsCreature() && ToCreature()->GetMovementTemplate().IsRooted())
+        return;
 
       if (HasRootAura() || GetVehicle())
         return;

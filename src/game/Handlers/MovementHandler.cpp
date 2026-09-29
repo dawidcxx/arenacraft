@@ -130,17 +130,6 @@ void WorldSession::HandleMoveWorldportAck()
 
   oldMap->AfterPlayerUnlinkFromMap();
 
-  // pussywizard: transport teleport couldn't teleport us to the same map (some other teleport pending, reqs not met,
-  // etc.), but we still have transport set until player moves! clear it if map differs (crashfix)
-  if (Transport* t = _player->GetTransport())
-    if (!t->IsInMap(_player))
-    {
-      t->RemovePassenger(_player);
-      _player->m_transport = nullptr;
-      _player->m_movementInfo.transport.Reset();
-      _player->m_movementInfo.RemoveMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
-    }
-
   if (!_player->getHostileRefMgr().IsEmpty())
     _player->getHostileRefMgr().deleteReferences(true); // pussywizard: multithreading crashfix
 
@@ -420,59 +409,19 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo, Unit* mover
   mover->UpdatePosition(movementInfo.pos);
   mover->m_movementInfo = movementInfo;
 
-  if (mover->m_movementInfo.HasMovementFlag(MOVEMENTFLAG_ONTRANSPORT))
+  // Transports are not supported on this PvP-only core: never track transport passengers
+  if (!mover->GetVehicle())
   {
-    // if we boarded a transport, add us to it
-    if (Player* plrMover = mover->ToPlayer())
-    {
-      if (!plrMover->GetTransport())
-      {
-        if (Transport* transport = plrMover->GetMap()->GetTransport(movementInfo.transport.guid))
-        {
-          plrMover->m_transport = transport;
-          transport->AddPassenger(plrMover);
-        }
-      }
-      else if (plrMover->GetTransport()->GetGUID() != movementInfo.transport.guid)
-      {
-        bool foundNewTransport = false;
-        plrMover->m_transport->RemovePassenger(plrMover);
-        if (Transport* transport = plrMover->GetMap()->GetTransport(movementInfo.transport.guid))
-        {
-          foundNewTransport     = true;
-          plrMover->m_transport = transport;
-          transport->AddPassenger(plrMover);
-        }
+    mover->m_movementInfo.RemoveMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
+    mover->m_movementInfo.transport.Reset();
+    movementInfo.RemoveMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
+    movementInfo.transport.Reset();
 
-        if (!foundNewTransport)
-        {
-          plrMover->m_transport = nullptr;
-          movementInfo.transport.Reset();
-        }
-      }
-    }
-
-    if (!mover->GetTransport() && !mover->GetVehicle())
+    // Detach cleanly so we never leave a dangling entry in the transport's passenger set.
+    if (Transport* transport = mover->GetTransport())
     {
-      GameObject* go = mover->GetMap()->GetGameObject(movementInfo.transport.guid);
-      if (!go || go->GetGoType() != GAMEOBJECT_TYPE_TRANSPORT)
-      {
-        movementInfo.RemoveMovementFlag(MOVEMENTFLAG_ONTRANSPORT);
-      }
-    }
-  }
-  else if (mover->IsPlayer())
-  {
-    if (Player* plrMover = mover->ToPlayer())
-    {
-      if (plrMover->GetTransport()) // if we were on a transport, leave
-      {
-        sScriptMgr->AnticheatSetUnderACKmount(plrMover); // just for safe
-
-        plrMover->m_transport->RemovePassenger(plrMover);
-        plrMover->m_transport = nullptr;
-        movementInfo.transport.Reset();
-      }
+      transport->RemovePassenger(mover);
+      mover->SetTransport(nullptr);
     }
   }
 
@@ -611,7 +560,7 @@ bool WorldSession::ProcessMovementInfo(MovementInfo& movementInfo, Unit* mover, 
   if (!VerifyMovementInfo(movementInfo, plrMover, mover, opcode))
     return false;
 
-  if (mover->HasUnitFlag(UNIT_FLAG_DISABLE_MOVE))
+  if (mover->HasUnitFlag(UNIT_FLAG_DISABLE_MOVE) || (mover->IsCreature() && mover->IsImmobilizedState()))
   {
     movementInfo.pos.Relocate(mover->GetPositionX(), mover->GetPositionY(), mover->GetPositionZ());
 
@@ -791,7 +740,7 @@ void WorldSession::HandleForceSpeedChangeAck(WorldPacket& recvData)
       return;
   }
 
-  if (!_player->GetTransport() && std::fabs(_player->GetSpeed(move_type) - newspeed) > 0.01f)
+  if (std::fabs(_player->GetSpeed(move_type) - newspeed) > 0.01f)
   {
     if (_player->GetSpeed(move_type) > newspeed) // must be greater - just correct
     {
@@ -1083,6 +1032,12 @@ void WorldSession::HandleMoveRootAck(WorldPacket& recvData)
   if (recvData.GetOpcode() == CMSG_FORCE_MOVE_UNROOT_ACK) // unroot case
   {
     if (!mover->m_movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT))
+      return;
+
+    // Legit unroots clear the state first, so a still immobilized mover was never sent one.
+    // This ack bypasses VerifyMovementInfo()'s root check, so accepting it clears
+    // MOVEMENTFLAG_ROOT permanently. Creatures only: ResurrectPlayer() unroots packet-only.
+    if (mover->IsCreature() && mover->IsImmobilizedState())
       return;
   }
   else // root case
