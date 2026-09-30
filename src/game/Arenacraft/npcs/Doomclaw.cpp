@@ -2,6 +2,8 @@
 
 #include "CreatureAI.h"
 #include "DBCStores.h"
+#include "LootMgr.h"
+#include "ObjectMgr.h"
 #include "Random.h"
 #include "SharedDefines.h"
 #include "SmartAI.h"
@@ -119,7 +121,7 @@ void DoomclawSetup::OnAfterDatabaseLoadCreatureTemplates(std::vector<CreatureTem
 
   // Runs before CheckCreatureTemplate(), which then multiplies in the (1.0x)
   // elite damage rate, so this is the final multiplier.
-  proto->DamageModifier *= 3.0f;
+  proto->DamageModifier *= Doomclaw::MeleeDamageMultiplier;
 }
 
 void DoomclawSpellTweaks::OnLoadSpellCustomAttr(SpellInfo* spell)
@@ -133,5 +135,19 @@ void DoomclawSpellTweaks::OnLoadSpellCustomAttr(SpellInfo* spell)
   // DieSides 1 makes CalcValue read BasePoints + 1, so this lands a flat ~10k.
   spell->Effects[EFFECT_0].DieSides   = 1;
   spell->Effects[EFFECT_0].BasePoints = 10000;
+}
+
+void DoomclawLoot::OnStartup()
+{
+  CreatureTemplate const* proto = sObjectMgr->GetCreatureTemplate(Doomclaw::Entry);
+  if (!proto || !proto->lootid)
+    return;
+
+  LootTemplate* loot = LootTemplates_Creature.GetLootForConditionFill(proto->lootid);
+  if (!loot)
+    return;
+
+  // groupid 0 / reference 0 => ordinary guaranteed entry, 100% chance.
+  loot->AddEntry(new LootStoreItem(Doomclaw::DropItem, 0, 100.0f, false, 0, 0, 1, 1));
 }
 } // namespace arenacraft

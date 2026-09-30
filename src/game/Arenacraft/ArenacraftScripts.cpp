@@ -16,6 +16,7 @@ void AddArenacraftScripts()
   new arenacraft::Doomclaw();
   new arenacraft::DoomclawSetup();
   new arenacraft::DoomclawSpellTweaks();
+  new arenacraft::DoomclawLoot();
   new arenacraft::transmog::TransmogPlayerScript();
   new arenacraft::soloq::SoloqNpc();
   new arenacraft::soloq::SoloqNpcSetup();

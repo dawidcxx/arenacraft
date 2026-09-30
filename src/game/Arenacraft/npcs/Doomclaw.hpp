@@ -4,6 +4,7 @@
 #include "Creature.h"
 #include "DatabaseScript.h"
 #include "GlobalScript.h"
+#include "WorldScript.h"
 
 namespace arenacraft
 {
@@ -14,12 +15,17 @@ namespace arenacraft
 class Doomclaw : public AllCreatureScript
 {
 public:
-  static constexpr uint32 Entry               = 19738;
-  static constexpr uint32 Level               = 80;
-  static constexpr uint32 Health              = 270000;
-  static constexpr uint32 SpellCloudOfDisease = 41193;
-  static constexpr uint32 SpellVenomBolt      = 54970;
-  static constexpr uint32 CloudIntervalMs     = 30 * 1000;
+  static constexpr uint32 Entry  = 19738;
+  static constexpr uint32 Level  = 80;
+  static constexpr uint32 Health = 170000;
+  // Guaranteed drop, added to his loot template from code.
+  static constexpr uint32 DropItem = 32768;
+  // Multiplier over the DB DamageModifier (1.0). 3x was the old value; 12x
+  // quadruples it, landing melee swings at roughly 4.2k-5.8k.
+  static constexpr float  MeleeDamageMultiplier = 12.0f;
+  static constexpr uint32 SpellCloudOfDisease   = 41193;
+  static constexpr uint32 SpellVenomBolt        = 54970;
+  static constexpr uint32 CloudIntervalMs       = 30 * 1000;
   // Staggered so the two casts alternate rather than landing together.
   static constexpr uint32 VenomBoltIntervalMs     = 30 * 1000;
   static constexpr uint32 VenomBoltInitialDelayMs = 15 * 1000;
@@ -59,5 +65,15 @@ public:
   DoomclawSpellTweaks() : GlobalScript("arenacraft::DoomclawSpellTweaks", {GLOBALHOOK_ON_LOAD_SPELL_CUSTOM_ATTR}) {}
 
   void OnLoadSpellCustomAttr(SpellInfo* spell) override;
+};
+
+// Appends the code-defined 100% drop to Doomclaw's loot template once the loot
+// tables are loaded. Like the item vendors, this is code-only stock (no SQL).
+class DoomclawLoot : public WorldScript
+{
+public:
+  DoomclawLoot() : WorldScript("arenacraft::DoomclawLoot", {WORLDHOOK_ON_STARTUP}) {}
+
+  void OnStartup() override;
 };
 } // namespace arenacraft
