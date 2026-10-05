@@ -471,40 +471,15 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo, Unit* mover
   }
 }
 
-bool WorldSession::VerifyMovementInfo(MovementInfo const& movementInfo, Player* plrMover, Unit* mover,
-                                      Opcodes opcode) const
+bool WorldSession::VerifyMovementInfo(MovementInfo const& /*movementInfo*/, Player* /*plrMover*/, Unit* mover,
+                                      Opcodes /*opcode*/) const
 {
-  if (!mover->movespline->Finalized())
-    return false;
-
-  // Xinef: do not allow to move with UNIT_FLAG_DISABLE_MOVE
-  if (mover->HasUnitFlag(UNIT_FLAG_DISABLE_MOVE))
-  {
-    // Xinef: skip moving packets
-    if (movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING))
-    {
-      return false;
-    }
-  }
-
-  // rooted mover sent packet without root or moving AND root - ignore, due to client crash possibility
-  if (opcode != CMSG_FORCE_MOVE_UNROOT_ACK)
-    if (mover->IsRooted() && (!movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT) ||
-                              movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING))) [[unlikely]]
-    {
-      LOG_WARN(
-          "movement",
-          "VerifyMovementInfo: rejecting packet from rooted mover {} ({}) player {} creature {} clientControlled {} "
-          "opcode {} flags 0x{:X} flags2 0x{:X} rootFlag {} moving {} immobilized {} rootAura {} stunAura {}",
-          mover->GetName(), mover->GetGUID().ToString(), plrMover != nullptr, mover->IsCreature(),
-          mover->IsClientControlled(), GetOpcodeNameForLogging(opcode), movementInfo.GetMovementFlags(),
-          movementInfo.GetExtraMovementFlags(), movementInfo.HasMovementFlag(MOVEMENTFLAG_ROOT),
-          movementInfo.HasMovementFlag(MOVEMENTFLAG_MASK_MOVING) != 0, mover->IsImmobilizedState(),
-          mover->HasRootAura(), mover->HasStunAura());
-      return false;
-    }
-
-  return true;
+  // This core is client-authoritative: the client owns its position and we relay it to observers.
+  // Silently dropping a movement packet (as position/root/flag anti-cheat leftovers used to) makes
+  // observers see a frozen unit while the mover keeps moving - exactly the desync we hit in play
+  // testing. The only drop kept is the server-side spline lock: while the server drives a movement
+  // spline (charge, knockback, ...) the client is not in control, so its packets are stale.
+  return mover->movespline->Finalized();
 }
 
 bool WorldSession::ProcessMovementInfo(MovementInfo& movementInfo, Unit* mover, Player* plrMover, WorldPacket& recvData)

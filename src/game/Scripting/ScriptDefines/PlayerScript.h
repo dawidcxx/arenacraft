@@ -199,9 +199,6 @@ enum PlayerHook
   PLAYERHOOK_ANTICHEAT_SET_UNDER_ACK_MOUNT,
   PLAYERHOOK_ANTICHEAT_SET_ROOT_ACK_UPD,
   PLAYERHOOK_ANTICHEAT_SET_JUMPING_BY_OPCODE,
-  PLAYERHOOK_ANTICHEAT_UPDATE_MOVEMENT_INFO,
-  PLAYERHOOK_ANTICHEAT_HANDLE_DOUBLE_JUMP,
-  PLAYERHOOK_ANTICHEAT_CHECK_MOVEMENT_INFO,
   PLAYERHOOK_CAN_SEND_ERROR_ALREADY_LOOTED,
   PLAYERHOOK_ON_AFTER_CREATURE_LOOT,
   PLAYERHOOK_ON_AFTER_CREATURE_LOOT_MONEY,
@@ -978,17 +975,10 @@ public:
   }
 
   // Passive Anticheat System
-  virtual void               AnticheatSetCanFlybyServer(Player* /*player*/, bool /*apply*/) {}
-  virtual void               AnticheatSetUnderACKmount(Player* /*player*/) {}
-  virtual void               AnticheatSetRootACKUpd(Player* /*player*/) {}
-  virtual void               AnticheatSetJumpingbyOpcode(Player* /*player*/, bool /*jump*/) {}
-  virtual void               AnticheatUpdateMovementInfo(Player* /*player*/, MovementInfo const& /*movementInfo*/) {}
-  [[nodiscard]] virtual bool AnticheatHandleDoubleJump(Player* /*player*/, Unit* /*mover*/) { return true; }
-  [[nodiscard]] virtual bool AnticheatCheckMovementInfo(Player* /*player*/, MovementInfo const& /*movementInfo*/,
-                                                        Unit* /*mover*/, bool /*jump*/)
-  {
-    return true;
-  }
+  virtual void AnticheatSetCanFlybyServer(Player* /*player*/, bool /*apply*/) {}
+  virtual void AnticheatSetUnderACKmount(Player* /*player*/) {}
+  virtual void AnticheatSetRootACKUpd(Player* /*player*/) {}
+  virtual void AnticheatSetJumpingbyOpcode(Player* /*player*/, bool /*jump*/) {}
 
   /**
    * @brief This hook is called, to avoid displaying the error message that the

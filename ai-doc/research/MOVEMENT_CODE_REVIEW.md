@@ -385,3 +385,60 @@ Per the design principle above, this is mostly *removal*, not addition:
 Open questions: (a) scope — players only or pets/creatures too; (b) how far to
 push the client-trusting pass (adopt echoed speed blindly vs. log-and-adopt);
 (c) confirm Phase 0 as the first PR.
+
+---
+
+# Addendum 2: implementation update (2026-10-05)
+
+Play testing surfaced two real regressions and this addendum records the fixes
+that were applied directly to the core. It **supersedes** the stale claims in
+§2, §3.D/F/G and §5.C2/C5.
+
+Root cause common to both symptoms: root had two sources of truth.
+`Unit::IsRooted()` reads the movement flag (`Unit.h:1911`), while the fork added
+`IsImmobilizedState()` reading `UNIT_STATE_ROOT|STUNNED` (`Unit.h:1913-1914`),
+and `ReadMovementInfo` silently **deleted** `MOVEMENTFLAG_ROOT` from every client
+packet (`WorldSession.cpp:1008`), so the flag half could never match the state
+half for players.
+
+## Applied changes
+
+1. **`ReadMovementInfo` no longer strips `MOVEMENTFLAG_ROOT`**; when ROOT is
+   present it strips the moving bits instead (`MOVEMENTFLAG_MASK_MOVING |
+   MOVEMENTFLAG_MASK_MOVING_FLY`, `WorldSession.cpp:1004-1012`). This keeps the
+   client-freeze guard (ROOT + moving bits is what spins the 3.3.5a client)
+   while restoring a coherent `IsRooted()`. Supersedes §3.D and §5.C5.
+2. **Re-root from aura, not state** (`Player::SendInitialPacketsAfterAddToMap`,
+   `Player.cpp:11876-11882`): `HasRootAura() || HasStunAura()` gates
+   `SendMoveRoot(true)`, and an orphaned `UNIT_STATE_ROOT|STUNNED` with no aura
+   is cleared. This reverts the `25511d6cd` behaviour that re-rooted players with
+   no aura after teleport.
+3. **`VerifyMovementInfo` no longer silently drops packets** except the spline
+   lock (`MovementHandler.cpp:474-482`). The root/`UNIT_FLAG_DISABLE_MOVE` drops
+   were removed: under a client-authoritative model a dropped packet freezes the
+   mover for observers (the "moved but nobody saw it" desync). `DISABLE_MOVE`
+   still clamps the stored position via `ProcessMovementInfo`. Supersedes the
+   §3.B row's addendum (spline lock intentionally kept) and the §1.3 bullet list.
+4. **Warden off by default** (`Warden.Enabled` default `false`, `World.cpp:1501`)
+   and the Win/OSX login gate removed (`WorldSocket.cpp:626-635`). Supersedes
+   §3.G and §5.C2.
+5. **Over-speed ping kick removed**; `CMSG_PING` is latency-only now
+   (`WorldSocket.cpp:759`), members `_OverSpeedPings`/`_LastPingTime` deleted.
+   Supersedes §3.F.
+6. **Dead anticheat hooks deleted** (`AnticheatUpdateMovementInfo`,
+   `AnticheatHandleDoubleJump`, `AnticheatCheckMovementInfo`): enum entries,
+   base virtuals, `ScriptMgr` dispatch. Supersedes §2's reference to the
+   `PlayerScript.h:980-987` family; the four `AnticheatSet*` no-ops remain
+   (called but unimplemented) and can be stripped later.
+
+## Consequences for the plan
+
+- Phase 3.4's "keep ROOT stripping" is now **wrong** — ROOT is preserved and the
+  moving bits are stripped instead.
+- §9.1's "reject + resync" is not adopted; we stay fully client-trusting as the
+  §11 design principle states. The spline lock (§3.B / §9.3) is the only drop
+  left and the spline-done handshake is still the open work item.
+- The `_timeSyncClockDelta` periodic resync (§1.4 / Phase 1.2) is unchanged; it
+  was already working. Relogin was only ever needed because root/position state
+  could not self-heal, which the above changes address by not splitting the
+  state.

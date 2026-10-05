@@ -11873,10 +11873,13 @@ void Player::SendInitialPacketsAfterAddToMap()
   GetZoneAndAreaId(newzone, newarea);
   UpdateZone(newzone, newarea); // also call SendInitWorldStates();
 
-  // Sync any immobilize which was applied before the unit entered the world (state-based, so that a
-  // root/stun whose aura was removed by the teleport is still re-sent to the fresh client).
-  if (IsImmobilizedState())
+  // Sync any immobilize which still has a backing aura. A root/stun whose aura was removed before
+  // the teleport must NOT be re-sent: that rooted the fresh client with no accompanying aura
+  // (SetControlled() can strand UNIT_STATE_ROOT). Clear the orphan state so it cannot resurrect.
+  if (HasRootAura() || HasStunAura())
     SendMoveRoot(true);
+  else if (IsImmobilizedState() && !GetVehicle())
+    ClearUnitState(UNIT_STATE_ROOT | UNIT_STATE_STUNNED);
 
   SendEnchantmentDurations(); // must be after add to map
   SendItemDurations();        // must be after add to map

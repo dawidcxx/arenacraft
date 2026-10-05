@@ -121,7 +121,7 @@ void EncryptableAndCompressiblePacket::CompressIfNeeded()
 }
 
 WorldSocket::WorldSocket(tcp::socket&& socket)
-    : Socket(std::move(socket)), _OverSpeedPings(0), _worldSession(nullptr), _authed(false), _sendBufferSize(4096)
+    : Socket(std::move(socket)), _worldSession(nullptr), _authed(false), _sendBufferSize(4096)
 {
   Acore::Crypto::GetRandomBytes(_authSeed);
   _headerBuffer.Resize(sizeof(ClientPktHeader));
@@ -625,14 +625,6 @@ void WorldSocket::HandleAuthSessionCallback(std::shared_ptr<AuthSessionData> aut
 
   // Must be done before WorldSession is created
   bool wardenActive = sWorld->getBoolConfig(CONFIG_WARDEN_ENABLED);
-  if (wardenActive && account.OS != "Win" && account.OS != "OSX")
-  {
-    SendAuthResponseError(AUTH_REJECT);
-    LOG_ERROR("network", "WorldSocket::HandleAuthSession: Client {} attempted to log in using invalid client OS ({}).",
-              address, account.OS);
-    DelayedCloseSocket();
-    return;
-  }
 
   // Check that Key and account name are the same on client and server
   uint8 t[4] = {0x00, 0x00, 0x00, 0x00};
@@ -766,50 +758,14 @@ void WorldSocket::SendAuthResponseError(uint8 code)
 
 bool WorldSocket::HandlePing(WorldPacket& recvPacket)
 {
-  using namespace std::chrono;
-
   uint32 ping;
   uint32 latency;
 
-  // Get the ping packet content
+  // The client owns the ping cadence. Treat it purely as latency information: the old
+  // over-speed-ping kick disconnected players on unstable links (bursty or reordered pings
+  // inside a 27s window) for no gameplay benefit on this client-authoritative core.
   recvPacket >> ping;
   recvPacket >> latency;
-
-  if (_LastPingTime == steady_clock::time_point())
-  {
-    _LastPingTime = steady_clock::now();
-  }
-  else
-  {
-    steady_clock::time_point now  = steady_clock::now();
-    steady_clock::duration   diff = now - _LastPingTime;
-
-    _LastPingTime = now;
-
-    if (diff < seconds(27))
-    {
-      ++_OverSpeedPings;
-
-      uint32 maxAllowed = sWorld->getIntConfig(CONFIG_MAX_OVERSPEED_PINGS);
-
-      if (maxAllowed && _OverSpeedPings > maxAllowed)
-      {
-        std::unique_lock<std::mutex> sessionGuard(_worldSessionLock);
-
-        if (_worldSession && AccountMgr::IsPlayerAccount(_worldSession->GetSecurity()))
-        {
-          LOG_ERROR("network", "WorldSocket::HandlePing: {} kicked for over-speed pings (address: {})",
-                    _worldSession->GetPlayerInfo(), GetRemoteIpAddress().to_string());
-
-          return false;
-        }
-      }
-    }
-    else
-    {
-      _OverSpeedPings = 0;
-    }
-  }
 
   {
     std::lock_guard<std::mutex> sessionGuard(_worldSessionLock);

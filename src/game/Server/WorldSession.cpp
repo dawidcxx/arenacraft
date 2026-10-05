@@ -1001,11 +1001,14 @@ void WorldSession::ReadMovementInfo(WorldPacket& data, MovementInfo* mi)
     mi->RemoveMovementFlag((maskToRemove));
 #endif
 
-  /*! This must be a packet spoofing attempt. MOVEMENTFLAG_ROOT sent from the client is not valid
-      in conjunction with any of the moving movement flags such as MOVEMENTFLAG_FORWARD.
-      It will freeze clients that receive this player's movement info.
+  /*! A legitimately rooted client reports MOVEMENTFLAG_ROOT and no moving bits. If a spoofed
+      packet combines ROOT with moving flags, the 3.3.5a client's movement step can spin forever
+      and freeze every client that receives this player's movement info (see
+      Unit::SendMoveRoot). Drop the moving bits, not the root bit: stripping ROOT here left the
+      server's IsRooted() permanently desynced from UNIT_STATE_ROOT for players.
   */
-  REMOVE_VIOLATING_FLAGS(mi->HasMovementFlag(MOVEMENTFLAG_ROOT), MOVEMENTFLAG_ROOT);
+  REMOVE_VIOLATING_FLAGS(mi->HasMovementFlag(MOVEMENTFLAG_ROOT),
+                         MOVEMENTFLAG_MASK_MOVING | MOVEMENTFLAG_MASK_MOVING_FLY);
 
   //! Cannot hover without SPELL_AURA_HOVER
   REMOVE_VIOLATING_FLAGS(mi->HasMovementFlag(MOVEMENTFLAG_HOVER) && !GetPlayer()->HasHoverAura(), MOVEMENTFLAG_HOVER);

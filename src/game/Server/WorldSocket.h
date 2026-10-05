@@ -121,9 +121,6 @@ private:
   std::array<uint8, 4> _authSeed;
   AuthCrypt            _authCrypt;
 
-  TimePoint _LastPingTime;
-  uint32    _OverSpeedPings;
-
   std::mutex    _worldSessionLock;
   WorldSession* _worldSession;
   bool          _authed;
