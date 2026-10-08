@@ -69,6 +69,10 @@ public:
   void               setSkipCharacterChecks(bool value);
   [[nodiscard]] bool skipCharacterChecks() const { return _skipCharacterChecks; }
 
+  // Relaxes team composition to any two DPS + one healer (see SoloqQueue).
+  void               setFlexMode(bool value) { _queue.setFlexMode(value); }
+  [[nodiscard]] bool flexMode() const { return _queue.flexMode(); }
+
 private:
   SoloqService() = default;
 

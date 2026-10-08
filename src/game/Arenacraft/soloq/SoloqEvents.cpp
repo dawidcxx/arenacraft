@@ -9,6 +9,7 @@
 #include "Outcome.hpp"
 #include "Player.h"
 #include "RedisConn.h"
+#include "Roles.hpp"
 #include "WorldSession.h"
 
 #include <array>
@@ -160,16 +161,18 @@ void AppendTeam(std::string& out, std::array<ParticipantInfo, 6> const& particip
   out += "]}";
 }
 
-ParticipantInfo ResolveParticipant(QueuedPlayer const& queued, Role role)
+ParticipantInfo ResolveParticipant(QueuedPlayer const& queued, Role fallbackRole)
 {
   ParticipantInfo info{};
   info.id        = queued.id;
   info.classId   = queued.classId;
   info.specIndex = queued.specIndex;
-  info.role      = role;
-  info.teamId    = queued.teamId;
-  info.rating    = queued.rating;
-  info.mmr       = queued.mmr;
+  // Derive the role from the character rather than its team slot: under flex
+  // matching a team's two DPS slots may both be the same role.
+  info.role   = roleFor(queued.classId, queued.specIndex).value_or(fallbackRole);
+  info.teamId = queued.teamId;
+  info.rating = queued.rating;
+  info.mmr    = queued.mmr;
 
   ObjectGuid const guid{queued.id};
   if (Player* player = ObjectAccessor::FindPlayer(guid))

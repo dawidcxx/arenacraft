@@ -7,6 +7,7 @@
  *   .soloq pending  arenas waiting for a result
  *   .soloq clear    dequeue everyone (clears badges too)
  *   .soloq debug    toggle bypass of the character readiness checks
+ *   .soloq flex     toggle relaxed composition (any two DPS + healer per team)
  */
 
 #include "Chat.h"
@@ -65,6 +66,7 @@ public:
         {"pending", HandlePendingCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"clear", HandleClearCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"debug", HandleDebugCommand, SEC_ADMINISTRATOR, Console::Yes},
+        {"flex", HandleFlexCommand, SEC_ADMINISTRATOR, Console::Yes},
     };
     static ChatCommandTable commandTable = {{"soloq", soloqTable}};
     return commandTable;
@@ -95,9 +97,13 @@ public:
                              SoloqService::instance().pendingArenas().size());
     handler->PSendSysMessage("Roles: melee {} | caster {} | healer {}", roles[0], roles[1], roles[2]);
 
-    bool const rolesReady = roles[0] >= 2 && roles[1] >= 2 && roles[2] >= 2;
+    bool const flex = SoloqService::instance().flexMode();
+    bool const rolesReady =
+        flex ? (roles[0] + roles[1] >= 4 && roles[2] >= 2) : (roles[0] >= 2 && roles[1] >= 2 && roles[2] >= 2);
     if (rolesReady)
       handler->SendSysMessage("SoloQ: requirements met, a match will form on the next world tick.");
+    else if (flex)
+      handler->SendSysMessage("SoloQ: flex mode - need at least 4 DPS (melee/caster) and 2 healers to form a match.");
     else
       handler->SendSysMessage("SoloQ: need at least 2 melee, 2 caster and 2 healer to form a match.");
     return true;
@@ -162,6 +168,20 @@ public:
           "SoloQ: debug enabled - readiness checks (gear/enchants/gems/talents/glyphs) are skipped when queueing.");
     else
       handler->SendSysMessage("SoloQ: debug disabled - readiness checks are enforced again.");
+    return true;
+  }
+
+  static bool HandleFlexCommand(ChatHandler* handler, Optional<bool> enableArg)
+  {
+    SoloqService& service = SoloqService::instance();
+    bool const    enable  = enableArg ? *enableArg : !service.flexMode();
+    service.setFlexMode(enable);
+
+    if (enable)
+      handler->SendSysMessage("SoloQ: flex enabled - teams take any two DPS (melee/caster) plus a healer; class "
+                              "stacking is still blocked.");
+    else
+      handler->SendSysMessage("SoloQ: flex disabled - teams require one melee, one caster and one healer.");
     return true;
   }
 };

@@ -31,11 +31,12 @@ std::vector<Match> SoloqQueue::update(std::chrono::milliseconds elapsed)
   std::vector<Match> matches;
   while (std::optional<Candidate> const candidate = findBestMatch())
   {
-    matches.push_back(buildMatch(*candidate));
+    matches.push_back(candidate->match);
 
-    std::array<PlayerId, 6> ids{};
+    std::array<QueuedPlayer const*, 6> const six = playersOf(candidate->match);
+    std::array<PlayerId, 6>                  ids{};
     for (std::size_t i = 0; i < ids.size(); ++i)
-      ids[i] = candidate->players[i].id;
+      ids[i] = six[i]->id;
 
     removePlayers(ids);
   }
@@ -96,18 +97,43 @@ bool SoloqQueue::allCompatible(std::array<Entry const*, 6> const& six) const
   return true;
 }
 
-std::optional<SoloqQueue::Candidate> SoloqQueue::makeCandidate(std::array<Entry const*, 6> const& six) const
+void SoloqQueue::fillStats(Candidate& candidate, std::array<Entry const*, 6> const& six)
 {
-  Candidate candidate{};
-  for (std::size_t i = 0; i < six.size(); ++i)
-    candidate.players[i] = six[i]->player;
+  candidate.spread      = 0;
+  candidate.waitTotal   = 0;
+  candidate.minSequence = six[0]->sequence;
 
-  QueuedPlayer const& m0 = candidate.players[0];
-  QueuedPlayer const& m1 = candidate.players[1];
-  QueuedPlayer const& c0 = candidate.players[2];
-  QueuedPlayer const& c1 = candidate.players[3];
-  QueuedPlayer const& h0 = candidate.players[4];
-  QueuedPlayer const& h1 = candidate.players[5];
+  uint32_t minMmr = six[0]->player.mmr;
+  uint32_t maxMmr = six[0]->player.mmr;
+  for (Entry const* entry : six)
+  {
+    minMmr = std::min(minMmr, entry->player.mmr);
+    maxMmr = std::max(maxMmr, entry->player.mmr);
+    candidate.waitTotal += static_cast<uint64_t>(entry->waited.count());
+    candidate.minSequence = std::min(candidate.minSequence, entry->sequence);
+  }
+  candidate.spread = maxMmr - minMmr;
+}
+
+bool SoloqQueue::betterThan(Candidate const& left, Candidate const& right)
+{
+  if (left.imbalance != right.imbalance)
+    return left.imbalance < right.imbalance;
+  if (left.spread != right.spread)
+    return left.spread < right.spread;
+  if (left.waitTotal != right.waitTotal)
+    return left.waitTotal > right.waitTotal;
+  return left.minSequence < right.minSequence;
+}
+
+std::optional<SoloqQueue::Candidate> SoloqQueue::makeStandardCandidate(std::array<Entry const*, 6> const& six) const
+{
+  QueuedPlayer const& m0 = six[0]->player;
+  QueuedPlayer const& m1 = six[1]->player;
+  QueuedPlayer const& c0 = six[2]->player;
+  QueuedPlayer const& c1 = six[3]->player;
+  QueuedPlayer const& h0 = six[4]->player;
+  QueuedPlayer const& h1 = six[5]->player;
 
   uint64_t const total = static_cast<uint64_t>(m0.mmr) + m1.mmr + c0.mmr + c1.mmr + h0.mmr + h1.mmr;
 
@@ -143,42 +169,99 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeCandidate(std::array<Entry 
   if (!found)
     return std::nullopt;
 
-  candidate.partition   = bestPartition;
-  candidate.imbalance   = bestImbalance;
-  candidate.spread      = 0;
-  candidate.waitTotal   = 0;
-  candidate.minSequence = six[0]->sequence;
+  bool const casterFirstInA = bestPartition == 0 || bestPartition == 1;
+  bool const healerFirstInA = bestPartition == 0 || bestPartition == 2;
 
-  uint32_t minMmr = six[0]->player.mmr;
-  uint32_t maxMmr = six[0]->player.mmr;
-  for (std::size_t i = 0; i < six.size(); ++i)
-  {
-    minMmr = std::min(minMmr, six[i]->player.mmr);
-    maxMmr = std::max(maxMmr, six[i]->player.mmr);
-    candidate.waitTotal += static_cast<uint64_t>(six[i]->waited.count());
-    candidate.minSequence = std::min(candidate.minSequence, six[i]->sequence);
-  }
-  candidate.spread = maxMmr - minMmr;
-
+  Candidate candidate{};
+  candidate.match.a.melee  = m0;
+  candidate.match.a.caster = casterFirstInA ? c0 : c1;
+  candidate.match.a.healer = healerFirstInA ? h0 : h1;
+  candidate.match.b.melee  = m1;
+  candidate.match.b.caster = casterFirstInA ? c1 : c0;
+  candidate.match.b.healer = healerFirstInA ? h1 : h0;
+  candidate.imbalance      = bestImbalance;
+  fillStats(candidate, six);
   return candidate;
 }
 
-Match SoloqQueue::buildMatch(Candidate const& candidate)
+std::optional<SoloqQueue::Candidate> SoloqQueue::makeFlexCandidate(std::array<Entry const*, 6> const& six) const
 {
-  bool const casterFirstInA = candidate.partition == 0 || candidate.partition == 1;
-  bool const healerFirstInA = candidate.partition == 0 || candidate.partition == 2;
+  // Flex composition: six[0..3] are DPS (melee or caster), six[4..5] are healers.
+  // Each team takes two DPS and one healer. Teams that stack a class are skipped.
+  uint64_t total = 0;
+  for (Entry const* entry : six)
+    total += entry->player.mmr;
 
-  Match match;
-  match.a.melee  = candidate.players[0];
-  match.a.caster = candidate.players[casterFirstInA ? 2 : 3];
-  match.a.healer = candidate.players[healerFirstInA ? 4 : 5];
-  match.b.melee  = candidate.players[1];
-  match.b.caster = candidate.players[casterFirstInA ? 3 : 2];
-  match.b.healer = candidate.players[healerFirstInA ? 5 : 4];
-  return match;
+  bool        found           = false;
+  uint64_t    bestImbalance   = 0;
+  std::size_t bestHealer      = 0;
+  std::size_t bestDpsA        = 0;
+  std::size_t bestDpsB        = 0;
+  std::size_t bestComplement0 = 0;
+  std::size_t bestComplement1 = 0;
+
+  for (std::size_t healer = 0; healer < 2; ++healer)
+  {
+    QueuedPlayer const& healerA = six[4 + healer]->player;
+    QueuedPlayer const& healerB = six[4 + (1 - healer)]->player;
+
+    for (std::size_t a = 0; a < 4; ++a)
+      for (std::size_t b = a + 1; b < 4; ++b)
+      {
+        std::size_t complement[2];
+        std::size_t count = 0;
+        for (std::size_t k = 0; k < 4; ++k)
+          if (k != a && k != b)
+            complement[count++] = k;
+
+        QueuedPlayer const& dpsA0 = six[a]->player;
+        QueuedPlayer const& dpsA1 = six[b]->player;
+        QueuedPlayer const& dpsB0 = six[complement[0]]->player;
+        QueuedPlayer const& dpsB1 = six[complement[1]]->player;
+
+        if (dpsA0.classId == dpsA1.classId || dpsA0.classId == healerA.classId || dpsA1.classId == healerA.classId)
+          continue;
+        if (dpsB0.classId == dpsB1.classId || dpsB0.classId == healerB.classId || dpsB1.classId == healerB.classId)
+          continue;
+
+        uint64_t const sumA      = static_cast<uint64_t>(dpsA0.mmr) + dpsA1.mmr + healerA.mmr;
+        uint64_t const doubled   = 2 * sumA;
+        uint64_t const imbalance = doubled > total ? doubled - total : total - doubled;
+
+        if (!found || imbalance < bestImbalance)
+        {
+          found           = true;
+          bestImbalance   = imbalance;
+          bestHealer      = healer;
+          bestDpsA        = a;
+          bestDpsB        = b;
+          bestComplement0 = complement[0];
+          bestComplement1 = complement[1];
+        }
+      }
+  }
+
+  if (!found)
+    return std::nullopt;
+
+  Candidate candidate{};
+  candidate.match.a.melee  = six[bestDpsA]->player;
+  candidate.match.a.caster = six[bestDpsB]->player;
+  candidate.match.a.healer = six[4 + bestHealer]->player;
+  candidate.match.b.melee  = six[bestComplement0]->player;
+  candidate.match.b.caster = six[bestComplement1]->player;
+  candidate.match.b.healer = six[4 + (1 - bestHealer)]->player;
+  candidate.imbalance      = bestImbalance;
+  fillStats(candidate, six);
+  return candidate;
 }
 
 std::optional<SoloqQueue::Candidate> SoloqQueue::findBestMatch() const
+{
+  return _flex ? findFlexMatch() : findStandardMatch();
+}
+
+std::optional<SoloqQueue::Candidate> SoloqQueue::findStandardMatch() const
 {
   std::vector<Entry const*> melee;
   std::vector<Entry const*> caster;
@@ -202,17 +285,6 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::findBestMatch() const
   if (melee.size() < 2 || caster.size() < 2 || healer.size() < 2)
     return std::nullopt;
 
-  auto const betterThan = [](Candidate const& left, Candidate const& right)
-  {
-    if (left.imbalance != right.imbalance)
-      return left.imbalance < right.imbalance;
-    if (left.spread != right.spread)
-      return left.spread < right.spread;
-    if (left.waitTotal != right.waitTotal)
-      return left.waitTotal > right.waitTotal;
-    return left.minSequence < right.minSequence;
-  };
-
   std::optional<Candidate> best;
   for (std::size_t mi = 0; mi < melee.size(); ++mi)
     for (std::size_t mj = mi + 1; mj < melee.size(); ++mj)
@@ -226,7 +298,42 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::findBestMatch() const
               if (!allCompatible(six))
                 continue;
 
-              std::optional<Candidate> const candidate = makeCandidate(six);
+              std::optional<Candidate> const candidate = makeStandardCandidate(six);
+              if (candidate && (!best || betterThan(*candidate, *best)))
+                best = candidate;
+            }
+
+  return best;
+}
+
+std::optional<SoloqQueue::Candidate> SoloqQueue::findFlexMatch() const
+{
+  std::vector<Entry const*> dps;
+  std::vector<Entry const*> healer;
+  for (Entry const& entry : _entries)
+  {
+    if (entry.role == Role::Healer)
+      healer.push_back(&entry);
+    else
+      dps.push_back(&entry);
+  }
+
+  if (dps.size() < 4 || healer.size() < 2)
+    return std::nullopt;
+
+  std::optional<Candidate> best;
+  for (std::size_t i = 0; i < dps.size(); ++i)
+    for (std::size_t j = i + 1; j < dps.size(); ++j)
+      for (std::size_t k = j + 1; k < dps.size(); ++k)
+        for (std::size_t l = k + 1; l < dps.size(); ++l)
+          for (std::size_t hi = 0; hi < healer.size(); ++hi)
+            for (std::size_t hj = hi + 1; hj < healer.size(); ++hj)
+            {
+              std::array<Entry const*, 6> const six = {dps[i], dps[j], dps[k], dps[l], healer[hi], healer[hj]};
+              if (!allCompatible(six))
+                continue;
+
+              std::optional<Candidate> const candidate = makeFlexCandidate(six);
               if (candidate && (!best || betterThan(*candidate, *best)))
                 best = candidate;
             }

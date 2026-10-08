@@ -267,3 +267,62 @@ TEST_CASE("SoloqQueue builds teams without regard to faction")
 
   CHECK(sixHorde.update(0ms).size() == 1);
 }
+
+TEST_CASE("flex mode forms double-DPS teams without casters")
+{
+  SoloqQueue queue;
+  queue.setFlexMode(true);
+  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
+  queue.playerAddToQueue(player(2, CLASS_ROGUE, 0));
+  queue.playerAddToQueue(player(3, CLASS_DEATH_KNIGHT, 0));
+  queue.playerAddToQueue(player(4, CLASS_HUNTER, 0));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));  // healer
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0)); // healer
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(matches.size() == 1);
+  CHECK(queue.empty());
+
+  for (SoloqTeam const* team : {&matches[0].a, &matches[0].b})
+  {
+    std::set<Classes> const classes = {team->melee.classId, team->caster.classId, team->healer.classId};
+    CHECK(classes.size() == 3);
+    CHECK(roleFor(team->healer.classId, team->healer.specIndex) == Role::Healer);
+    CHECK(roleFor(team->melee.classId, team->melee.specIndex) != Role::Healer);
+    CHECK(roleFor(team->caster.classId, team->caster.specIndex) != Role::Healer);
+  }
+}
+
+TEST_CASE("flex mode still refuses to stack a class within a team")
+{
+  SoloqQueue queue;
+  queue.setFlexMode(true);
+  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
+  queue.playerAddToQueue(player(2, CLASS_WARRIOR, 0));
+  queue.playerAddToQueue(player(3, CLASS_WARRIOR, 0));
+  queue.playerAddToQueue(player(4, CLASS_ROGUE, 0));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0));
+
+  // Three warriors cannot be split two-and-two without a team fielding two.
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 6);
+}
+
+TEST_CASE("flex mode needs four DPS and two healers")
+{
+  SoloqQueue queue;
+  queue.setFlexMode(true);
+  queue.playerAddToQueue(melee(1));
+  queue.playerAddToQueue(melee(2));
+  queue.playerAddToQueue(caster(3));
+  queue.playerAddToQueue(healer(4));
+  queue.playerAddToQueue(healer(5));
+
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 5);
+
+  queue.playerAddToQueue(caster(6));
+  CHECK(queue.update(0ms).size() == 1);
+  CHECK(queue.empty());
+}
