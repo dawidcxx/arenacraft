@@ -64,9 +64,6 @@ struct npc_pet_pri_shadowfiend : public PetAI
     PetAI::Reset();
     if (!me->HasAura(SPELL_PRIEST_SHADOWFIEND_DODGE))
       me->AddAura(SPELL_PRIEST_SHADOWFIEND_DODGE, me);
-
-    if (Unit* target = me->SelectNearestTarget(15.0f))
-      AttackStart(target);
   }
 
   void JustDied(Unit* /*killer*/) override
