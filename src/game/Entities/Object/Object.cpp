@@ -268,19 +268,12 @@ void Object::DestroyForPlayer(Player* target, bool onDeath) const
 {
   ASSERT(target);
 
-  if (IsUnit() || isType(TYPEMASK_PLAYER))
-  {
-    if (Battleground* bg = target->GetBattleground())
-    {
-      if (bg->isArena())
-      {
-        WorldPacket data(SMSG_ARENA_UNIT_DESTROYED, 8);
-        data << GetGUID();
-        target->GetSession()->SendPacket(&data);
-      }
-    }
-  }
-
+  // NOTE (arenacraft): SMSG_ARENA_UNIT_DESTROYED is intentionally NOT sent here. This function is
+  // used for every visibility hide (stealth/invisibility/out-of-range via
+  // Player::UpdateVisibilityOf), and the client reports that packet as the arena opponent being
+  // "destroyed"/gone, so it stops firing ARENA_OPPONENT_UPDATE "seen" when the unit reappears and
+  // arena addons keep it hidden. The packet is sent from WorldObject::DestroyForNearbyPlayers,
+  // which is the actual "unit left the world" path (death/disconnect/leave).
   WorldPacket data(SMSG_DESTROY_OBJECT, 8 + 1);
   data << GetGUID();
   //! If the following bool is true, the client will call "void CGUnit_C::OnDeath()" for this object.
@@ -2999,6 +2992,17 @@ void WorldObject::DestroyForNearbyPlayers()
 
     if (IsUnit() && ((Unit*)this)->GetCharmerGUID() == player->GetGUID()) /// @todo: this is for puppet
       continue;
+
+    // arenacraft: an arena unit that is truly leaving the world (death/disconnect/leave, not a
+    // stealth/invisibility visibility hide) is reported as destroyed so arena frames mark it gone.
+    if (IsUnit() || isType(TYPEMASK_PLAYER))
+      if (Battleground* bg = player->GetBattleground())
+        if (bg->isArena())
+        {
+          WorldPacket data(SMSG_ARENA_UNIT_DESTROYED, 8);
+          data << GetGUID();
+          player->GetSession()->SendPacket(&data);
+        }
 
     DestroyForPlayer(player);
     player->m_clientGUIDs.erase(GetGUID());
