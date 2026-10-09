@@ -10,8 +10,9 @@
 // alternatives. Both are documented in ai-doc/enchant_guides.md. Only enchants
 // those guides recommend are listed; vanilla/BC-era filler, strictly-dominated
 // budget duplicates and everything that needs a profession to apply (the server
-// has none) is dropped. The Titanium Weapon Chain is added by hand: it is
-// applied directly to the weapon, so it needs no profession.
+// has none) is dropped. Two entries are added by hand: the Titanium Weapon
+// Chain (applied directly to the weapon, so it needs no profession) and the
+// Scroll of Enchant Weapon - Executioner.
 // Head/shoulder/leg entries are the applied Arcanum/Inscription/Spellthread/Leg
 // Armor items; the waist and weapon sections also hold the applied Eternal Belt
 // Buckle and Titanium Weapon Chain; the rest are "Scroll of Enchant ..."
@@ -99,6 +100,7 @@ std::vector<uint32> const& AllEnchants()
       44466, // Scroll of Enchant Weapon - Superior Potency
       44497, // Scroll of Enchant Weapon - Accuracy
       38925, // Scroll of Enchant Weapon - Mongoose
+      38948, // Scroll of Enchant Weapon - Executioner
       46098, // Scroll of Enchant Weapon - Blood Draining
       38918, // Scroll of Enchant Weapon - Major Intellect
       38963, // Scroll of Enchant Weapon - Exceptional Spirit
