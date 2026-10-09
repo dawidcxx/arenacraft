@@ -22,6 +22,7 @@
 
 #include "CreatureScript.h"
 #include "PetAI.h"
+#include "Player.h"
 #include "ScriptedCreature.h"
 #include "TotemAI.h"
 
@@ -64,6 +65,27 @@ struct npc_pet_pri_shadowfiend : public PetAI
     PetAI::Reset();
     if (!me->HasAura(SPELL_PRIEST_SHADOWFIEND_DODGE))
       me->AddAura(SPELL_PRIEST_SHADOWFIEND_DODGE, me);
+
+    // On summon the fiend should engage its owner's current target immediately, like a /petattack,
+    // instead of idling next to the summoner until the player commands it again. This mirrors the
+    // flag bookkeeping of WorldSession::HandlePetActionHelper's COMMAND_ATTACK branch; calling
+    // AttackStart() alone is ignored while the fresh pet is still flagged as returning.
+    Player* owner  = me->GetOwner() ? me->GetOwner()->ToPlayer() : nullptr;
+    Unit*   target = owner ? owner->GetSelectedUnit() : nullptr;
+
+    if (owner && target && owner->IsValidAttackTarget(target) && me->CanCreatureAttack(target) && me->GetCharmInfo())
+    {
+      me->ClearUnitState(UNIT_STATE_FOLLOW);
+      me->AttackStop();
+
+      me->GetCharmInfo()->SetIsCommandAttack(true);
+      me->GetCharmInfo()->SetIsAtStay(false);
+      me->GetCharmInfo()->SetIsFollowing(false);
+      me->GetCharmInfo()->SetIsCommandFollow(false);
+      me->GetCharmInfo()->SetIsReturning(false);
+
+      AttackStart(target);
+    }
   }
 
   void JustDied(Unit* /*killer*/) override
