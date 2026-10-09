@@ -265,6 +265,20 @@ void WorldSession::HandleMoveWorldportAck()
 
   // lets process all delayed operations on successful teleport
   GetPlayer()->ProcessDelayedOperations();
+
+  // Hack: after a map teleport the 3.3.5a client can stay stuck in a rooted state even though the
+  // server already removed every root/stun aura (arena end being the common case). Re-send an
+  // unroot one second after landing to resync the client. Map (far) teleports only.
+  _player->m_Events.AddEventAtOffset(
+      [player = _player]()
+      {
+        if (!player->IsInWorld())
+          return;
+
+        player->ClearUnitState(UNIT_STATE_ROOT | UNIT_STATE_STUNNED);
+        player->SendMoveRoot(false);
+      },
+      1s);
 }
 
 void WorldSession::HandleMoveTeleportAck(WorldPacket& recvData)
