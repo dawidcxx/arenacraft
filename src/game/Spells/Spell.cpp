@@ -6314,6 +6314,15 @@ SpellCastResult Spell::CheckCast(bool strict)
             return SPELL_FAILED_NOTHING_TO_DISPEL;
         }
       }
+
+      // Dispel-type spells can only be cast when there is something to dispel. GetDispellableAuraList
+      // filters by the aura's usability for this caster/target (debuffs on friendly targets, buffs on
+      // hostile ones), so a target with only positive buffs is correctly rejected.
+      DispelChargesList dispelList;
+      target->GetDispellableAuraList(m_caster, dispelMask, dispelList, m_spellInfo);
+
+      if (dispelList.empty())
+        return SPELL_FAILED_NOTHING_TO_DISPEL;
     }
   }
 
