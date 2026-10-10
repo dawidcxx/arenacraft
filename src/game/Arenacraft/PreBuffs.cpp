@@ -1,6 +1,9 @@
 #include "PreBuffs.hpp"
 #include "Battleground.h"
+#include "BattlegroundMgr.h"
 #include "Player.h"
+
+#include <algorithm>
 
 namespace arenacraft
 {
@@ -66,32 +69,45 @@ std::vector<ArenaPreBuff> const& GetArenaPreBuffsForClass(uint8 playerClass)
   }
 }
 
+namespace
+{
+// Applies the buffs a class brings to `target`. selfOnly buffs stay on the class that provides
+// them, everything else lands on the target as well. Cast as the target so a teammate that has not
+// finished teleporting in can still contribute its buffs.
+void ApplyClassBuffsToPlayer(Player* target, uint8 providerClass)
+{
+  if (!target)
+    return;
+
+  for (ArenaPreBuff const& buff : GetArenaPreBuffsForClass(providerClass))
+  {
+    if (buff.selfOnly && providerClass != target->getClass())
+      continue;
+
+    target->CastSpell(target, buff.spellId, true);
+  }
+}
+} // namespace
+
 void ArenaPreBuffs::OnBattlegroundAddPlayer(Battleground* bg, Player* player)
 {
   if (!bg || !bg->isArena() || !player || !player->IsAlive())
     return;
 
-  // Apply every class currently present on the player's team onto the team members already loaded,
-  // so the team's composition decides which buffs it enters the prep room with. Re-ran for each
-  // player as they land, filling in buffs for teammates that arrived earlier.
-  TeamId team = player->GetBgTeamId();
-  for (auto const& [providerGuid, provider] : bg->GetPlayers())
-  {
-    if (!provider || !provider->IsAlive() || provider->GetBgTeamId() != team)
-      continue;
+  TeamId const team = player->GetBgTeamId();
 
-    for (ArenaPreBuff const& buff : GetArenaPreBuffsForClass(provider->getClass()))
-    {
-      if (buff.selfOnly)
-      {
-        provider->CastSpell(provider, buff.spellId, true);
-        continue;
-      }
+  // Gather the whole team: the players already in the match plus those still invited (their queue
+  // entry disappears once they accept, so neither list alone is complete).
+  std::vector<Player*> teamPlayers;
+  for (auto const& [guid, present] : bg->GetPlayers())
+    if (present && present->IsAlive() && present->GetBgTeamId() == team)
+      teamPlayers.push_back(present);
 
-      for (auto const& [targetGuid, target] : bg->GetPlayers())
-        if (target && target->IsAlive() && target->GetBgTeamId() == team)
-          provider->CastSpell(target, buff.spellId, true);
-    }
-  }
+  for (Player* invited : sBattlegroundMgr->GetInvitedPlayers(bg->GetInstanceID(), team))
+    if (std::find(teamPlayers.begin(), teamPlayers.end(), invited) == teamPlayers.end())
+      teamPlayers.push_back(invited);
+
+  for (Player* member : teamPlayers)
+    ApplyClassBuffsToPlayer(player, member->getClass());
 }
 } // namespace arenacraft

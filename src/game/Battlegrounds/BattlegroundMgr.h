@@ -105,6 +105,11 @@ public:
   {
     return m_BattlegroundQueues[bgQueueTypeId];
   }
+
+  // Connected players invited to the given battleground instance, restricted to `teamId`
+  // (TEAM_NEUTRAL for both sides). Includes players who have been invited but have not entered the
+  // map yet; once a player accepts their queue entry is gone, so this is not the full roster.
+  std::vector<Player*> GetInvitedPlayers(uint32 bgInstanceId, TeamId teamId = TEAM_NEUTRAL) const;
   void   ScheduleQueueUpdate(uint32 arenaMatchmakerRating, uint8 arenaType, BattlegroundQueueTypeId bgQueueTypeId,
                              BattlegroundTypeId bgTypeId, BattlegroundBracketId bracket_id);
   uint32 GetPrematureFinishTime() const;

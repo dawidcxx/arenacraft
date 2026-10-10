@@ -40,6 +40,7 @@
 #include "Map.h"
 #include "MapMgr.h"
 #include "MiscPackets.h"
+#include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "Player.h"
@@ -812,6 +813,30 @@ uint32 BattlegroundMgr::GetRatingDiscardTimer() const
 uint32 BattlegroundMgr::GetPrematureFinishTime() const
 {
   return sWorld->getIntConfig(CONFIG_BATTLEGROUND_PREMATURE_FINISH_TIMER);
+}
+
+std::vector<Player*> BattlegroundMgr::GetInvitedPlayers(uint32 bgInstanceId, TeamId teamId) const
+{
+  std::vector<Player*> players;
+  GuidSet              seen;
+
+  for (uint8 qtype = BATTLEGROUND_QUEUE_NONE; qtype < MAX_BATTLEGROUND_QUEUE_TYPES; ++qtype)
+  {
+    for (auto const& [guid, ginfo] : m_BattlegroundQueues[qtype].m_QueuedPlayers)
+    {
+      if (!ginfo || ginfo->IsInvitedToBGInstanceGUID != bgInstanceId)
+        continue;
+      if (teamId != TEAM_NEUTRAL && ginfo->teamId != teamId)
+        continue;
+      if (!seen.insert(guid).second)
+        continue;
+
+      if (Player* player = ObjectAccessor::FindConnectedPlayer(guid))
+        players.push_back(player);
+    }
+  }
+
+  return players;
 }
 
 void BattlegroundMgr::LoadBattleMastersEntry()
