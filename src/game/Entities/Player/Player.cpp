@@ -2058,6 +2058,23 @@ void Player::ResetAllPowers()
   {
     SetPower(POWER_RUNIC_POWER, 0);
   }
+
+  // Top off the active pet/summon as well, so hunters and warlocks bring a fully restored pet into
+  // arenas/battlegrounds (the map teleport temporarily unsummons it, so restoring it in AddPlayer
+  // is too late; this runs during preparation and at the start).
+  if (Pet* pet = GetPet())
+  {
+    if (pet->IsAlive())
+    {
+      pet->SetFullHealth();
+
+      Powers power = pet->getPowerType();
+      if (power == POWER_RAGE || power == POWER_RUNIC_POWER)
+        pet->SetPower(power, 0);
+      else
+        pet->SetPower(power, pet->GetMaxPower(power));
+    }
+  }
 }
 
 bool Player::CanInteractWithQuestGiver(Object* questGiver)

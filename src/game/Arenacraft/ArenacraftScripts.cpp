@@ -2,6 +2,7 @@
 #include "Doomclaw.hpp"
 #include "GeneralGoodsVendor.hpp"
 #include "ItemVendor.hpp"
+#include "PreBuffs.hpp"
 #include "soloq/SoloqNpc.hpp"
 #include "transmog/Transmogrification.hpp"
 
@@ -17,6 +18,7 @@ void AddArenacraftScripts()
   new arenacraft::DoomclawSetup();
   new arenacraft::DoomclawSpellTweaks();
   new arenacraft::DoomclawLoot();
+  new arenacraft::ArenaPreBuffs();
   new arenacraft::transmog::TransmogPlayerScript();
   new arenacraft::soloq::SoloqNpc();
   new arenacraft::soloq::SoloqNpcSetup();
