@@ -148,6 +148,8 @@ void DoomclawLoot::OnStartup()
     return;
 
   // groupid 0 / reference 0 => ordinary guaranteed entry, 100% chance.
-  loot->AddEntry(new LootStoreItem(Doomclaw::DropItem, 0, 100.0f, false, 0, 0, 1, 1));
+  // lootmode must be LOOT_MODE_DEFAULT (DB-loaded rows are forced to it too),
+  // otherwise LootTemplate::Process skips the entry as a mode mismatch.
+  loot->AddEntry(new LootStoreItem(Doomclaw::DropItem, 0, 100.0f, false, LOOT_MODE_DEFAULT, 0, 1, 1));
 }
 } // namespace arenacraft

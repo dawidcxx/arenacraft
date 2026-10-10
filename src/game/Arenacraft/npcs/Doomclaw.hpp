@@ -17,12 +17,10 @@ class Doomclaw : public AllCreatureScript
 public:
   static constexpr uint32 Entry  = 19738;
   static constexpr uint32 Level  = 80;
-  static constexpr uint32 Health = 170000;
+  static constexpr uint32 Health = 1000000;
   // Guaranteed drop, added to his loot template from code.
-  static constexpr uint32 DropItem = 32768;
-  // Multiplier over the DB DamageModifier (1.0). 3x was the old value; 12x
-  // quadruples it, landing melee swings at roughly 4.2k-5.8k.
-  static constexpr float  MeleeDamageMultiplier = 12.0f;
+  static constexpr uint32 DropItem = 32859;
+  static constexpr float  MeleeDamageMultiplier = 24.0f;
   static constexpr uint32 SpellCloudOfDisease   = 41193;
   static constexpr uint32 SpellVenomBolt        = 54970;
   static constexpr uint32 CloudIntervalMs       = 30 * 1000;
