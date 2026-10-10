@@ -19,7 +19,7 @@ public:
   static constexpr uint32 Level  = 80;
   static constexpr uint32 Health = 1000000;
   // Guaranteed drop, added to his loot template from code.
-  static constexpr uint32 DropItem = 32859;
+  static constexpr uint32 DropItem = 32768;
   static constexpr float  MeleeDamageMultiplier = 24.0f;
   static constexpr uint32 SpellCloudOfDisease   = 41193;
   static constexpr uint32 SpellVenomBolt        = 54970;
