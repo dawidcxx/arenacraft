@@ -1,3 +1,4 @@
+#include "Challenge.hpp"
 #include "CosmeticVendor.hpp"
 #include "Doomclaw.hpp"
 #include "GeneralGoodsVendor.hpp"
@@ -24,4 +25,5 @@ void AddArenacraftScripts()
   new arenacraft::soloq::SoloqNpcSetup();
   new arenacraft::soloq::SoloqDriver();
   new arenacraft::soloq::SoloqBattlegroundScript();
+  arenacraft::AddChallengeCommand();
 }
