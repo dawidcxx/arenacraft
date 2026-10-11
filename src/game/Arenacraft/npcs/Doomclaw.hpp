@@ -19,15 +19,24 @@ public:
   static constexpr uint32 Level  = 80;
   static constexpr uint32 Health = 1000000;
   // Guaranteed drop, added to his loot template from code.
-  static constexpr uint32 DropItem = 32768;
+  static constexpr uint32 DropItem              = 32768;
   static constexpr float  MeleeDamageMultiplier = 24.0f;
   static constexpr uint32 SpellCloudOfDisease   = 41193;
   static constexpr uint32 SpellVenomBolt        = 54970;
+  static constexpr uint32 SpellStaggeringStomp  = 66330;
   static constexpr uint32 CloudIntervalMs       = 30 * 1000;
   // Staggered so the two casts alternate rather than landing together.
   static constexpr uint32 VenomBoltIntervalMs     = 30 * 1000;
   static constexpr uint32 VenomBoltInitialDelayMs = 15 * 1000;
   static constexpr uint32 BraapChancePercent      = 50;
+  static constexpr uint32 StompIntervalMs         = 20 * 1000;
+  static constexpr uint32 StompInitialDelayMs     = 10 * 1000;
+  // Stomp damage effect radius (effect #2, the interrupt, reaches 20y).
+  static constexpr float StompRadiusYards = 15.0f;
+  // Spell damage range; interrupting an in-progress cast lands a bonus hit on
+  // top of the spell's own damage.
+  static constexpr int32 StompDamageMin = 11700;
+  static constexpr int32 StompDamageMax = 12300;
 
   Doomclaw() : AllCreatureScript("arenacraft::Doomclaw") {}
 
