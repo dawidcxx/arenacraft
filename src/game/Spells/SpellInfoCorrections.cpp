@@ -4618,6 +4618,18 @@ void SpellMgr::LoadSpellInfoCorrections()
                   spellInfo->Attributes &= ~SPELL_ATTR0_AURA_IS_DEBUFF;
                   spellInfo->StackAmount = 2;
                 });
+  // Earthliving Weapon (all ranks): mark the imbue's temporary enchant as
+  // arena-legal so it survives arena entry, like poisons/DK runes. The flag is
+  // what SpellMgr::LoadEnchantCustomAttr scans for; without it
+  // Player::RemoveArenaEnchantments strips the enchant when teleporting in.
+  ApplySpellFix({51730, 51988, 51991, 51992, 51993, 51994},
+                [](SpellInfo* spellInfo) { spellInfo->AttributesEx2 |= SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY; });
+  // Frostbrand Weapon: every rank applies its enchant straight from MiscValue.
+  ApplySpellFix({8033, 8038, 10456, 16355, 16356, 25500, 58794, 58795, 58796},
+                [](SpellInfo* spellInfo) { spellInfo->AttributesEx2 |= SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY; });
+  // Windfury Weapon: every rank applies its enchant straight from MiscValue too.
+  ApplySpellFix({8232, 8235, 10486, 16362, 25505, 58801, 58803, 58804},
+                [](SpellInfo* spellInfo) { spellInfo->AttributesEx2 |= SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY; });
 
   LOG_INFO("server.loading", ">> Loading spell dbc data corrections  in {} ms", GetMSTimeDiffToNow(oldMSTime));
   LOG_INFO("server.loading", " ");

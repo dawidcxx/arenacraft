@@ -10,9 +10,9 @@
 // alternatives. Both are documented in ai-doc/enchant_guides.md. Only enchants
 // those guides recommend are listed; vanilla/BC-era filler, strictly-dominated
 // budget duplicates and everything that needs a profession to apply (the server
-// has none) is dropped. Two entries are added by hand: the Titanium Weapon
-// Chain (applied directly to the weapon, so it needs no profession) and the
-// Scroll of Enchant Weapon - Executioner.
+// has none) is dropped. A few applied items are added by hand (they are used
+// directly, so no profession is needed): the Titanium Weapon Chain, the Scroll
+// of Enchant Weapon - Executioner, Titanium Plating and the two ranged scopes.
 // Head/shoulder/leg entries are the applied Arcanum/Inscription/Spellthread/Leg
 // Armor items; the waist and weapon sections also hold the applied Eternal Belt
 // Buckle and Titanium Weapon Chain; the rest are "Scroll of Enchant ..."
@@ -91,6 +91,10 @@ std::vector<uint32> const& AllEnchants()
       38945, // Scroll of Enchant Shield - Major Stamina
       38949, // Scroll of Enchant Shield - Resilience
       38954, // Scroll of Enchant Shield - Defense
+      44936, // Titanium Plating
+      // == Ranged ==
+      18283, // Biznicks 247x128 Accurascope
+      41167, // Heartseeker Scope
       // == Weapon ==
       44493, // Scroll of Enchant Weapon - Berserking
       44467, // Scroll of Enchant Weapon - Mighty Spellpower

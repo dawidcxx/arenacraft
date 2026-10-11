@@ -3106,9 +3106,9 @@ void Spell::EffectEnchantItemTmp(SpellEffIndex effIndex)
   // family-wide override also covers the odd poison with wrong EffBasePoints.
   if (m_spellInfo->SpellFamilyName == SPELLFAMILY_ROGUE)
     duration = 7 * 24 * 3600; // 7 days
-  // shaman family enchantments
+  // shaman family enchantments (weapon imbues) also last 7 days, like poisons.
   else if (m_spellInfo->SpellFamilyName == SPELLFAMILY_SHAMAN)
-    duration = 1800; // 30 mins
+    duration = 7 * 24 * 3600; // 7 days
   // other cases with this SpellVisual already selected
   else if (m_spellInfo->SpellVisual[0] == 215)
     duration = 1800; // 30 mins

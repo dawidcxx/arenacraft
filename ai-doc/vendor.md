@@ -98,8 +98,10 @@ and Gems" guides supplying the remaining general alternatives (all recorded in
 `ai-doc/enchant_guides.md`): only recommended, non-profession enchants are kept
 (the server has no professions), excluding vanilla/BC filler and strictly
 dominated duplicates. Head/shoulder/leg rows are the applied
-Arcanum/Inscription/Spellthread/Leg Armor items, the rest are "Scroll of
-Enchant ..." consumables.
+Arcanum/Inscription/Spellthread/Leg Armor items, plus a few more applied items
+added by hand (used directly, no profession needed): Titanium Weapon Chain,
+Titanium Plating, Biznicks 247x128 Accurascope and Heartseeker Scope; the rest
+are "Scroll of Enchant ..." consumables.
 
 The menu then has two gem options. `GemVendorItems.cpp` holds two flat
 `std::vector<uint32>` lists exposed as `AllGems()` and `AllMetaGems()`, served by
