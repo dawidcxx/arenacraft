@@ -14,11 +14,12 @@ the env file is applied. It installs POSIX signal handlers for `SIGSEGV`,
 Asserts are covered too: `Acore::Assert/Fatal/Error` write to a null pointer on
 Linux, which raises `SIGSEGV`.
 
-On a fatal signal the handler writes a report to **stderr** (so it shows up in
-`docker compose logs world`) and, when `AC_CRASH_DIR` is set, to a timestamped
-file `<app>_crash_<YYYYmmdd_HHMMSS>_<pid>.log` in that directory. Compose mounts
-`./crashes` from the host and sets `AC_CRASH_DIR=/app/crashes`, so reports also
-land in `./crashes/` on the host.
+On a fatal signal the handler writes a report to **stderr** (the service log:
+`journalctl` on the server, `docker compose logs world` for the local compose
+setup) and, when `AC_CRASH_DIR` is set, to a timestamped file
+`<app>_crash_<YYYYmmdd_HHMMSS>_<pid>.log` in that directory. In production the
+service mounts a host `crashes/` directory there; the local compose setup mounts
+`./crashes`, so reports also land in `./crashes/` on the host.
 
 ## Report contents
 

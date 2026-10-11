@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Restart just the world service, picking up the image ./scripts/deploy loaded.
-# Run on the server (where docker-compose.yml lives).
+# Run on the server (the core runs as systemd-managed containers there).
 set -euo pipefail
-cd "$(dirname "$0")/.."
-exec podman compose --profile full up -d --no-deps --force-recreate world
+exec sudo systemctl restart podman-arenacraft-world

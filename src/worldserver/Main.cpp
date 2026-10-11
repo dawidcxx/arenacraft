@@ -343,7 +343,8 @@ int worldserver_main(int argc, char** argv)
 
   // Start the Remote Access port (acceptor) if enabled
   std::unique_ptr<AsyncAcceptor> raAcceptor;
-  if (sConfigMgr->GetOption<bool>("Ra.Enable", false))
+  bool const                     raEnabled = sConfigMgr->GetOption<bool>("Ra.Enable", false);
+  if (raEnabled)
   {
     raAcceptor.reset(StartRaSocketAcceptor(*ioContext));
   }
@@ -413,13 +414,16 @@ int worldserver_main(int argc, char** argv)
 
   sScriptMgr->OnStartup();
 
-  // Launch CliRunnable thread
+  // Launch CliRunnable thread. When remote access (Ra.Enable / AC_RA_ENABLE) is
+  // enabled it is the console we actually use: the interactive readline prompt is
+  // useless in a service and its output floods the log, so skip it and keep
+  // plain stdout logging.
   std::shared_ptr<std::thread> cliThread;
 #if AC_PLATFORM == AC_PLATFORM_WINDOWS
-  if (sConfigMgr->GetOption<bool>("Console.Enable", true) &&
+  if (!raEnabled && sConfigMgr->GetOption<bool>("Console.Enable", true) &&
       (m_ServiceStatus == -1) /* need disable console in service mode*/)
 #else
-  if (sConfigMgr->GetOption<bool>("Console.Enable", true))
+  if (!raEnabled && sConfigMgr->GetOption<bool>("Console.Enable", true))
 #endif
   {
     cliThread.reset(new std::thread(CliThread), &ShutdownCLIThread);

@@ -12,7 +12,7 @@
  *   scripts/deploy                                  # build + ship (the normal one)
  *   scripts/deploy --skip-build                     # ship what's already here
  *   scripts/deploy --no-ship                        # build + verify arch only
- *   scripts/deploy --up --remote-dir ~/arenacraft   # also restart the stack there
+ *   scripts/deploy --restart                        # also restart the stack there
  */
 import { $ } from "bun";
 import { Command } from "commander";
@@ -21,11 +21,14 @@ import { join } from "node:path";
 import { repoRoot } from "./lib/repo.ts";
 
 const DEFAULTS = {
-  target: "dawid@hetznerbox",
+  target: "arenacraft@hetznerbox",
   image: "arenacraft:local",
   platform: "linux/arm64",
-  remoteEngine: "podman" as const, // the target runs podman + podman compose
+  remoteEngine: "podman" as const, // the target runs podman
 };
+
+/** systemd units that serve the freshly loaded image (see the host deploy config) */
+const REMOTE_SERVICES = ["podman-arenacraft-auth", "podman-arenacraft-world"];
 
 const ENGINES = ["podman", "docker"] as const;
 type Engine = (typeof ENGINES)[number];
@@ -38,8 +41,7 @@ interface Options {
   remoteEngine: string;
   skipBuild: boolean;
   ship: boolean;
-  up: boolean;
-  remoteDir: string | undefined;
+  restart: boolean;
   dryRun: boolean;
 }
 
@@ -54,8 +56,7 @@ program
   .option("--remote-engine <podman|docker>", "engine on the target", DEFAULTS.remoteEngine)
   .option("--skip-build", "reuse the local image", false)
   .option("--no-ship", "build and verify only, no transfer")
-  .option("--up", "also run 'up -d --no-build' via the target's compose", false)
-  .option("--remote-dir <dir>", "target dir holding docker-compose.yml (for --up)")
+  .option("--restart", "also restart the systemd services on the target", false)
   .option("--dry-run", "print commands without running them", false)
   .parse(process.argv);
 
@@ -155,7 +156,6 @@ const engine: Engine = opts.engine
 const remoteEngine = asEngine(opts.remoteEngine, "--remote-engine");
 
 if (opts.ship && !Bun.which("ssh")) fail("ssh not found in PATH");
-if (opts.up && !opts.remoteDir) fail("--up requires --remote-dir <dir>");
 if (!existsSync(dockerfile)) fail(`Dockerfile not found: ${dockerfile}`);
 
 // only podman needs the host bind-mounts; docker buildx embeds its own qemu
@@ -204,14 +204,15 @@ if (opts.ship) {
   }
 }
 
-if (opts.up && opts.remoteDir) {
-  console.log(`restarting on ${opts.target} in ${opts.remoteDir}`);
-  const remoteUp = `cd ${opts.remoteDir} && ${remoteEngine} compose up -d --no-build`;
+const remoteRestart = REMOTE_SERVICES.map((s) => `sudo systemctl restart ${s}`).join(" && ");
+
+if (opts.restart) {
+  console.log(`restarting services on ${opts.target}`);
   if (opts.dryRun) {
-    console.log(`+ ssh ${quote(opts.target)} ${quote(remoteUp)}`);
+    console.log(`+ ssh ${quote(opts.target)} ${quote(remoteRestart)}`);
   } else {
-    await shell("compose up", () => $`ssh ${opts.target} ${remoteUp}`);
+    await shell("restart", () => $`ssh ${opts.target} ${remoteRestart}`);
   }
 } else if (opts.ship && !opts.dryRun) {
-  console.log(`\nnext: ssh ${opts.target} '${remoteEngine} compose up -d --no-build'   # from the docker-compose.yml dir`);
+  console.log(`\nnext: ssh ${opts.target} ${quote(remoteRestart)}`);
 }

@@ -24,7 +24,7 @@ Needs `nix`, `podman` (or docker), and a 3.3.5a client.
 - `zig build run-ac -- worldserver` build and run
 - `zig build test` unit tests (needs `nix develop`)
 - `zig build test-build` dep/link smoke test
-- `scripts/deploy` build the arm64 image and ship it to `dawid@hetznerbox`
+- `scripts/deploy` build the arm64 image and ship it to `arenacraft@hetznerbox`
 
 ## Deploy
 
@@ -32,15 +32,14 @@ The server is a small arm host, so the image is built elsewhere and shipped as
 a single stream to the target's local container engine - no registry involved:
 
 ```bash
-scripts/deploy                 # build linux/arm64, stream to dawid@hetznerbox
+scripts/deploy                 # build linux/arm64, stream to arenacraft@hetznerbox
 scripts/deploy --no-ship       # build + verify arch only
 scripts/deploy --skip-build    # ship the image already on this machine
-scripts/deploy --up --remote-dir ~/arenacraft   # also (re)start the stack there
+scripts/deploy --restart       # also restart the auth/world services there
 ```
 
-On the server, after a deploy, `scripts/restart_world` recreates only the
-`world` container from the freshly loaded image (`docker compose up -d --no-deps
-world`), leaving db/valkey/auth untouched.
+The target runs the core as systemd-managed containers; the freshly loaded
+image is picked up by restarting those units, which `--restart` does for you.
 
 Works with **podman or docker** (auto-detected; override with `--engine`). The
 target runs podman, so the remote side defaults to `--remote-engine podman`.
@@ -49,9 +48,7 @@ cross-arch build on x86 Linux uses binfmt/qemu emulation, slow the first time
 but cached.
 
 Only the final multi-stage runtime image is transferred; zig's caches live in
-`--mount=type=cache` mounts and never ship. The image lands as `arenacraft:local`
-(the tag `docker-compose.yml` refers to), so on the target: `podman compose up -d
---no-build`.
+`--mount=type=cache` mounts and never ship. The image lands as `arenacraft:local`.
 
 On NixOS a binfmt entry without the `F` flag cannot see its interpreter inside a
 container - the script detects this and bind-mounts `/run/binfmt` and `/nix/store`
