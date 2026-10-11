@@ -1,6 +1,6 @@
 # ac-bot
 
-Rewritten Arenacraft Discord bot. Three jobs:
+Rewritten Arenacraft Discord bot. Four jobs:
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
@@ -9,6 +9,9 @@ Rewritten Arenacraft Discord bot. Three jobs:
 3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
    `soloq-matchup-ended` Redis events and moves players between the waiting room
    and paired `game-<n>-<k>` voice channels.
+4. **Info commands** - `/toprankers` (soloQ leaderboard) and `/onlinelist`
+   (characters currently online). Both reply ephemerally and are served from a
+   30s cache to keep repeated calls off the DB.
 
 On startup the bot overwrites both its global and guild command lists, so
 commands removed from the code do not linger as unreachable "ghosts".

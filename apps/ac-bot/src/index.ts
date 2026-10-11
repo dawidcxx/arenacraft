@@ -5,6 +5,7 @@ import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
 import { getConfig } from "./config";
 import { logger } from "./logger";
+import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
 import { PING_COMMAND, handlePing } from "./pingCommand";
 import { startEventSubscriber } from "./redisEvents";
 import { handleRegister, REGISTER_COMMAND } from "./registerCommand";
@@ -22,6 +23,11 @@ const characterDb = new CharacterDb(config.CHARACTER_DB_URL);
 const RANKERS_CACHE_TTL_MS = 30_000;
 const rankersCache = new TtlCache(RANKERS_CACHE_TTL_MS, () => loadTopRankers({ authDb, characterDb }));
 
+// Online status flips frequently; a 30s snapshot keeps repeated /onlinelist
+// calls off the DB without being noticeably stale.
+const ONLINE_LIST_CACHE_TTL_MS = 30_000;
+const onlineListCache = new TtlCache(ONLINE_LIST_CACHE_TTL_MS, () => loadOnlineList(characterDb));
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMembers],
 });
@@ -34,7 +40,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     // Wipe leftover global commands so stale ones do not linger next to the
     // guild commands we actually implement.
     await readyClient.application.commands.set([]);
-    await guild.commands.set([REGISTER_COMMAND, SET_PASSWORD_COMMAND, PING_COMMAND, TOP_RANKERS_COMMAND]);
+    await guild.commands.set([REGISTER_COMMAND, SET_PASSWORD_COMMAND, PING_COMMAND, TOP_RANKERS_COMMAND, ONLINE_LIST_COMMAND]);
     await guild.members.fetch();
 
     const rooms = new RoomManager(guild, config);
@@ -66,6 +72,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "register") await handleRegister(interaction, authDb);
     else if (interaction.commandName === "setpassword") await handleSetPassword(interaction, authDb);
     else if (interaction.commandName === "toprankers") await handleTopRankers(interaction, () => rankersCache.get());
+    else if (interaction.commandName === "onlinelist") await handleOnlineList(interaction, () => onlineListCache.get());
     else if (interaction.commandName === "ping") await handlePing(interaction);
   } catch (error) {
     logger.error(`Failed to handle /${interaction.commandName}`, error);

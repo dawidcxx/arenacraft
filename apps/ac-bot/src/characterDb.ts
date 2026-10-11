@@ -14,6 +14,11 @@ export interface SoloqRanker {
   seasonGames: number;
 }
 
+export interface OnlineCharacter {
+  charName: string;
+  classId: number;
+}
+
 export class CharacterDb {
   private readonly pool: Pool;
 
@@ -47,6 +52,21 @@ export class CharacterDb {
       rating: Number(row.rating),
       seasonWins: Number(row.seasonWins),
       seasonGames: Number(row.seasonGames),
+    }));
+  }
+
+  /** Characters the core currently flags as online (`characters.online > 0`). */
+  async onlineCharacters(): Promise<OnlineCharacter[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT name AS charName, class AS classId
+       FROM characters
+       WHERE online > 0
+       ORDER BY name ASC`,
+    );
+
+    return rows.map((row) => ({
+      charName: String(row.charName),
+      classId: Number(row.classId),
     }));
   }
 }
