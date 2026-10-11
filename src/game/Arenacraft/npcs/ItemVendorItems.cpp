@@ -427,7 +427,8 @@ std::vector<ItemEntry> const& AllItems()
       {ICCSetWeapons, 51880}, // Gluth's Fetching Knife
       {ICCSetWeapons, 51852}, // Wand of Ruby Claret
 
-      // == ICC relics (ilvl 264) ==
+      // == ICC relics (ilvl 264); + Onyxia's Sigil of the Vengeful Heart (226) ==
+      {ICCSetWeapons, 45254}, // Sigil of the Vengeful Heart
       {ICCSetWeapons, 50454}, // Idol of the Black Willow
       {ICCSetWeapons, 50455}, // Libram of Three Truths
       {ICCSetWeapons, 50456}, // Idol of the Crying Moon

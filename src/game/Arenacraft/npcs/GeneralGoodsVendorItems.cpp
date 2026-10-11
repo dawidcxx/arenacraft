@@ -21,6 +21,7 @@ std::vector<uint32> const& AllGeneralGoods()
       43236, // Star's Sorrow
       43523, // Conjured Mana Strudel
       6265,  // Soul Shard
+      37201, // Corpse Dust
       52021, // Iceblade Arrow
       52020, // Shatter Rounds
       3775,  // Crippling Poison
@@ -33,6 +34,8 @@ std::vector<uint32> const& AllGeneralGoods()
       17033, // Symbol of Divinity
       17030, // Ankh
       17056, // Light Feather
+      17057, // Shiny Fish Scales
+      17058, // Fish Oil
       44605, // Wild Spineleaf
       44614, // Starleaf Seed
       44615, // Devout Candle

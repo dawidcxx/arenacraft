@@ -188,8 +188,9 @@ Current lists: Wrathful Set & Weapons (270 set + 277 weapons), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator
 rings), Trinkets (264 ICC + 258/245 ToC + the five ilvl-245 Battlemaster PvP
 trinkets), ICC Set & Weapons (264 tier + 277
-weapons; the weaker 264/271 PvE weapon drops are not stocked, except the 264
-thrown Gluth's Fetching Knife, which has no 277 version), ICC Offparts (264
+weapons, plus the ilvl-226 Onyxia Sigil of the Vengeful Heart; the weaker
+264/271 PvE weapon drops are not stocked, except the 264 thrown Gluth's
+Fetching Knife, which has no 277 version), ICC Offparts (264
 necks/cloaks/boots/belts/wrists/rings plus the 272 ToGC tribute-chest cloaks) and
 ICC Offset (264 non-tier main pieces).
 
