@@ -1,5 +1,1 @@
-#!/usr/bin/env bash
-# Restart just the world service, picking up the image ./scripts/deploy loaded.
-# Run on the server (the core runs as systemd-managed containers there).
-set -euo pipefail
-exec sudo systemctl restart podman-arenacraft-world
+src/restart_world.ts

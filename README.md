@@ -24,7 +24,8 @@ Needs `nix`, `podman` (or docker), and a 3.3.5a client.
 - `zig build run-ac -- worldserver` build and run
 - `zig build test` unit tests (needs `nix develop`)
 - `zig build test-build` dep/link smoke test
-- `scripts/deploy` build the arm64 image and ship it to `arenacraft@hetznerbox`
+- `scripts/deploy` build the arm64 image and ship it to the target
+- `scripts/restart_world` restart the world service on the target and prune old images
 
 ## Deploy
 
@@ -32,18 +33,18 @@ The server is a small arm host, so the image is built elsewhere and shipped as
 a single stream to the target's local container engine - no registry involved:
 
 ```bash
-scripts/deploy                 # build linux/arm64, stream to arenacraft@hetznerbox
-scripts/deploy --no-ship       # build + verify arch only
-scripts/deploy --skip-build    # ship the image already on this machine
-scripts/deploy --restart       # also restart the auth/world services there
+scripts/deploy          # build linux/arm64 and stream the image to the target
+scripts/restart_world   # restart the world service there + prune old images
 ```
 
-The target runs the core as systemd-managed containers; the freshly loaded
-image is picked up by restarting those units, which `--restart` does for you.
+`scripts/deploy` only builds and ships the image (as `arenacraft:local`); the
+running systemd-managed containers pick it up on their next restart, which
+`scripts/restart_world` does (and then prunes the images left behind by repeated
+deploys). Both scripts ssh to `arenacraft@hetznerbox`; set `ARENACRAFT_HOST` to
+override the target.
 
-Works with **podman or docker** (auto-detected; override with `--engine`). The
-target runs podman, so the remote side defaults to `--remote-engine podman`.
-Building on a native arm64 machine (Apple Silicon) is direct and fast; a
+`deploy` auto-detects **podman or docker** locally and loads into podman on the
+target. Building on a native arm64 machine (Apple Silicon) is direct and fast; a
 cross-arch build on x86 Linux uses binfmt/qemu emulation, slow the first time
 but cached.
 

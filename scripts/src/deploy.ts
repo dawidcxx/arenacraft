@@ -5,81 +5,34 @@
  * over ssh as `save | gzip | ssh ... 'gunzip | load'`, and only that final image
  * is sent (zig/build caches live in build mounts).
  *
- * Works with podman or docker (auto-detected, override with --engine). Native
- * arm64 (e.g. an Apple Silicon mac) builds directly; a cross-arch build on
- * Linux falls back to binfmt/qemu emulation, which is slow but cached.
+ * Build + ship only. The running services pick the image up on their next
+ * restart, so run ./scripts/restart_world afterwards.
  *
- *   scripts/deploy                                  # build + ship (the normal one)
- *   scripts/deploy --skip-build                     # ship what's already here
- *   scripts/deploy --no-ship                        # build + verify arch only
- *   scripts/deploy --restart                        # also restart the stack there
+ * Works with podman or docker (auto-detected). Native arm64 builds directly; a
+ * cross-arch build on Linux falls back to binfmt/qemu emulation, slow but cached.
+ *
+ *   ./scripts/deploy
+ *
+ * ARENACRAFT_HOST overrides the ssh target (default arenacraft@hetznerbox).
  */
 import { $ } from "bun";
-import { Command } from "commander";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "./lib/repo.ts";
 
-const DEFAULTS = {
-  target: "arenacraft@hetznerbox",
-  image: "arenacraft:local",
-  platform: "linux/arm64",
-  remoteEngine: "podman" as const, // the target runs podman
-};
-
-/** systemd units that serve the freshly loaded image (see the host deploy config) */
-const REMOTE_SERVICES = ["podman-arenacraft-auth", "podman-arenacraft-world"];
-
-const ENGINES = ["podman", "docker"] as const;
-type Engine = (typeof ENGINES)[number];
-
-interface Options {
-  target: string;
-  image: string;
-  platform: string;
-  engine: string | undefined;
-  remoteEngine: string;
-  skipBuild: boolean;
-  ship: boolean;
-  restart: boolean;
-  dryRun: boolean;
-}
-
-const program = new Command();
-program
-  .name("deploy")
-  .description("Build the core image and load it on the target's container engine (podman/docker).")
-  .option("--target <user@host>", "ssh target", DEFAULTS.target)
-  .option("--image <ref>", "image to build and load", DEFAULTS.image)
-  .option("--platform <os/arch>", "target platform", DEFAULTS.platform)
-  .option("--engine <podman|docker>", "local engine (default: podman, else docker)")
-  .option("--remote-engine <podman|docker>", "engine on the target", DEFAULTS.remoteEngine)
-  .option("--skip-build", "reuse the local image", false)
-  .option("--no-ship", "build and verify only, no transfer")
-  .option("--restart", "also restart the systemd services on the target", false)
-  .option("--dry-run", "print commands without running them", false)
-  .parse(process.argv);
-
-const opts = program.opts<Options>();
-const dockerfile = join(repoRoot, "Dockerfile");
+const target = process.env.ARENACRAFT_HOST ?? "arenacraft@hetznerbox";
+const image = "arenacraft:local";
+const platform = "linux/arm64";
+const remoteEngine = "podman";
 const fmt = "{{.Architecture}}";
-const targetArch = (opts.platform.split("/")[1] ?? opts.platform).trim();
+
+const dockerfile = join(repoRoot, "Dockerfile");
+const targetArch = (platform.split("/")[1] ?? platform).trim();
 const crossArch = targetArch !== hostArch();
 
 function fail(message: string): never {
   console.error(message);
   process.exit(1);
-}
-
-function quote(s: string): string {
-  return `'${s.replaceAll("'", `'\\''`)}'`;
-}
-
-function asEngine(value: string, flag: string): Engine {
-  if (!(ENGINES as readonly string[]).includes(value)) {
-    fail(`${flag} must be one of: ${ENGINES.join(", ")} (got '${value}')`);
-  }
-  return value as Engine;
 }
 
 /** surface a ShellError's exit code instead of a stack trace */
@@ -146,16 +99,9 @@ async function qemuMounts(): Promise<string[]> {
   return mounts;
 }
 
-const engine: Engine = opts.engine
-  ? asEngine(opts.engine, "--engine")
-  : Bun.which("podman")
-    ? "podman"
-    : Bun.which("docker")
-      ? "docker"
-      : fail("neither podman nor docker found in PATH");
-const remoteEngine = asEngine(opts.remoteEngine, "--remote-engine");
+const engine = Bun.which("podman") ? "podman" : Bun.which("docker") ? "docker" : fail("neither podman nor docker found in PATH");
 
-if (opts.ship && !Bun.which("ssh")) fail("ssh not found in PATH");
+if (!Bun.which("ssh")) fail("ssh not found in PATH");
 if (!existsSync(dockerfile)) fail(`Dockerfile not found: ${dockerfile}`);
 
 // only podman needs the host bind-mounts; docker buildx embeds its own qemu
@@ -164,55 +110,25 @@ const mounts = engine === "podman" ? await qemuMounts() : [];
 const saveArgs = engine === "podman" ? ["--format", "docker-archive"] : [];
 const remoteLoad = `gunzip | ${remoteEngine} load`;
 
-if (!opts.skipBuild) {
-  const note = crossArch ? " (emulated; first run is slow)" : "";
-  console.log(`building ${opts.image} for ${opts.platform} with ${engine}${note}`);
-  if (opts.dryRun) {
-    console.log(`+ ${engine} build --platform ${opts.platform} ${mounts.map(quote).join(" ")} -f ${quote(dockerfile)} -t ${quote(opts.image)} ${quote(repoRoot)}`);
-  } else {
-    await shell(`${engine} build`, () =>
-      $`${engine} build --platform ${opts.platform} ${mounts} -f ${dockerfile} -t ${opts.image} ${repoRoot}`,
-    );
-  }
-} else {
-  console.log(`skipping build, reusing ${opts.image}`);
-}
+const note = crossArch ? " (emulated; first run is slow)" : "";
+console.log(`building ${image} for ${platform} with ${engine}${note}`);
+await shell(`${engine} build`, () =>
+  $`${engine} build --platform ${platform} ${mounts} -f ${dockerfile} -t ${image} ${repoRoot}`,
+);
 
-if (opts.dryRun) {
-  console.log(`+ ${engine} image inspect --format ${quote(fmt)} ${quote(opts.image)}`);
-} else {
-  const arch = await capture(`${engine} image inspect`, () =>
-    $`${engine} image inspect --format ${fmt} ${opts.image}`.text(),
-  );
-  if (arch !== targetArch) fail(`refusing to ship: ${opts.image} is ${arch}, want ${targetArch}`);
-  console.log(`built ${opts.image} (${arch})`);
-}
+const arch = await capture(`${engine} image inspect`, () =>
+  $`${engine} image inspect --format ${fmt} ${image}`.text(),
+);
+if (arch !== targetArch) fail(`refusing to ship: ${image} is ${arch}, want ${targetArch}`);
+console.log(`built ${image} (${arch})`);
 
-if (opts.ship) {
-  console.log(`shipping ${opts.image} -> ${opts.target} (${remoteEngine})`);
-  if (opts.dryRun) {
-    console.log(`+ ${engine} save ${saveArgs.join(" ")} ${quote(opts.image)} | gzip -1 | ssh ${quote(opts.target)} ${quote(remoteLoad)}`);
-  } else {
-    await shell("ship", () =>
-      $`${engine} save ${saveArgs} ${opts.image} | gzip -1 | ssh ${opts.target} ${remoteLoad}`,
-    );
-    const arch = await capture("remote inspect", () =>
-      $`ssh ${opts.target} ${remoteEngine} image inspect --format ${fmt} ${opts.image}`.text(),
-    );
-    if (arch !== targetArch) fail(`target has the wrong arch: ${arch}, want ${targetArch}`);
-    console.log(`loaded on ${opts.target} (${arch})`);
-  }
-}
+console.log(`shipping ${image} -> ${target} (${remoteEngine})`);
+await shell("ship", () => $`${engine} save ${saveArgs} ${image} | gzip -1 | ssh ${target} ${remoteLoad}`);
 
-const remoteRestart = REMOTE_SERVICES.map((s) => `sudo systemctl restart ${s}`).join(" && ");
+const remoteArch = await capture("remote inspect", () =>
+  $`ssh ${target} ${remoteEngine} image inspect --format ${fmt} ${image}`.text(),
+);
+if (remoteArch !== targetArch) fail(`target has the wrong arch: ${remoteArch}, want ${targetArch}`);
+console.log(`loaded on ${target} (${remoteArch})`);
 
-if (opts.restart) {
-  console.log(`restarting services on ${opts.target}`);
-  if (opts.dryRun) {
-    console.log(`+ ssh ${quote(opts.target)} ${quote(remoteRestart)}`);
-  } else {
-    await shell("restart", () => $`ssh ${opts.target} ${remoteRestart}`);
-  }
-} else if (opts.ship && !opts.dryRun) {
-  console.log(`\nnext: ssh ${opts.target} ${quote(remoteRestart)}`);
-}
+console.log(`\nnext: ./scripts/restart_world`);
