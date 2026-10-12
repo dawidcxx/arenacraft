@@ -18,9 +18,7 @@ std::vector<ArenaPreBuff> const& GetArenaPreBuffsForClass(uint8 playerClass)
       {1008, false},  // Amplify Magic (Rank 1)
       {43024, true},  // Mage Armor (Rank 6) - self only
   };
-  static std::vector<ArenaPreBuff> const warrior = {
-      {47440, false}, // Commanding Shout (Rank 3)
-  };
+  static std::vector<ArenaPreBuff> const warrior     = {};
   static std::vector<ArenaPreBuff> const deathKnight = {
       {57623, false}, // Horn of Winter (Rank 2)
   };
@@ -38,10 +36,8 @@ std::vector<ArenaPreBuff> const& GetArenaPreBuffsForClass(uint8 playerClass)
       {48469, false}, // Mark of the Wild (Rank 9)
       {467, false},   // Thorns (Rank 1)
   };
-  static std::vector<ArenaPreBuff> const paladin = {
-      {25898, false}, // Greater Blessing of Kings
-  };
-  static std::vector<ArenaPreBuff> const shaman = {
+  static std::vector<ArenaPreBuff> const paladin = {};
+  static std::vector<ArenaPreBuff> const shaman  = {
       {546, false}, // Water Walking
       {131, false}, // Water Breathing
   };
