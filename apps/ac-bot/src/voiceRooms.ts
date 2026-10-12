@@ -174,26 +174,27 @@ export class RoomManager {
 
   private async freeRoom(room: Room): Promise<void> {
     const members = [...room.first.members.values(), ...room.second.members.values()];
-    let moved = 0;
-    for (const member of members) {
-      if (await this.moveMember(member, this.waitingRoom)) moved++;
-    }
+    const moves = await Promise.all(members.map((member) => this.moveMember(member, this.waitingRoom)));
+    const moved = moves.filter(Boolean).length;
     room.instanceId = null;
     room.bookedAt = null;
     logger.info(`Released ${roomName(room)} (moved ${moved} players back)`);
   }
 
+  // Discord has no bulk voice-move endpoint; each move is its own request, so we
+  // issue them all concurrently (a match is at most 6) instead of one at a time.
   private async moveAccounts(accountNames: string[], channel: VoiceChannel): Promise<number> {
-    let moved = 0;
-    for (const accountName of accountNames) {
-      const member = await this.resolveMember(accountName);
-      if (!member) {
-        logger.debug(`No Discord member for account ${accountName}`);
-        continue;
-      }
-      if (await this.moveMember(member, channel)) moved++;
-    }
-    return moved;
+    const moves = await Promise.all(
+      accountNames.map(async (accountName) => {
+        const member = await this.resolveMember(accountName);
+        if (!member) {
+          logger.debug(`No Discord member for account ${accountName}`);
+          return false;
+        }
+        return this.moveMember(member, channel);
+      }),
+    );
+    return moves.filter(Boolean).length;
   }
 
   private async resolveMember(accountName: string): Promise<GuildMember | undefined> {
