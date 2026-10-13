@@ -3078,6 +3078,32 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
   }
 }
 
+// Arenacraft: a caster may not re-apply CC of a diminishing group over a player/pet target while
+// their own aura of that group still has more than half of its duration left (see
+// ai-doc/server_side_balance.md, "Diminishing CC").
+static bool HasOwnFreshDiminishedAura(Unit const* unit, DiminishingGroup group, ObjectGuid casterGuid)
+{
+  if (group == DIMINISHING_NONE || GetDiminishingReturnsGroupType(group) == DRTYPE_NONE ||
+      !unit->IsCharmedOwnedByPlayerOrPlayer())
+    return false;
+
+  for (auto const& ownedAura : unit->GetOwnedAuras())
+  {
+    if (ownedAura.second->GetType() != UNIT_AURA_TYPE)
+      continue;
+
+    UnitAura const* existingAura = static_cast<UnitAura const*>(ownedAura.second);
+    if (existingAura->GetDiminishGroup() != group || existingAura->IsPermanent() ||
+        existingAura->GetCasterGUID() != casterGuid)
+      continue;
+
+    if (existingAura->GetDuration() * 2 > existingAura->GetMaxDuration())
+      return true;
+  }
+
+  return false;
+}
+
 SpellMissInfo Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool scaleAura)
 {
   if (!unit || !effectMask)
@@ -3190,25 +3216,19 @@ SpellMissInfo Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, bool scaleA
   // not aura add Xinef: Do not increase diminishing level for self cast
   m_diminishGroup = GetDiminishingReturnsGroupForSpell(m_spellInfo, m_triggeredByAuraSpell.spellInfo);
 
-  if (m_diminishGroup != DIMINISHING_NONE && GetDiminishingReturnsGroupType(m_diminishGroup) != DRTYPE_NONE &&
-      unit != m_caster && unit->IsCharmedOwnedByPlayerOrPlayer())
+  // Only the CC aura bounces: damage and other non-aura effects of the spell still land. Pure CC is
+  // normally rejected earlier in CheckCast; this catches AoE, travel-time and triggered CC.
+  if (aura_effmask && unit != m_caster && HasOwnFreshDiminishedAura(unit, m_diminishGroup, originalCaster->GetGUID()))
   {
-    for (auto const& ownedAura : unit->GetOwnedAuras())
-    {
-      if (ownedAura.second->GetType() != UNIT_AURA_TYPE)
-        continue;
+    if (!IsTriggered() && unit == m_targets.GetUnitTarget())
+      SendCastResult(SPELL_FAILED_AURA_BOUNCED);
 
-      UnitAura* existingAura = static_cast<UnitAura*>(ownedAura.second);
-      if (existingAura->GetDiminishGroup() != m_diminishGroup || existingAura->IsPermanent() ||
-          existingAura->GetCasterGUID() != originalCaster->GetGUID())
-        continue;
-
-      if (existingAura->GetDuration() * 2 > existingAura->GetMaxDuration())
-      {
-        SendCastResult(SPELL_FAILED_AURA_BOUNCED);
-        return SPELL_MISS_MISS;
-      }
-    }
+    // strip the aura effects from the mask too, so EffectApplyAura never sees an aura created for a
+    // previous target of the same cast
+    effectMask &= ~aura_effmask;
+    aura_effmask = 0;
+    if (!effectMask)
+      return SPELL_MISS_MISS;
   }
 
   // xinef: do not increase diminish level for bosses (eg. Void Reaver silence is never diminished)
@@ -6278,6 +6298,30 @@ SpellCastResult Spell::CheckCast(bool strict)
   castResult = CallScriptCheckCastHandlers();
   if (castResult != SPELL_CAST_OK)
     return castResult;
+
+  // Arenacraft: reject a pure CC re-apply (see HasOwnFreshDiminishedAura) before any power, combo
+  // points or cooldown are spent. Spells with non-aura effects are not blocked here: their damage
+  // still lands and only the aura bounces in DoSpellHitOnUnit.
+  if (!IsTriggered())
+  {
+    Unit* target = m_targets.GetUnitTarget();
+    if (target && target != m_caster)
+    {
+      bool pureAura = true;
+      for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+        if (m_spellInfo->Effects[i].IsEffect() && !m_spellInfo->Effects[i].IsUnitOwnedAuraEffect())
+        {
+          pureAura = false;
+          break;
+        }
+
+      Unit const* originalCaster = m_originalCaster ? m_originalCaster : m_caster;
+      if (pureAura &&
+          HasOwnFreshDiminishedAura(target, GetDiminishingReturnsGroupForSpell(m_spellInfo, false),
+                                    originalCaster->GetGUID()))
+        return SPELL_FAILED_AURA_BOUNCED;
+    }
+  }
 
   bool   hasDispellableAura = false;
   bool   hasNonDispelEffect = false;
