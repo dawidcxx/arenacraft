@@ -1351,6 +1351,84 @@ void Spell::SelectImplicitAreaTargets(SpellEffIndex effIndex, SpellImplicitTarge
   }
 }
 
+// Arenacraft: totem slot placement. Every totem gets its own spot, never one shared with the shaman or with the
+// shaman's other totems: the slot's own offset when it can be reached, otherwise another reachable spot around the
+// shaman. The search starts from the ground below an airborne shaman, so a totem dropped mid-air does not end up at
+// the shaman's position (the collision check fails when the start is far above the navmesh).
+static Position SelectTotemSlotPosition(Unit* caster, uint32 ownSlot, float dist, float slotAngle)
+{
+  static constexpr float MinTotemSeparation = 1.0f; // from the shaman and from each other
+  static constexpr float FallbackDistance   = 0.75f;
+
+  Position start = caster->GetPosition();
+  if (caster->HasUnitMovementFlag(MOVEMENTFLAG_FALLING) && !caster->IsInWater())
+  {
+    // water surface when falling into water, so the totems do not end up on the bottom
+    float groundZ = caster->GetMapWaterOrGroundLevel(start.GetPositionX(), start.GetPositionY(), start.GetPositionZ());
+    if (groundZ > INVALID_HEIGHT && groundZ < start.GetPositionZ())
+      start.m_positionZ = groundZ;
+  }
+
+  auto isFree = [&](Position const& pos)
+  {
+    if (start.GetExactDist2d(pos) < MinTotemSeparation)
+      return false;
+
+    for (uint8 slot = SUMMON_SLOT_TOTEM; slot < MAX_TOTEM_SLOT; ++slot)
+    {
+      // the totem this cast replaces is about to be unsummoned, it does not block its own slot
+      if (slot == ownSlot || !caster->m_SummonSlot[slot])
+        continue;
+
+      if (Creature* totem = caster->GetMap()->GetCreature(caster->m_SummonSlot[slot]))
+        if (totem->IsInWorld() && totem->GetExactDist2d(pos) < MinTotemSeparation)
+          return false;
+    }
+
+    return true;
+  };
+
+  // the slot itself first, then directions progressively further away from it, at full and at half distance
+  static constexpr float AngleOffsets[] = {0.0f,
+                                           float(M_PI / 4),
+                                           float(-M_PI / 4),
+                                           float(M_PI / 2),
+                                           float(-M_PI / 2),
+                                           float(3 * M_PI / 4),
+                                           float(-3 * M_PI / 4),
+                                           float(M_PI)};
+  for (float distance : {dist, dist * 0.5f})
+  {
+    for (float offset : AngleOffsets)
+    {
+      float angle = caster->GetOrientation() + slotAngle + offset;
+      float x     = start.GetPositionX() + distance * std::cos(angle);
+      float y     = start.GetPositionY() + distance * std::sin(angle);
+      float z     = start.GetPositionZ();
+
+      if (!caster->GetMap()->CheckCollisionAndGetValidCoords(caster, start.GetPositionX(), start.GetPositionY(),
+                                                             start.GetPositionZ(), x, y, z, false))
+        continue;
+
+      Position pos(x, y, z, caster->GetOrientation());
+      if (isFree(pos))
+        return pos;
+    }
+  }
+
+  // nothing reachable (e.g. no navmesh where the shaman stands): a short step towards the slot, which still keeps
+  // the four slots apart, on the ground
+  float    angle = caster->GetOrientation() + slotAngle;
+  Position pos(start.GetPositionX() + FallbackDistance * std::cos(angle),
+               start.GetPositionY() + FallbackDistance * std::sin(angle), start.GetPositionZ(),
+               caster->GetOrientation());
+  float    groundZ = caster->GetMapHeight(pos.GetPositionX(), pos.GetPositionY(), start.GetPositionZ());
+  if (groundZ > INVALID_HEIGHT)
+    pos.m_positionZ = groundZ;
+
+  return pos;
+}
+
 void Spell::SelectImplicitCasterDestTargets(SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType)
 {
   SpellDestination dest(*m_caster);
@@ -1703,6 +1781,28 @@ void Spell::SelectImplicitCasterDestTargets(SpellEffIndex effIndex, SpellImplici
     if (dist < objSize)
     {
       dist = objSize;
+    }
+
+    if (m_spellInfo->Effects[effIndex].Effect == SPELL_EFFECT_SUMMON)
+    {
+      SummonPropertiesEntry const* properties =
+          sSummonPropertiesStore.LookupEntry(m_spellInfo->Effects[effIndex].MiscValueB);
+      if (properties && properties->Type == SUMMON_TYPE_TOTEM)
+      {
+        switch (targetType.GetTarget())
+        {
+        case TARGET_DEST_CASTER_FRONT_LEFT:
+        case TARGET_DEST_CASTER_BACK_LEFT:
+        case TARGET_DEST_CASTER_FRONT_RIGHT:
+        case TARGET_DEST_CASTER_BACK_RIGHT:
+          dest.Relocate(SelectTotemSlotPosition(m_caster, properties->Slot, dist, angle));
+          CallScriptDestinationTargetSelectHandlers(dest, effIndex, targetType);
+          m_targets.SetDst(dest);
+          return;
+        default:
+          break;
+        }
+      }
     }
 
     Position pos = dest._position;
