@@ -35,6 +35,7 @@ Related, already documented investigations (not repeated here):
 | 10 | Duel reset happens on accept, not on duel end | Low | confirmed (code) |
 | 11 | `SMSG_ARENA_UNIT_DESTROYED` sent for every unit, incl. own team / totems | Low | needs in-game check |
 | 12 | Grounding Totem redirect has no LoS check | Low | needs in-game check |
+| 13 | Ebon Gargoyle deals about half of its retail damage | Medium | fix in review (`fix/gargoyle-damage`) |
 
 ---
 
@@ -180,3 +181,22 @@ Related, already documented investigations (not repeated here):
   by one totem.
 - **Check:** compare with retail 3.3.5 behavior before changing anything. This is long-standing
   AzerothCore behavior, not an arenacraft change.
+
+## 13. Ebon Gargoyle deals about half of its retail damage
+
+- **Status:** fix in review — `fix/gargoyle-damage`: the gargoyle's spell power is 33.3% of the
+  DK's attack power +4% per Impurity rank (40% at 5/5), and Gargoyle Strike takes 100% of it
+  (coefficient override in `SpellMgr::LoadSpellBonuses`), so a strike scales with 0.4 AP.
+
+- **Where:** `spell_dk_pet_scaling::CalculateSPAmount` (`src/game/Scripts/Spells/spell_dk.cpp`),
+  `spell_bonus_data` row for 51963 (direct coefficient 0.453), `spell_pet_dk_gargoyle_strike`
+  (`src/game/Scripts/Pet/pet_dk.cpp`, base 140 at level 80).
+- **What:** the gargoyle gets 33% of the DK's attack power as spell power (40% with any Impurity
+  rank), and Gargoyle Strike then gets only 0.453 of that spell power. The two cuts stack to
+  ~0.15 AP per strike (~0.18 with Impurity). Retail 3.3.5 testing (3.1 era, quoted in
+  AzerothCore issue #11387) puts it at 0.4 AP per strike.
+- **Example:** DK with 6000 AP, 5/5 Impurity: ~1230 per strike now, ~2540 with 0.4 AP (before
+  resilience and partial nature resists).
+- **Not a bug:** attack power and haste are snapshotted at summon (correct for 3.3.5, see
+  AzerothCore issue #27790); haste does shorten the Gargoyle Strike cast; partial resists on
+  nature damage make individual strikes vary.
