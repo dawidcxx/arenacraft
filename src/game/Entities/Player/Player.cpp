@@ -64,6 +64,7 @@
 #include "OutdoorPvPMgr.h"
 #include "Pet.h"
 #include "PetitionMgr.h"
+#include "PreBuffs.hpp"
 #include "QuestDef.h"
 #include "Realm.h"
 #include "ReputationMgr.h"
@@ -9206,6 +9207,9 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
 
   if (duration > 0s)
     pet->SetDuration(duration);
+
+  // Arenacraft: a brand new pet (no saved one to load) summoned in the arena preparation phase.
+  arenacraft::ApplyArenaPreBuffsToPet(pet);
 
   if (NeedSendSpectatorData() && pet->GetCreatureTemplate()->family)
   {

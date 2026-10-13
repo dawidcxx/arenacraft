@@ -27,6 +27,7 @@
 #include "ObjectMgr.h"
 #include "PetPackets.h"
 #include "Player.h"
+#include "PreBuffs.hpp"
 #include "QueryHolder.h"
 #include "ScriptMgr.h"
 #include "SpellAuraEffects.h"
@@ -446,6 +447,9 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petEntry, uint32 petnumber, bool c
 
               CastPetAuras(current);
             }
+
+            // Arenacraft: arena pre-buffs for the pet, after RemoveArenaAuras so they stick.
+            arenacraft::ApplyArenaPreBuffsToPet(this);
 
             CleanupActionBar(); // remove unknown spells from action bar after load
 
