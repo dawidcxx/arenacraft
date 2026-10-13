@@ -36,6 +36,11 @@ Related, already documented investigations (not repeated here):
 | 11 | `SMSG_ARENA_UNIT_DESTROYED` sent for every unit, incl. own team / totems | Low | needs in-game check |
 | 12 | Grounding Totem redirect has no LoS check | Low | needs in-game check |
 | 13 | Ebon Gargoyle deals about half of its retail damage | Medium | fix in review (`fix/gargoyle-damage`) |
+| 14 | Stealth broken by friendly spells and by fully absorbed DoT ticks | Medium | needs in-game check |
+| 15 | Vanish/Shadowmeld only absorbs in-flight spells for 500 ms, never instant ones | Medium | needs in-game check |
+| 16 | Deep Freeze bonus damage procs on temporarily stun-immune players | Medium | needs in-game check |
+| 17 | Retaliation proc may use the wrong damage spell | Medium | needs in-game check |
+| 18 | Recasting Cyclone/Banish on an already affected target may refresh it | Low | needs in-game check |
 
 ---
 
@@ -200,3 +205,76 @@ Related, already documented investigations (not repeated here):
 - **Not a bug:** attack power and haste are snapshotted at summon (correct for 3.3.5, see
   AzerothCore issue #27790); haste does shorten the Gargoyle Strike cast; partial resists on
   nature damage make individual strikes vary.
+
+## Upstream (AzerothCore) fixes reviewed — 2026-10-13
+
+AzerothCore commits after our fork point (2024-12-22) were checked against our
+code. Fixes already present (often via the `backport:` commits) or areas we
+changed on purpose are not listed.
+
+- **Ported, in review:** `fix/security-backports` (13 crash / use-after-free /
+  packet-validation / money fixes, one commit each, upstream PR in the message)
+  and `fix/pvp-backports` (Hand of Freedom vs Intimidating Shout, Chains of Ice
+  Frost Fever on immune targets, Bone Shield 2 s charge delay, fall damage
+  threshold, fall info reset on near teleport, guardians excluded from party/raid
+  target search).
+- **Deliberately not ported:**
+  - movement root safeguards that drop client packets (azerothcore#23117 part) —
+    we removed those drops on purpose, see `ai-doc/research/MOVEMENT_CODE_REVIEW.md`
+    Addendum 2;
+  - fear pathing (azerothcore#22451, #24892) — we have our own flee cliff
+    avoidance (`072cf5ac7`);
+  - movement order counters / async speed ack (azerothcore#23015, #23371,
+    #23465) — large protocol rework, partially backported already;
+  - trade rework (azerothcore#24710) and anti-DoS opcode table
+    (azerothcore#21502) — large refactors, the latter moves config into the DB.
+
+## 14. Stealth broken by friendly spells and by fully absorbed DoT ticks
+
+- **Where:** stealth removal in `Spell::DoSpellHitOnUnit` / aura procs,
+  `AuraEffect::HandlePeriodicDamageAurasTick` and
+  `HandlePeriodicHealthLeechAuraTick` (`procEx` always has NORMAL/CRITICAL_HIT).
+- **What:** upstream fixed stealth charges being consumed by friendly/positive
+  procs (azerothcore#24834, #24875, #24898) and a periodic tick that was fully
+  absorbed still counting as a hit (azerothcore#24975). Our proc system is the
+  older one, so the upstream patch does not apply as is.
+- **Check:** rogue in stealth with a DoT absorbed by Power Word: Shield; friendly
+  priest casting on a stealthed rogue.
+
+## 15. Vanish/Shadowmeld spell absorption window
+
+- **Where:** `Spell::DoAllEffectOnTarget`, "Xinef: absorb delayed projectiles for 500ms".
+- **What:** in-flight spells are only absorbed if they land within 500 ms of the
+  Sanctuary, area spells are excluded, and instant spells landing right after
+  Vanish are not absorbed. Upstream (azerothcore#24937) absorbs every projectile
+  launched before the Sanctuary and instant hostile spells for 400 ms after it.
+- **Check:** compare with retail 3.3.5 before changing — this decides whether
+  Vanish dodges a Frostbolt/Chaos Bolt in flight.
+
+## 16. Deep Freeze bonus damage on stun-immune players
+
+- **Where:** spell 71761 (Deep Freeze Immunity State) has no proc check.
+- **What:** the 71757 damage proc is meant for targets permanently immune to
+  stuns (bosses). Upstream (azerothcore#26168) restricts it to creatures with a
+  template stun immunity; here it can proc on players who are only temporarily
+  stun-immune (Bladestorm, Divine Shield, ...).
+- **Fix:** port the `spell_mage_deep_freeze_immunity_state` AuraScript (needs a
+  `spell_script_names` binding for 71761).
+
+## 17. Retaliation damage spell
+
+- **Where:** `spell_warr_retaliation` (`src/game/Scripts/Spells/spell_warrior.cpp`),
+  `SPELL_WARRIOR_RETALIATION_DAMAGE = 22858`.
+- **What:** upstream (azerothcore#24868) switched to 20240 and casts from the
+  warrior onto the attacker, citing self-damage and lost charges. That change was
+  made on top of their newer proc system; TrinityCore 3.3.5 still uses 22858.
+- **Check:** use Retaliation in a duel and watch who takes the damage and how many
+  charges are spent.
+
+## 18. Recast of hostile self-immunity spells (Cyclone, Banish)
+
+- **What:** upstream (azerothcore#27482) made a hostile spell that grants school
+  immunity (Cyclone, Banish) report immunity when recast while its own aura is
+  active, instead of refreshing. Our immunity code differs from upstream.
+- **Check:** recast Cyclone on a cycloned target: it should fail as immune, not
+  refresh the duration.
