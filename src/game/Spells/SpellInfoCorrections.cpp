@@ -4617,6 +4617,8 @@ void SpellMgr::LoadSpellInfoCorrections()
                 {
                   spellInfo->Attributes &= ~SPELL_ATTR0_AURA_IS_DEBUFF;
                   spellInfo->StackAmount = 2;
+                  // arena-only: never persist it on a saved pet or a player logging out mid-match
+                  spellInfo->AttributesCu |= SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED;
                 });
   // Earthliving Weapon (all ranks): mark the imbue's temporary enchant as
   // arena-legal so it survives arena entry, like poisons/DK runes. The flag is
