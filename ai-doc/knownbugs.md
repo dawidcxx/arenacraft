@@ -2,7 +2,8 @@
 
 Living list of gameplay/mechanic bugs found by reading the code. Each entry has a
 location, a concrete repro, and a suggested fix. Nothing here is fixed yet unless
-marked otherwise.
+marked otherwise. Once a fix is merged, move the entry's status to **fixed** (or drop
+the entry) in the same change.
 
 Status legend:
 
@@ -10,6 +11,8 @@ Status legend:
   reproduced in game.
 - **needs in-game check** — the code looks suspicious, but retail 3.3.5 behavior
   or the exact repro still has to be verified.
+- **fix in review (`branch`)** — a fix exists on the named branch and is waiting
+  for review/merge.
 
 Related, already documented investigations (not repeated here):
 
@@ -20,13 +23,13 @@ Related, already documented investigations (not repeated here):
 
 | # | Area | Severity | Status |
 |---|------|----------|--------|
-| 1 | CC re-apply guard eats combo points (Kidney Shot) | High | confirmed (code) |
-| 2 | CC re-apply guard drops the damage part of CC spells | Medium | confirmed (code) |
-| 3 | CC re-apply guard sends "bounced" errors for proc-triggered CC | Low | needs in-game check |
-| 4 | Arena dampening ignores pets and guardians | Medium | confirmed (code) |
-| 5 | `.challenge` against your own party member puts the party on both teams | High | confirmed (code) |
-| 6 | Post-teleport unroot hack clears legitimate roots/stuns | Medium | confirmed (code) |
-| 7 | Arena pre-buffs skip pets | Low | confirmed (code) |
+| 1 | CC re-apply guard eats combo points (Kidney Shot) | High | fix in review (`fix/cc-reapply-guard`) |
+| 2 | CC re-apply guard drops the damage part of CC spells | Medium | fix in review (`fix/cc-reapply-guard`) |
+| 3 | CC re-apply guard sends "bounced" errors for proc-triggered CC | Low | fix in review (`fix/cc-reapply-guard`) |
+| 4 | Arena dampening ignores pets and guardians | Medium | fix in review (`fix/dampening-pets`) |
+| 5 | `.challenge` against your own party member puts the party on both teams | High | fix in review (`fix/challenge-same-party`) |
+| 6 | Post-teleport unroot hack clears legitimate roots/stuns | Medium | fix in review (`fix/teleport-unroot-hack`) |
+| 7 | Arena pre-buffs skip pets | Low | fix in review (`fix/prebuffs-pets`) |
 | 8 | Arena pre-buffs are cast with the receiver's talents | Low | confirmed (code) |
 | 9 | Horn of Winter pre-buff expires early in the match | Low | confirmed (code) |
 | 10 | Duel reset happens on accept, not on duel end | Low | confirmed (code) |
@@ -36,6 +39,8 @@ Related, already documented investigations (not repeated here):
 ---
 
 ## 1. CC re-apply guard eats combo points
+
+- **Status:** fix in review — `fix/cc-reapply-guard`: pure CC is rejected in `Spell::CheckCast` before power, combo points or cooldown are spent.
 
 - **Where:** `Spell::DoSpellHitOnUnit` (`src/game/Spells/Spell.cpp:3208`), combo point
   handling in `Spell::DoAllEffectOnTarget` (`Spell.cpp:2789`) and `Spell.cpp:4442`.
@@ -53,6 +58,8 @@ Related, already documented investigations (not repeated here):
 
 ## 2. CC re-apply guard drops the damage part of CC spells
 
+- **Status:** fix in review — `fix/cc-reapply-guard`: only the aura effects are dropped at hit time, the damage still lands.
+
 - **Where:** `Spell.cpp:3208` (guard) → `Spell.cpp:2777` (`m_damage = 0` on any non-NONE result).
 - **What:** the guard turns the **whole** hit into a miss, not just the aura. Any CC spell that
   also deals damage loses its damage when it bounces: Concussion Blow, Dragon's Breath,
@@ -64,6 +71,8 @@ Related, already documented investigations (not repeated here):
 
 ## 3. CC re-apply guard sends "bounced" errors for proc-triggered CC
 
+- **Status:** fix in review — `fix/cc-reapply-guard`: the error is sent only for non-triggered casts and only for the main target.
+
 - **Where:** `Spell.cpp:3208`.
 - **What:** the guard also runs for triggered/proc CC (Impact, Improved Hamstring, Seal of
   Justice, Blackout, Charge stun, ...). Each blocked proc sends
@@ -74,6 +83,8 @@ Related, already documented investigations (not repeated here):
 
 ## 4. Arena dampening ignores pets and guardians
 
+- **Status:** fix in review — `fix/dampening-pets`: dampening is applied to every alive unit in the player's `m_Controlled` on each update (so later summons are covered too), and 29659 is marked unsaveable.
+
 - **Where:** `Arena::PreUpdateImpl` (`src/game/Battlegrounds/Arena.cpp:181`).
 - **What:** the +10%/+20% damage stacks of 29659 are applied only to `GetPlayers()`.
   Hunter / warlock / DK pets, Shadowfiend, Gargoyle, Army of the Dead, Mirror Images, Feral
@@ -83,6 +94,8 @@ Related, already documented investigations (not repeated here):
   (`m_Controlled`), and to pets summoned after dampening started.
 
 ## 5. `.challenge` against your own party member puts the party on both teams
+
+- **Status:** fix in review — `fix/challenge-same-party`: `.challenge` is refused when both players are in the same group. The cooldown note under "Related" is not addressed.
 
 - **Where:** `ChallengeCommand::HandleChallenge` (`src/game/Arenacraft/Challenge.cpp:101`, `:188-189`).
 - **What:** nothing checks that `enemy` is outside the challenger's group. If A and B are in one
@@ -96,6 +109,8 @@ Related, already documented investigations (not repeated here):
 
 ## 6. Post-teleport unroot hack clears legitimate roots/stuns
 
+- **Status:** fix in review — `fix/teleport-unroot-hack`: the delayed unroot is skipped while a root/stun aura is active or the player is on a vehicle.
+
 - **Where:** `WorldSession::HandleMoveWorldportAck` (`src/game/Handlers/MovementHandler.cpp:272`).
 - **What:** 1 s after **every** far teleport the server unconditionally clears
   `UNIT_STATE_ROOT | UNIT_STATE_STUNNED` and sends an unroot, without checking whether a root or
@@ -107,6 +122,8 @@ Related, already documented investigations (not repeated here):
   `!HasAuraType(SPELL_AURA_MOD_ROOT) && !HasAuraType(SPELL_AURA_MOD_STUN)` (and not on a vehicle).
 
 ## 7. Arena pre-buffs skip pets
+
+- **Status:** fix in review — `fix/prebuffs-pets`: `arenacraft::ApplyArenaPreBuffsToPet` runs after the pet has loaded (`Pet::LoadPetFromDB`, after `RemoveArenaAuras`) and for new pets (`Player::SummonPet`), during the preparation phase only.
 
 - **Where:** `ArenaPreBuffs::OnBattlegroundAddPlayer` (`src/game/Arenacraft/PreBuffs.cpp:106`).
 - **What:** only players are buffed. Pets enter the arena without Mark of the Wild, Fortitude,
