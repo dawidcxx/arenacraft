@@ -54,16 +54,20 @@ template <class T> T* HashMapHolder<T>::Find(ObjectGuid guid)
   return (itr != GetContainer().end()) ? itr->second : nullptr;
 }
 
+// Both statics are intentionally never destroyed: other global destructors (GuildMgr tearing down guild bank
+// items -> Item::GetOwner -> ObjectAccessor::FindPlayer) still reach into them during exit, and locking a
+// destroyed std::shared_mutex is undefined behaviour (crash on graceful shutdown). Leaking them makes a late
+// lookup find an empty but valid map; the OS reclaims the memory at exit.
 template <class T> auto HashMapHolder<T>::GetContainer() -> MapType&
 {
-  static MapType _objectMap;
-  return _objectMap;
+  static MapType* _objectMap = new MapType();
+  return *_objectMap;
 }
 
 template <class T> std::shared_mutex* HashMapHolder<T>::GetLock()
 {
-  static std::shared_mutex _lock;
-  return &_lock;
+  static std::shared_mutex* _lock = new std::shared_mutex();
+  return _lock;
 }
 
 HashMapHolder<Player>::MapType const& ObjectAccessor::GetPlayers() { return HashMapHolder<Player>::GetContainer(); }
