@@ -41,6 +41,7 @@ Related, already documented investigations (not repeated here):
 | 16 | Deep Freeze bonus damage procs on temporarily stun-immune players | Medium | needs in-game check |
 | 17 | Retaliation proc may use the wrong damage spell | Medium | needs in-game check |
 | 18 | Recasting Cyclone/Banish on an already affected target may refresh it | Low | needs in-game check |
+| 19 | Shaman totems stacked in one point when dropped mid-air or off the navmesh | Medium | fix in review (`fix/totem-placement`) |
 
 ---
 
@@ -278,3 +279,24 @@ changed on purpose are not listed.
   active, instead of refreshing. Our immunity code differs from upstream.
 - **Check:** recast Cyclone on a cycloned target: it should fail as immune, not
   refresh the duration.
+
+## 19. Shaman totems stacked in one point
+
+- **Status:** fix in review — `fix/totem-placement`: `SelectTotemSlotPosition` gives
+  every totem its own reachable spot (slot offset, then other directions, never
+  within 1 yd of the shaman or another of its totems), searching from the ground
+  below an airborne shaman.
+
+- **Where:** `Spell::SelectImplicitCasterDestTargets` (`src/game/Spells/Spell.cpp`),
+  `WorldObject::MovePositionToFirstCollision`, `Map::CheckCollisionAndGetValidCoords`.
+- **What:** a totem's spot is the caster offset for its slot (3 yd). When the
+  collision check fails the position is left unchanged, i.e. the shaman's own
+  position, so every totem lands there (with no ground correction, possibly in the
+  air). The check fails when the shaman is more than 7 yd from the navmesh
+  (`PATHFIND_FARFROMPOLY_START` is not an accepted path type): falling from the
+  Blade's Edge bridge or a Nagrand pillar, knocked up by Thunderstorm/Typhoon, or
+  standing on a pillar top/ledge with no navmesh. A normal jump is not affected.
+  Unchanged upstream.
+- **Check:** drop totems (single and Call of the Elements) while falling from a
+  height, while standing on a pillar edge, and with the back against a wall.
+
