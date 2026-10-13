@@ -2028,6 +2028,14 @@ void SpellMgr::LoadSpellProcs()
   LOG_INFO("server.loading", " ");
 }
 
+// Arenacraft: coefficients that override `spell_bonus_data` rows (static C++ over DB content).
+static void ApplySpellBonusCorrections(SpellBonusMap& bonusMap)
+{
+  // Gargoyle Strike: full benefit from the gargoyle's spell power, which already is a share of the
+  // DK's attack power (spell_dk_pet_scaling). The DB 0.453 applied on top halved the AP scaling.
+  bonusMap[51963] = {1.0f, 0.0f, 0.0f, 0.0f};
+}
+
 void SpellMgr::LoadSpellBonuses()
 {
   uint32 oldMSTime = getMSTime();
@@ -2041,6 +2049,7 @@ void SpellMgr::LoadSpellBonuses()
   {
     LOG_WARN("server.loading", ">> Loaded 0 spell bonus data. DB table `spell_bonus_data` is empty.");
     LOG_INFO("server.loading", " ");
+    ApplySpellBonusCorrections(mSpellBonusMap);
     return;
   }
 
@@ -2065,6 +2074,8 @@ void SpellMgr::LoadSpellBonuses()
 
     ++count;
   } while (result->NextRow());
+
+  ApplySpellBonusCorrections(mSpellBonusMap);
 
   LOG_INFO("server.loading", ">> Loaded {} Extra Spell Bonus Data in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
   LOG_INFO("server.loading", " ");
