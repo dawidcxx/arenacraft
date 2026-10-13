@@ -90,6 +90,14 @@ private:
       return false;
     }
 
+    // Both sides are built from the players' parties, so a party member would
+    // end up queued on both teams.
+    if (challenger->GetGroup() && challenger->GetGroup() == enemy->GetGroup())
+    {
+      handler->SendErrorMessage("You cannot challenge a member of your own party. Leave the party first.");
+      return false;
+    }
+
     // Build both sides from their normal parties and require equal sizes.
     std::vector<Player*> mySide;
     std::vector<Player*> enemySide;
