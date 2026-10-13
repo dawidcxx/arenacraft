@@ -275,6 +275,11 @@ void WorldSession::HandleMoveWorldportAck()
         if (!player->IsInWorld())
           return;
 
+        // a root/stun that landed after the teleport (or a vehicle seat) is legitimate: leave it alone
+        if (player->HasAuraType(SPELL_AURA_MOD_ROOT) || player->HasAuraType(SPELL_AURA_MOD_STUN) ||
+            player->GetVehicle())
+          return;
+
         player->ClearUnitState(UNIT_STATE_ROOT | UNIT_STATE_STUNNED);
         player->SendMoveRoot(false);
       },
