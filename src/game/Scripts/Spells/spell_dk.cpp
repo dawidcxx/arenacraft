@@ -401,8 +401,10 @@ class spell_dk_chains_of_ice : public SpellScript
     {
       std::list<TargetInfo> const* targetsInfo = GetSpell()->GetUniqueTargetInfo();
       for (std::list<TargetInfo>::const_iterator ihit = targetsInfo->begin(); ihit != targetsInfo->end(); ++ihit)
-        if (ihit->missCondition == SPELL_MISS_NONE && ihit->targetGUID == target->GetGUID())
-          GetCaster()->CastSpell(target, 55095 /*SPELL_FROST_FEVER*/, true);
+        if (ihit->targetGUID == target->GetGUID() &&
+            (ihit->missCondition == SPELL_MISS_NONE || ihit->missCondition == SPELL_MISS_IMMUNE ||
+             ihit->missCondition == SPELL_MISS_IMMUNE2))
+          GetCaster()->CastSpell(target, SPELL_DK_FROST_FEVER, true);
     }
   }
 
@@ -535,11 +537,21 @@ class spell_dk_bone_shield : public AuraScript
 {
   PrepareAuraScript(spell_dk_bone_shield);
 
+  uint32 lastChargeUsedTime = 0;
+
   void HandleProc(ProcEventInfo& eventInfo)
   {
     PreventDefaultAction();
+    uint32 currentTime = getMSTime();
+    // Checks for 2 seconds between uses of bone shield charges
+    if (getMSTimeDiff(lastChargeUsedTime, currentTime) < 2000)
+      return;
+
     if (!eventInfo.GetSpellInfo() || !eventInfo.GetSpellInfo()->IsTargetingArea())
+    {
       DropCharge();
+      lastChargeUsedTime = currentTime;
+    }
   }
 
   void Register() override { OnProc += AuraProcFn(spell_dk_bone_shield::HandleProc); }
