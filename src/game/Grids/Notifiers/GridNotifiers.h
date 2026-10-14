@@ -1235,7 +1235,11 @@ public:
       return;
 
     if (u->AI())
+    {
+      u->SetNoCallForHelp(true); // avoid recursive call for help causing stack overflow
       u->AI()->AttackStart(i_enemy);
+      u->SetNoCallForHelp(false);
+    }
   }
 
 private:

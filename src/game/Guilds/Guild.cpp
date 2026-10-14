@@ -1567,11 +1567,14 @@ void Guild::HandleRemoveMember(WorldSession* session, std::string_view name)
         SendCommandResult(session, GUILD_COMMAND_REMOVE, ERR_GUILD_RANK_TOO_HIGH_S, name);
       else
       {
-        ObjectGuid guid = member->GetGUID();
+        // Copy values since everything will be deleted in DeleteMember().
+        ObjectGuid  guid       = member->GetGUID();
+        std::string memberName = member->GetName();
+
         // After call to DeleteMember pointer to member becomes invalid
         DeleteMember(guid, false, true);
         _LogEvent(GUILD_EVENT_LOG_UNINVITE_PLAYER, player->GetGUID(), guid);
-        _BroadcastEvent(GE_REMOVED, ObjectGuid::Empty, member->GetName(), player->GetName());
+        _BroadcastEvent(GE_REMOVED, ObjectGuid::Empty, memberName, player->GetName());
       }
     }
   }
@@ -1726,19 +1729,25 @@ bool Guild::HandleMemberWithdrawMoney(WorldSession* session, uint32 amount, bool
   sScriptMgr->OnGuildMemberWitdrawMoney(this, player, amount, repair);
 
   CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+
+  // Remove money from bank first, so the player can never be paid from a bank that cannot cover it
+  if (!_ModifyBankMoney(trans, amount, false))
+    return false;
+
   // Add money to player (if required)
   if (!repair)
   {
     if (!player->ModifyMoney(amount))
+    {
+      _ModifyBankMoney(trans, amount, true);
       return false;
+    }
 
     player->SaveGoldToDB(trans);
   }
 
   // Update remaining money amount
   member->UpdateBankWithdrawValue(trans, GUILD_BANK_MAX_TABS, amount);
-  // Remove money from bank
-  _ModifyBankMoney(trans, amount, false);
 
   // Log guild bank event
   _LogBankEvent(trans, repair ? GUILD_BANK_LOG_REPAIR_MONEY : GUILD_BANK_LOG_WITHDRAW_MONEY, uint8(0),
