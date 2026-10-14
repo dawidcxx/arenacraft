@@ -1,6 +1,7 @@
 #include "PreBuffs.hpp"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
+#include "Pet.h"
 #include "Player.h"
 
 #include <algorithm>
@@ -83,17 +84,11 @@ void ApplyClassBuffsToPlayer(Player* target, uint8 providerClass)
     target->CastSpell(target, buff.spellId, true);
   }
 }
-} // namespace
 
-void ArenaPreBuffs::OnBattlegroundAddPlayer(Battleground* bg, Player* player)
+// The whole team: the players already in the match plus those still invited (their queue entry
+// disappears once they accept, so neither list alone is complete).
+std::vector<Player*> CollectArenaTeam(Battleground* bg, TeamId team)
 {
-  if (!bg || !bg->isArena() || !player || !player->IsAlive())
-    return;
-
-  TeamId const team = player->GetBgTeamId();
-
-  // Gather the whole team: the players already in the match plus those still invited (their queue
-  // entry disappears once they accept, so neither list alone is complete).
   std::vector<Player*> teamPlayers;
   for (auto const& [guid, present] : bg->GetPlayers())
     if (present && present->IsAlive() && present->GetBgTeamId() == team)
@@ -103,7 +98,38 @@ void ArenaPreBuffs::OnBattlegroundAddPlayer(Battleground* bg, Player* player)
     if (std::find(teamPlayers.begin(), teamPlayers.end(), invited) == teamPlayers.end())
       teamPlayers.push_back(invited);
 
-  for (Player* member : teamPlayers)
+  return teamPlayers;
+}
+} // namespace
+
+void ArenaPreBuffs::OnBattlegroundAddPlayer(Battleground* bg, Player* player)
+{
+  if (!bg || !bg->isArena() || !player || !player->IsAlive())
+    return;
+
+  for (Player* member : CollectArenaTeam(bg, player->GetBgTeamId()))
     ApplyClassBuffsToPlayer(player, member->getClass());
+}
+
+void ApplyArenaPreBuffsToPet(Pet* pet)
+{
+  if (!pet || !pet->IsAlive())
+    return;
+
+  Player* owner = pet->GetOwner();
+  if (!owner)
+    return;
+
+  // Preparation phase only: a pet summoned or resummoned mid-match does not get free buffs.
+  Battleground* bg = owner->GetBattleground();
+  if (!bg || !bg->isArena() || bg->GetStatus() != STATUS_WAIT_JOIN)
+    return;
+
+  // AddAura rather than a cast: the buff lands on the pet only and does not depend on the pet being
+  // able to cast (party-wide Prayer spells, pet spell checks).
+  for (Player* member : CollectArenaTeam(bg, owner->GetBgTeamId()))
+    for (ArenaPreBuff const& buff : GetArenaPreBuffsForClass(member->getClass()))
+      if (!buff.selfOnly)
+        pet->AddAura(buff.spellId, pet);
 }
 } // namespace arenacraft

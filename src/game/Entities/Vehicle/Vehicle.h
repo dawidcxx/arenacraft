@@ -53,7 +53,9 @@ public:
   void RemoveAllPassengers();
   void Dismiss();
   bool IsVehicleInUse();
-  void TeleportVehicle(float x, float y, float z, float ang);
+  // true if any seat lets its passenger control the vehicle (a passenger-only vehicle mount is not)
+  [[nodiscard]] bool IsControllableVehicle() const;
+  void               TeleportVehicle(float x, float y, float z, float ang);
 
   SeatMap Seats;
 

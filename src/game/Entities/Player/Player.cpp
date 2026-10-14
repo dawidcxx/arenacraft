@@ -64,6 +64,7 @@
 #include "OutdoorPvPMgr.h"
 #include "Pet.h"
 #include "PetitionMgr.h"
+#include "PreBuffs.hpp"
 #include "QuestDef.h"
 #include "Realm.h"
 #include "ReputationMgr.h"
@@ -9207,6 +9208,9 @@ Pet* Player::SummonPet(uint32 entry, float x, float y, float z, float ang, PetTy
   if (duration > 0s)
     pet->SetDuration(duration);
 
+  // Arenacraft: a brand new pet (no saved one to load) summoned in the arena preparation phase.
+  arenacraft::ApplyArenaPreBuffsToPet(pet);
+
   if (NeedSendSpectatorData() && pet->GetCreatureTemplate()->family)
   {
     ArenaSpectator::SendCommand_UInt32Value(FindMap(), GetGUID(), "PHP", (uint32)pet->GetHealthPct());
@@ -14115,8 +14119,8 @@ void Player::HandleFall(MovementInfo const& movementInfo)
   float z_diff = m_lastFallZ - movementInfo.pos.GetPositionZ();
 
   // Players with low fall distance, Feather Fall or physical immunity (charges used) are ignored
-  //  14.57 can be calculated by resolving damageperc formula below to 0
-  if (z_diff >= 14.57f && !isDead() && !IsGameMaster() && !GetCommandStatus(CHEAT_GOD) && !HasHoverAura() &&
+  //  13.48 can be calculated by resolving damageperc formula below to 0 (no safe fall)
+  if (z_diff >= 13.48f && !isDead() && !IsGameMaster() && !GetCommandStatus(CHEAT_GOD) && !HasHoverAura() &&
       !HasFeatherFallAura() && !HasFlyAura())
   {
     // Safe fall, fall height reduction

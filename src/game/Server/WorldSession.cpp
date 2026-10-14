@@ -299,18 +299,13 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
           // skip STATUS_LOGGEDIN opcode unexpected errors if player logout sometime ago - this can be network lag
           // delayed packets
           //! If player didn't log out a while ago, it means packets are being sent while the server does not recognize
-          //! the client to be in world yet. We will re-add the packets to the bottom of the queue and process them
-          //! later.
+          //! the client to be in world yet. They are dropped, not requeued: a client (e.g. an addon sending
+          //! CMSG_SOCIAL_LIST before entering the world) could otherwise get the same packet requeued and reprocessed
+          //! hundreds of times a second.
           if (!m_playerRecentlyLogout)
-          {
-            requeuePackets.push_back(packet);
-            deletePacket = false;
-
-            LOG_DEBUG(
-                "network",
-                "Delaying processing of message with status STATUS_LOGGEDIN: No players in the world for account id {}",
-                GetAccountId());
-          }
+            LOG_DEBUG("network",
+                      "Dropping message with status STATUS_LOGGEDIN: No players in the world for account id {}",
+                      GetAccountId());
         }
         else if (_player->IsInWorld())
         {
