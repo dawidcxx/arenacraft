@@ -107,8 +107,8 @@ uint8 ArenaSupplyForClass(uint8 playerClass)
 }
 
 // Arenacraft: arena dampening. Five minutes after the gates open (which can be
-// sooner if both teams click their ready crystals) every player starts gaining
-// a stack of the repurposed "Positive Charge" buff (29659, see
+// sooner if both teams click their ready crystals) every player (and their
+// pets/guardians) gains a stack of the repurposed "Positive Charge" buff (29659, see
 // SpellInfoCorrections) every two minutes, up to 2: +10% damage per stack,
 // +20% at the cap, that nudges stalled matches to a close. The buff is
 // permanent and undispellable, so it simply rides the match out.
@@ -178,14 +178,24 @@ bool Arena::PreUpdateImpl(uint32 diff)
 
     if (desired)
     {
-      for (auto const& [guid, player] : GetPlayers())
+      auto applyDampening = [desired](Unit* unit)
       {
-        Aura* aura = player->GetAura(ARENA_DAMPENING_SPELL);
+        Aura* aura = unit->GetAura(ARENA_DAMPENING_SPELL);
         if (!aura)
-          aura = player->AddAura(ARENA_DAMPENING_SPELL, player);
+          aura = unit->AddAura(ARENA_DAMPENING_SPELL, unit);
 
         if (aura && aura->GetStackAmount() < desired)
           aura->SetStackAmount(desired);
+      };
+
+      for (auto const& [guid, player] : GetPlayers())
+      {
+        applyDampening(player);
+
+        // pets and guardians (Shadowfiend, Gargoyle, Feral Spirits, ...) deal damage too
+        for (Unit* controlled : player->m_Controlled)
+          if (controlled->IsAlive())
+            applyDampening(controlled);
       }
     }
   }

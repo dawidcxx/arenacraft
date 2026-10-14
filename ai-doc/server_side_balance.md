@@ -27,7 +27,7 @@ edit, so the in-game tooltip may show the old value. We accept that mismatch.
 | 31224 | Cloak of Shadows (Rogue) | spell avoidance 90% -> 100% | `ApplySpellFix({31224}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = -101; });` | Full spell avoidance during the window | 2026-09-21 |
 | 35449 | Improved Mortal Strike rank 3 (Warrior) | Mortal Strike dmg bonus 10% -> 15% | `ApplySpellFix({35449}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_0].BasePoints = 14; });` | Compensate warriors for imperfect charge pathing | 2026-09-21 |
 | 53385 | Divine Storm (Paladin) | weapon damage 110% -> 130% | `ApplySpellFix({53385}, [](SpellInfo* spellInfo) { spellInfo->Effects[EFFECT_2].BasePoints = 129; });` | Buff Divine Storm damage | 2026-09-21 |
-| 29659 | Positive Charge (arena dampening) | forced-debuff flag cleared (rendered as a buff); stack cap 99 -> 2 | `ApplySpellFix({29659}, [](SpellInfo* spellInfo) { spellInfo->Attributes &= ~SPELL_ATTR0_AURA_IS_DEBUFF; spellInfo->StackAmount = 2; });` | Arena dampening: from 5 min after gates open, +1 stack at 5 and 7 min, cap 2 (+20% damage) | 2026-09-23 |
+| 29659 | Positive Charge (arena dampening) | forced-debuff flag cleared (rendered as a buff); stack cap 99 -> 2; never saved (`SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED`) | `ApplySpellFix({29659}, [](SpellInfo* spellInfo) { spellInfo->Attributes &= ~SPELL_ATTR0_AURA_IS_DEBUFF; spellInfo->StackAmount = 2; spellInfo->AttributesCu |= SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED; });` | Arena dampening: from 5 min after gates open, +1 stack at 5 and 7 min, cap 2 (+20% damage), applied to players and their pets/guardians | 2026-09-23 |
 | 51730, 51988, 51991, 51992, 51993, 51994 | Earthliving Weapon ranks 1-6 (Shaman) | `AttributesEx2` gains `SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY` (0x2000) | `ApplySpellFix({51730, 51988, 51991, 51992, 51993, 51994}, [](SpellInfo* spellInfo) { spellInfo->AttributesEx2 |= SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY; });` | Earthliving Weapon is a rogue-poison-style class imbue and must persist through arena entry | 2026-10-11 |
 | 8033, 8038, 10456, 16355, 16356, 25500, 58794, 58795, 58796 | Frostbrand Weapon ranks 1-9 (Shaman) | `AttributesEx2` gains `SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY` (0x2000) | `ApplySpellFix({8033, 8038, 10456, 16355, 16356, 25500, 58794, 58795, 58796}, [](SpellInfo* spellInfo) { spellInfo->AttributesEx2 |= SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY; });` | Same as Earthliving: shaman weapon imbue must persist through arena entry | 2026-10-11 |
 | 8232, 8235, 10486, 16362, 25505, 58801, 58803, 58804 | Windfury Weapon ranks 1-8 (Shaman) | `AttributesEx2` gains `SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY` (0x2000) | `ApplySpellFix({8232, 8235, 10486, 16362, 25505, 58801, 58803, 58804}, [](SpellInfo* spellInfo) { spellInfo->AttributesEx2 |= SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY; });` | Same as Earthliving: shaman weapon imbue must persist through arena entry | 2026-10-11 |
@@ -54,7 +54,9 @@ they can be found and reverted.
   it harmful; clearing it makes the aura land in the buff row. Its `BasePoints`
   is locked by the shared `BasePoints + 1` rule (`9` = 10%/stack). The
   gates-open timer and stacking live in `Arena::PreUpdateImpl`
-  (`src/game/Battlegrounds/Arena.cpp`), not in the fix.
+  (`src/game/Battlegrounds/Arena.cpp`), not in the fix. It is applied to every
+  player and every alive unit in their `m_Controlled` (pets, guardians), and it
+  is marked unsaveable so a hunter/warlock pet cannot carry it out of the arena.
 - `31224` also exists as unpublished duplicates `39666`/`65961`; only `31224` is
   granted to rogues (`src/game/Arenacraft/StartingSpells.cpp`).
 - `53385`: `EFFECT_2` is `SPELL_EFFECT_WEAPON_PERCENT_DAMAGE`; `EFFECT_1` (25%
