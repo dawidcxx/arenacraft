@@ -182,6 +182,18 @@ std::vector<ItemEntry> const& AllItems()
       {WrathfulSetWeapons, 51513}, // Wrathful Gladiator's Totem of Survival
       {WrathfulSetWeapons, 51501}, // Wrathful Gladiator's Totem of the Third Wind
 
+      // == Wintergrasp: Titan-Forged shoulders (ilvl 251) ==
+      {WrathfulSetWeapons, 51572}, // Titan-Forged Shoulderpads of Salvation (cloth)
+      {WrathfulSetWeapons, 51573}, // Titan-Forged Shoulderpads of Domination (cloth)
+      {WrathfulSetWeapons, 51574}, // Titan-Forged Spaulders of Dominance (leather)
+      {WrathfulSetWeapons, 51575}, // Titan-Forged Spaulders of Salvation (leather)
+      {WrathfulSetWeapons, 51576}, // Titan-Forged Spaulders of Triumph (leather)
+      {WrathfulSetWeapons, 51577}, // Titan-Forged Shoulders of Triumph (mail)
+      {WrathfulSetWeapons, 51578}, // Titan-Forged Shoulders of Dominance (mail)
+      {WrathfulSetWeapons, 51579}, // Titan-Forged Shoulders of Salvation (mail)
+      {WrathfulSetWeapons, 51580}, // Titan-Forged Shoulderplates of Triumph (plate)
+      {WrathfulSetWeapons, 51581}, // Titan-Forged Shoulderplates of Salvation (plate)
+
       // == Wrathful Gladiator offparts (season 8, ilvl 264) ==
       // Belts
       {WrathfulOffparts, 51327}, // Wrathful Gladiator's Cord of Dominance (cloth)
