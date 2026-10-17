@@ -99,9 +99,9 @@ bool SoloqQueue::allCompatible(std::array<Entry const*, 6> const& six) const
 
 void SoloqQueue::fillStats(Candidate& candidate, std::array<Entry const*, 6> const& six)
 {
-  candidate.spread      = 0;
-  candidate.waitTotal   = 0;
-  candidate.minSequence = six[0]->sequence;
+  candidate.spread         = 0;
+  candidate.waitTotal      = 0;
+  candidate.oldestSequence = six[0]->sequence;
 
   uint32_t minMmr = six[0]->player.mmr;
   uint32_t maxMmr = six[0]->player.mmr;
@@ -110,20 +110,24 @@ void SoloqQueue::fillStats(Candidate& candidate, std::array<Entry const*, 6> con
     minMmr = std::min(minMmr, entry->player.mmr);
     maxMmr = std::max(maxMmr, entry->player.mmr);
     candidate.waitTotal += static_cast<uint64_t>(entry->waited.count());
-    candidate.minSequence = std::min(candidate.minSequence, entry->sequence);
+    candidate.oldestSequence = std::min(candidate.oldestSequence, entry->sequence);
   }
   candidate.spread = maxMmr - minMmr;
 }
 
 bool SoloqQueue::betterThan(Candidate const& left, Candidate const& right)
 {
-  if (left.imbalance != right.imbalance)
-    return left.imbalance < right.imbalance;
-  if (left.spread != right.spread)
-    return left.spread < right.spread;
+  // Queue order comes before fairness: the earliest-queued player is always
+  // included when a valid set exists, otherwise long-waiting players could be
+  // skipped forever by fairer sets of newer arrivals. Fairness still breaks
+  // ties among sets anchored on the same oldest player.
+  if (left.oldestSequence != right.oldestSequence)
+    return left.oldestSequence < right.oldestSequence;
   if (left.waitTotal != right.waitTotal)
     return left.waitTotal > right.waitTotal;
-  return left.minSequence < right.minSequence;
+  if (left.imbalance != right.imbalance)
+    return left.imbalance < right.imbalance;
+  return left.spread < right.spread;
 }
 
 std::optional<SoloqQueue::Candidate> SoloqQueue::makeStandardCandidate(std::array<Entry const*, 6> const& six) const

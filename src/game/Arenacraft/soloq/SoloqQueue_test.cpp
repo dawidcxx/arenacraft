@@ -201,6 +201,27 @@ TEST_CASE("update prefers the tightest available match")
     CHECK(mmr == 1500);
 }
 
+TEST_CASE("matching includes the longest-waiting player instead of a fairer newer set")
+{
+  SoloqQueue queue;
+
+  // The oldest player is slightly off the others' MMR. Without the queue-order
+  // tie break the perfectly fair newer set (all 1500) wins and this player is
+  // skipped on every tick.
+  queue.playerAddToQueue(melee(1, 1600));
+  addSet(queue, 100, 1500, 1500, 1500);
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(!matches.empty());
+
+  bool oldestMatched = false;
+  for (Match const& match : matches)
+    oldestMatched = oldestMatched || idsOf(match).contains(1);
+
+  CHECK(oldestMatched);
+  CHECK_FALSE(queue.contains(1));
+}
+
 TEST_CASE("teams are split to minimise the MMR difference")
 {
   SoloqQueue queue;

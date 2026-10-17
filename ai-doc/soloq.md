@@ -99,9 +99,11 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
   entirely. `makeCandidate` returns `nullopt` in that case.
 - Exhaustive best-fit: enumerate all `(2 melee, 2 caster, 2 healer)` valid sets,
   try the 4 ways to split them into two teams (keeping only class-distinct
-  teams), and score by `team imbalance -> MMR spread -> longest total wait ->
-  insertion order`. Emit the best match, remove those six, repeat until nothing
-  valid remains.
+  teams), and score by `oldest queued player -> longest total wait ->
+  team imbalance -> MMR spread`. Queue order dominates: the earliest-queued
+  player is always included when any valid set contains them, so fairness can
+  never skip a long-waiting player in favour of a fairer set of newer arrivals.
+  Emit the best match, remove those six, repeat until nothing valid remains.
 - **Flex mode** (`setFlexMode`, off by default, toggled by `.soloq flex`): the
   melee/caster/healer split is relaxed. The queue pools all DPS (melee + caster)
   and requires at least 4 of them plus 2 healers; each team fields any two DPS

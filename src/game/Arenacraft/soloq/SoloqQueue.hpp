@@ -58,7 +58,7 @@ private:
     uint64_t imbalance;
     uint32_t spread;
     uint64_t waitTotal;
-    uint64_t minSequence;
+    uint64_t oldestSequence;
   };
 
   [[nodiscard]] std::optional<Candidate> findBestMatch() const;
