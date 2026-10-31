@@ -17,6 +17,7 @@
 
 #include "Arena.h"
 #include "ArenaTeamMgr.h"
+#include "Chat.h"
 #include "GroupMgr.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
@@ -360,14 +361,76 @@ void Arena::CheckWinConditions()
   if (!sScriptMgr->OnBeforeArenaCheckWinConditions(this))
     return;
 
+  // Arenacraft: the first in-progress check runs right as the gates open.
+  if (GetStatus() == STATUS_IN_PROGRESS && !m_StartRosterChecked)
+  {
+    m_StartRosterChecked = true;
+    if (CancelIfIncompleteAtStart())
+      return;
+  }
+
   if (!GetAlivePlayersCountByTeam(TEAM_ALLIANCE) && GetPlayersCountByTeam(TEAM_HORDE))
     EndBattleground(TEAM_HORDE);
   else if (GetPlayersCountByTeam(TEAM_ALLIANCE) && !GetAlivePlayersCountByTeam(TEAM_HORDE))
     EndBattleground(TEAM_ALLIANCE);
 }
 
+bool Arena::CancelIfIncompleteAtStart()
+{
+  if (!isRated())
+    return false;
+
+  uint32 const teamSize = GetArenaType();
+  if (GetPlayersCountByTeam(TEAM_ALLIANCE) >= teamSize && GetPlayersCountByTeam(TEAM_HORDE) >= teamSize)
+    return false;
+
+  constexpr uint32 SpellDeserter    = 26013;
+  constexpr int32  DeserterDuration = 5 * MINUTE * IN_MILLISECONDS;
+
+  // Everyone invited to a rated arena is in ArenaLogEntries; whoever is not in
+  // the arena now either never entered or left during preparation.
+  for (auto const& [guid, entry] : ArenaLogEntries)
+  {
+    if (GetPlayers().contains(guid))
+      continue;
+
+    Player* player = ObjectAccessor::FindConnectedPlayer(guid);
+    if (!player)
+      continue;
+
+    Aura* aura = player->GetAura(SpellDeserter);
+    if (aura && aura->GetDuration() >= DeserterDuration)
+      continue;
+    if (!aura)
+      aura = player->AddAura(SpellDeserter, player);
+    if (aura)
+    {
+      aura->SetMaxDuration(DeserterDuration);
+      aura->SetDuration(DeserterDuration);
+    }
+  }
+
+  LOG_DEBUG("bg.arena", "Arena {} opened with {}v{} of {}v{}, cancelled without rating changes", GetInstanceID(),
+            GetPlayersCountByTeam(TEAM_ALLIANCE), GetPlayersCountByTeam(TEAM_HORDE), teamSize, teamSize);
+
+  for (auto const& [guid, player] : GetPlayers())
+    ChatHandler(player->GetSession())
+        .SendSysMessage("Arena cancelled: not every player entered before the gates opened. No rating change.");
+
+  m_CancelledAtStart = true;
+  EndBattleground(TEAM_NEUTRAL);
+  return true;
+}
+
 void Arena::EndBattleground(TeamId winnerTeamId)
 {
+  // Arenacraft: cancelled at the gates - no rating, no logs, no draw penalty.
+  if (m_CancelledAtStart)
+  {
+    Battleground::EndBattleground(TEAM_NEUTRAL);
+    return;
+  }
+
   if (isRated())
   {
     uint32 startDelay  = GetStartDelayTime();

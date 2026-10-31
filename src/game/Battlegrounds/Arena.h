@@ -70,6 +70,14 @@ private:
   void CheckWinConditions() override;
   void EndBattleground(TeamId winnerTeamId) override;
 
+  // Arenacraft: a rated arena that opens its gates short-handed (someone never
+  // entered or left during preparation) is cancelled without rating changes and
+  // the missing players get a short deserter. Returns true if it was cancelled.
+  bool CancelIfIncompleteAtStart();
+
+  bool m_StartRosterChecked{false};
+  bool m_CancelledAtStart{false};
+
   // Arenacraft: runs the arena dampening clock (see Arena.cpp). No arena zone
   // overrides this, so Arena's implementation reaches every arena map.
   bool PreUpdateImpl(uint32 diff) override;
