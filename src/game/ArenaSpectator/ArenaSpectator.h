@@ -53,7 +53,7 @@ template <class T> inline void SendCommand_String(T* o, ObjectGuid targetGUID, c
   if (!targetGUID.IsPlayer())
     return;
 
-  SendCommand(o, "%s0x%016llX;%s=%s;", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, c);
+  SendCommand(o, "{}0x{:016X};{}={};", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, c);
 }
 
 template <class T> inline void SendCommand_UInt32Value(T* o, ObjectGuid targetGUID, const char* prefix, uint32 t)
@@ -61,7 +61,7 @@ template <class T> inline void SendCommand_UInt32Value(T* o, ObjectGuid targetGU
   if (!targetGUID.IsPlayer())
     return;
 
-  SendCommand(o, "%s0x%016llX;%s=%u;", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, t);
+  SendCommand(o, "{}0x{:016X};{}={};", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, t);
 }
 
 template <class T> inline void SendCommand_GUID(T* o, ObjectGuid targetGUID, const char* prefix, ObjectGuid t)
@@ -69,7 +69,7 @@ template <class T> inline void SendCommand_GUID(T* o, ObjectGuid targetGUID, con
   if (!targetGUID.IsPlayer())
     return;
 
-  SendCommand(o, "%s0x%016llX;%s=0x%016llX;", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix,
+  SendCommand(o, "{}0x{:016X};{}=0x{:016X};", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix,
               t.GetRawValue());
 }
 
@@ -79,7 +79,7 @@ inline void SendCommand_Spell(T* o, ObjectGuid targetGUID, const char* prefix, u
   if (!targetGUID.IsPlayer())
     return;
 
-  SendCommand(o, "%s0x%016llX;%s=%u,%i;", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, id, casttime);
+  SendCommand(o, "{}0x{:016X};{}={},{};", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, id, casttime);
 }
 
 template <class T>
@@ -92,7 +92,7 @@ inline void SendCommand_Cooldown(T* o, ObjectGuid targetGUID, const char* prefix
     if (si->SpellIconID == 1)
       return;
 
-  SendCommand(o, "%s0x%016llX;%s=%u,%u,%u;", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, id, dur, maxdur);
+  SendCommand(o, "{}0x{:016X};{}={},{},{};", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(), prefix, id, dur, maxdur);
 }
 
 template <class T>
@@ -102,7 +102,7 @@ inline void SendCommand_Aura(T* o, ObjectGuid targetGUID, const char* prefix, Ob
   if (!targetGUID.IsPlayer())
     return;
 
-  SendCommand(o, "%s0x%016llX;%s=%u,%u,%i,%i,%u,%u,%u,0x%016llX;", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(),
+  SendCommand(o, "{}0x{:016X};{}={},{},{},{},{},{},{},0x{:016X};", SPECTATOR_ADDON_PREFIX, targetGUID.GetRawValue(),
               prefix, remove ? 1 : 0, stack, dur, maxdur, id, dispel, isDebuff ? 1 : 0, caster.GetRawValue());
 }
 
