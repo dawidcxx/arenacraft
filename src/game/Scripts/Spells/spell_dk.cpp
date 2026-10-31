@@ -1416,6 +1416,22 @@ class spell_dk_death_grip : public SpellScript
             target->InterruptNonMeleeSpells(false, 0, false);
         }
 
+        // Arenacraft: the pull dest is picked from the caster's facing when the
+        // grip lands, and the jump ignores LoS. A DK turning / stepping behind a
+        // pillar during the grip travel could pull the target through it. Pull
+        // only with LoS at landing time, toward the DK along the line to the
+        // target instead of wherever the DK now faces.
+        if (target != GetCaster())
+        {
+          Unit* caster = GetCaster();
+          if (!target->IsWithinLOSInMap(caster))
+            return;
+
+          Position pos = caster->GetPosition();
+          caster->MovePositionToFirstCollision(pos, caster->GetExactDist2d(gripPos), caster->GetRelativeAngle(target));
+          gripPos.Relocate(pos);
+        }
+
         if (target->GetMapId() == 618) // for Ring of Valor
           gripPos.m_positionZ = std::max(casterZ + 0.2f, 28.5f);
 
