@@ -41,6 +41,7 @@
 #include "Pet.h"
 #include "Player.h"
 #include "QueryHolder.h"
+#include "ReplayRecorder.hpp"
 #include "ScriptMgr.h"
 #include "SocialMgr.h"
 #include "Transport.h"
@@ -229,7 +230,23 @@ void WorldSession::SendPacket(WorldPacket const* packet)
     return;
   }
 
+  if (_replayTapActive.load(std::memory_order_relaxed))
+  {
+    std::lock_guard<std::mutex> guard(_replayTapLock);
+    if (_replayTap)
+      _replayTap->onPacket(_replayTapPrimary, packet->GetOpcode(), packet->empty() ? nullptr : packet->contents(),
+                           packet->size());
+  }
+
   m_Socket->SendPacket(*packet);
+}
+
+void WorldSession::SetReplayTap(std::shared_ptr<arenacraft::replay::Recording> recording, bool primary)
+{
+  std::lock_guard<std::mutex> guard(_replayTapLock);
+  _replayTapActive.store(recording != nullptr, std::memory_order_relaxed);
+  _replayTap        = std::move(recording);
+  _replayTapPrimary = primary;
 }
 
 /// Add an incoming packet to the queue
@@ -975,8 +992,8 @@ void WorldSession::ReadMovementInfo(WorldPacket& data, MovementInfo* mi)
   if (mi->HasMovementFlag(MOVEMENTFLAG_SPLINE_ELEVATION))
     data >> mi->splineElevation;
 
-  //! Anti-cheat checks. Please keep them in seperate if () blocks to maintain a clear overview.
-  //! Might be subject to latency, so just remove improper flags.
+    //! Anti-cheat checks. Please keep them in seperate if () blocks to maintain a clear overview.
+    //! Might be subject to latency, so just remove improper flags.
 #ifdef ACORE_DEBUG
 #define REMOVE_VIOLATING_FLAGS(check, maskToRemove)                                                                    \
   {                                                                                                                    \

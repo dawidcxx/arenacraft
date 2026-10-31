@@ -16,6 +16,7 @@
  */
 
 #include "Battleground.h"
+#include "ReplayRecorder.hpp"
 #include "ArenaSpectator.h"
 #include "ArenaTeam.h"
 #include "BattlegroundBE.h"
@@ -578,6 +579,10 @@ inline void Battleground::_ProcessJoin(uint32 diff)
       if (BattlegroundMap* map = GetBgMap())
         map->SetVisibilityRange(World::GetMaxVisibleDistanceInBGArenas());
 
+      // Arenacraft: replay capture starts before visibility widens below, so
+      // the enemies' creation lands in the recording.
+      arenacraft::replay::ReplayRecorder::instance().onGatesOpen(this);
+
       for (BattlegroundPlayerMap::const_iterator itr = GetPlayers().begin(); itr != GetPlayers().end(); ++itr)
         if (Player* player = itr->second)
         {
@@ -816,6 +821,9 @@ void Battleground::EndBattleground(PvPTeamId winnerTeamId)
   RemoveFromBGFreeSlotQueue();
   SetStatus(STATUS_WAIT_LEAVE);
   SetWinner(winnerTeamId);
+
+  if (isArena())
+    arenacraft::replay::ReplayRecorder::instance().onArenaEnd(this, uint8(GetTeamId(winnerTeamId)));
 
   if (winnerTeamId == PVP_TEAM_ALLIANCE)
   {

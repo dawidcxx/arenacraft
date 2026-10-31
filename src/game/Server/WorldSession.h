@@ -33,8 +33,10 @@
 #include "Packet.h"
 #include "SharedDefines.h"
 #include "World.h"
+#include <atomic>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 class Creature;
@@ -254,6 +256,11 @@ public:
 
 // class used to filer only thread-unsafe packets from queue
 // in order to update only be used in World::UpdateSessions()
+namespace arenacraft::replay
+{
+class Recording;
+}
+
 class WorldSessionFilter : public PacketFilter
 {
 public:
@@ -353,6 +360,10 @@ public:
   bool ProcessMovementInfo(MovementInfo& movementInfo, Unit* mover, Player* plrMover, WorldPacket& recvData);
 
   void SendPacket(WorldPacket const* packet);
+
+  // Arenacraft: arena replay capture. While set, every packet sent to this
+  // session is offered to the recording (see arenacraft::replay::Recording).
+  void SetReplayTap(std::shared_ptr<arenacraft::replay::Recording> recording, bool primary);
   void SendPetNameInvalid(uint32 error, std::string const& name, DeclinedName* declinedName);
   void SendPartyResult(PartyOperation operation, std::string const& member, PartyResult res, uint32 val = 0);
   void SendAreaTriggerMessage(const char* Text, ...) ATTR_PRINTF(2, 3);
@@ -1120,6 +1131,12 @@ protected:
   } AntiDOS;
 
 private:
+  // Arenacraft: arena replay capture (SetReplayTap)
+  std::atomic<bool>                              _replayTapActive{false};
+  std::mutex                                     _replayTapLock;
+  std::shared_ptr<arenacraft::replay::Recording> _replayTap;
+  bool                                           _replayTapPrimary{false};
+
   // private trade methods
   void moveItems(Item* myItems[], Item* hisItems[]);
 
