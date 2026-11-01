@@ -15,10 +15,12 @@
  *   ./scripts/soloq_lottery --dry-run
  *   ./scripts/soloq_lottery --min-wins 10
  *
- * Connects to the characters database via AC_CHARACTER_DATABASE_INFO (same
- * "host;port;user;password;db" format the core uses); defaults to the local
- * acore_characters database. Bun loads .env automatically when run from the
- * repo root. Read-only, so the worldserver does not need a restart.
+ * Connects to the characters database via AC_CHARACTER_DATABASE_INFO and to the
+ * auth database via AC_LOGIN_DATABASE_INFO (same "host;port;user;password;db"
+ * format the core uses); both default to the local acore_* databases. Accounts
+ * are registered under the Discord username (lowercased), so that name is
+ * printed alongside the account id. Bun loads .env automatically when run from
+ * the repo root. Read-only, so the worldserver does not need a restart.
  */
 import { Command } from "commander";
 import { connect, parseDbInfo, type DbInfo } from "./src/lib/db.ts";
@@ -34,8 +36,14 @@ const DEFAULT_CHARACTERS: DbInfo = {
   database: "acore_characters",
 };
 
+const DEFAULT_AUTH: DbInfo = {
+  ...DEFAULT_CHARACTERS,
+  database: "acore_auth",
+};
+
 interface Options {
   characters: string | undefined;
+  auth: string | undefined;
   minWins: string;
   dryRun: boolean;
 }
@@ -53,6 +61,7 @@ program
   .name("soloq_lottery")
   .description("Draw a SoloQ lottery winner weighted by games played per account.")
   .option("--characters <info>", "characters connection 'host;port;user;password;db' [AC_CHARACTER_DATABASE_INFO]")
+  .option("--auth <info>", "auth connection for Discord names 'host;port;user;password;db' [AC_LOGIN_DATABASE_INFO]")
   .option("--min-wins <value>", "minimum wins a single character needs for its account to qualify", String(DEFAULT_MIN_WINS))
   .option("--dry-run", "show eligible accounts and their tickets without drawing a winner")
   .parse(process.argv);
@@ -65,6 +74,7 @@ if (!Number.isInteger(minWins) || minWins < 0) {
 }
 
 const info = parseDbInfo(opts.characters ?? process.env.AC_CHARACTER_DATABASE_INFO, DEFAULT_CHARACTERS);
+const authInfo = parseDbInfo(opts.auth ?? process.env.AC_LOGIN_DATABASE_INFO, DEFAULT_AUTH);
 const sql = connect(info);
 
 const rows = await sql`
@@ -94,6 +104,31 @@ const entries: Entry[] = rows.map((row) => {
 
 const totalTickets = entries.reduce((sum, entry) => sum + Math.max(entry.games, 0), 0);
 
+const names = new Map<number, string>();
+if (entries.length > 0) {
+  const authSql = connect(authInfo);
+  try {
+    const ids = entries.map((entry) => entry.account);
+    const placeholders = ids.map(() => "?").join(", ");
+    const authRows = await authSql.unsafe(
+      `SELECT id, username FROM account WHERE id IN (${placeholders})`,
+      ids,
+    );
+    for (const row of authRows as { id: number; username: string }[]) {
+      names.set(Number(row.id), String(row.username));
+    }
+  } catch (err) {
+    console.error(`[auth] could not look up Discord names: ${(err as Error).message}`);
+  } finally {
+    await authSql.end();
+  }
+}
+
+function accountLabel(entry: Entry): string {
+  const name = names.get(entry.account);
+  return name ? `account ${entry.account} (discord: ${name})` : `account ${entry.account}`;
+}
+
 console.log(
   `[characters] ${entries.length} eligible account(s) (single character with >=${minWins} wins), ${totalTickets} ticket(s)`,
 );
@@ -101,7 +136,7 @@ console.log(
 if (opts.dryRun) {
   for (const entry of entries) {
     console.log(
-      `  account ${entry.account}: ${entry.games} ticket(s) (${entry.wins}W/${entry.losses}L over ${entry.characters} character(s))`,
+      `  ${accountLabel(entry)}: ${entry.games} ticket(s) (${entry.wins}W/${entry.losses}L over ${entry.characters} character(s))`,
     );
   }
   console.log("[characters] dry run, no winner drawn");
@@ -126,7 +161,7 @@ for (const entry of entries) {
 }
 
 console.log(
-  `[lottery] winner: account ${winner.account} (${winner.games} ticket(s), ${winner.wins}W/${winner.losses}L over ${winner.characters} character(s))`,
+  `[lottery] winner: ${accountLabel(winner)} (${winner.games} ticket(s), ${winner.wins}W/${winner.losses}L over ${winner.characters} character(s))`,
 );
 console.log(`[lottery] odds: ${winner.games}/${totalTickets}`);
 
