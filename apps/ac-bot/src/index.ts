@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import type { InteractionReplyOptions } from "discord.js";
 
+import { ALIAS_COMMAND, handleAlias } from "./aliasCommand";
 import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
@@ -41,7 +42,14 @@ client.once(Events.ClientReady, async (readyClient) => {
     // Wipe leftover global commands so stale ones do not linger next to the
     // guild commands we actually implement.
     await readyClient.application.commands.set([]);
-    await guild.commands.set([REGISTER_COMMAND, SET_PASSWORD_COMMAND, PING_COMMAND, TOP_RANKERS_COMMAND, ONLINE_LIST_COMMAND]);
+    await guild.commands.set([
+      REGISTER_COMMAND,
+      SET_PASSWORD_COMMAND,
+      PING_COMMAND,
+      TOP_RANKERS_COMMAND,
+      ONLINE_LIST_COMMAND,
+      ALIAS_COMMAND,
+    ]);
     await guild.members.fetch();
 
     const rooms = new RoomManager(guild, config);
@@ -77,6 +85,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     else if (interaction.commandName === "toprankers") await handleTopRankers(interaction, () => rankersCache.get());
     else if (interaction.commandName === "onlinelist") await handleOnlineList(interaction, () => onlineListCache.get());
     else if (interaction.commandName === "ping") await handlePing(interaction);
+    else if (interaction.commandName === "alias") await handleAlias(interaction, authDb, config.VIP_ROLE_NAME);
   } catch (error) {
     logger.error(`Failed to handle /${interaction.commandName}`, error);
     const reply: InteractionReplyOptions = { content: "Something went wrong, try again later.", flags: MessageFlags.Ephemeral };

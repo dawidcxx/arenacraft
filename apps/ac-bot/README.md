@@ -1,6 +1,6 @@
 # ac-bot
 
-Rewritten Arenacraft Discord bot. Five jobs:
+Rewritten Arenacraft Discord bot. Six jobs:
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
@@ -16,6 +16,9 @@ Rewritten Arenacraft Discord bot. Five jobs:
    `AUDIT_LOG_CHANNEL_NAME` (default `audit-log`): match formed (teams, class
    icons, ratings), match finished (winner, duration, per-player rating
    change) and aborted matches.
+6. **Aliases** - `/alias set` / `/alias reset`, restricted to the `VIP_ROLE_NAME`
+   role. Stores a per-account display alias in `acore_auth.account_alias`; the
+   in-game GM command `.alias get [character]` resolves it.
 
 On startup the bot overwrites both its global and guild command lists, so
 commands removed from the code do not linger as unreachable "ghosts".
@@ -36,6 +39,17 @@ The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
 `hunter`, `rogue`, `priest`, `deathknight`, `shaman`, `mage`, `warlock`,
 `druid`). Any missing emoji simply render as the bare character name. Set
 `AUDIT_LOG_CHANNEL_NAME` to an empty string to disable these messages.
+
+`/alias` is registered with `default_member_permissions: 0`, so it is hidden
+from regular members. Allow the `VIP_ROLE_NAME` role once in **Server Settings
+-> Integrations -> arenacraft -> Manage -> /alias**; Discord only accepts an
+OAuth2 bearer token for that overwrite, so the bot cannot set it itself.
+Registration is an upsert by command name, so the overwrite survives restarts.
+
+The in-game GM command `.alias get [character]` resolves character -> account
+-> alias and prints one machine-readable line for future addons:
+`ALIAS:<character>=<alias-or-account>` (the account name is hidden whenever an
+alias is set).
 
 `/register` is registered as a guild command, so it appears instantly.
 

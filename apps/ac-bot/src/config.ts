@@ -11,6 +11,8 @@ const ConfigSchema = z.object({
   INFO_CHANNEL_NAME: z.string().min(1).default("bot"),
   // Channel for match found/finished/aborted messages; empty disables them.
   AUDIT_LOG_CHANNEL_NAME: z.string().default("audit-log"),
+  // Role allowed to use /alias (and required by its runtime check).
+  VIP_ROLE_NAME: z.string().min(1).default("vip"),
   STALE_ROOM_MINUTES: z.coerce.number().int().positive().default(60),
 });
 

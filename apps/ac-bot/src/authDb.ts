@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import type { Pool, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { makeRegistrationData } from "./srp6";
 
@@ -82,5 +82,30 @@ export class AuthDb {
       verifier,
       username,
     ]);
+  }
+
+  /** Resolves a (normalized) account name to its id, or null when it does not exist. */
+  async accountIdByName(username: string): Promise<number | null> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>("SELECT id FROM account WHERE username = ? LIMIT 1", [
+      username,
+    ]);
+    const row = rows[0];
+    return row ? Number(row.id) : null;
+  }
+
+  /** Inserts or replaces the account's display alias. */
+  async setAlias(accountId: number, alias: string): Promise<void> {
+    await this.pool.execute(
+      "INSERT INTO account_alias (account_id, alias) VALUES (?, ?) ON DUPLICATE KEY UPDATE alias = ?",
+      [accountId, alias, alias],
+    );
+  }
+
+  /** Deletes the account's alias. Returns false when there was nothing to delete. */
+  async resetAlias(accountId: number): Promise<boolean> {
+    const [result] = await this.pool.execute<ResultSetHeader>("DELETE FROM account_alias WHERE account_id = ?", [
+      accountId,
+    ]);
+    return result.affectedRows > 0;
   }
 }
