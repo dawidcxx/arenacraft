@@ -54,6 +54,11 @@ public:
   // of a replay; see arenacraft::replay::Playback.
   void StartReplay(std::shared_ptr<arenacraft::replay::Playback> playback) { m_ReplayPlayback = std::move(playback); }
 
+  // Arenacraft: true when the arena was cancelled because it opened short-handed
+  // (see CancelIfIncompleteAtStart). Lets external systems report the abort
+  // reason instead of treating it as a normal neutral end.
+  [[nodiscard]] bool IsCancelledAtStart() const { return m_CancelledAtStart; }
+
 protected:
   Arena();
 

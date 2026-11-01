@@ -66,6 +66,7 @@ function endedEvent(): MatchupEndedEvent {
     event: "soloq.matchup.ended",
     instanceId: 1234,
     finished: true,
+    reason: "finished",
     winner: "teamA",
     startedAtMs: 1_700_000_000_000,
     endedAtMs: 1_700_000_252_000,
@@ -109,12 +110,25 @@ describe("formatEnded", () => {
   test("renders an aborted match without rating movement", () => {
     const event = endedEvent();
     event.finished = false;
+    event.reason = "declined";
     event.winner = null;
 
     const text = formatEnded(event, emoji);
     expect(text).toContain("⚠️ SoloQ #1234 · aborted (invites declined)");
     expect(text).toContain("🟦 Alpha, Beta, Gamma");
     expect(text).toContain("🟥 Delta, Epsilon, Zeta");
+    expect(text).not.toContain("+9");
+  });
+
+  test("renders a short-handed start as cancelled", () => {
+    const event = endedEvent();
+    event.finished = false;
+    event.reason = "cancelled";
+    event.winner = null;
+
+    const text = formatEnded(event, emoji);
+    expect(text).toContain("⚠️ SoloQ #1234 · cancelled at start (team short-handed)");
+    expect(text).toContain("🟦 Alpha, Beta, Gamma");
     expect(text).not.toContain("+9");
   });
 });

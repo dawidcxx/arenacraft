@@ -379,6 +379,7 @@ When the arena ends (or is destroyed without finishing) the core publishes
   "event": "soloq.matchup.ended",
   "instanceId": 1234,
   "finished": true,
+  "reason": "finished",
   "winner": "teamA",
   "startedAtMs": 1700000000000,
   "endedAtMs": 1700000252000,
@@ -389,7 +390,12 @@ When the arena ends (or is destroyed without finishing) the core publishes
 ```
 
 - `finished` is `true` when a winner ended the arena, `false` when it was
-  destroyed (invites declined).
+  destroyed (invites declined) or cancelled at start.
+- `reason` is `finished`, `declined` (invites never accepted) or `cancelled`
+  (the arena opened short-handed and `Arena::CancelIfIncompleteAtStart` ended
+  it without ratings). Cancelled matches are reported from `OnBattlegroundEnd`
+  so consumers can free rooms immediately; declined ones come from
+  `OnBattlegroundDestroy`.
 - `winner` is `"teamA"` (the alliance side), `"teamB"` (the horde side) or
   `null` when the match never finished.
 - `startedAtMs` is the pop time echoed from the matchup event, so consumers can

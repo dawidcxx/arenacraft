@@ -69,13 +69,25 @@ struct ParticipantResult
   uint32_t mmrAfter;
 };
 
+// Why the matchup ended. Serialized as "finished", "cancelled" (the arena
+// opened short-handed and was cancelled) or "declined" (invites were never
+// accepted / the arena was destroyed without finishing).
+enum class MatchupEndReason : uint8_t
+{
+  Finished,
+  Cancelled,
+  Declined
+};
+
 struct MatchupEndedEvent
 {
   uint32_t bgInstanceId;
-  // true when the arena ended with a winner, false when it was destroyed
-  // without ever finishing (invites declined, aborted).
-  bool finished;
-  // TEAM_ALLIANCE (team A) or TEAM_HORDE (team B); TEAM_NEUTRAL when aborted.
+  // true when the arena ended with a winner, false when it was cancelled at
+  // start or destroyed without ever finishing (see reason).
+  bool             finished;
+  MatchupEndReason reason;
+  // TEAM_ALLIANCE (team A) or TEAM_HORDE (team B); TEAM_NEUTRAL when aborted or
+  // cancelled.
   TeamId winner;
   // Pop time (same value the matchup event reported) and the time the arena
   // ended, both milliseconds since the Unix epoch.
@@ -96,6 +108,6 @@ bool publishMatchupEnded(MatchupEndedEvent const& event);
 // Resolves the finished/aborted match into a MatchupEndedEvent. `updates` is
 // the resolveMatch output for a finished match and is ignored when aborted.
 MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished,
-                                        uint64_t startedAtMs, TeamId winner = TEAM_NEUTRAL,
+                                        MatchupEndReason reason, uint64_t startedAtMs, TeamId winner = TEAM_NEUTRAL,
                                         std::array<RatingUpdate, 6> const* updates = nullptr);
 } // namespace arenacraft::soloq

@@ -56,6 +56,7 @@ describe("event schemas", () => {
       event: "soloq.matchup.ended",
       instanceId: 1,
       finished: true,
+      reason: "finished",
       winner: "teamA",
       startedAtMs: 1_700_000_000_000,
       endedAtMs: 1_700_000_252_000,

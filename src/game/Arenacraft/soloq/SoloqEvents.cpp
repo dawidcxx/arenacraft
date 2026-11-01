@@ -37,6 +37,20 @@ char const* RoleName(Role role)
   return "unknown";
 }
 
+char const* MatchupEndReasonName(MatchupEndReason reason)
+{
+  switch (reason)
+  {
+  case MatchupEndReason::Finished:
+    return "finished";
+  case MatchupEndReason::Cancelled:
+    return "cancelled";
+  case MatchupEndReason::Declined:
+    return "declined";
+  }
+  return "finished";
+}
+
 char const* FactionName(TeamId teamId)
 {
   switch (teamId)
@@ -324,7 +338,9 @@ std::string buildMatchupEndedPayload(MatchupEndedEvent const& event)
   out += std::to_string(event.bgInstanceId);
   out += ",\"finished\":";
   out += event.finished ? "true" : "false";
-  out += ",\"winner\":";
+  out += ",\"reason\":\"";
+  out += MatchupEndReasonName(event.reason);
+  out += "\",\"winner\":";
   if (event.finished && event.winner == TEAM_ALLIANCE)
     out += "\"teamA\"";
   else if (event.finished && event.winner == TEAM_HORDE)
@@ -350,13 +366,14 @@ bool publishMatchupEnded(MatchupEndedEvent const& event)
 {
   return sRedisConn.publish(MatchupEndedChannel, buildMatchupEndedPayload(event));
 }
-
 MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished,
-                                        uint64_t startedAtMs, TeamId winner, std::array<RatingUpdate, 6> const* updates)
+                                        MatchupEndReason reason, uint64_t startedAtMs, TeamId winner,
+                                        std::array<RatingUpdate, 6> const* updates)
 {
   MatchupEndedEvent event{};
   event.bgInstanceId = arena ? arena->GetInstanceID() : 0;
   event.finished     = finished;
+  event.reason       = reason;
   event.winner       = finished ? winner : TEAM_NEUTRAL;
   event.startedAtMs  = startedAtMs;
   event.endedAtMs    = NowMs();

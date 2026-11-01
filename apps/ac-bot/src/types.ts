@@ -55,6 +55,8 @@ export const MatchupEndedEventSchema = z.object({
   event: z.literal("soloq.matchup.ended"),
   instanceId: z.number(),
   finished: z.boolean(),
+  // Optional for backwards compatibility with cores that predate the field.
+  reason: z.enum(["finished", "cancelled", "declined"]).optional(),
   winner: z.enum(["teamA", "teamB"]).nullable(),
   startedAtMs: z.number().int(),
   endedAtMs: z.number().int(),

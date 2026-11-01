@@ -97,9 +97,9 @@ export function formatEnded(event: MatchupEndedEvent, emoji: EmojiResolver): str
 
   if (!event.finished) {
     const names = (players: Participant[]) => players.map((player) => player.characterName).join(", ");
-    return [`⚠️ ${header} · aborted (invites declined)`, `${TEAM_A} ${names(teamA)}`, `${TEAM_B} ${names(teamB)}`].join(
-      "\n",
-    );
+    const headline =
+      event.reason === "cancelled" ? "cancelled at start (team short-handed)" : "aborted (invites declined)";
+    return [`⚠️ ${header} · ${headline}`, `${TEAM_A} ${names(teamA)}`, `${TEAM_B} ${names(teamB)}`].join("\n");
   }
 
   const winner = event.winner === "teamB" ? "Team B" : "Team A";

@@ -15,7 +15,8 @@ Rewritten Arenacraft Discord bot. Six jobs:
 5. **Match audit log** - posts one compact message per solo queue event to
    `AUDIT_LOG_CHANNEL_NAME` (default `audit-log`): match formed (teams, class
    icons, ratings), match finished (winner, duration, per-player rating
-   change) and aborted matches.
+   change), plus aborted (invites declined) and cancelled-at-start
+   (short-handed) matches.
 6. **Aliases** - `/alias set` / `/alias reset`, restricted to the `VIP_ROLE_NAME`
    role. Stores a per-account display alias in `acore_auth.account_alias`; the
    in-game GM command `.alias get [character]` resolves it.

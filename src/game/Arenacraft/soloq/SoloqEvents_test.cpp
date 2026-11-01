@@ -7,6 +7,7 @@
 using arenacraft::soloq::buildMatchupEndedPayload;
 using arenacraft::soloq::buildMatchupPayload;
 using arenacraft::soloq::MatchupEndedEvent;
+using arenacraft::soloq::MatchupEndReason;
 using arenacraft::soloq::MatchupEvent;
 using arenacraft::soloq::ParticipantInfo;
 using arenacraft::soloq::ParticipantResult;
@@ -100,6 +101,7 @@ TEST_CASE("buildMatchupEndedPayload reports winner, timestamps and per-player ra
   MatchupEndedEvent event{};
   event.bgInstanceId = source.bgInstanceId;
   event.finished     = true;
+  event.reason       = MatchupEndReason::Finished;
   event.winner       = TEAM_ALLIANCE;
   event.startedAtMs  = 1700000000000ULL;
   event.endedAtMs    = 1700000252000ULL;
@@ -113,6 +115,7 @@ TEST_CASE("buildMatchupEndedPayload reports winner, timestamps and per-player ra
   CHECK(json.find("\"event\":\"soloq.matchup.ended\"") != std::string::npos);
   CHECK(json.find("\"instanceId\":77") != std::string::npos);
   CHECK(json.find("\"finished\":true") != std::string::npos);
+  CHECK(json.find("\"reason\":\"finished\"") != std::string::npos);
   CHECK(json.find("\"winner\":\"teamA\"") != std::string::npos);
   CHECK(json.find("\"startedAtMs\":1700000000000") != std::string::npos);
   CHECK(json.find("\"endedAtMs\":1700000252000") != std::string::npos);
@@ -123,13 +126,19 @@ TEST_CASE("buildMatchupEndedPayload reports winner, timestamps and per-player ra
   CHECK(json.find("\"mmrAfter\":1141") != std::string::npos);
 
   event.finished            = false;
+  event.reason              = MatchupEndReason::Declined;
   event.winner              = TEAM_NEUTRAL;
   std::string const aborted = buildMatchupEndedPayload(event);
   CHECK(aborted.find("\"finished\":false") != std::string::npos);
+  CHECK(aborted.find("\"reason\":\"declined\"") != std::string::npos);
   CHECK(aborted.find("\"winner\":null") != std::string::npos);
   CHECK(aborted.find("\"ratingDelta\":null") != std::string::npos);
   CHECK(aborted.find("\"ratingAfter\":null") != std::string::npos);
   CHECK(aborted.find("\"mmrAfter\":null") != std::string::npos);
+
+  event.reason                = MatchupEndReason::Cancelled;
+  std::string const cancelled = buildMatchupEndedPayload(event);
+  CHECK(cancelled.find("\"reason\":\"cancelled\"") != std::string::npos);
 }
 
 TEST_CASE("buildMatchupEndedPayload reports team B as the winner")

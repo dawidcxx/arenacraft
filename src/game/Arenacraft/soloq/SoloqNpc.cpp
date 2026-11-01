@@ -1,5 +1,6 @@
 #include "SoloqNpc.hpp"
 
+#include "Arena.h"
 #include "ArenaTeam.h"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
@@ -208,10 +209,36 @@ bool SoloqBattlegroundScript::OnQueueUpdateValidity(BattlegroundQueue* /*queue*/
 
 void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
 {
-  if (!bg || winner == TEAM_NEUTRAL)
+  if (!bg)
     return;
 
-  SoloqService&                                   service = SoloqService::instance();
+  SoloqService& service = SoloqService::instance();
+
+  if (winner == TEAM_NEUTRAL)
+  {
+    // A short-handed start is neutral-ended on purpose by
+    // Arena::CancelIfIncompleteAtStart. Consume the pending match here so the
+    // bot frees the room immediately with the right reason; any other neutral
+    // end still falls through to OnBattlegroundDestroy as a declined match.
+    Arena* arena = bg->isArena() ? static_cast<Arena*>(bg) : nullptr;
+    if (!arena || !arena->IsCancelledAtStart())
+      return;
+
+    std::optional<SoloqService::PendingArena> const pending = service.takeMatch(bg->GetInstanceID());
+    if (!pending)
+      return;
+
+    // Clear the badge/queue entry for everyone, including players who never
+    // entered the arena (they only get removed by the invite timeout otherwise).
+    for (QueuedPlayer const* queued : playersOf(pending->match))
+      if (Player* player = ObjectAccessor::FindPlayer(ObjectGuid{queued->id}))
+        ClearSoloqQueueId(player, bg->GetInstanceID());
+
+    publishMatchupEnded(
+        makeMatchupEndedEvent(pending->match, bg, false, MatchupEndReason::Cancelled, pending->startedAtMs));
+    return;
+  }
+
   std::optional<SoloqService::PendingArena> const pending = service.takeMatch(bg->GetInstanceID());
   if (!pending)
     return;
@@ -220,7 +247,8 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
   MatchResult const                 result  = winner == TEAM_ALLIANCE ? MatchResult::TeamAWin : MatchResult::TeamBWin;
   std::array<RatingUpdate, 6> const updates = resolveMatch(match, result);
 
-  publishMatchupEnded(makeMatchupEndedEvent(match, bg, true, pending->startedAtMs, winner, &updates));
+  publishMatchupEnded(
+      makeMatchupEndedEvent(match, bg, true, MatchupEndReason::Finished, pending->startedAtMs, winner, &updates));
 
   for (std::size_t i = 0; i < updates.size(); ++i)
   {
@@ -250,7 +278,8 @@ void SoloqBattlegroundScript::OnBattlegroundDestroy(Battleground* bg)
   // match is still pending here - notify consumers so they can free the room.
   std::optional<SoloqService::PendingArena> const pending = SoloqService::instance().takeMatch(bg->GetInstanceID());
   if (pending)
-    publishMatchupEnded(makeMatchupEndedEvent(pending->match, bg, false, pending->startedAtMs));
+    publishMatchupEnded(
+        makeMatchupEndedEvent(pending->match, bg, false, MatchupEndReason::Declined, pending->startedAtMs));
 }
 
 void SoloqBattlegroundScript::OnBattlegroundRemovePlayerAtLeave(Battleground* bg, Player* player)
