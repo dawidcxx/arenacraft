@@ -163,6 +163,7 @@ bool CreateArenaForMatch(Match const& match)
   Battleground* arena = sBattlegroundMgr->CreateNewBattleground(BATTLEGROUND_AA, bracketEntry, MatchArenaType, true);
   if (!arena)
     return false;
+  arena->SetSoloq(true);
 
   for (std::size_t i = 0; i < TeamSize; ++i)
     bgQueue.InviteGroupToBG(ginfos[i], arena, TEAM_ALLIANCE);

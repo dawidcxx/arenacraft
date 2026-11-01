@@ -21,6 +21,13 @@
 
 #include "Battleground.h"
 
+#include <memory>
+
+namespace arenacraft::replay
+{
+class Playback;
+}
+
 enum ArenaBroadcastTexts
 {
   ARENA_TEXT_START_ONE_MINUTE       = 15740,
@@ -42,6 +49,11 @@ enum ArenaWorldStates
 
 class AC_GAME_API Arena : public Battleground
 {
+public:
+  // Arenacraft: turns this (never started, empty) arena into the private stage
+  // of a replay; see arenacraft::replay::Playback.
+  void StartReplay(std::shared_ptr<arenacraft::replay::Playback> playback) { m_ReplayPlayback = std::move(playback); }
+
 protected:
   Arena();
 
@@ -66,6 +78,9 @@ private:
   // Soulwell), tracked per team and per kind (0 = table, 1 = soulwell) so we
   // only ever drop one of each.
   bool m_TeamSuppliesSpawned[PVP_TEAMS_COUNT][2]{};
+
+  // Arenacraft: set while this arena hosts a replay (see StartReplay).
+  std::shared_ptr<arenacraft::replay::Playback> m_ReplayPlayback;
 
   // Arenacraft: arena dampening, elapsed in-progress match time.
   uint32 m_DampeningElapsedMs{0};

@@ -22,6 +22,8 @@
 #include "ObjectAccessor.h"
 #include "Pet.h"
 #include "Player.h"
+#include "ReplayPlayback.hpp"
+#include "ReplayRecorder.hpp"
 #include "ScriptMgr.h"
 #include "World.h"
 #include "WorldSession.h"
@@ -163,6 +165,18 @@ Arena::Arena()
 
 bool Arena::PreUpdateImpl(uint32 diff)
 {
+  // Arenacraft: a replay stage only drives its playback. Once that is over,
+  // drop the invite that kept the empty arena alive so it gets deleted.
+  if (m_ReplayPlayback)
+  {
+    if (!m_ReplayPlayback->update(this, diff))
+    {
+      m_ReplayPlayback.reset();
+      DecreaseInvitedCount(TEAM_ALLIANCE);
+    }
+    return true;
+  }
+
   // Dampening ticks against the in-progress clock only, so the countdown before
   // the gates open (and any early start from ready crystals) does not count.
   if (GetStatus() == STATUS_IN_PROGRESS)
@@ -319,6 +333,8 @@ void Arena::RemovePlayerAtLeave(Player* player)
   // Arenacraft: the dampening buff is applied raw (see PreUpdateImpl), so it
   // would otherwise ride out of the arena into the world / the next match.
   player->RemoveAura(ARENA_DAMPENING_SPELL);
+
+  arenacraft::replay::ReplayRecorder::instance().onPlayerLeave(this, player);
 
   if (isRated() && GetStatus() == STATUS_IN_PROGRESS)
   {

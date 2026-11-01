@@ -791,6 +791,35 @@ void CharacterDatabaseConnection::DoPrepareStatements()
                    "INSERT INTO log_arena_fights VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CONNECTION_ASYNC);
   PrepareStatement(CHAR_INS_ARENA_LOG_MEMBERSTATS,
                    "INSERT INTO log_arena_memberstats VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", CONNECTION_ASYNC);
+  // Arenacraft: arena replays (src/game/Arenacraft/replay)
+  PrepareStatement(CHAR_INS_ARENA_REPLAY,
+                   "INSERT INTO arena_replay (id, bracket, map_id, bg_type_id, winner, duration_ms, created_at, data) "
+                   "VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)",
+                   CONNECTION_ASYNC);
+  PrepareStatement(CHAR_INS_ARENA_REPLAY_PLAYER,
+                   "INSERT INTO arena_replay_player (replay_id, guid, name, team, class) VALUES (?, ?, ?, ?, ?)",
+                   CONNECTION_ASYNC);
+  PrepareStatement(CHAR_SEL_ARENA_REPLAY,
+                   "SELECT r.map_id, r.bg_type_id, r.data, (SELECT COUNT(*) FROM arena_replay_player p "
+                   "WHERE p.replay_id = r.id AND p.guid = ?) FROM arena_replay r WHERE r.id = ?",
+                   CONNECTION_ASYNC);
+  PrepareStatement(
+      CHAR_SEL_ARENA_REPLAYS,
+      "SELECT r.id, r.bracket, r.map_id, r.duration_ms, r.winner, DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i'), "
+      "IFNULL(GROUP_CONCAT(IF(p.team = 0, p.name, NULL) ORDER BY p.name SEPARATOR ', '), ''), "
+      "IFNULL(GROUP_CONCAT(IF(p.team = 1, p.name, NULL) ORDER BY p.name SEPARATOR ', '), '') "
+      "FROM arena_replay r LEFT JOIN arena_replay_player p ON p.replay_id = r.id "
+      "GROUP BY r.id ORDER BY r.id DESC LIMIT ?",
+      CONNECTION_SYNCH);
+  PrepareStatement(
+      CHAR_SEL_ARENA_REPLAYS_BY_NAME,
+      "SELECT r.id, r.bracket, r.map_id, r.duration_ms, r.winner, DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i'), "
+      "IFNULL(GROUP_CONCAT(IF(p.team = 0, p.name, NULL) ORDER BY p.name SEPARATOR ', '), ''), "
+      "IFNULL(GROUP_CONCAT(IF(p.team = 1, p.name, NULL) ORDER BY p.name SEPARATOR ', '), '') "
+      "FROM arena_replay r LEFT JOIN arena_replay_player p ON p.replay_id = r.id "
+      "WHERE r.id IN (SELECT replay_id FROM arena_replay_player WHERE name = ?) "
+      "GROUP BY r.id ORDER BY r.id DESC LIMIT ?",
+      CONNECTION_SYNCH);
   PrepareStatement(CHAR_UPD_GENDER_AND_APPEARANCE,
                    "UPDATE characters SET gender = ?, skin = ?, face = ?, hairStyle = ?, hairColor = ?, facialStyle = "
                    "? WHERE guid = ?",

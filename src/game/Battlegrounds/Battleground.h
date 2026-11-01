@@ -391,6 +391,8 @@ public:
     m_LevelMax = max;
   }
   void SetRated(bool state) { m_IsRated = state; }
+  // Arenacraft: rated arena created by the solo queue (not a team bracket)
+  void SetSoloq(bool state) { m_IsSoloq = state; }
   void SetArenaType(uint8 type) { m_ArenaType = type; }
   void SetArenaorBGType(bool _isArena) { m_IsArena = _isArena; }
   void SetWinner(PvPTeamId winner) { m_WinnerId = winner; }
@@ -438,6 +440,7 @@ public:
   [[nodiscard]] bool isArena() const { return m_IsArena; }
   [[nodiscard]] bool isBattleground() const { return !m_IsArena; }
   [[nodiscard]] bool isRated() const { return m_IsRated; }
+  [[nodiscard]] bool IsSoloq() const { return m_IsSoloq; }
 
   typedef std::map<ObjectGuid, Player*>      BattlegroundPlayerMap;
   [[nodiscard]] BattlegroundPlayerMap const& GetPlayers() const { return m_Players; }
@@ -847,6 +850,7 @@ private:
   PvPTeamId   m_WinnerId;
   int32       m_StartDelayTime;
   bool        m_IsRated; // is this battle rated?
+  bool        m_IsSoloq{false};
   bool        m_PrematureCountDown;
   uint32      m_PrematureCountDownTimer;
   std::string m_Name{};
