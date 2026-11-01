@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import type { InteractionReplyOptions } from "discord.js";
 
+import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
 import { getConfig } from "./config";
@@ -46,7 +47,9 @@ client.once(Events.ClientReady, async (readyClient) => {
     const rooms = new RoomManager(guild, config);
     await rooms.init();
 
-    const redis = await startEventSubscriber(config.REDIS_URL, rooms);
+    const auditLog = await AuditLog.create(guild, config.AUDIT_LOG_CHANNEL_NAME);
+
+    const redis = await startEventSubscriber(config.REDIS_URL, rooms, auditLog);
     const sweep = setInterval(() => void rooms.sweepStale(), 60_000);
 
     const shutdown = async () => {

@@ -211,15 +211,16 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
   if (!bg || winner == TEAM_NEUTRAL)
     return;
 
-  SoloqService&              service = SoloqService::instance();
-  std::optional<Match> const match   = service.takeMatch(bg->GetInstanceID());
-  if (!match)
+  SoloqService&                                   service = SoloqService::instance();
+  std::optional<SoloqService::PendingArena> const pending = service.takeMatch(bg->GetInstanceID());
+  if (!pending)
     return;
 
-  publishMatchupEnded(makeMatchupEndedEvent(*match, bg, true));
-
+  Match const&                      match   = pending->match;
   MatchResult const                 result  = winner == TEAM_ALLIANCE ? MatchResult::TeamAWin : MatchResult::TeamBWin;
-  std::array<RatingUpdate, 6> const updates = resolveMatch(*match, result);
+  std::array<RatingUpdate, 6> const updates = resolveMatch(match, result);
+
+  publishMatchupEnded(makeMatchupEndedEvent(match, bg, true, pending->startedAtMs, winner, &updates));
 
   for (std::size_t i = 0; i < updates.size(); ++i)
   {
@@ -247,9 +248,9 @@ void SoloqBattlegroundScript::OnBattlegroundDestroy(Battleground* bg)
 
   // If the arena was destroyed without ever finishing (invites declined), the
   // match is still pending here - notify consumers so they can free the room.
-  std::optional<Match> const match = SoloqService::instance().takeMatch(bg->GetInstanceID());
-  if (match)
-    publishMatchupEnded(makeMatchupEndedEvent(*match, bg, false));
+  std::optional<SoloqService::PendingArena> const pending = SoloqService::instance().takeMatch(bg->GetInstanceID());
+  if (pending)
+    publishMatchupEnded(makeMatchupEndedEvent(pending->match, bg, false, pending->startedAtMs));
 }
 
 void SoloqBattlegroundScript::OnBattlegroundRemovePlayerAtLeave(Battleground* bg, Player* player)

@@ -5,8 +5,11 @@
  * Usage:
  *   bun run scripts/emit-fake-event.ts --channel matchup --instance 123 \
  *       --team-a ALPHA,BRAVO,CHARLIE --team-b DELTA,ECHO,FOXTROT
- *   bun run scripts/emit-fake-event.ts --channel ended --instance 123
+ *   bun run scripts/emit-fake-event.ts --channel ended --instance 123 --winner teamB
  *   bun run scripts/emit-fake-event.ts --channel both --delay 5000
+ *
+ * `--finished false` publishes an aborted match; `--winner teamA|teamB` picks
+ * the winning side for a finished match (default teamA).
  *
  * Account names must match Discord usernames (the bot maps them case-
  * insensitively). Anything omitted falls back to a default set.
@@ -75,6 +78,8 @@ async function main(): Promise<void> {
   const instanceId = Number(args.instance ?? 9000);
   const delayMs = Number(args.delay ?? 5000);
   const finished = args.finished !== "false";
+  const winner = args.winner === "teamB" ? "teamB" : "teamA";
+  const startedAtMs = Date.now();
 
   const teamANames = accountList(args["team-a"], ["ALPHA", "BRAVO", "CHARLIE"]);
   const teamBNames = accountList(args["team-b"], ["DELTA", "ECHO", "FOXTROT"]);
@@ -92,7 +97,7 @@ async function main(): Promise<void> {
     event: "soloq.matchup",
     instanceId,
     arenaType: 3,
-    matchup: { instanceId, arenaType: 3, mapId: 617, bracketId: 2, queueType: 5, startedAtMs: Date.now() },
+    matchup: { instanceId, arenaType: 3, mapId: 617, bracketId: 2, queueType: 5, startedAtMs },
     players,
     teamA: {
       teamId: 0,
@@ -114,11 +119,27 @@ async function main(): Promise<void> {
     },
   });
 
+  const endedPlayers = finished
+    ? players.map((player) => {
+        const won = (winner === "teamA") === (player.teamId === 0);
+        const delta = won ? 8 : -8;
+        return {
+          ...player,
+          ratingDelta: delta,
+          ratingAfter: player.rating + delta,
+          mmrAfter: player.mmr + delta,
+        };
+      })
+    : players.map((player) => ({ ...player, ratingDelta: null, ratingAfter: null, mmrAfter: null }));
+
   const ended = MatchupEndedEventSchema.parse({
     event: "soloq.matchup.ended",
     instanceId,
     finished,
-    players,
+    winner: finished ? winner : null,
+    startedAtMs,
+    endedAtMs: Date.now(),
+    players: endedPlayers,
   });
 
   const redis = new Redis(process.env.REDIS_URL ?? "redis://127.0.0.1:6379");

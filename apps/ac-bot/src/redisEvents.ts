@@ -1,14 +1,19 @@
 import { Redis } from "ioredis";
 
+import type { AuditLog } from "./auditLog";
 import { logger } from "./logger";
 import { MATCHUP_CHANNEL, MATCHUP_ENDED_CHANNEL, MatchupEndedEventSchema, MatchupEventSchema } from "./types";
 import type { RoomManager } from "./voiceRooms";
 
-export async function startEventSubscriber(redisUrl: string, rooms: RoomManager): Promise<Redis> {
+export async function startEventSubscriber(
+  redisUrl: string,
+  rooms: RoomManager,
+  auditLog: AuditLog | null = null,
+): Promise<Redis> {
   const redis = new Redis(redisUrl);
   redis.on("error", (error) => logger.error("Redis error", error));
   redis.on("message", (channel, message) => {
-    void handleMessage(channel, message, rooms);
+    void handleMessage(channel, message, rooms, auditLog);
   });
 
   await redis.subscribe(MATCHUP_CHANNEL, MATCHUP_ENDED_CHANNEL);
@@ -16,7 +21,12 @@ export async function startEventSubscriber(redisUrl: string, rooms: RoomManager)
   return redis;
 }
 
-async function handleMessage(channel: string, message: string, rooms: RoomManager): Promise<void> {
+async function handleMessage(
+  channel: string,
+  message: string,
+  rooms: RoomManager,
+  auditLog: AuditLog | null,
+): Promise<void> {
   try {
     const raw: unknown = JSON.parse(message);
 
@@ -32,6 +42,7 @@ async function handleMessage(channel: string, message: string, rooms: RoomManage
         event.teamA.players.map((player) => player.accountName),
         event.teamB.players.map((player) => player.accountName),
       );
+      if (auditLog) await auditLog.matchup(event);
       return;
     }
 
@@ -46,6 +57,7 @@ async function handleMessage(channel: string, message: string, rooms: RoomManage
         event.instanceId,
         event.players.map((player) => player.accountName),
       );
+      if (auditLog) await auditLog.ended(event);
     }
   } catch (error) {
     logger.error(`Failed to handle Redis message on '${channel}'`, error);

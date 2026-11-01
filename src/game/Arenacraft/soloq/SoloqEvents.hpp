@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Outcome.hpp"
 #include "Types.hpp"
 
 #include <array>
@@ -59,13 +60,31 @@ bool publishMatchup(MatchupEvent const& event);
 // cache). Missing players yield empty names instead of failing.
 MatchupEvent makeMatchupEvent(Match const& match, Battleground const* arena);
 
+// Post-match rating movement for one participant. Only meaningful when the
+// ended event's `finished` flag is true.
+struct ParticipantResult
+{
+  int32_t  ratingDelta;
+  uint32_t ratingAfter;
+  uint32_t mmrAfter;
+};
+
 struct MatchupEndedEvent
 {
   uint32_t bgInstanceId;
   // true when the arena ended with a winner, false when it was destroyed
   // without ever finishing (invites declined, aborted).
-  bool                           finished;
+  bool finished;
+  // TEAM_ALLIANCE (team A) or TEAM_HORDE (team B); TEAM_NEUTRAL when aborted.
+  TeamId winner;
+  // Pop time (same value the matchup event reported) and the time the arena
+  // ended, both milliseconds since the Unix epoch.
+  uint64_t startedAtMs;
+  uint64_t endedAtMs;
+  // Team A first, then team B; three players each, melee/caster/healer order.
   std::array<ParticipantInfo, 6> participants;
+  // Filled from resolveMatch when finished; zero-initialized when aborted.
+  std::array<ParticipantResult, 6> results;
 };
 
 // Pure serializer for the ended event. Unit-tested.
@@ -74,6 +93,9 @@ std::string buildMatchupEndedPayload(MatchupEndedEvent const& event);
 // Serializes and publishes the ended event. Best-effort like publishMatchup.
 bool publishMatchupEnded(MatchupEndedEvent const& event);
 
-// Resolves the finished/aborted match into a MatchupEndedEvent.
-MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished);
+// Resolves the finished/aborted match into a MatchupEndedEvent. `updates` is
+// the resolveMatch output for a finished match and is ignored when aborted.
+MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished,
+                                        uint64_t startedAtMs, TeamId winner = TEAM_NEUTRAL,
+                                        std::array<RatingUpdate, 6> const* updates = nullptr);
 } // namespace arenacraft::soloq

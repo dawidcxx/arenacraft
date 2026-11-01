@@ -16,6 +16,10 @@ export const ParticipantSchema = z.object({
   faction: z.string(),
   rating: z.number(),
   mmr: z.number(),
+  // Only present on matchup-ended events. Null when the match was aborted.
+  ratingDelta: z.number().int().nullable().optional(),
+  ratingAfter: z.number().int().nonnegative().nullable().optional(),
+  mmrAfter: z.number().int().nonnegative().nullable().optional(),
 });
 
 const TeamSchema = z.object({
@@ -51,6 +55,9 @@ export const MatchupEndedEventSchema = z.object({
   event: z.literal("soloq.matchup.ended"),
   instanceId: z.number(),
   finished: z.boolean(),
+  winner: z.enum(["teamA", "teamB"]).nullable(),
+  startedAtMs: z.number().int(),
+  endedAtMs: z.number().int(),
   players: z.array(ParticipantSchema),
 });
 

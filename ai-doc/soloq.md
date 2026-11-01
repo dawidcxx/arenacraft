@@ -379,14 +379,27 @@ When the arena ends (or is destroyed without finishing) the core publishes
   "event": "soloq.matchup.ended",
   "instanceId": 1234,
   "finished": true,
-  "players": [ /* same shape as above, so consumers can recover a lost room by account name */ ]
+  "winner": "teamA",
+  "startedAtMs": 1700000000000,
+  "endedAtMs": 1700000252000,
+  "players": [
+    { "...same fields as the matchup participant...", "ratingDelta": 9, "ratingAfter": 1459, "mmrAfter": 1559 }
+  ]
 }
 ```
 
-`finished` is `true` when a winner ended the arena, `false` when it was destroyed
-(invites declined). Both events are emitted exactly once per popped matchup:
-`OnBattlegroundEnd` takes the pending match (normal path) and
-`OnBattlegroundDestroy` takes it only if it is still pending (abort path).
+- `finished` is `true` when a winner ended the arena, `false` when it was
+  destroyed (invites declined).
+- `winner` is `"teamA"` (the alliance side), `"teamB"` (the horde side) or
+  `null` when the match never finished.
+- `startedAtMs` is the pop time echoed from the matchup event, so consumers can
+  correlate the two events and compute a duration without keeping state.
+- `ratingDelta`/`ratingAfter`/`mmrAfter` are the `resolveMatch` results. They
+  are `null` for every player when `finished` is `false`.
+
+Both events are emitted exactly once per popped matchup: `OnBattlegroundEnd`
+takes the pending match (normal path) and `OnBattlegroundDestroy` takes it only
+if it is still pending (abort path).
 
 ## Commands
 

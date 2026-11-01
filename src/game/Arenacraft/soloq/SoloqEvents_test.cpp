@@ -9,6 +9,7 @@ using arenacraft::soloq::buildMatchupPayload;
 using arenacraft::soloq::MatchupEndedEvent;
 using arenacraft::soloq::MatchupEvent;
 using arenacraft::soloq::ParticipantInfo;
+using arenacraft::soloq::ParticipantResult;
 using arenacraft::soloq::Role;
 
 namespace
@@ -92,21 +93,54 @@ TEST_CASE("buildMatchupPayload emits empty strings for missing names")
   CHECK(json.find("\"accountName\":\"\"") != std::string::npos);
 }
 
-TEST_CASE("buildMatchupEndedPayload reports instance, finished flag and players")
+TEST_CASE("buildMatchupEndedPayload reports winner, timestamps and per-player rating movement")
 {
   MatchupEvent const source = MakeEvent();
 
   MatchupEndedEvent event{};
   event.bgInstanceId = source.bgInstanceId;
-  event.finished     = false;
+  event.finished     = true;
+  event.winner       = TEAM_ALLIANCE;
+  event.startedAtMs  = 1700000000000ULL;
+  event.endedAtMs    = 1700000252000ULL;
   event.participants = source.participants;
+  event.results      = {
+      ParticipantResult{9, 1509, 1559},  ParticipantResult{9, 1409, 1459},  ParticipantResult{9, 1309, 1359},
+      ParticipantResult{-9, 1591, 1641}, ParticipantResult{-9, 1191, 1241}, ParticipantResult{-9, 1091, 1141},
+  };
 
   std::string const json = buildMatchupEndedPayload(event);
   CHECK(json.find("\"event\":\"soloq.matchup.ended\"") != std::string::npos);
   CHECK(json.find("\"instanceId\":77") != std::string::npos);
-  CHECK(json.find("\"finished\":false") != std::string::npos);
+  CHECK(json.find("\"finished\":true") != std::string::npos);
+  CHECK(json.find("\"winner\":\"teamA\"") != std::string::npos);
+  CHECK(json.find("\"startedAtMs\":1700000000000") != std::string::npos);
+  CHECK(json.find("\"endedAtMs\":1700000252000") != std::string::npos);
   CHECK(json.find("\"accountName\":\"acc-delta\"") != std::string::npos);
+  CHECK(json.find("\"ratingDelta\":9") != std::string::npos);
+  CHECK(json.find("\"ratingDelta\":-9") != std::string::npos);
+  CHECK(json.find("\"ratingAfter\":1509") != std::string::npos);
+  CHECK(json.find("\"mmrAfter\":1141") != std::string::npos);
 
-  event.finished = true;
-  CHECK(buildMatchupEndedPayload(event).find("\"finished\":true") != std::string::npos);
+  event.finished            = false;
+  event.winner              = TEAM_NEUTRAL;
+  std::string const aborted = buildMatchupEndedPayload(event);
+  CHECK(aborted.find("\"finished\":false") != std::string::npos);
+  CHECK(aborted.find("\"winner\":null") != std::string::npos);
+  CHECK(aborted.find("\"ratingDelta\":null") != std::string::npos);
+  CHECK(aborted.find("\"ratingAfter\":null") != std::string::npos);
+  CHECK(aborted.find("\"mmrAfter\":null") != std::string::npos);
+}
+
+TEST_CASE("buildMatchupEndedPayload reports team B as the winner")
+{
+  MatchupEvent const source = MakeEvent();
+
+  MatchupEndedEvent event{};
+  event.bgInstanceId = source.bgInstanceId;
+  event.finished     = true;
+  event.winner       = TEAM_HORDE;
+  event.participants = source.participants;
+
+  CHECK(buildMatchupEndedPayload(event).find("\"winner\":\"teamB\"") != std::string::npos);
 }

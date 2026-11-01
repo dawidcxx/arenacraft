@@ -56,7 +56,10 @@ describe("event schemas", () => {
       event: "soloq.matchup.ended",
       instanceId: 1,
       finished: true,
-      players: [participant],
+      winner: "teamA",
+      startedAtMs: 1_700_000_000_000,
+      endedAtMs: 1_700_000_252_000,
+      players: [{ ...participant, ratingDelta: 9, ratingAfter: 1409, mmrAfter: 1509 }],
     });
     expect(parsed.success).toBe(true);
   });

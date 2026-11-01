@@ -1,6 +1,6 @@
 # ac-bot
 
-Rewritten Arenacraft Discord bot. Four jobs:
+Rewritten Arenacraft Discord bot. Five jobs:
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
@@ -12,6 +12,10 @@ Rewritten Arenacraft Discord bot. Four jobs:
 4. **Info commands** - `/toprankers` (soloQ leaderboard) and `/onlinelist`
    (characters currently online). Both reply ephemerally and are served from a
    30s cache to keep repeated calls off the DB.
+5. **Match audit log** - posts one compact message per solo queue event to
+   `AUDIT_LOG_CHANNEL_NAME` (default `audit-log`): match formed (teams, class
+   icons, ratings), match finished (winner, duration, per-player rating
+   change) and aborted matches.
 
 On startup the bot overwrites both its global and guild command lists, so
 commands removed from the code do not linger as unreachable "ghosts".
@@ -27,6 +31,11 @@ bun run start
 The bot needs the **Server Members** privileged intent enabled in the Discord
 Developer Portal (Bot -> Privileged Gateway Intents). Members are resolved by
 matching the Wow account name against the Discord username (case-insensitive).
+
+The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
+`hunter`, `rogue`, `priest`, `deathknight`, `shaman`, `mage`, `warlock`,
+`druid`). Any missing emoji simply render as the bare character name. Set
+`AUDIT_LOG_CHANNEL_NAME` to an empty string to disable these messages.
 
 `/register` is registered as a guild command, so it appears instantly.
 

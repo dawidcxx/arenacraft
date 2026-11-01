@@ -78,17 +78,20 @@ std::vector<Match> SoloqService::tick(std::chrono::milliseconds elapsed)
   return matches;
 }
 
-void SoloqService::registerMatch(uint32 bgInstanceId, Match const& match) { _pendingMatches[bgInstanceId] = match; }
+void SoloqService::registerMatch(uint32 bgInstanceId, Match const& match, uint64_t startedAtMs)
+{
+  _pendingMatches[bgInstanceId] = PendingArena{bgInstanceId, match, startedAtMs};
+}
 
-std::optional<Match> SoloqService::takeMatch(uint32 bgInstanceId)
+std::optional<SoloqService::PendingArena> SoloqService::takeMatch(uint32 bgInstanceId)
 {
   auto const it = _pendingMatches.find(bgInstanceId);
   if (it == _pendingMatches.end())
     return std::nullopt;
 
-  Match const match = it->second;
+  PendingArena const pending = it->second;
   _pendingMatches.erase(it);
-  return match;
+  return pending;
 }
 
 std::size_t SoloqService::queueSize() const { return _queue.size(); }
@@ -105,8 +108,8 @@ std::vector<SoloqService::PendingArena> SoloqService::pendingArenas() const
 {
   std::vector<PendingArena> result;
   result.reserve(_pendingMatches.size());
-  for (auto const& [bgInstanceId, match] : _pendingMatches)
-    result.push_back(PendingArena{bgInstanceId, match});
+  for (auto const& [bgInstanceId, pending] : _pendingMatches)
+    result.push_back(pending);
   return result;
 }
 } // namespace arenacraft::soloq

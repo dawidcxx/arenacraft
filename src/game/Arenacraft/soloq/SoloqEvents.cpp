@@ -101,7 +101,13 @@ std::string GuidToHex(PlayerId id)
   return buf;
 }
 
-void AppendPlayer(std::string& out, ParticipantInfo const& player)
+uint64_t NowMs()
+{
+  return static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(GameTime::GetSystemTime().time_since_epoch()).count());
+}
+
+void AppendPlayerBody(std::string& out, ParticipantInfo const& player)
 {
   out += "{\"guid\":\"";
   out += GuidToHex(player.id);
@@ -125,6 +131,26 @@ void AppendPlayer(std::string& out, ParticipantInfo const& player)
   out += std::to_string(player.rating);
   out += ",\"mmr\":";
   out += std::to_string(player.mmr);
+}
+
+void AppendPlayer(std::string& out, ParticipantInfo const& player)
+{
+  AppendPlayerBody(out, player);
+  out += "}";
+}
+
+// Ended-event variant: always emits the result fields, using null when the
+// match never finished and no rating was applied.
+void AppendPlayerWithResult(std::string& out, ParticipantInfo const& player, ParticipantResult const* result)
+{
+  AppendPlayerBody(out, player);
+
+  out += ",\"ratingDelta\":";
+  out += result ? std::to_string(result->ratingDelta) : "null";
+  out += ",\"ratingAfter\":";
+  out += result ? std::to_string(result->ratingAfter) : "null";
+  out += ",\"mmrAfter\":";
+  out += result ? std::to_string(result->mmrAfter) : "null";
   out += "}";
 }
 
@@ -278,8 +304,7 @@ MatchupEvent makeMatchupEvent(Match const& match, Battleground const* arena)
   event.mapId        = arena ? arena->GetMapId() : 0;
   event.bracketId    = arena ? static_cast<uint8_t>(arena->GetBracketId()) : 0;
   event.queueType    = static_cast<uint8_t>(BATTLEGROUND_QUEUE_5v5);
-  event.startedAtMs  = static_cast<uint64_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(GameTime::GetSystemTime().time_since_epoch()).count());
+  event.startedAtMs  = NowMs();
 
   std::array<QueuedPlayer const*, 6> const players = playersOf(match);
   std::array<Role, 3> const                roles   = {Role::Melee, Role::Caster, Role::Healer};
@@ -292,19 +317,30 @@ MatchupEvent makeMatchupEvent(Match const& match, Battleground const* arena)
 std::string buildMatchupEndedPayload(MatchupEndedEvent const& event)
 {
   std::string out;
-  out.reserve(1024);
+  out.reserve(1536);
   out += "{\"event\":\"";
   out += MatchupEndedEventName;
   out += "\",\"instanceId\":";
   out += std::to_string(event.bgInstanceId);
   out += ",\"finished\":";
   out += event.finished ? "true" : "false";
+  out += ",\"winner\":";
+  if (event.finished && event.winner == TEAM_ALLIANCE)
+    out += "\"teamA\"";
+  else if (event.finished && event.winner == TEAM_HORDE)
+    out += "\"teamB\"";
+  else
+    out += "null";
+  out += ",\"startedAtMs\":";
+  out += std::to_string(event.startedAtMs);
+  out += ",\"endedAtMs\":";
+  out += std::to_string(event.endedAtMs);
   out += ",\"players\":[";
   for (std::size_t i = 0; i < event.participants.size(); ++i)
   {
     if (i)
       out += ',';
-    AppendPlayer(out, event.participants[i]);
+    AppendPlayerWithResult(out, event.participants[i], event.finished ? &event.results[i] : nullptr);
   }
   out += "]}";
   return out;
@@ -315,16 +351,26 @@ bool publishMatchupEnded(MatchupEndedEvent const& event)
   return sRedisConn.publish(MatchupEndedChannel, buildMatchupEndedPayload(event));
 }
 
-MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished)
+MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* arena, bool finished,
+                                        uint64_t startedAtMs, TeamId winner, std::array<RatingUpdate, 6> const* updates)
 {
   MatchupEndedEvent event{};
   event.bgInstanceId = arena ? arena->GetInstanceID() : 0;
   event.finished     = finished;
+  event.winner       = finished ? winner : TEAM_NEUTRAL;
+  event.startedAtMs  = startedAtMs;
+  event.endedAtMs    = NowMs();
 
   std::array<QueuedPlayer const*, 6> const players = playersOf(match);
   std::array<Role, 3> const                roles   = {Role::Melee, Role::Caster, Role::Healer};
   for (std::size_t i = 0; i < players.size(); ++i)
     event.participants[i] = ResolveParticipant(*players[i], roles[i % 3]);
+
+  if (updates)
+  {
+    for (std::size_t i = 0; i < updates->size(); ++i)
+      event.results[i] = ParticipantResult{(*updates)[i].delta, (*updates)[i].rating, (*updates)[i].mmr};
+  }
 
   return event;
 }

@@ -43,16 +43,19 @@ public:
 
   std::vector<Match> tick(std::chrono::milliseconds elapsed);
 
-  // Soloq arenas are keyed by battleground instance id until they end, so the
-  // result can be fed back through resolveMatch.
-  void                 registerMatch(uint32 bgInstanceId, Match const& match);
-  std::optional<Match> takeMatch(uint32 bgInstanceId);
-
   struct PendingArena
   {
-    uint32 bgInstanceId;
-    Match  match;
+    uint32   bgInstanceId;
+    Match    match;
+    uint64_t startedAtMs;
   };
+
+  // Soloq arenas are keyed by battleground instance id until they end, so the
+  // result can be fed back through resolveMatch. startedAtMs is the pop time
+  // carried through so the end event can report a duration without keeping
+  // state in the process.
+  void                        registerMatch(uint32 bgInstanceId, Match const& match, uint64_t startedAtMs);
+  std::optional<PendingArena> takeMatch(uint32 bgInstanceId);
 
   [[nodiscard]] std::size_t                            queueSize() const;
   [[nodiscard]] bool                                   inQueue(PlayerId id) const;
@@ -78,10 +81,10 @@ private:
 
   void refreshRoleCounts();
 
-  SoloqQueue                        _queue;
-  std::unordered_map<uint32, Match> _pendingMatches;
-  std::unordered_set<PlayerId>      _validatedCharacters;
-  RoleCounts                        _roleCounts{};
-  bool                              _skipCharacterChecks = false;
+  SoloqQueue                               _queue;
+  std::unordered_map<uint32, PendingArena> _pendingMatches;
+  std::unordered_set<PlayerId>             _validatedCharacters;
+  RoleCounts                               _roleCounts{};
+  bool                                     _skipCharacterChecks = false;
 };
 } // namespace arenacraft::soloq

@@ -9,6 +9,8 @@ const ConfigSchema = z.object({
   WAITING_ROOM_NAME: z.string().min(1).default("Waiting Room"),
   GAME_CHANNEL_PATTERN: z.string().min(1).default("^game-(\\d+)-(\\d+)$"),
   INFO_CHANNEL_NAME: z.string().min(1).default("bot"),
+  // Channel for match found/finished/aborted messages; empty disables them.
+  AUDIT_LOG_CHANNEL_NAME: z.string().default("audit-log"),
   STALE_ROOM_MINUTES: z.coerce.number().int().positive().default(60),
 });
 

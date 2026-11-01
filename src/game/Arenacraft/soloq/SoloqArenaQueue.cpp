@@ -170,13 +170,16 @@ bool CreateArenaForMatch(Match const& match)
   for (std::size_t i = TeamSize; i < ginfos.size(); ++i)
     bgQueue.InviteGroupToBG(ginfos[i], arena, TEAM_HORDE);
 
-  SoloqService::instance().registerMatch(arena->GetInstanceID(), match);
+  // Build the event first so the pending arena carries the exact pop time the
+  // matchup event reports; consumers correlate the two by startedAtMs.
+  MatchupEvent const matchup = makeMatchupEvent(match, arena);
+  SoloqService::instance().registerMatch(arena->GetInstanceID(), match, matchup.startedAtMs);
 
   arena->StartBattleground();
 
   // Notify external consumers that a matchup popped. Best-effort: a missing
   // Redis never blocks the arena.
-  publishMatchup(makeMatchupEvent(match, arena));
+  publishMatchup(matchup);
   return true;
 }
 } // namespace arenacraft::soloq
