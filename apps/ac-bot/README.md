@@ -9,9 +9,10 @@ Rewritten Arenacraft Discord bot. Six jobs:
 3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
    `soloq-matchup-ended` Redis events and moves players between the waiting room
    and paired `game-<n>-<k>` voice channels.
-4. **Info commands** - `/toprankers` (soloQ leaderboard) and `/onlinelist`
-   (characters currently online). Both reply ephemerally and are served from a
-   30s cache to keep repeated calls off the DB.
+4. **Info commands** - `/toprankers` (soloQ leaderboard), `/onlinelist`
+   (characters currently online) and `/lookup <character>` (the Discord user
+   behind a character name). All reply ephemerally; the leaderboard and online
+   list are served from a 30s cache to keep repeated calls off the DB.
 5. **Match audit log** - posts one compact message per solo queue event to
    `AUDIT_LOG_CHANNEL_NAME` (default `audit-log`): match formed (teams, class
    icons, ratings), match finished (winner, duration, per-player rating

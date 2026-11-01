@@ -7,6 +7,7 @@ import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
 import { getConfig } from "./config";
 import { logger } from "./logger";
+import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
 import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
 import { PING_COMMAND, handlePing } from "./pingCommand";
 import { startEventSubscriber } from "./redisEvents";
@@ -48,6 +49,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       PING_COMMAND,
       TOP_RANKERS_COMMAND,
       ONLINE_LIST_COMMAND,
+      LOOKUP_COMMAND,
       ALIAS_COMMAND,
     ]);
     await guild.members.fetch();
@@ -84,6 +86,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     else if (interaction.commandName === "setpassword") await handleSetPassword(interaction, authDb);
     else if (interaction.commandName === "toprankers") await handleTopRankers(interaction, () => rankersCache.get());
     else if (interaction.commandName === "onlinelist") await handleOnlineList(interaction, () => onlineListCache.get());
+    else if (interaction.commandName === "lookup") await handleLookup(interaction, { authDb, characterDb });
     else if (interaction.commandName === "ping") await handlePing(interaction);
     else if (interaction.commandName === "alias") await handleAlias(interaction, authDb, config.VIP_ROLE_NAME);
   } catch (error) {

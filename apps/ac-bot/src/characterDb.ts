@@ -55,6 +55,15 @@ export class CharacterDb {
     }));
   }
 
+  /** Resolves a character name to its owning account id, or null when absent. */
+  async accountIdByCharacterName(charName: string): Promise<number | null> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>("SELECT account FROM characters WHERE name = ? LIMIT 1", [
+      charName,
+    ]);
+    const row = rows[0];
+    return row ? Number(row.account) : null;
+  }
+
   /** Characters the core currently flags as online (`characters.online > 0`). */
   async onlineCharacters(): Promise<OnlineCharacter[]> {
     const [rows] = await this.pool.execute<RowDataPacket[]>(
