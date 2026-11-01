@@ -3,8 +3,9 @@
  * reset_soloq - reset the whole SoloQ ladder.
  *
  * Every SoloQ team (the otherwise-unused 5v5 arena track) gets its team rating
- * and every member's personal rating set to 1400, and every member's matchmaker
- * rating (MMR) plus its high-water mark reset to 1400.
+ * and every member's personal rating set to 1400, every member's matchmaker
+ * rating (MMR) plus its high-water mark reset to 1500, and all win/loss counters
+ * (season and week) zeroed out.
  *
  *   ./scripts/reset_soloq
  *   ./scripts/reset_soloq --dry-run
@@ -24,7 +25,7 @@ import { connect, parseDbInfo, type DbInfo } from "./src/lib/db.ts";
 const SOLOQ_ARENA_TYPE = 5; // ARENA_TYPE_5v5
 const SOLOQ_ARENA_SLOT = 2; // ARENA_SLOT_5v5
 const DEFAULT_RATING = 1400;
-const DEFAULT_MMR = 1400;
+const DEFAULT_MMR = 1500;
 
 const DEFAULT_CHARACTERS: DbInfo = {
   hostname: "127.0.0.1",
@@ -76,7 +77,7 @@ const teamCount = Number((teamRows[0] as { n: number }).n);
 const memberCount = Number((memberRows[0] as { n: number }).n);
 
 console.log(
-  `[characters] ${teamCount} SoloQ team(s), ${memberCount} member(s) -> rating ${rating}, MMR ${mmr}`,
+  `[characters] ${teamCount} SoloQ team(s), ${memberCount} member(s) -> rating ${rating}, MMR ${mmr}, stats zeroed`,
 );
 
 if (opts.dryRun) {
@@ -85,12 +86,19 @@ if (opts.dryRun) {
   process.exit(0);
 }
 
-await sql.unsafe(`UPDATE arena_team SET rating = ? WHERE type = ?`, [rating, SOLOQ_ARENA_TYPE]);
+await sql.unsafe(
+  `UPDATE arena_team
+   SET rating = ?, seasonGames = 0, seasonWins = 0, weekGames = 0, weekWins = 0
+   WHERE type = ?`,
+  [rating, SOLOQ_ARENA_TYPE],
+);
 
 await sql.unsafe(
   `UPDATE arena_team_member atm
    JOIN arena_team at ON at.arenaTeamId = atm.arenaTeamId
-   SET atm.personalRating = ?
+   SET atm.personalRating = ?,
+       atm.seasonGames = 0, atm.seasonWins = 0,
+       atm.weekGames = 0, atm.weekWins = 0
    WHERE at.type = ?`,
   [rating, SOLOQ_ARENA_TYPE],
 );
@@ -106,7 +114,7 @@ await sql.unsafe(
 );
 
 console.log(
-  `[characters] reset ${teamCount} SoloQ team(s) and ${memberCount} member(s) to rating ${rating}, MMR ${mmr}`,
+  `[characters] reset ${teamCount} SoloQ team(s) and ${memberCount} member(s) to rating ${rating}, MMR ${mmr}, stats zeroed`,
 );
 console.log("[characters] restart the worldserver so it drops the in-memory ratings");
 
