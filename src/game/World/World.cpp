@@ -1449,8 +1449,8 @@ void World::LoadConfigSettings(bool reload)
   if (reload)
   {
     if (dataPath != _dataPath)
-      LOG_ERROR("server.loading",
-                "DataDir option can't be changed at config reload, using current value ({}).", _dataPath);
+      LOG_ERROR("server.loading", "DataDir option can't be changed at config reload, using current value ({}).",
+                _dataPath);
   }
   else
   {
@@ -1489,12 +1489,15 @@ void World::LoadConfigSettings(bool reload)
   if (_int_configs[CONFIG_PVP_TOKEN_COUNT] < 1)
     _int_configs[CONFIG_PVP_TOKEN_COUNT] = 1;
 
-  _bool_configs[CONFIG_NO_RESET_TALENT_COST]       = sConfigMgr->GetOption<bool>("NoResetTalentsCost", false);
-  _int_configs[CONFIG_TOGGLE_XP_COST]              = sConfigMgr->GetOption<int32>("ToggleXP.Cost", 100000);
-  _bool_configs[CONFIG_SHOW_KICK_IN_WORLD]         = sConfigMgr->GetOption<bool>("ShowKickInWorld", false);
-  _bool_configs[CONFIG_SHOW_MUTE_IN_WORLD]         = sConfigMgr->GetOption<bool>("ShowMuteInWorld", false);
-  _bool_configs[CONFIG_SHOW_BAN_IN_WORLD]          = sConfigMgr->GetOption<bool>("ShowBanInWorld", false);
-  _int_configs[CONFIG_NUMTHREADS]                  = sConfigMgr->GetOption<int32>("MapUpdate.Threads", 1);
+  _bool_configs[CONFIG_NO_RESET_TALENT_COST] = sConfigMgr->GetOption<bool>("NoResetTalentsCost", false);
+  _int_configs[CONFIG_TOGGLE_XP_COST]        = sConfigMgr->GetOption<int32>("ToggleXP.Cost", 100000);
+  _bool_configs[CONFIG_SHOW_KICK_IN_WORLD]   = sConfigMgr->GetOption<bool>("ShowKickInWorld", false);
+  _bool_configs[CONFIG_SHOW_MUTE_IN_WORLD]   = sConfigMgr->GetOption<bool>("ShowMuteInWorld", false);
+  _bool_configs[CONFIG_SHOW_BAN_IN_WORLD]    = sConfigMgr->GetOption<bool>("ShowBanInWorld", false);
+  // Run map updates on a second worker so arena/dungeon instances do not
+  // serialize behind the open world on every tick. Override with
+  // AC_MAP_UPDATE_THREADS.
+  _int_configs[CONFIG_NUMTHREADS]                  = sConfigMgr->GetOption<int32>("MapUpdate.Threads", 4);
   _int_configs[CONFIG_MAX_RESULTS_LOOKUP_COMMANDS] = sConfigMgr->GetOption<int32>("Command.LookupMaxResults", 0);
 
   // Warden

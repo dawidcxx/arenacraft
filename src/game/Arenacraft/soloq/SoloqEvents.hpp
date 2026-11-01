@@ -51,8 +51,8 @@ struct MatchupEvent
 // Pure serializer: no Redis, no game world. Unit-tested.
 std::string buildMatchupPayload(MatchupEvent const& event);
 
-// Serializes and publishes the event. Best-effort: returns false when Redis is
-// disabled or unreachable, never throws.
+// Serializes and enqueues the event for the Redis publisher thread. Best-effort:
+// returns false only when Redis is disabled or shutting down, never throws.
 bool publishMatchup(MatchupEvent const& event);
 
 // Resolves a formed match and its arena into a MatchupEvent, pulling

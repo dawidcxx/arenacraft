@@ -289,7 +289,7 @@ int worldserver_main(int argc, char** argv)
                                            // sScriptReloadMgr->Unload();
                                          });
 
-  LOG_INFO("server.", "Connecting to Redis");
+  LOG_INFO("server.", "Starting Redis event publisher");
   sRedisConn.init();
 
   LOG_INFO("server.loading", "Initializing Scripts...");
@@ -366,7 +366,9 @@ int worldserver_main(int argc, char** argv)
   uint16      worldPort     = uint16(sWorld->getIntConfig(CONFIG_PORT_WORLD));
   std::string worldListener = sConfigMgr->GetOption<std::string>("BindIP", "0.0.0.0");
 
-  int networkThreads = sConfigMgr->GetOption<int32>("Network.Threads", 1);
+  // Two socket threads spread decrypt/dispatch load without oversubscribing the
+  // arena host. Override with AC_NETWORK_THREADS if needed.
+  int networkThreads = sConfigMgr->GetOption<int32>("Network.Threads", 2);
 
   if (networkThreads <= 0)
   {
@@ -437,6 +439,8 @@ int worldserver_main(int argc, char** argv)
   sLog->SetSynchronous();
 
   sScriptMgr->OnShutdown();
+
+  sRedisConn.shutdown();
 
   // set server offline
   LoginDatabase.DirectExecute("UPDATE realmlist SET flag = flag | {} WHERE id = '{}'", REALM_FLAG_OFFLINE,
@@ -604,7 +608,9 @@ void ShutdownCLIThread(std::thread* cliThread)
 
 void WorldUpdateLoop()
 {
-  uint32 minUpdateDiff = uint32(sConfigMgr->GetOption<int32>("MinWorldUpdateTime", 1));
+  // 100 Hz is plenty for arena combat and batches nearby events into one tick;
+  // override with AC_MIN_WORLD_UPDATE_TIME.
+  uint32 minUpdateDiff = uint32(sConfigMgr->GetOption<int32>("MinWorldUpdateTime", 10));
 
   // With no clients connected the server is idle: back the loop off instead of
   // spinning at MinWorldUpdateTime over empty maps. Normal cadence resumes as

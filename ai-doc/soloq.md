@@ -335,10 +335,12 @@ and team B is `TEAM_HORDE`.
 When a match pops (i.e. `CreateArenaForMatch` has created the arena and sent
 the invites), the core publishes a `soloq-matchup` event so external consumers
 (web, Discord, overlays) can react. Publishing is **best-effort**: `RedisConn`
-(`src/common/Redis/`) never blocks the world, reconnects on demand (10s backoff)
-and no-ops when Redis is disabled or unreachable. Config is `AC_REDIS_ENABLED`,
-`AC_REDIS_HOST`, `AC_REDIS_PORT`, `AC_REDIS_PASSWORD`, `AC_REDIS_DB` (see
-`.env.example`).
+(`src/common/Redis/`) only enqueues the event on the calling thread; a dedicated
+publisher thread performs the blocking connect/publish, reconnects on demand
+(10s backoff) and drops events when Redis is disabled or unreachable. The queue
+is bounded (1024 messages, oldest dropped first) so an outage cannot grow memory
+or stall the world. Config is `AC_REDIS_ENABLED`, `AC_REDIS_HOST`,
+`AC_REDIS_PORT`, `AC_REDIS_PASSWORD`, `AC_REDIS_DB` (see `.env.example`).
 
 Payload (`event = "soloq.matchup"`, see `SoloqEvents.hpp`):
 
