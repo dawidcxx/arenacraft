@@ -181,6 +181,12 @@ bool Playback::update(Battleground* bg, uint32_t diff)
 
 void watch(Player* viewer, uint32_t id)
 {
+  if (!config().enabled)
+  {
+    tell(viewer, "Replay: playback is disabled.");
+    return;
+  }
+
   if (std::string const problem = whyCannotWatch(viewer); !problem.empty())
   {
     tell(viewer, "Replay: " + problem);

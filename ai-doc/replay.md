@@ -7,7 +7,7 @@ Code: `src/game/Arenacraft/replay/`. Tables: `arena_replay`, `arena_replay_playe
 
 | env                        | default          | meaning                                                   |
 |----------------------------|------------------|-----------------------------------------------------------|
-| `AC_REPLAY_ENABLED`        | `0`              | record matches; watching works regardless                 |
+| `AC_REPLAY_ENABLED`        | `0`              | master switch: record matches and allow playback          |
 | `AC_REPLAY_BRACKETS`       | `2v2,3v3,soloq`  | `2v2`, `3v3`, `5v5`, `soloq`, `skirmish`, `all`           |
 | `AC_REPLAY_KEEP_DAYS`      | `0`              | delete recordings older than N days                       |
 | `AC_REPLAY_MAX_TOTAL`      | `0`              | keep the newest N recordings overall                      |
