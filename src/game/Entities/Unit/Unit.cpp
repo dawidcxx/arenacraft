@@ -10037,21 +10037,26 @@ bool Unit::HandleProcTriggerSpell(Unit* victim, uint32 damage, AuraEffect* trigg
   // Fingers of Frost, synchronise with Frostbite
   case 44544:
   {
-    if (procPhase == PROC_SPELL_PHASE_HIT)
+    // arenacraft: the talents' spell_proc_event rows (44543/44545) allow every spell phase, so Fingers of Frost
+    // also procced on cast and on finish, where the Frostbite roll below never ran, so FoF fired without Frostbite
+    // (and got extra proc rolls per chill). It now procs only when the chill lands, and every proc rolls Frostbite
+    // (100% with 3/3 Frostbite + 2/2 Fingers of Frost; Frostbite's own procs grant FoF the same way, see the 12494
+    // case in SpellAuras.cpp).
+    if (procPhase != PROC_SPELL_PHASE_HIT)
+      return false;
+
+    // Find Frostbite
+    if (AuraEffect* aurEff = this->GetAuraEffect(SPELL_AURA_ADD_TARGET_TRIGGER, SPELLFAMILY_MAGE, 119, EFFECT_0))
     {
-      // Find Frostbite
-      if (AuraEffect* aurEff = this->GetAuraEffect(SPELL_AURA_ADD_TARGET_TRIGGER, SPELLFAMILY_MAGE, 119, EFFECT_0))
-      {
-        if (!victim)
-          return false;
+      if (!victim)
+        return false;
 
-        uint8 fofRank = sSpellMgr->GetSpellRank(triggeredByAura->GetId());
-        uint8 fbRank  = sSpellMgr->GetSpellRank(aurEff->GetId());
-        uint8 chance  = uint8(std::ceil(fofRank * fbRank * 16.6f));
+      uint8 fofRank = sSpellMgr->GetSpellRank(triggeredByAura->GetId());
+      uint8 fbRank  = sSpellMgr->GetSpellRank(aurEff->GetId());
+      uint8 chance  = uint8(std::ceil(fofRank * fbRank * 16.6f));
 
-        if (roll_chance_i(chance))
-          CastSpell(victim, aurEff->GetSpellInfo()->Effects[EFFECT_0].TriggerSpell, true);
-      }
+      if (roll_chance_i(chance))
+        CastSpell(victim, aurEff->GetSpellInfo()->Effects[EFFECT_0].TriggerSpell, true);
     }
     break;
   }
