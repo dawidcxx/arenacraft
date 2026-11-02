@@ -7248,11 +7248,21 @@ SpellCastResult Spell::CheckCasterAuras(bool preventionOnly) const
       mechanic_immune = IMMUNE_TO_MOVEMENT_IMPAIRMENT_AND_LOSS_CONTROL_MASK;
   }
 
+  // arenacraft: a physical-only school immunity does not lift a loss of control. Sap, Blind, Gouge, Kidney Shot,
+  // Cheap Shot, Bash, ... are physical school, so Hand of Protection (physical immunity + IMMUNITY_PURGES_EFFECT) was
+  // castable out of them. Full immunities (Divine Shield, Ice Block) keep their existing behaviour.
+  if (school_immune == SPELL_SCHOOL_MASK_NORMAL)
+    school_immune = 0;
+
   bool usableInStun = m_spellInfo->HasAttribute(SPELL_ATTR5_ALLOW_WHILE_STUNNED);
 
   // Glyph of Pain Suppression
   // there is no other way to handle it
   if (m_spellInfo->Id == 33206 && !m_caster->HasAura(63248))
+    usableInStun = false;
+
+  // arenacraft: Hand of Protection is never usable while stunned or sapped
+  if (m_spellInfo->Id == 1022 || m_spellInfo->Id == 5599 || m_spellInfo->Id == 10278)
     usableInStun = false;
 
   // Check whether the cast should be prevented by any state you might have.
@@ -7294,7 +7304,9 @@ SpellCastResult Spell::CheckCasterAuras(bool preventionOnly) const
       else
         prevented_reason = SPELL_FAILED_STUNNED;
     }
-    else if (unitflag & UNIT_FLAG_CONFUSED && !m_spellInfo->HasAttribute(SPELL_ATTR5_ALLOW_WHILE_CONFUSED))
+    // arenacraft: Hand of Freedom is never usable while disoriented (Blind, Scatter Shot, Dragon's Breath, ...)
+    else if (unitflag & UNIT_FLAG_CONFUSED &&
+             (!m_spellInfo->HasAttribute(SPELL_ATTR5_ALLOW_WHILE_CONFUSED) || m_spellInfo->Id == 1044))
       prevented_reason = SPELL_FAILED_CONFUSED;
     else if (unitflag & UNIT_FLAG_FLEEING && !m_spellInfo->HasAttribute(SPELL_ATTR5_ALLOW_WHILE_FLEEING))
       prevented_reason = SPELL_FAILED_FLEEING;
@@ -7352,7 +7364,7 @@ SpellCastResult Spell::CheckCasterAuras(bool preventionOnly) const
               break;
             }
             case SPELL_AURA_MOD_CONFUSE:
-              if (!m_spellInfo->HasAttribute(SPELL_ATTR5_ALLOW_WHILE_CONFUSED))
+              if (!m_spellInfo->HasAttribute(SPELL_ATTR5_ALLOW_WHILE_CONFUSED) || m_spellInfo->Id == 1044)
                 return SPELL_FAILED_CONFUSED;
               break;
             case SPELL_AURA_MOD_FEAR:
