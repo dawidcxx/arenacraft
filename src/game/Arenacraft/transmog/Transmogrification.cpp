@@ -6,6 +6,7 @@
 #include "ObjectMgr.h"
 #include "SharedDefines.h"
 #include "UpdateFields.h"
+#include "Vip.hpp"
 
 #include <mutex>
 #include <optional>
@@ -262,7 +263,10 @@ bool Apply(Player* player, uint32 sourceEntry, std::string& message)
     return false;
   }
 
-  if (!IsTransmoggableQuality(source->Quality))
+  // VIPs skip the quality and armor/weapon type rules; slot compatibility still applies
+  bool const vip = vip::IsVip(player);
+
+  if (!vip && !IsTransmoggableQuality(source->Quality))
   {
     message = "Only rare, epic and legendary items can be used as appearances.";
     return false;
@@ -282,12 +286,12 @@ bool Apply(Player* player, uint32 sourceEntry, std::string& message)
 
     ItemTemplate const* target = item->GetTemplate();
 
-    // Same slot, same class and same armor/weapon type; both must be rare+.
+    // Same slot, same class and same armor/weapon type; both must be rare+ (VIPs: same slot and class only).
     if (!SlotAcceptsInventoryType(slot, source->InventoryType))
       continue;
-    if (target->Class != source->Class || target->SubClass != source->SubClass)
+    if (target->Class != source->Class || (!vip && target->SubClass != source->SubClass))
       continue;
-    if (!IsTransmoggableQuality(target->Quality))
+    if (!vip && !IsTransmoggableQuality(target->Quality))
       continue;
     if (target->ItemId == source->ItemId || target->DisplayInfoID == source->DisplayInfoID)
       continue;
