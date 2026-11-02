@@ -102,6 +102,45 @@ services:
       valkey:
         condition: service_healthy
 
+  # --- public ladder: read-only API + nginx in front of it ----------------------------------------------
+  # `podman compose --profile ladder up -d` (also part of the full profile). Only nginx publishes a port;
+  # put TLS in front of it (Cloudflare Tunnel / proxy or certbot), the website is served over https.
+  ladder-api:
+    profiles: [full, ladder]
+    build: { context: apps/ladder-api }
+    image: arenacraft-ladder-api:local
+    restart: unless-stopped
+    environment:
+      # use a SELECT-only account in production (see apps/ladder-api/README.md)
+      CHARACTER_DB_URL: "mysql://acore:acore@db:3306/acore_characters"
+      LADDER_SIZE: "200"
+      CACHE_TTL_SECONDS: "30"
+      CORS_ORIGIN: "*"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 64
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ladder-nginx:
+    profiles: [full, ladder]
+    image: docker.io/library/nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    volumes:
+      - ./apps/ladder-api/nginx/ladder-api.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    mem_limit: 128m
+    depends_on:
+      ladder-api:
+        condition: service_healthy
+
 volumes:
   mysql-data:
   redis-insight:
