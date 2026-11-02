@@ -107,7 +107,11 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
 - **Flex mode** (`setFlexMode`, off by default, toggled by `.soloq flex`): the
   melee/caster/healer split is relaxed. The queue pools all DPS (melee + caster)
   and requires at least 4 of them plus 2 healers; each team fields any two DPS
-  plus one healer. Class stacking within a team is still rejected. The queue's
+  plus one healer. Class stacking within a team is still rejected, with one
+  exception: **Mancleave** - an Arms warrior (spec 0) and a Protection warrior
+  (spec 2) may share a team (`isMancleavePair`, a constant-time check, so the
+  enumeration cost is unchanged). Other warrior pairs still count as stacking.
+  The queue's
   `Team::melee`/`Team::caster` fields are just the two DPS slots in this mode,
   so the real role is derived from class/spec when reporting participants.
 - `update` returns the drained `std::vector<Match>`; matched players are removed.

@@ -4,6 +4,33 @@
 
 namespace arenacraft::soloq
 {
+namespace
+{
+constexpr uint8_t WarriorSpecArms = 0;
+constexpr uint8_t WarriorSpecProt = 2;
+
+// Mancleave (Arms warrior + Protection warrior + healer) is the one class stack flex mode allows. Constant time, so
+// the matchmaker's enumeration cost is unchanged.
+bool isMancleavePair(QueuedPlayer const& x, QueuedPlayer const& y)
+{
+  if (x.classId != CLASS_WARRIOR || y.classId != CLASS_WARRIOR)
+    return false;
+  return (x.specIndex == WarriorSpecArms && y.specIndex == WarriorSpecProt) ||
+         (x.specIndex == WarriorSpecProt && y.specIndex == WarriorSpecArms);
+}
+
+bool stacksClass(QueuedPlayer const& x, QueuedPlayer const& y)
+{
+  return x.classId == y.classId && !isMancleavePair(x, y);
+}
+
+// a flex team is two DPS and one healer; healers are never warriors, so only the DPS pair can be mancleave
+bool flexTeamStacksClass(QueuedPlayer const& dps0, QueuedPlayer const& dps1, QueuedPlayer const& healer)
+{
+  return stacksClass(dps0, dps1) || dps0.classId == healer.classId || dps1.classId == healer.classId;
+}
+} // namespace
+
 bool SoloqQueue::playerAddToQueue(QueuedPlayer player)
 {
   std::optional<Role> const role = roleFor(player.classId, player.specIndex);
@@ -191,7 +218,7 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeStandardCandidate(std::arra
 std::optional<SoloqQueue::Candidate> SoloqQueue::makeFlexCandidate(std::array<Entry const*, 6> const& six) const
 {
   // Flex composition: six[0..3] are DPS (melee or caster), six[4..5] are healers.
-  // Each team takes two DPS and one healer. Teams that stack a class are skipped.
+  // Each team takes two DPS and one healer. Teams that stack a class are skipped, except Mancleave (Arms + Prot).
   uint64_t total = 0;
   for (Entry const* entry : six)
     total += entry->player.mmr;
@@ -223,9 +250,7 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeFlexCandidate(std::array<En
         QueuedPlayer const& dpsB0 = six[complement[0]]->player;
         QueuedPlayer const& dpsB1 = six[complement[1]]->player;
 
-        if (dpsA0.classId == dpsA1.classId || dpsA0.classId == healerA.classId || dpsA1.classId == healerA.classId)
-          continue;
-        if (dpsB0.classId == dpsB1.classId || dpsB0.classId == healerB.classId || dpsB1.classId == healerB.classId)
+        if (flexTeamStacksClass(dpsA0, dpsA1, healerA) || flexTeamStacksClass(dpsB0, dpsB1, healerB))
           continue;
 
         uint64_t const sumA      = static_cast<uint64_t>(dpsA0.mmr) + dpsA1.mmr + healerA.mmr;
