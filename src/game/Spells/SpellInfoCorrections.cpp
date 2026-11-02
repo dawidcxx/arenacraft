@@ -3709,7 +3709,25 @@ void SpellMgr::LoadSpellInfoCorrections()
       [](SpellInfo* spellInfo) { spellInfo->AttributesEx7 |= SPELL_ATTR7_CAN_CAUSE_INTERRUPT; });
 
   // Shadowmeld
-  ApplySpellFix({58984}, [](SpellInfo* spellInfo) { spellInfo->AttributesEx3 |= SPELL_ATTR3_ONLY_ON_PLAYER; });
+  ApplySpellFix({58984},
+                [](SpellInfo* spellInfo)
+                {
+                  spellInfo->AttributesEx3 |= SPELL_ATTR3_ONLY_ON_PLAYER;
+
+                  // arenacraft: give Shadowmeld the Vanish component - a self sanctuary effect, which interrupts
+                  // casts aimed at the night elf and drops projectiles already in flight (see Spell::DoAllEffectOnTarget)
+                  for (SpellEffectInfo const& effect : spellInfo->Effects)
+                    if (effect.Effect == SPELL_EFFECT_SANCTUARY)
+                      return;
+                  for (uint8 i = EFFECT_0; i < MAX_SPELL_EFFECTS; ++i)
+                  {
+                    if (spellInfo->Effects[i].Effect)
+                      continue;
+                    spellInfo->Effects[i].Effect  = SPELL_EFFECT_SANCTUARY;
+                    spellInfo->Effects[i].TargetA = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
+                    break;
+                  }
+                });
 
   // Flare activation speed
   ApplySpellFix({1543}, [](SpellInfo* spellInfo) { spellInfo->Speed = 0.0f; });
