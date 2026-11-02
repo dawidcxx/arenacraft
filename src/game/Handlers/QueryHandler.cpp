@@ -22,6 +22,7 @@
 #include "NPCHandler.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
+#include "Patrol.hpp"
 #include "Pet.h"
 #include "Player.h"
 #include "World.h"
@@ -43,9 +44,13 @@ void WorldSession::SendNameQueryOpcode(ObjectGuid guid)
 
   Player* player = ObjectAccessor::FindConnectedPlayer(guid);
 
-  data << uint8(0);         // name known
-  data << playerData->Name; // played name
-  data << uint8(0);         // realm name - only set for cross realm interaction (such as Battlegrounds)
+  // arenacraft: a patrol reviewer sees aliases ("Suspect", "Player1", ...) for the players of the reviewed match
+  std::optional<std::string> const alias =
+      _player ? arenacraft::patrol::AliasFor(_player->GetGUID(), guid) : std::nullopt;
+
+  data << uint8(0);                            // name known
+  data << (alias ? *alias : playerData->Name); // played name
+  data << uint8(0); // realm name - only set for cross realm interaction (such as Battlegrounds)
   data << uint8(player ? player->getRace() : playerData->Race);
   data << uint8(playerData->Sex);
   data << uint8(playerData->Class);

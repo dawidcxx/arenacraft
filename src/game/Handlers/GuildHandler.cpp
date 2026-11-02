@@ -20,6 +20,7 @@
 #include "GuildPackets.h"
 #include "Log.h"
 #include "ObjectMgr.h"
+#include "Patrol.hpp"
 #include "SocialMgr.h"
 #include "WorldSession.h"
 
@@ -27,6 +28,10 @@ void WorldSession::HandleGuildQueryOpcode(WorldPackets::Guild::QueryGuildInfo& q
 {
   LOG_DEBUG("guild", "CMSG_GUILD_QUERY [{}]: Guild: {}", GetPlayerInfo(), query.GuildId);
   if (!query.GuildId)
+    return;
+
+  // arenacraft: guild names would identify the anonymous players of a patrol review
+  if (_player && arenacraft::patrol::IsReviewing(_player->GetGUID()))
     return;
 
   if (Guild* guild = sGuildMgr->GetGuildById(query.GuildId))

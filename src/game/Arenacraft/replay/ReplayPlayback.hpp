@@ -55,6 +55,9 @@ private:
   void                  destroyRecordedObjects(Player* viewer) const;
   void                  tickState(Player* viewer, uint32_t diff);
 
+  // tells patrol (and anything else) that the playback is over, once
+  void finish(bool watched);
+
   ObjectGuid            _viewer;
   uint32_t              _replayId;
   ReplayData            _data;
@@ -66,6 +69,8 @@ private:
   uint32_t              _stateTimer = 0; // ms since the last addon state message
   std::size_t           _next       = 0; // next packet to send
   bool                  _paused     = false;
+  bool                  _started    = false;
+  bool                  _ended      = false;
 };
 
 // The playback `viewer` is watching, if any (world thread).

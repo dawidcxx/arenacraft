@@ -227,6 +227,12 @@ std::vector<RecordedPacket> Recording::finish()
   return std::move(_packets);
 }
 
+namespace
+{
+// Retention never deletes a recording that an open patrol case still needs (Patrol.hpp).
+constexpr char const* KeepPatrolEvidence = "AND id NOT IN (SELECT replay_id FROM patrol_case WHERE status = 0)";
+} // namespace
+
 ReplayRecorder& ReplayRecorder::instance()
 {
   static ReplayRecorder recorder;
@@ -239,7 +245,8 @@ void ReplayRecorder::init()
     _lastId = (*result)[0].Get<uint32>();
 
   if (uint32 days = config().keepDays)
-    CharacterDatabase.Execute("DELETE FROM arena_replay WHERE created_at < NOW() - INTERVAL {} DAY", days);
+    CharacterDatabase.Execute("DELETE FROM arena_replay WHERE created_at < NOW() - INTERVAL {} DAY {}", days,
+                              KeepPatrolEvidence);
 }
 
 Bracket ReplayRecorder::bracketOf(Battleground const* bg)
@@ -417,17 +424,18 @@ void ReplayRecorder::save(Active active, uint8_t winnerTeam, uint32_t durationMs
   // arena_replay cascades to arena_replay_player.
   Config const& cfg = config();
   if (cfg.keepDays)
-    trans->Append("DELETE FROM arena_replay WHERE created_at < NOW() - INTERVAL {} DAY", cfg.keepDays);
+    trans->Append("DELETE FROM arena_replay WHERE created_at < NOW() - INTERVAL {} DAY {}", cfg.keepDays,
+                  KeepPatrolEvidence);
   if (cfg.maxTotal)
     trans->Append("DELETE FROM arena_replay WHERE id <= (SELECT id FROM (SELECT id FROM arena_replay ORDER BY id DESC "
-                  "LIMIT 1 OFFSET {}) t)",
-                  cfg.maxTotal);
+                  "LIMIT 1 OFFSET {}) t) {}",
+                  cfg.maxTotal, KeepPatrolEvidence);
   if (cfg.maxPerPlayer)
     for (Participant const& p : active.participants)
       trans->Append("DELETE FROM arena_replay WHERE id IN (SELECT replay_id FROM (SELECT replay_id FROM "
                     "arena_replay_player WHERE guid = {} ORDER BY replay_id DESC LIMIT 18446744073709551615 "
-                    "OFFSET {}) t)",
-                    p.guid, cfg.maxPerPlayer);
+                    "OFFSET {}) t) {}",
+                    p.guid, cfg.maxPerPlayer, KeepPatrolEvidence);
 
   CharacterDatabase.CommitTransaction(trans);
 

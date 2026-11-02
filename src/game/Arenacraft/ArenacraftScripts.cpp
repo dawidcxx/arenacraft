@@ -4,6 +4,7 @@
 #include "GeneralGoodsVendor.hpp"
 #include "ItemVendor.hpp"
 #include "PreBuffs.hpp"
+#include "patrol/Patrol.hpp"
 #include "replay/ReplayScripts.hpp"
 #include "soloq/SoloqNpc.hpp"
 #include "transmog/Transmogrification.hpp"
@@ -29,5 +30,6 @@ void AddArenacraftScripts()
   new arenacraft::soloq::SoloqBattlegroundScript();
   arenacraft::AddChallengeCommand();
   arenacraft::replay::AddReplayScripts();
+  arenacraft::patrol::AddPatrolScripts();
   arenacraft::vip::AddVipScripts();
 }
