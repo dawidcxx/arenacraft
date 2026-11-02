@@ -332,6 +332,50 @@ TEST_CASE("flex mode still refuses to stack a class within a team")
   CHECK(queue.size() == 6);
 }
 
+TEST_CASE("flex mode allows Mancleave (Arms + Protection warrior) on one team")
+{
+  SoloqQueue queue;
+  queue.setFlexMode(true);
+  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0)); // arms
+  queue.playerAddToQueue(player(2, CLASS_WARRIOR, 2)); // protection
+  queue.playerAddToQueue(player(3, CLASS_WARRIOR, 0)); // arms
+  queue.playerAddToQueue(player(4, CLASS_ROGUE, 0));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0));
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(matches.size() == 1);
+  CHECK(queue.empty());
+
+  // the only legal split puts the protection warrior with one of the arms warriors
+  bool foundMancleave = false;
+  for (SoloqTeam const* team : {&matches[0].a, &matches[0].b})
+  {
+    if (team->melee.classId == CLASS_WARRIOR && team->caster.classId == CLASS_WARRIOR)
+    {
+      foundMancleave = true;
+      CHECK(team->melee.specIndex != team->caster.specIndex);
+    }
+    CHECK(team->healer.classId != CLASS_WARRIOR);
+  }
+  CHECK(foundMancleave);
+}
+
+TEST_CASE("flex mode still refuses warrior stacks that are not Mancleave")
+{
+  SoloqQueue queue;
+  queue.setFlexMode(true);
+  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 1)); // fury
+  queue.playerAddToQueue(player(2, CLASS_WARRIOR, 2)); // protection
+  queue.playerAddToQueue(player(3, CLASS_WARRIOR, 1)); // fury
+  queue.playerAddToQueue(player(4, CLASS_ROGUE, 0));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0));
+
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 6);
+}
+
 TEST_CASE("flex mode needs four DPS and two healers")
 {
   SoloqQueue queue;
