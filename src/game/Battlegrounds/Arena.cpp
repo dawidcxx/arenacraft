@@ -18,6 +18,7 @@
 #include "Arena.h"
 #include "ArenaTeamMgr.h"
 #include "Chat.h"
+#include "Group.h"
 #include "GroupMgr.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
@@ -29,7 +30,10 @@
 #include "World.h"
 #include "WorldSession.h"
 // #include "WorldStatePackets.h"
+#include <algorithm>
 #include <cmath>
+#include <span>
+#include <vector>
 
 namespace
 {
@@ -119,6 +123,62 @@ constexpr uint32 ARENA_DAMPENING_SPELL    = 29659;
 constexpr uint32 ARENA_DAMPENING_START_MS = 5 * MINUTE * IN_MILLISECONDS;
 constexpr uint32 ARENA_DAMPENING_STEP_MS  = 2 * MINUTE * IN_MILLISECONDS;
 constexpr uint32 ARENA_DAMPENING_MAX      = 2;
+
+// Arenacraft: raid target icon ids, as the client numbers them.
+enum ArenaMark : uint8
+{
+  MARK_STAR     = 0,
+  MARK_CIRCLE   = 1,
+  MARK_DIAMOND  = 2,
+  MARK_TRIANGLE = 3,
+  MARK_MOON     = 4,
+  MARK_SQUARE   = 5,
+  MARK_CROSS    = 6,
+  MARK_SKULL    = 7,
+};
+
+// Best-effort class colour of each mark. Classes listed with several marks try
+// them in order; a class whose marks are all taken gets any free one.
+std::span<uint8 const> ArenaMarksForClass(uint8 playerClass)
+{
+  static constexpr uint8 Skull[]      = {MARK_SKULL};
+  static constexpr uint8 SkullCross[] = {MARK_SKULL, MARK_CROSS};
+  static constexpr uint8 Cross[]      = {MARK_CROSS};
+  static constexpr uint8 Circle[]     = {MARK_CIRCLE};
+  static constexpr uint8 Star[]       = {MARK_STAR};
+  static constexpr uint8 Square[]     = {MARK_SQUARE};
+  static constexpr uint8 Triangle[]   = {MARK_TRIANGLE};
+  static constexpr uint8 Diamond[]    = {MARK_DIAMOND};
+  static constexpr uint8 Moon[]       = {MARK_MOON};
+
+  switch (playerClass)
+  {
+  case CLASS_PRIEST:
+    return Skull;
+  case CLASS_DEATH_KNIGHT:
+    return SkullCross;
+  case CLASS_WARRIOR:
+    return Cross;
+  case CLASS_PALADIN:
+    return Circle;
+  case CLASS_ROGUE:
+    return Star;
+  case CLASS_MAGE:
+  case CLASS_SHAMAN:
+    return Square;
+  case CLASS_HUNTER:
+    return Triangle;
+  case CLASS_WARLOCK:
+    return Diamond;
+  case CLASS_DRUID:
+    return Moon;
+  default:
+    return {};
+  }
+}
+
+// Player pets (hunter, warlock, death knight ghoul, ...) go on the cross.
+constexpr uint8 ArenaPetMarks[] = {MARK_CROSS};
 } // namespace
 
 void ArenaScore::AppendToPacket(WorldPacket& data)
@@ -178,6 +238,15 @@ bool Arena::PreUpdateImpl(uint32 diff)
     return true;
   }
 
+  if (!m_TeamsMarked)
+  {
+    uint32 const teamSize = GetArenaType();
+    bool const   fullRoster =
+        GetPlayersCountByTeam(TEAM_ALLIANCE) >= teamSize && GetPlayersCountByTeam(TEAM_HORDE) >= teamSize;
+    if ((GetStatus() == STATUS_WAIT_JOIN && fullRoster) || GetStatus() == STATUS_IN_PROGRESS)
+      MarkTeams();
+  }
+
   // Dampening ticks against the in-progress clock only, so the countdown before
   // the gates open (and any early start from ready crystals) does not count.
   if (GetStatus() == STATUS_IN_PROGRESS)
@@ -216,6 +285,55 @@ bool Arena::PreUpdateImpl(uint32 diff)
   }
 
   return true;
+}
+
+void Arena::MarkTeams()
+{
+  m_TeamsMarked = true;
+
+  for (TeamId teamId : {TEAM_ALLIANCE, TEAM_HORDE})
+  {
+    Group* group = GetBgRaid(teamId);
+    if (!group)
+      continue;
+
+    std::vector<Player*> players;
+    for (auto const& [guid, player] : GetPlayers())
+      if (player->GetBgTeamId() == teamId && player->GetGroup() == group)
+        players.push_back(player);
+
+    // Classes with a single colour first, so a death knight does not take the
+    // priest's skull when the cross is still free.
+    std::stable_sort(players.begin(), players.end(), [](Player const* l, Player const* r)
+                     { return ArenaMarksForClass(l->getClass()).size() < ArenaMarksForClass(r->getClass()).size(); });
+
+    bool used[TARGETICONCOUNT]{};
+    auto mark = [&](Unit* unit, std::span<uint8 const> preferred)
+    {
+      uint8 icon = TARGETICONCOUNT;
+      for (uint8 wanted : preferred)
+        if (!used[wanted])
+        {
+          icon = wanted;
+          break;
+        }
+      for (uint8 i = 0; i < TARGETICONCOUNT && icon == TARGETICONCOUNT; ++i)
+        if (!used[i])
+          icon = i;
+      if (icon == TARGETICONCOUNT)
+        return;
+
+      used[icon] = true;
+      group->SetTargetIcon(icon, ObjectGuid::Empty, unit->GetGUID());
+    };
+
+    for (Player* player : players)
+      mark(player, ArenaMarksForClass(player->getClass()));
+
+    for (Player* player : players)
+      if (Pet* pet = player->GetPet())
+        mark(pet, ArenaPetMarks);
+  }
 }
 
 void Arena::AddPlayer(Player* player)
