@@ -24,6 +24,7 @@ Needs `nix`, `podman` (or docker), and a 3.3.5a client.
 - `zig build run-ac -- worldserver` build and run
 - `zig build test` unit tests (needs `nix develop`)
 - `zig build test-build` dep/link smoke test
+- CI: `.github/workflows/build.yml` runs `zig build ac` on every pull request and on pushes to `local`
 - `scripts/deploy` build the arm64 image and ship it to the target
 - `scripts/restart_world` restart the world service on the target and prune old images
 
