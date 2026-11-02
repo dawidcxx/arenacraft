@@ -12536,6 +12536,14 @@ bool Player::InArena() const
   return true;
 }
 
+// arenacraft: from arena entry until the match is over (starting rooms included) the character is locked: only
+// weapons, shields, off-hands and relics may be swapped; no gems, permanent enchants, glyphs, talents or spec swap.
+bool Player::IsArenaGearLocked() const
+{
+  Battleground const* bg = GetBattleground();
+  return bg && bg->isArena() && bg->GetStatus() != STATUS_WAIT_LEAVE;
+}
+
 void Player::SetBattlegroundId(uint32 id, BattlegroundTypeId bgTypeId, uint32 queueSlot, bool invited, bool isRandom,
                                TeamId teamId)
 {
@@ -14202,6 +14210,10 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
 
   if (!command)
   {
+    // arenacraft: talents are locked inside an arena (see IsArenaGearLocked)
+    if (IsArenaGearLocked())
+      return;
+
     // xinef: check basic data
     if (!CurTalentPoints)
     {
@@ -14337,6 +14349,10 @@ void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRa
     return;
 
   if (petGuid != pet->GetGUID())
+    return;
+
+  // arenacraft: pet talents are locked inside an arena too
+  if (IsArenaGearLocked())
     return;
 
   uint32 CurTalentPoints = pet->GetFreeTalentPoints();

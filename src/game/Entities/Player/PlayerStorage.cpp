@@ -1871,15 +1871,14 @@ InventoryResult Player::CanEquipItem(uint8 slot, uint16& dest, Item* pItem, bool
 
         // do not allow equipping gear except weapons, offhands, projectiles, relics in
         // - combat
-        // - in-progress arenas
+        // - arenas (arenacraft: from entry, starting rooms included, see IsArenaGearLocked)
         if (!pProto->CanChangeEquipStateInCombat())
         {
           if (IsInCombat())
             return EQUIP_ERR_NOT_IN_COMBAT;
 
-          if (Battleground* bg = GetBattleground())
-            if (bg->isArena() && bg->GetStatus() == STATUS_IN_PROGRESS)
-              return EQUIP_ERR_NOT_DURING_ARENA_MATCH;
+          if (IsArenaGearLocked())
+            return EQUIP_ERR_NOT_DURING_ARENA_MATCH;
         }
 
         if (IsInCombat() && (pProto->Class == ITEM_CLASS_WEAPON || pProto->InventoryType == INVTYPE_RELIC) &&
@@ -2051,15 +2050,14 @@ InventoryResult Player::CanUnequipItem(uint16 pos, bool swap) const
 
   // do not allow unequipping gear except weapons, offhands, projectiles, relics in
   // - combat
-  // - in-progress arenas
+  // - arenas (arenacraft: from entry, starting rooms included, see IsArenaGearLocked)
   if (!pProto->CanChangeEquipStateInCombat())
   {
     if (IsInCombat())
       return EQUIP_ERR_NOT_IN_COMBAT;
 
-    if (Battleground* bg = GetBattleground())
-      if (bg->isArena() && bg->GetStatus() == STATUS_IN_PROGRESS)
-        return EQUIP_ERR_NOT_DURING_ARENA_MATCH;
+    if (IsArenaGearLocked())
+      return EQUIP_ERR_NOT_DURING_ARENA_MATCH;
   }
 
   // Xinef: dont allow to unequip items on disarmed slot

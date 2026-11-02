@@ -1439,6 +1439,13 @@ void WorldSession::HandleSocketOpcode(WorldPacket& recvData)
   if (!itemTarget) // missing item to socket
     return;
 
+  // arenacraft: no socketing inside an arena (see Player::IsArenaGearLocked)
+  if (_player->IsArenaGearLocked())
+  {
+    _player->SendEquipError(EQUIP_ERR_NOT_DURING_ARENA_MATCH, itemTarget, nullptr);
+    return;
+  }
+
   ItemTemplate const* itemProto = itemTarget->GetTemplate();
   if (!itemProto)
     return;
