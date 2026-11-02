@@ -17,6 +17,7 @@
 
 #include "CellImpl.h"
 #include "CreatureScript.h"
+#include "GameTime.h"
 #include "GridNotifiers.h"
 #include "SpellAuraEffects.h"
 #include "SpellMgr.h"
@@ -144,7 +145,14 @@ class spell_rog_cheat_death : public AuraScript
 {
   PrepareAuraScript(spell_rog_cheat_death);
 
+  // arenacraft: hits that land in the same burst as the lethal one had their damage computed before Cheating Death
+  // (-90% taken) was applied (launched spells, same-tick melee/procs), so they went through at full value and killed
+  // the rogue anyway. For a short grace window after the proc, absorb almost all of every hit ourselves.
+  static constexpr uint64 GRACE_WINDOW_MS = 500;
+  static constexpr uint32 GRACE_ABSORB_PCT = 99;
+
   uint32 absorbChance;
+  uint64 procTimeMs = 0;
 
   bool Validate(SpellInfo const* /*spellInfo*/) override
   {
@@ -157,6 +165,15 @@ class spell_rog_cheat_death : public AuraScript
     return GetUnitOwner()->ToPlayer();
   }
 
+  // returns the absorb that keeps the rogue at (at least) 10% health, or the whole hit if already below
+  static uint32 KeepAtTenPercent(Player* target, uint32 damage)
+  {
+    uint32 health10 = target->CountPctFromMaxHealth(10);
+    if (target->GetHealth() > health10)
+      return damage > target->GetHealth() - health10 ? damage - (target->GetHealth() - health10) : 0;
+    return damage;
+  }
+
   void CalculateAmount(AuraEffect const* /*aurEff*/, int32& amount, bool& /*canBeRecalculated*/)
   {
     // Set absorbtion amount to unlimited
@@ -166,22 +183,27 @@ class spell_rog_cheat_death : public AuraScript
   void Absorb(AuraEffect* /*aurEff*/, DamageInfo& dmgInfo, uint32& absorbAmount)
   {
     Player* target = GetTarget()->ToPlayer();
-    if (dmgInfo.GetDamage() < target->GetHealth() || target->HasSpellCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN) ||
+    uint32  damage = dmgInfo.GetDamage();
+    uint64  now    = GameTime::GetGameTimeMS().count();
+
+    // grace window right after the proc: absorb 99% of every hit
+    if (procTimeMs && now < procTimeMs + GRACE_WINDOW_MS)
+    {
+      absorbAmount = CalculatePct(damage, GRACE_ABSORB_PCT);
+      return;
+    }
+
+    if (damage < target->GetHealth() || target->HasSpellCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN) ||
         !roll_chance_i(absorbChance))
       return;
 
+    procTimeMs = now;
     target->CastSpell(target, SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, true);
     target->CastSpell(target, SPELL_ROGUE_CHEATING_DEATH, true);
     target->AddSpellCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, 0, MINUTE * IN_MILLISECONDS);
 
-    uint32 health10 = target->CountPctFromMaxHealth(10);
-
-    // hp > 10% - absorb hp till 10%
-    if (target->GetHealth() > health10)
-      absorbAmount = dmgInfo.GetDamage() - target->GetHealth() + health10;
-    // hp lower than 10% - absorb everything
-    else
-      absorbAmount = dmgInfo.GetDamage();
+    // hp > 10% - absorb hp till 10%, hp lower than 10% - absorb everything
+    absorbAmount = KeepAtTenPercent(target, damage);
   }
 
   void Register() override
