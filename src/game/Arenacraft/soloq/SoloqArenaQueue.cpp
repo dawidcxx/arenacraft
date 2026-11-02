@@ -6,7 +6,9 @@
 #include "CharacterCheck.hpp"
 #include "Chat.h"
 #include "DBCStores.h"
+#include "DatabaseEnv.h"
 #include "Player.h"
+#include "Roles.hpp"
 #include "SharedDefines.h"
 #include "SoloqEvents.hpp"
 #include "SoloqService.hpp"
@@ -133,6 +135,12 @@ bool JoinSoloqQueue(Player* player)
     Notify(player, "SoloQ: could not join the queue right now.");
     return false;
   }
+
+  // the public ladder (apps/ladder-api) shows the role a character last queued as
+  if (std::optional<Role> const role =
+          roleFor(static_cast<Classes>(player->getClass()), player->GetMostPointsTalentTree()))
+    CharacterDatabase.Execute("REPLACE INTO character_soloq_role (guid, role) VALUES ({}, {})",
+                              player->GetGUID().GetCounter(), uint32(*role));
 
   Notify(player, "SoloQ: joined the queue (" + std::to_string(service.queueSize()) + " waiting).");
   return true;
