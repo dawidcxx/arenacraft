@@ -2822,10 +2822,14 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
     return;
 
   // Xinef: absorb delayed projectiles for 500ms
+  // arenacraft: projectiles launched before a sanctuary (Vanish, Shadowmeld) are also absorbed for as long as the
+  // target is still stealthed - long flights (Chaos Bolt, Frostbolt from max range, ...) used to land after the 500ms
+  // window and pull a melded night elf right back out.
   if (getState() == SPELL_STATE_DELAYED && !m_spellInfo->IsTargetingArea() && !m_spellInfo->IsPositive() &&
       (GameTime::GetGameTimeMS().count() - target->timeDelay) <= effectUnit->m_lastSanctuaryTime &&
-      GameTime::GetGameTimeMS().count() < (effectUnit->m_lastSanctuaryTime + 500) && effectUnit->FindMap() &&
-      !effectUnit->FindMap()->IsDungeon())
+      (GameTime::GetGameTimeMS().count() < (effectUnit->m_lastSanctuaryTime + 500) ||
+       effectUnit->HasStealthAura()) &&
+      effectUnit->FindMap() && !effectUnit->FindMap()->IsDungeon())
     return; // No missinfo in that case
 
   // Get original caster (if exist) and calculate damage/healing from him data
