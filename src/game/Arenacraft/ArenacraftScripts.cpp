@@ -7,6 +7,7 @@
 #include "replay/ReplayScripts.hpp"
 #include "soloq/SoloqNpc.hpp"
 #include "transmog/Transmogrification.hpp"
+#include "vip/Vip.hpp"
 
 void AddArenacraftScripts()
 {
@@ -28,4 +29,5 @@ void AddArenacraftScripts()
   new arenacraft::soloq::SoloqBattlegroundScript();
   arenacraft::AddChallengeCommand();
   arenacraft::replay::AddReplayScripts();
+  arenacraft::vip::AddVipScripts();
 }

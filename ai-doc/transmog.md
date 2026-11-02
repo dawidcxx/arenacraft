@@ -55,6 +55,9 @@ harmless; they are not currently pruned.
 - rings, trinkets, necks, bags, ammo, relics etc. cannot be transmogrified (no
   inventory type -> slot mapping)
 - set bonuses are never invalidated (see above)
+- **VIP characters** (`src/game/Arenacraft/vip`, `.vip add|del|get`) skip the
+  quality rule and the armor/weapon type rule (e.g. epic plate into rare
+  cloth); the item class (armor vs weapon) and slot rules still apply
 
 ## Menus (CosmeticVendor)
 
