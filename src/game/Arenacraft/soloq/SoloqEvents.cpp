@@ -239,12 +239,16 @@ ParticipantInfo ResolveParticipant(QueuedPlayer const& queued, Role fallbackRole
 
 std::string buildMatchupPayload(MatchupEvent const& event)
 {
-  uint32_t const avgRatingA = AverageRating(event.participants, 0);
-  uint32_t const avgMmrA    = AverageMmr(event.participants, 0);
-  uint32_t const avgRatingB = AverageRating(event.participants, 3);
-  uint32_t const avgMmrB    = AverageMmr(event.participants, 3);
-  int32_t const  deltaAWin  = winningRatingDelta(avgMmrA, avgMmrB);
-  int32_t const  deltaBWin  = winningRatingDelta(avgMmrB, avgMmrA);
+  uint32_t const avgRatingA   = AverageRating(event.participants, 0);
+  uint32_t const avgMmrA      = AverageMmr(event.participants, 0);
+  uint32_t const avgRatingB   = AverageRating(event.participants, 3);
+  uint32_t const avgMmrB      = AverageMmr(event.participants, 3);
+  int32_t const  mmrDeltaAWin = winningRatingDelta(avgMmrA, avgMmrB);
+  int32_t const  mmrDeltaBWin = winningRatingDelta(avgMmrB, avgMmrA);
+  int32_t const  deltaAWin    = personalRatingDelta(avgRatingA, avgMmrA, mmrDeltaAWin, true);
+  int32_t const  deltaALoss   = personalRatingDelta(avgRatingA, avgMmrA, -mmrDeltaBWin, false);
+  int32_t const  deltaBWin    = personalRatingDelta(avgRatingB, avgMmrB, mmrDeltaBWin, true);
+  int32_t const  deltaBLoss   = personalRatingDelta(avgRatingB, avgMmrB, -mmrDeltaAWin, false);
 
   std::string out;
   out.reserve(1024);
@@ -290,7 +294,7 @@ std::string buildMatchupPayload(MatchupEvent const& event)
   out += ",\"winDelta\":";
   out += std::to_string(deltaAWin);
   out += ",\"lossDelta\":";
-  out += std::to_string(-deltaBWin);
+  out += std::to_string(deltaALoss);
   out += "},\"teamB\":{\"averageRating\":";
   out += std::to_string(avgRatingB);
   out += ",\"averageMmr\":";
@@ -298,7 +302,7 @@ std::string buildMatchupPayload(MatchupEvent const& event)
   out += ",\"winDelta\":";
   out += std::to_string(deltaBWin);
   out += ",\"lossDelta\":";
-  out += std::to_string(-deltaAWin);
+  out += std::to_string(deltaBLoss);
   out += "}}";
 
   out += "}";
@@ -386,7 +390,7 @@ MatchupEndedEvent makeMatchupEndedEvent(Match const& match, Battleground const* 
   if (updates)
   {
     for (std::size_t i = 0; i < updates->size(); ++i)
-      event.results[i] = ParticipantResult{(*updates)[i].delta, (*updates)[i].rating, (*updates)[i].mmr};
+      event.results[i] = ParticipantResult{(*updates)[i].ratingDelta, (*updates)[i].rating, (*updates)[i].mmr};
   }
 
   return event;

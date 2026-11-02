@@ -115,12 +115,20 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
 ## Post-match adjustment (`resolveMatch`)
 
 Pure function: given a `Match` and `MatchResult::{TeamAWin,TeamBWin}` it returns
-six `RatingUpdate{id, mmr, rating, delta}` (team A first, then team B).
+six `RatingUpdate{id, mmr, rating, mmrDelta, ratingDelta}` (team A first, then
+team B).
 
-- Elo expected score with `EloScale = 400`, `KFactor = 16`.
-- The winner gains and the loser loses the same amount (zero-sum); an underdog
-  win is worth more than a favourite win.
-- `mmr`/`rating` both move by `delta` and clamp at 0.
+- Elo expected score with `EloScale = 400`, `KFactor = 32`.
+- MMR is the matchmaking ladder: it uses the two team-average MMRs and stays
+  zero-sum (winner gains, loser loses the same amount); an underdog win is worth
+  more than a favourite win.
+- Personal rating follows the same result-based delta but is pulled towards the
+  player's own MMR by `RatingCatchupRate` (`0.05`) of the gap per match
+  (`personalRatingDelta`). An under-rated player gains more on a win and loses
+  less on a loss; an over-rated player gains less and loses more. This closes any
+  rating/MMR gap over time instead of letting it persist. The result is clamped
+  to the match outcome (a win never removes rating, a loss never rewards it).
+- Both `mmr` and `rating` clamp at 0.
 
 `CreateArenaForMatch` registers the arena instance id -> `Match` in
 `SoloqService`. `SoloqBattlegroundScript::OnBattlegroundEnd` looks it up, maps
@@ -368,9 +376,10 @@ Payload (`event = "soloq.matchup"`, see `SoloqEvents.hpp`):
   character name and the auth account id/name.
 - `guid` is serialized as a `0x`-prefixed hex **string** (raw `ObjectGuid` is a
   uint64 and would lose precision as a JSON number).
-- `winDelta`/`lossDelta` come from the same Elo used by `resolveMatch`; they are
-  the hypothetical result for each side (`Outcome.hpp` exposes
-  `teamAverageMmr`/`teamAverageRating`/`winningRatingDelta`).
+- `winDelta`/`lossDelta` come from the same Elo + catch-up used by
+  `resolveMatch`; they are the hypothetical team-average result for each side
+  (`Outcome.hpp` exposes
+  `teamAverageMmr`/`teamAverageRating`/`winningRatingDelta`/`personalRatingDelta`).
 - `SoloqEvents_test.cpp` covers the pure `buildMatchupPayload` serializer.
 
 When the arena ends (or is destroyed without finishing) the core publishes

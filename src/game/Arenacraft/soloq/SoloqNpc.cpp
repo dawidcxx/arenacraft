@@ -264,8 +264,9 @@ void SoloqBattlegroundScript::OnBattlegroundEnd(Battleground* bg, TeamId winner)
     if (!applied)
       continue;
 
-    SendMessage(player, "SoloQ: rating " + std::to_string(update.rating) + " (" + (update.delta >= 0 ? "+" : "") +
-                            std::to_string(update.delta) + "), MMR " + std::to_string(update.mmr) + ".");
+    SendMessage(player, "SoloQ: rating " + std::to_string(update.rating) + " (" + (update.ratingDelta >= 0 ? "+" : "") +
+                            std::to_string(update.ratingDelta) + "), MMR " + std::to_string(update.mmr) + " (" +
+                            (update.mmrDelta >= 0 ? "+" : "") + std::to_string(update.mmrDelta) + ").");
   }
 }
 
