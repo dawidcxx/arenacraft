@@ -2612,7 +2612,11 @@ void Spell::AddUnitTarget(Unit* target, uint32 effectMask, bool checkIfValid /*=
   // Calculate hit result
   if (m_originalCaster)
   {
-    targetInfo.missCondition = m_originalCaster->SpellHitResult(target, this, m_canReflect);
+    // arenacraft: only the explicitly targeted unit may reflect. Area spells (Thunderstorm, Blizzard, Hurricane,
+    // Typhoon, ...) and secondary hits (chain bounces) land on units that never were "the target" of the cast.
+    bool const canReflect =
+        m_canReflect && m_spellInfo->NeedsExplicitUnitTarget() && target == m_targets.GetUnitTarget();
+    targetInfo.missCondition = m_originalCaster->SpellHitResult(target, this, canReflect);
     if (m_skipCheck && targetInfo.missCondition != SPELL_MISS_IMMUNE)
     {
       targetInfo.missCondition = SPELL_MISS_NONE;
