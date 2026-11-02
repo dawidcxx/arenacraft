@@ -29,6 +29,7 @@
 #include "Util.h"
 #include <cstddef>
 #include <map>
+#include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
@@ -44,6 +45,14 @@ enum class Console : bool
 };
 
 struct ChatCommandBuilder;
+
+// arenacraft: one invokable command the handler may use, for the curated .help / .gm help listings
+struct CommandListing
+{
+  std::string Name;          // full command path without the leading dot, e.g. "replay list"
+  uint32      RequiredLevel; // effective security level (after the `command` table overrides)
+  std::string Help;          // help text from the `command` table / acore_string, empty if none
+};
 using ChatCommandTable = std::vector<ChatCommandBuilder>;
 } // namespace Acore::ChatCommands
 
@@ -192,6 +201,7 @@ public:
   static bool                     TryExecuteCommand(ChatHandler& handler, std::string_view cmd);
   static void                     SendCommandHelpFor(ChatHandler& handler, std::string_view cmd);
   static std::vector<std::string> GetAutoCompletionsFor(ChatHandler const& handler, std::string_view cmd);
+  static std::vector<Acore::ChatCommands::CommandListing> ListUsableCommands(ChatHandler const& handler);
 
   ChatCommandNode() : _name{}, _invoker{}, _permission{}, _help{}, _subCommands{} {}
 
@@ -207,6 +217,7 @@ private:
 
   void ResolveNames(std::string name);
   void SendCommandHelp(ChatHandler& handler) const;
+  void CollectUsable(ChatHandler const& handler, std::vector<Acore::ChatCommands::CommandListing>& out) const;
 
   bool IsVisible(ChatHandler const& who) const { return (IsInvokerVisible(who) || HasVisibleSubCommands(who)); }
   bool IsInvokerVisible(ChatHandler const& who) const;
@@ -278,6 +289,8 @@ AC_GAME_API void InvalidateCommandMap();
 AC_GAME_API bool TryExecuteCommand(ChatHandler& handler, std::string_view cmd);
 AC_GAME_API void SendCommandHelpFor(ChatHandler& handler, std::string_view cmd);
 AC_GAME_API std::vector<std::string> GetAutoCompletionsFor(ChatHandler const& handler, std::string_view cmd);
+// arenacraft: every command the handler may invoke, sorted by name
+AC_GAME_API std::vector<CommandListing> ListUsableCommands(ChatHandler const& handler);
 } // namespace Acore::ChatCommands
 
 // backwards compatibility with old patches
