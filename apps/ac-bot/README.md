@@ -57,7 +57,9 @@ alias is set).
 
 ### Voice channels
 
-- `Waiting Room` - lobby everyone returns to.
+- `Waiting Room` - lobby everyone returns to. The bot denies `Speak` on the
+  channel so the queue stays quiet; channel-scoped means it cannot leave anyone
+  server-muted outside the lobby.
 - `game-<n>-1` / `game-<n>-2` - one room per `<n>`. Team A goes to `-1`, team B
   to `-2`. Rooms are discovered dynamically and reused once released.
 

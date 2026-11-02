@@ -79,6 +79,7 @@ export class RoomManager {
     this.waitingRoom = voiceChannels.find((channel) => sameName(channel.name, this.config.WAITING_ROOM_NAME)) ?? null;
     if (!this.waitingRoom)
       logger.warn(`Waiting room voice channel "${this.config.WAITING_ROOM_NAME}" not found`);
+    else await this.muteWaitingRoom();
 
     this.infoChannel =
       [...channels.values()].find(
@@ -145,6 +146,20 @@ export class RoomManager {
       return;
     }
     await this.freeRoom(room);
+  }
+
+  // Deny Speak on the channel itself instead of server-muting each member. A
+  // per-member mute can outlive the bot (crash, restart, manual channel moves)
+  // and leave players stuck muted; a channel overwrite only applies inside the
+  // waiting room and is restored on every startup.
+  private async muteWaitingRoom(): Promise<void> {
+    if (!this.waitingRoom) return;
+    try {
+      await this.waitingRoom.permissionOverwrites.edit(this.guild.roles.everyone, { Speak: false });
+      logger.info(`Muted waiting room "${this.waitingRoom.name}"`);
+    } catch (error) {
+      logger.warn(`Failed to mute waiting room "${this.waitingRoom.name}"`, error);
+    }
   }
 
   async sweepStale(): Promise<void> {
