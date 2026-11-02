@@ -103,6 +103,10 @@ private:
   // open. Each team only sees the marks of its own group.
   void MarkTeams();
   bool m_TeamsMarked{false};
+
+  // Arenacraft: set once both rosters were complete in the starting rooms (anti-snipe voice move, see
+  // SoloqEvents.hpp MatchupReadyChannel).
+  bool m_RosterReadyAnnounced{false};
 };
 
 #endif // ACORE_ARENA_H

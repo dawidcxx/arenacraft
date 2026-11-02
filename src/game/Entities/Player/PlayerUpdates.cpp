@@ -1158,7 +1158,7 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
                         newArea); // only if really enters to new zone, not
                                   // just area change, works strange...
     if (Guild* guild = GetGuild())
-      guild->UpdateMemberData(this, GUILD_MEMBER_DATA_ZONEID, newZone);
+      guild->UpdateMemberData(this, GUILD_MEMBER_DATA_ZONEID, InArena() ? GetPublicZoneId() : newZone);
   }
 
   // group update

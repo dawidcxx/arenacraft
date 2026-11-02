@@ -5,8 +5,12 @@
  * Usage:
  *   bun run scripts/emit-fake-event.ts --channel matchup --instance 123 \
  *       --team-a ALPHA,BRAVO,CHARLIE --team-b DELTA,ECHO,FOXTROT
+ *   bun run scripts/emit-fake-event.ts --channel ready --instance 123
  *   bun run scripts/emit-fake-event.ts --channel ended --instance 123 --winner teamB
  *   bun run scripts/emit-fake-event.ts --channel both --delay 5000
+ *
+ * `both` publishes matchup, ready (the bot moves players into the rooms only now)
+ * and ended, waiting `--delay` ms between them.
  *
  * `--finished false` publishes an aborted match; `--winner teamA|teamB` picks
  * the winning side for a finished match (default teamA).
@@ -18,6 +22,7 @@ import { Redis } from "ioredis";
 
 import {
   MATCHUP_CHANNEL,
+  MATCHUP_READY_CHANNEL,
   MATCHUP_ENDED_CHANNEL,
   MatchupEndedEventSchema,
   MatchupEventSchema,
@@ -147,6 +152,12 @@ async function main(): Promise<void> {
     if (channel === "matchup" || channel === "both") {
       await redis.publish(MATCHUP_CHANNEL, JSON.stringify(matchup));
       console.log(`published ${MATCHUP_CHANNEL} instance=${instanceId} players=${players.map((p) => p.accountName).join(",")}`);
+    }
+    if (channel === "both") await new Promise((resolve) => setTimeout(resolve, delayMs));
+    if (channel === "ready" || channel === "both") {
+      const ready = { event: "soloq.matchup.ready", instanceId, readyAtMs: Date.now() };
+      await redis.publish(MATCHUP_READY_CHANNEL, JSON.stringify(ready));
+      console.log(`published ${MATCHUP_READY_CHANNEL} instance=${instanceId}`);
     }
     if (channel === "both") await new Promise((resolve) => setTimeout(resolve, delayMs));
     if (channel === "ended" || channel === "both") {

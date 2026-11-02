@@ -17,6 +17,11 @@ inline constexpr char const* MatchupChannel        = "soloq-matchup";
 inline constexpr char const* MatchupEventName      = "soloq.matchup";
 inline constexpr char const* MatchupEndedChannel   = "soloq-matchup-ended";
 inline constexpr char const* MatchupEndedEventName = "soloq.matchup.ended";
+// Published once every player of a soloq arena is inside it (both rosters complete in the starting rooms).
+// The Discord bot only moves players into their team voice rooms on this event, so a pop does not reveal who
+// got matched before they are in the arena.
+inline constexpr char const* MatchupReadyChannel   = "soloq-matchup-ready";
+inline constexpr char const* MatchupReadyEventName = "soloq.matchup.ready";
 
 // Fully-resolved participant snapshot for a matchup event. Character/account
 // data is filled from the live player at pop time, so consumers never have to
@@ -54,6 +59,12 @@ std::string buildMatchupPayload(MatchupEvent const& event);
 // Serializes and enqueues the event for the Redis publisher thread. Best-effort:
 // returns false only when Redis is disabled or shutting down, never throws.
 bool publishMatchup(MatchupEvent const& event);
+
+// {"event":"soloq.matchup.ready","instanceId":...,"readyAtMs":...}. Pure serializer, unit-tested.
+std::string buildMatchupReadyPayload(uint32_t bgInstanceId, uint64_t readyAtMs);
+
+// Publishes the ready event for a soloq arena whose rosters just completed. Best-effort like publishMatchup.
+bool publishMatchupReady(uint32_t bgInstanceId);
 
 // Resolves a formed match and its arena into a MatchupEvent, pulling
 // character/account names from the live players (falling back to the character

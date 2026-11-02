@@ -418,6 +418,13 @@ When the arena ends (or is destroyed without finishing) the core publishes
 - `ratingDelta`/`ratingAfter`/`mmrAfter` are the `resolveMatch` results. They
   are `null` for every player when `finished` is `false`.
 
+`soloq-matchup-ready` (`{"event":"soloq.matchup.ready","instanceId":...,"readyAtMs":...}`)
+is published once per soloq arena from `Arena::PreUpdateImpl`, the first time
+both rosters are complete in the starting rooms (`STATUS_WAIT_JOIN`). The
+Discord bot only moves players into their team voice rooms on this event
+(anti-snipe: the pop alone moves nobody). An arena that never fills (declined
+invites, short-handed cancel) never sends it.
+
 Both events are emitted exactly once per popped matchup: `OnBattlegroundEnd`
 takes the pending match (normal path) and `OnBattlegroundDestroy` takes it only
 if it is still pending (abort path).

@@ -62,6 +62,7 @@ public:
   [[nodiscard]] std::vector<PlayerId>                  waitingPlayers() const;
   [[nodiscard]] std::vector<SoloqQueue::QueueSnapshot> snapshot() const;
   [[nodiscard]] std::vector<PendingArena>              pendingArenas() const;
+  [[nodiscard]] bool hasPendingMatch(uint32 bgInstanceId) const { return _pendingMatches.contains(bgInstanceId); }
 
   // Total role counts cached from the last queue mutation; see refreshRoleCounts.
   // Cheap to read from the gossip handler.

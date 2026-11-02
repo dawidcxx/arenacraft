@@ -2,7 +2,15 @@ import { Redis } from "ioredis";
 
 import type { AuditLog } from "./auditLog";
 import { logger } from "./logger";
-import { MATCHUP_CHANNEL, MATCHUP_ENDED_CHANNEL, MatchupEndedEventSchema, MatchupEventSchema } from "./types";
+import { PendingMatchups } from "./pendingMatchups";
+import {
+  MATCHUP_CHANNEL,
+  MATCHUP_ENDED_CHANNEL,
+  MATCHUP_READY_CHANNEL,
+  MatchupEndedEventSchema,
+  MatchupEventSchema,
+  MatchupReadyEventSchema,
+} from "./types";
 import type { RoomManager } from "./voiceRooms";
 
 export async function startEventSubscriber(
@@ -11,13 +19,14 @@ export async function startEventSubscriber(
   auditLog: AuditLog | null = null,
 ): Promise<Redis> {
   const redis = new Redis(redisUrl);
+  const pending = new PendingMatchups();
   redis.on("error", (error) => logger.error("Redis error", error));
   redis.on("message", (channel, message) => {
-    void handleMessage(channel, message, rooms, auditLog);
+    void handleMessage(channel, message, rooms, pending, auditLog);
   });
 
-  await redis.subscribe(MATCHUP_CHANNEL, MATCHUP_ENDED_CHANNEL);
-  logger.info(`Subscribed to ${MATCHUP_CHANNEL} and ${MATCHUP_ENDED_CHANNEL}`);
+  await redis.subscribe(MATCHUP_CHANNEL, MATCHUP_READY_CHANNEL, MATCHUP_ENDED_CHANNEL);
+  logger.info(`Subscribed to ${MATCHUP_CHANNEL}, ${MATCHUP_READY_CHANNEL} and ${MATCHUP_ENDED_CHANNEL}`);
   return redis;
 }
 
@@ -25,6 +34,7 @@ async function handleMessage(
   channel: string,
   message: string,
   rooms: RoomManager,
+  pending: PendingMatchups,
   auditLog: AuditLog | null,
 ): Promise<void> {
   try {
@@ -37,12 +47,27 @@ async function handleMessage(
         return;
       }
       const event = parsed.data;
-      await rooms.book(
-        event.instanceId,
-        event.teamA.players.map((player) => player.accountName),
-        event.teamB.players.map((player) => player.accountName),
-      );
+      // anti-snipe: nobody is moved on the pop itself, only once everyone is inside the arena (ready event)
+      pending.add(event.instanceId, {
+        teamA: event.teamA.players.map((player) => player.accountName),
+        teamB: event.teamB.players.map((player) => player.accountName),
+      });
       if (auditLog) await auditLog.matchup(event);
+      return;
+    }
+
+    if (channel === MATCHUP_READY_CHANNEL) {
+      const parsed = MatchupReadyEventSchema.safeParse(raw);
+      if (!parsed.success) {
+        logger.warn("Ignoring malformed matchup-ready event", parsed.error.issues);
+        return;
+      }
+      const rosters = pending.take(parsed.data.instanceId);
+      if (!rosters) {
+        logger.warn(`Ready event for unknown matchup ${parsed.data.instanceId}; no rooms booked`);
+        return;
+      }
+      await rooms.book(parsed.data.instanceId, rosters.teamA, rosters.teamB);
       return;
     }
 
@@ -53,6 +78,7 @@ async function handleMessage(
         return;
       }
       const event = parsed.data;
+      pending.forget(event.instanceId);
       await rooms.release(
         event.instanceId,
         event.players.map((player) => player.accountName),

@@ -12538,6 +12538,24 @@ bool Player::InArena() const
 
 // arenacraft: from arena entry until the match is over (starting rooms included) the character is locked: only
 // weapons, shields, off-hands and relics may be swapped; no gems, permanent enchants, glyphs, talents or spec swap.
+// arenacraft (anti-snipe): the zone other players see in /who, the friend list and the guild roster. Inside an
+// arena it is the zone the player entered from, so nobody can tell from the outside who is in an arena.
+uint32 Player::GetPublicZoneId() const
+{
+  if (!InArena())
+    return GetZoneId();
+
+  WorldLocation const& entry = GetEntryPoint();
+  if (entry.GetMapId() != MAPID_INVALID)
+    if (uint32 zone = sMapMgr->GetZoneId(PHASEMASK_NORMAL, entry))
+      return zone;
+
+  // no recorded entry point (e.g. logged in inside the arena): show the home zone
+  if (AreaTableEntry const* area = sAreaTableStore.LookupEntry(m_homebindAreaId))
+    return area->zone ? area->zone : area->ID;
+  return 0;
+}
+
 bool Player::IsArenaGearLocked() const
 {
   Battleground const* bg = GetBattleground();

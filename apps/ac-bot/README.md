@@ -6,9 +6,12 @@ Rewritten Arenacraft Discord bot. Six jobs:
    username is the caller's Discord handle and returns a generated password.
    Calling it again resets the existing account's password.
 2. **Greeting** - `/ping` greets the caller publicly in the channel.
-3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
-   `soloq-matchup-ended` Redis events and moves players between the waiting room
-   and paired `game-<n>-<k>` voice channels.
+3. **Voice room shuffling** - subscribes to the core's `soloq-matchup`,
+   `soloq-matchup-ready` and `soloq-matchup-ended` Redis events and moves players
+   between the waiting room and paired `game-<n>-<k>` voice channels. Anti-snipe:
+   a pop (`soloq-matchup`) only remembers the two rosters; players are moved once
+   the core reports all six inside the arena (`soloq-matchup-ready`). The core and
+   the bot have to be deployed together for this.
 4. **Info commands** - `/toprankers` (soloQ leaderboard), `/onlinelist`
    (characters currently online) and `/lookup <character>` (the Discord user
    behind a character name). All reply ephemerally; the leaderboard and online
@@ -72,12 +75,15 @@ longer than `STALE_ROOM_MINUTES` (default 60) is reclaimed.
 Test the voice flow without the core:
 
 ```bash
-# full cycle (publish matchup, wait, publish ended)
+# full cycle (publish matchup, wait, ready, wait, ended)
 bun run scripts/emit-fake-event.ts --channel both --instance 42 \
   --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK
 
-# just a matchup
+# just a matchup (nobody is moved yet)
 bun run scripts/emit-fake-event.ts --channel matchup --instance 42
+
+# everyone is in the arena: book the rooms
+bun run scripts/emit-fake-event.ts --channel ready --instance 42
 
 # just an end (test crash recovery / unknown instance)
 bun run scripts/emit-fake-event.ts --channel ended --instance 42
