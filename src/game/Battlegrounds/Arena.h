@@ -97,6 +97,12 @@ private:
 
   // Arenacraft: arena dampening, elapsed in-progress match time.
   uint32 m_DampeningElapsedMs{0};
+
+  // Arenacraft: raid-mark every team's players (and pets) by class colour once
+  // the whole roster is in the starting rooms, or at the latest when the gates
+  // open. Each team only sees the marks of its own group.
+  void MarkTeams();
+  bool m_TeamsMarked{false};
 };
 
 #endif // ACORE_ARENA_H
