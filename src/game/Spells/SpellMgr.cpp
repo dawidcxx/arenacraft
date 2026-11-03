@@ -2034,6 +2034,13 @@ static void ApplySpellBonusCorrections(SpellBonusMap& bonusMap)
   // Gargoyle Strike: full benefit from the gargoyle's spell power, which already is a share of the
   // DK's attack power (spell_dk_pet_scaling). The DB 0.453 applied on top halved the AP scaling.
   bonusMap[51963] = {1.0f, 0.0f, 0.0f, 0.0f};
+
+  // Hunter pet basic attacks (Claw, Bite, Smack; every rank): 0.364 of the pet's attack power, which is 22% of the
+  // hunter's ranged attack power, so a hit gains ~8% of the hunter's RAP (DB: 0.07, ~1.5%). The share of the pet's
+  // spell power stays.
+  for (uint32 firstRank : {16827u /*Claw*/, 17253u /*Bite*/, 49966u /*Smack*/})
+    for (SpellInfo const* rank = sSpellMgr->GetSpellInfo(firstRank); rank; rank = rank->GetNextRankSpell())
+      bonusMap[rank->Id] = {0.119658f, 0.0f, 0.364f, 0.0f};
 }
 
 void SpellMgr::LoadSpellBonuses()
