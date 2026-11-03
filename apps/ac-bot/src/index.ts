@@ -6,6 +6,7 @@ import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
 import { getConfig } from "./config";
+import { buildAccountFlags } from "./duplicateAccounts";
 import { logger } from "./logger";
 import { autoLinkLegacyAccounts, formatLegacyConflict } from "./legacyLink";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
@@ -55,14 +56,39 @@ client.once(Events.ClientReady, async (readyClient) => {
       LOOKUP_COMMAND,
       ALIAS_COMMAND,
     ]);
-    await guild.members.fetch();
+    try {
+      await guild.members.fetch();
+    } catch (error) {
+      logger.warn("Failed to fetch guild members; continuing with the existing cache", error);
+    }
 
     const members = guild.members.cache
       .filter((member) => !member.user.bot)
       .map((member) => ({ id: member.id, username: member.user.username }));
+
+    logger.info(`Starting legacy account migration (${members.length} Discord member(s))`);
+    if (members.length === 0) {
+      logger.warn("No Discord members in cache; legacy account migration skipped");
+    }
     const { linked, plan } = await autoLinkLegacyAccounts(authDb, members);
-    logger.info(`Auto-linked ${linked} legacy account(s) to Discord IDs`);
+    logger.info(`Legacy account migration: linked ${linked} account(s)`);
     for (const conflict of plan.conflicts) logger.warn(formatLegacyConflict(conflict));
+
+    const [accounts, links] = await Promise.all([authDb.listAccounts(), authDb.listDiscordLinks()]);
+    const auditFlags = buildAccountFlags(accounts, links, members).filter((flag) => flag.kind !== "shared-ip");
+    if (auditFlags.length === 0) {
+      logger.info("Account audit: no duplicate or suspicious accounts found");
+    } else {
+      logger.warn(`Account audit: ${auditFlags.length} group(s) need review`);
+      for (const flag of auditFlags) {
+        logger.warn(`[${flag.kind}] ${flag.title}`);
+        for (const account of flag.accounts) {
+          logger.warn(
+            `  #${account.id} ${account.username} discord=${account.discordId ?? "unlinked"} gm=${account.gmLevel}`,
+          );
+        }
+      }
+    }
 
     const rooms = new RoomManager(guild, config);
     await rooms.init();
