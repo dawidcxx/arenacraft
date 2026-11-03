@@ -40,6 +40,8 @@ bun run setup:discord --apply --sync-players   # create/move/permission + Player
   deny, stay). Only the two default categories are renamed. Channels the layout does not know are left alone.
 - Run it again any time; it only adds what is missing.
 - `--sync-players` gives `Player` to members that already have a game account, so nobody loses access.
+- The `game-<n>-<k>` voice rooms stay hidden (staff only); the bot opens a room to the players of a match
+  while it lasts.
 - The bot's role must be above the class/language/`Player` roles to hand them out; the script warns if not.
 - The bot needs **Manage Roles**, **Manage Channels**, **Manage Threads**, **Create Private Threads** and
   **Move Members**.

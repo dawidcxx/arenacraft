@@ -233,7 +233,8 @@ export const LAYOUT: readonly CategorySpec[] = [
     channels: [
       { name: "Chill Room", kind: "voice", access: { kind: "players" } },
       { name: "Waiting Room", kind: "voice", access: { kind: "players" } },
-      { name: "game-<n>-<k>", kind: "voice", access: { kind: "players" }, pattern: /^game-(\d+)-(\d+)$/ },
+      // Hidden: only staff by default; the bot lets the players of a match into their team's room (anti-snipe).
+      { name: "game-<n>-<k>", kind: "voice", access: { kind: "staff" }, pattern: /^game-(\d+)-(\d+)$/ },
     ],
   },
   {
