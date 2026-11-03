@@ -4,7 +4,12 @@ Rewritten Arenacraft Discord bot. Six jobs:
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
-   Calling it again resets the existing account's password.
+   Ownership is stored in `acore_auth.account_discord` against the immutable
+   Discord user ID, so renaming a handle cannot take over an account. Calling it
+   again resets the password for the account linked to that Discord ID. On
+   startup the bot auto-links legacy accounts whose username still matches a
+   current member; anything ambiguous is logged for manual resolution. An
+   existing unlinked account can also be claimed by passing `old_password`.
 2. **Greeting** - `/ping` greets the caller publicly in the channel.
 3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
    `soloq-matchup-ended` Redis events and moves players between the waiting room
@@ -30,12 +35,32 @@ commands removed from the code do not linger as unreachable "ghosts".
 ```bash
 bun install
 cp .env.example .env   # fill in the values
+scripts/db_sync        # applies data/sql/updates/db_auth (account_discord)
 bun run start
 ```
 
 The bot needs the **Server Members** privileged intent enabled in the Discord
 Developer Portal (Bot -> Privileged Gateway Intents). Members are resolved by
-matching the Wow account name against the Discord username (case-insensitive).
+the Discord user ID stored in `account_discord`, never by their current handle.
+
+On startup legacy accounts are auto-linked when exactly one current member still
+holds the matching handle. Conflicts are logged and left alone: no matching
+member, a member already linked to another account, or a linked account whose
+old handle is now held by a different member. Resolve those manually, e.g.:
+
+```sql
+INSERT INTO acore_auth.account_discord (account_id, discord_id) VALUES (<account id>, '<discord id>');
+```
+
+To audit existing accounts for takeover/duplicate signals (duplicate links,
+reclaimed handles, lookalike names, shared IPs, orphaned legacy accounts):
+
+```bash
+bun run flag-accounts
+```
+
+It prints a report and exits non-zero when anything is flagged. Pass no extra
+flags; it reads the same `.env` as the bot.
 
 The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
 `hunter`, `rogue`, `priest`, `deathknight`, `shaman`, `mage`, `warlock`,
@@ -76,6 +101,12 @@ Test the voice flow without the core:
 bun run scripts/emit-fake-event.ts --channel both --instance 42 \
   --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK
 
+# move real Discord users into the rooms (IDs from Discord, no DB lookup)
+bun run scripts/emit-fake-event.ts --channel both --instance 42 \
+  --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK \
+  --team-a-ids 111111111111111111,222222222222222222,333333333333333333 \
+  --team-b-ids 444444444444444444,555555555555555555,666666666666666666
+
 # just a matchup
 bun run scripts/emit-fake-event.ts --channel matchup --instance 42
 
@@ -83,4 +114,5 @@ bun run scripts/emit-fake-event.ts --channel matchup --instance 42
 bun run scripts/emit-fake-event.ts --channel ended --instance 42
 ```
 
-Account names must match Discord usernames; defaults are provided.
+Without `--team-a-ids` / `--team-b-ids` the fake `accountId`s are looked up in
+`account_discord`; pass IDs for a purely fake match with no DB accounts.

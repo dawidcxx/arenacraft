@@ -9,6 +9,7 @@ export const ParticipantSchema = z.object({
   characterName: z.string(),
   accountId: z.number(),
   accountName: z.string(),
+  discordId: z.string().optional(),
   classId: z.number(),
   specIndex: z.number(),
   role: z.string(),

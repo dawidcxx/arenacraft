@@ -1,9 +1,25 @@
 import mysql from "mysql2/promise";
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
-import { makeRegistrationData } from "./srp6";
+import { makeRegistrationData, verifyPassword as verifySrp6Password } from "./srp6";
 
 const EXPANSION_WOTLK = 2;
+
+export interface AccountRef {
+  id: number;
+  username: string;
+}
+
+export interface AccountSummary {
+  id: number;
+  username: string;
+  lastIp: string;
+}
+
+export interface DiscordLink {
+  accountId: number;
+  discordId: string;
+}
 
 export class AuthDb {
   private readonly pool: Pool;
@@ -14,6 +30,17 @@ export class AuthDb {
 
   async close(): Promise<void> {
     await this.pool.end();
+  }
+
+  async assertSchema(): Promise<void> {
+    try {
+      await this.pool.query("SELECT 1 FROM account_discord LIMIT 1");
+    } catch (error) {
+      if ((error as { code?: string }).code === "ER_NO_SUCH_TABLE") {
+        throw new Error("account_discord table is missing; run scripts/db_sync to apply data/sql updates");
+      }
+      throw error;
+    }
   }
 
   async accountExists(username: string): Promise<boolean> {
@@ -37,30 +64,70 @@ export class AuthDb {
     return new Map(rows.map((row) => [Number(row.id), String(row.username)]));
   }
 
+  async accountByDiscordId(discordId: string): Promise<AccountRef | null> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT a.id, a.username
+       FROM account a
+       JOIN account_discord d ON d.account_id = a.id
+       WHERE d.discord_id = ?
+       LIMIT 1`,
+      [discordId],
+    );
+    const row = rows[0];
+    return row ? { id: Number(row.id), username: String(row.username) } : null;
+  }
+
+  async discordIdByAccountId(accountId: number): Promise<string | null> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT discord_id FROM account_discord WHERE account_id = ? LIMIT 1",
+      [accountId],
+    );
+    const row = rows[0];
+    return row ? String(row.discord_id) : null;
+  }
+
+  async discordIdsByAccountIds(ids: number[]): Promise<Map<number, string>> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+
+    const placeholders = unique.map(() => "?").join(", ");
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT account_id, discord_id FROM account_discord WHERE account_id IN (${placeholders})`,
+      unique,
+    );
+    return new Map(rows.map((row) => [Number(row.account_id), String(row.discord_id)]));
+  }
+
   /**
-   * Creates a fresh account. The caller must have verified the account does not
-   * exist. Writes only to the auth database (account + realm character counts).
+   * Creates a fresh account bound to a Discord user. The caller must have
+   * verified the account name and Discord ID are not already used.
    */
-  async createAccount(username: string, password: string): Promise<void> {
+  async createAccount(discordId: string, username: string, password: string): Promise<void> {
     const { salt, verifier } = makeRegistrationData(username, password);
 
     const connection = await this.pool.getConnection();
     try {
       await connection.beginTransaction();
-      await connection.execute(
+      const [inserted] = await connection.execute<ResultSetHeader>(
         "INSERT INTO account (username, salt, verifier, expansion, joindate) VALUES (?, ?, ?, ?, NOW())",
         [username, salt, verifier, EXPANSION_WOTLK],
       );
+      const accountId = inserted.insertId;
+
+      await connection.execute("INSERT INTO account_discord (account_id, discord_id) VALUES (?, ?)", [
+        accountId,
+        discordId,
+      ]);
+
       // Mirror the core's LOGIN_INS_REALM_CHARACTERS_INIT: one zero-count row
       // per realm so the realm list shows the account.
       await connection.execute(
         `INSERT INTO realmcharacters (realmid, acctid, numchars)
-         SELECT r.id, a.id, 0
+         SELECT r.id, ?, 0
          FROM realmlist r
-         JOIN account a ON a.username = ?
-         LEFT JOIN realmcharacters rc ON rc.realmid = r.id AND rc.acctid = a.id
+         LEFT JOIN realmcharacters rc ON rc.realmid = r.id AND rc.acctid = ?
          WHERE rc.acctid IS NULL`,
-        [username],
+        [accountId, accountId],
       );
       await connection.commit();
     } catch (error) {
@@ -71,17 +138,45 @@ export class AuthDb {
     }
   }
 
+  async bindDiscordId(accountId: number, discordId: string): Promise<void> {
+    await this.pool.execute("INSERT INTO account_discord (account_id, discord_id) VALUES (?, ?)", [
+      accountId,
+      discordId,
+    ]);
+  }
+
   /**
-   * Replaces an existing account's credentials. The caller must have verified
-   * the account exists. Matching is case-insensitive via the column collation.
+   * Replaces an existing account's credentials.
    */
-  async resetPassword(username: string, password: string): Promise<void> {
-    const { salt, verifier } = makeRegistrationData(username, password);
-    await this.pool.execute("UPDATE account SET salt = ?, verifier = ? WHERE username = ?", [
+  async resetPasswordForAccount(accountId: number, password: string): Promise<void> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT username FROM account WHERE id = ? LIMIT 1",
+      [accountId],
+    );
+    const row = rows[0];
+    if (!row) throw new Error(`Account ${accountId} does not exist`);
+
+    const { salt, verifier } = makeRegistrationData(String(row.username), password);
+    await this.pool.execute("UPDATE account SET salt = ?, verifier = ? WHERE id = ?", [
       salt,
       verifier,
-      username,
+      accountId,
     ]);
+  }
+
+  async verifyAccountPassword(accountId: number, password: string): Promise<boolean> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT username, salt, verifier FROM account WHERE id = ? LIMIT 1",
+      [accountId],
+    );
+    const row = rows[0];
+    if (!row) return false;
+    return verifySrp6Password(
+      String(row.username),
+      password,
+      row.salt as Buffer,
+      row.verifier as Buffer,
+    );
   }
 
   /** Resolves a (normalized) account name to its id, or null when it does not exist. */
@@ -91,6 +186,27 @@ export class AuthDb {
     ]);
     const row = rows[0];
     return row ? Number(row.id) : null;
+  }
+
+  async listAccounts(): Promise<AccountSummary[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT id, username, last_ip AS lastIp FROM account ORDER BY id ASC",
+    );
+    return rows.map((row) => ({
+      id: Number(row.id),
+      username: String(row.username),
+      lastIp: String(row.lastIp),
+    }));
+  }
+
+  async listDiscordLinks(): Promise<DiscordLink[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT account_id AS accountId, discord_id AS discordId FROM account_discord",
+    );
+    return rows.map((row) => ({
+      accountId: Number(row.accountId),
+      discordId: String(row.discordId),
+    }));
   }
 
   /** Inserts or replaces the account's display alias. */

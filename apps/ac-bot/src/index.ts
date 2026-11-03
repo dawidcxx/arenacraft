@@ -7,6 +7,7 @@ import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
 import { getConfig } from "./config";
 import { logger } from "./logger";
+import { autoLinkLegacyAccounts, formatLegacyConflict } from "./legacyLink";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
 import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
 import { PING_COMMAND, handlePing } from "./pingCommand";
@@ -20,6 +21,8 @@ import { RoomManager } from "./voiceRooms";
 const config = getConfig();
 const authDb = new AuthDb(config.AUTH_DB_URL);
 const characterDb = new CharacterDb(config.CHARACTER_DB_URL);
+
+await authDb.assertSchema();
 
 // Soloq leaderboard queries join several tables; one 30s snapshot per window is
 // plenty for a Discord leaderboard and keeps the DB load negligible.
@@ -54,12 +57,19 @@ client.once(Events.ClientReady, async (readyClient) => {
     ]);
     await guild.members.fetch();
 
+    const members = guild.members.cache
+      .filter((member) => !member.user.bot)
+      .map((member) => ({ id: member.id, username: member.user.username }));
+    const { linked, plan } = await autoLinkLegacyAccounts(authDb, members);
+    logger.info(`Auto-linked ${linked} legacy account(s) to Discord IDs`);
+    for (const conflict of plan.conflicts) logger.warn(formatLegacyConflict(conflict));
+
     const rooms = new RoomManager(guild, config);
     await rooms.init();
 
     const auditLog = await AuditLog.create(guild, config.AUDIT_LOG_CHANNEL_NAME);
 
-    const redis = await startEventSubscriber(config.REDIS_URL, rooms, auditLog);
+    const redis = await startEventSubscriber(config.REDIS_URL, rooms, authDb, auditLog);
     const sweep = setInterval(() => void rooms.sweepStale(), 60_000);
 
     const shutdown = async () => {
