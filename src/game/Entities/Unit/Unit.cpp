@@ -45,6 +45,7 @@
 #include "MovementGenerator.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
+#include "OmenOfClarity.hpp"
 #include "OutdoorPvP.h"
 #include "PassiveAI.h"
 #include "Pet.h"
@@ -17767,6 +17768,38 @@ bool Unit::InitTamedPet(Pet* pet, uint8 level, uint32 spell_id)
   return true;
 }
 
+// arenacraft: Omen of Clarity (16864) chance for a spell proc, see OmenOfClarity.hpp. 0 = this spell cannot proc it.
+static float OmenOfClaritySpellChance(Unit* caster, SpellInfo const* procSpell, Spell const* spell)
+{
+  using arenacraft::ooc::SpellKind;
+  using arenacraft::ooc::spellProcChance;
+
+  switch (procSpell->Id)
+  {
+  case 42230: // Hurricane damage, every rank
+  case 42231:
+  case 42232:
+  case 42233:
+  case 48466:
+    return spellProcChance(0, SpellKind::HurricaneTick);
+  default:
+    break;
+  }
+
+  // spells cast by other spells or procs (Starfall stars, ...) do not proc it
+  if (spell && spell->IsTriggered())
+    return 0.0f;
+
+  SpellInfo const* firstRank = procSpell->GetFirstRankSpell();
+  if (firstRank && (firstRank->Id == 48438 /*Wild Growth*/ || firstRank->Id == 50516 /*Typhoon*/))
+    return spellProcChance(0, SpellKind::MultiTarget);
+
+  int32 const castTime = spell ? spell->GetCastTime() : int32(procSpell->CalcCastTime(caster));
+  if (castTime <= 0 || procSpell->IsChanneled())
+    return spellProcChance(0, SpellKind::Instant);
+  return spellProcChance(uint32(castTime), SpellKind::CastTime);
+}
+
 bool Unit::IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackType attType, bool isVictim, bool active,
                                        SpellProcEventEntry const*& spellProcEvent, ProcEventInfo const& eventInfo)
 {
@@ -17882,6 +17915,15 @@ bool Unit::IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackTyp
       uint32 WeaponSpeed = victim->GetAttackTime(attType);
       chance             = victim->GetPPMProcChance(WeaponSpeed, spellProcEvent->ppmRate, spellProto);
     }
+  }
+
+  // arenacraft: Omen of Clarity on spells is measured on the spell's cast time, not on the druid's weapon speed (a
+  // staff made it ~20% per spell). Auto attacks and melee abilities keep the weapon-speed rate.
+  if (spellProto->Id == 16864 && !isVictim && procSpell && procSpell->DmgClass != SPELL_DAMAGE_CLASS_MELEE)
+  {
+    chance = OmenOfClaritySpellChance(this, procSpell, eventInfo.GetProcSpell());
+    if (chance <= 0.0f)
+      return false;
   }
 
   // Custom chances
