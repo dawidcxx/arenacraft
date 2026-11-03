@@ -14,6 +14,7 @@ export interface AccountSummary {
   id: number;
   username: string;
   lastIp: string;
+  gmLevel: number;
 }
 
 export interface DiscordLink {
@@ -190,12 +191,16 @@ export class AuthDb {
 
   async listAccounts(): Promise<AccountSummary[]> {
     const [rows] = await this.pool.execute<RowDataPacket[]>(
-      "SELECT id, username, last_ip AS lastIp FROM account ORDER BY id ASC",
+      `SELECT a.id, a.username, a.last_ip AS lastIp,
+              COALESCE((SELECT MAX(aa.gmlevel) FROM account_access aa WHERE aa.id = a.id), 0) AS gmLevel
+       FROM account a
+       ORDER BY a.id ASC`,
     );
     return rows.map((row) => ({
       id: Number(row.id),
       username: String(row.username),
       lastIp: String(row.lastIp),
+      gmLevel: Number(row.gmLevel),
     }));
   }
 

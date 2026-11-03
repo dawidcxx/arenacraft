@@ -56,11 +56,16 @@ To audit existing accounts for takeover/duplicate signals (duplicate links,
 reclaimed handles, lookalike names, shared IPs, orphaned legacy accounts):
 
 ```bash
-bun run flag-accounts
+bun run flag-accounts             # report only (exit 0)
+bun run flag-accounts --link      # auto-link legacy accounts, then report
+bun run flag-accounts --shared-ip # also show shared-IP groups (NAT/VPN noise)
+bun run flag-accounts --strict    # exit 1 when flags are found (for CI)
 ```
 
-It prints a report and exits non-zero when anything is flagged. Pass no extra
-flags; it reads the same `.env` as the bot.
+Exit code 0 means the scan completed; it does not mean "no findings". Findings
+are listed in the output. Shared-IP groups are hidden by default because a
+proxy/VPN makes almost everyone share an IP. `gm=<level>` shows staff accounts
+so they are not mistaken for player alts.
 
 The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
 `hunter`, `rogue`, `priest`, `deathknight`, `shaman`, `mage`, `warlock`,

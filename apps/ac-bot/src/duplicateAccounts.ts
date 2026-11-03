@@ -2,6 +2,7 @@ export interface AccountLike {
   id: number;
   username: string;
   lastIp: string;
+  gmLevel?: number;
 }
 
 export interface LinkLike {
@@ -19,6 +20,7 @@ export interface AccountEntry {
   username: string;
   discordId: string | null;
   lastIp: string;
+  gmLevel: number;
 }
 
 export type AccountFlagKind =
@@ -72,6 +74,7 @@ export function buildAccountFlags(
     username: account.username,
     discordId: linkByAccount.get(account.id) ?? null,
     lastIp: account.lastIp,
+    gmLevel: account.gmLevel ?? 0,
   }));
 
   const flags: AccountFlag[] = [];
