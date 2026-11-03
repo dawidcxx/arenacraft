@@ -26,9 +26,9 @@ std::vector<ArenaPreBuff> const& GetArenaPreBuffsForClass(uint8 playerClass);
 // only after the player has been added, so OnBattlegroundAddPlayer cannot buff them.
 void ApplyArenaPreBuffsToPet(Pet* pet);
 
-// As each player loads into an arena (prep phase), every class currently present on their team
-// casts its curated buffs onto the team members already there. Re-running as more players land
-// means the full team ends up with the union of its composition's buffs.
+// As each player loads into an arena (prep phase) they get the curated buffs of every class on their team (inside
+// or still invited), and their own class's buffs go to the teammates (and pets) already inside. Whatever the load
+// order, the full team ends up with the union of its composition's buffs.
 class ArenaPreBuffs : public AllBattlegroundScript
 {
 public:
