@@ -12536,8 +12536,6 @@ bool Player::InArena() const
   return true;
 }
 
-// arenacraft: from arena entry until the match is over (starting rooms included) the character is locked: only
-// weapons, shields, off-hands and relics may be swapped; no gems, permanent enchants, glyphs, talents or spec swap.
 // arenacraft (anti-snipe): the zone other players see in /who, the friend list and the guild roster. Inside an
 // arena it is the zone the player entered from, so nobody can tell from the outside who is in an arena.
 uint32 Player::GetPublicZoneId() const
@@ -12554,12 +12552,6 @@ uint32 Player::GetPublicZoneId() const
   if (AreaTableEntry const* area = sAreaTableStore.LookupEntry(m_homebindAreaId))
     return area->zone ? area->zone : area->ID;
   return 0;
-}
-
-bool Player::IsArenaGearLocked() const
-{
-  Battleground const* bg = GetBattleground();
-  return bg && bg->isArena() && bg->GetStatus() != STATUS_WAIT_LEAVE;
 }
 
 void Player::SetBattlegroundId(uint32 id, BattlegroundTypeId bgTypeId, uint32 queueSlot, bool invited, bool isRandom,
@@ -14228,10 +14220,6 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank, bool command /*= fa
 
   if (!command)
   {
-    // arenacraft: talents are locked inside an arena (see IsArenaGearLocked)
-    if (IsArenaGearLocked())
-      return;
-
     // xinef: check basic data
     if (!CurTalentPoints)
     {
@@ -14367,10 +14355,6 @@ void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRa
     return;
 
   if (petGuid != pet->GetGUID())
-    return;
-
-  // arenacraft: pet talents are locked inside an arena too
-  if (IsArenaGearLocked())
     return;
 
   uint32 CurTalentPoints = pet->GetFreeTalentPoints();

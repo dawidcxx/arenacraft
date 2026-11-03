@@ -2379,7 +2379,6 @@ public:
 
   [[nodiscard]] bool               InBattleground() const { return m_bgData.bgInstanceID != 0; }
   [[nodiscard]] bool               InArena() const;
-  [[nodiscard]] bool               IsArenaGearLocked() const; // arenacraft: see Player.cpp
   [[nodiscard]] uint32             GetPublicZoneId() const;   // arenacraft: see Player.cpp
   [[nodiscard]] uint32             GetBattlegroundId() const { return m_bgData.bgInstanceID; }
   [[nodiscard]] BattlegroundTypeId GetBattlegroundTypeId() const { return m_bgData.bgTypeID; }

@@ -6530,10 +6530,6 @@ SpellCastResult Spell::CheckCast(bool strict)
     }
     case SPELL_EFFECT_APPLY_GLYPH:
     {
-      // arenacraft: glyphs are locked inside an arena (see Player::IsArenaGearLocked)
-      if (Player const* glyphCaster = m_caster->ToPlayer(); glyphCaster && glyphCaster->IsArenaGearLocked())
-        return SPELL_FAILED_NOT_IN_ARENA;
-
       uint32 glyphId = m_spellInfo->Effects[i].MiscValue;
       if (GlyphPropertiesEntry const* gp = sGlyphPropertiesStore.LookupEntry(glyphId))
         if (m_caster->HasAura(gp->SpellId))
@@ -6970,14 +6966,9 @@ SpellCastResult Spell::CheckCast(bool strict)
         return SPELL_FAILED_DONT_REPORT;
       // can't change during already started arena/battleground
       if (m_caster->IsPlayer())
-      {
-        // arenacraft: arenas lock the spec from entry, starting rooms included
-        if (m_caster->ToPlayer()->IsArenaGearLocked())
-          return SPELL_FAILED_NOT_IN_ARENA;
         if (Battleground const* bg = m_caster->ToPlayer()->GetBattleground())
           if (bg->GetStatus() == STATUS_IN_PROGRESS)
             return SPELL_FAILED_NOT_IN_BATTLEGROUND;
-      }
       break;
     default:
       break;
@@ -7872,10 +7863,6 @@ SpellCastResult Spell::CheckItems()
       Item* targetItem = m_targets.GetItemTarget();
       if (!targetItem)
         return SPELL_FAILED_ITEM_NOT_FOUND;
-
-      // arenacraft: no permanent enchants inside an arena (temporary ones - poisons, imbues, oils - stay allowed)
-      if (player && player->IsArenaGearLocked())
-        return SPELL_FAILED_NOT_IN_ARENA;
 
       // xinef: required level has to be checked also! Exploit fix
       if (targetItem->GetTemplate()->ItemLevel < m_spellInfo->BaseLevel ||
