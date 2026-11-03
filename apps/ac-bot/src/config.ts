@@ -14,6 +14,8 @@ const ConfigSchema = z.object({
   // Role allowed to use /alias (and required by its runtime check).
   VIP_ROLE_NAME: z.string().min(1).default("vip"),
   STALE_ROOM_MINUTES: z.coerce.number().int().positive().default(60),
+  // Realm address shown by /register ("set realmlist <REALMLIST>"); empty leaves it out.
+  REALMLIST: z.string().default(""),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

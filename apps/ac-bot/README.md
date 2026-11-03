@@ -1,6 +1,6 @@
 # ac-bot
 
-Rewritten Arenacraft Discord bot. Six jobs:
+Rewritten Arenacraft Discord bot. Six jobs (plus the server layout and onboarding below):
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
@@ -24,6 +24,41 @@ Rewritten Arenacraft Discord bot. Six jobs:
 
 On startup the bot overwrites both its global and guild command lists, so
 commands removed from the code do not linger as unreachable "ghosts".
+
+## Server layout and onboarding
+
+The server structure lives in code: `src/serverLayout.ts` (roles, categories, channels, who sees what).
+`bun run setup:discord` compares the guild with it and prints a plan; `--apply` carries it out:
+
+```bash
+bun run setup:discord                          # dry run
+bun run setup:discord --apply --sync-players   # create/move/permission + Player role for registered members
+```
+
+- Nothing is deleted and no channel is renamed, so message history stays. Existing channels are matched by name,
+  moved into their category and get their permissions merged in (other overwrites, like the Waiting Room `Speak`
+  deny, stay). Only the two default categories are renamed. Channels the layout does not know are left alone.
+- Run it again any time; it only adds what is missing.
+- `--sync-players` gives `Player` to members that already have a game account, so nobody loses access.
+- The bot's role must be above the class/language/`Player` roles to hand them out; the script warns if not.
+- The bot needs **Manage Roles**, **Manage Channels**, **Manage Threads**, **Create Private Threads** and
+  **Move Members**.
+
+Onboarding:
+
+1. A new member sees only **#bot**. The pinned welcome panel (posted and kept up to date by the bot at startup)
+   has language buttons (they toggle the `English`/`Русский`/`Deutsch`/`Français` roles and open
+   `discussion-ru/de/fr`) and a class menu (one class role at a time, changeable).
+2. `/register` sends the login, password and realmlist (`REALMLIST`) and gives `Player`, which opens the server.
+3. **#support** has a pinned panel: **Open a ticket** creates a private thread with the staff, **Report a bug**
+   opens the bug form.
+
+Bug reports: `/bug` or the button opens a form (title, class/spell, what happened, steps, expected). It becomes a
+post in the `bug-reports` forum tagged with the class and `Open`. Each report also goes to a `BugReportSink`
+(`src/bugReport.ts`); it only logs today, a GitHub sink can create an issue per report later.
+
+Roles: `Admin` (administrator), `Developer` and `Game Master` (moderation, see the staff category and tickets),
+`vip` (existing), `Player`, one role per class (class colour) and per language.
 
 ## Setup
 

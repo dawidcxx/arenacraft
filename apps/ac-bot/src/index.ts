@@ -4,10 +4,21 @@ import type { InteractionReplyOptions } from "discord.js";
 import { ALIAS_COMMAND, handleAlias } from "./aliasCommand";
 import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
+import { BUG_COMMAND, BUG_MODAL, buildBugModal, handleBugModal, logBugReportSink } from "./bugReport";
 import { CharacterDb } from "./characterDb";
 import { getConfig } from "./config";
 import { logger } from "./logger";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
+import {
+  BUG_BUTTON,
+  CLASS_SELECT,
+  ensurePanels,
+  handleClassSelect,
+  handleLanguageButton,
+  handleTicketButton,
+  LANGUAGE_BUTTON,
+  TICKET_BUTTON,
+} from "./onboarding";
 import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
 import { PING_COMMAND, handlePing } from "./pingCommand";
 import { startEventSubscriber } from "./redisEvents";
@@ -51,8 +62,12 @@ client.once(Events.ClientReady, async (readyClient) => {
       ONLINE_LIST_COMMAND,
       LOOKUP_COMMAND,
       ALIAS_COMMAND,
+      BUG_COMMAND,
     ]);
     await guild.members.fetch();
+
+    // Welcome panel in #bot (language + class pickers) and the support panel (ticket + bug report buttons).
+    await ensurePanels(guild).catch((error) => logger.error("Could not post the onboarding panels", error));
 
     const rooms = new RoomManager(guild, config);
     await rooms.init();
@@ -79,10 +94,27 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  // Buttons, the class menu and the bug form (onboarding.ts, bugReport.ts).
+  if (interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) {
+    try {
+      if (interaction.isButton() && interaction.customId.startsWith(LANGUAGE_BUTTON)) await handleLanguageButton(interaction);
+      else if (interaction.isButton() && interaction.customId === TICKET_BUTTON) await handleTicketButton(interaction);
+      else if (interaction.isButton() && interaction.customId === BUG_BUTTON) await interaction.showModal(buildBugModal());
+      else if (interaction.isStringSelectMenu() && interaction.customId === CLASS_SELECT) await handleClassSelect(interaction);
+      else if (interaction.isModalSubmit() && interaction.customId === BUG_MODAL) await handleBugModal(interaction, logBugReportSink);
+    } catch (error) {
+      logger.error(`Failed to handle component ${interaction.customId}`, error);
+      const reply: InteractionReplyOptions = { content: "Something went wrong, try again later.", flags: MessageFlags.Ephemeral };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(reply).catch(() => {});
+      else await interaction.reply(reply).catch(() => {});
+    }
+    return;
+  }
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    if (interaction.commandName === "register") await handleRegister(interaction, authDb);
+    if (interaction.commandName === "register") await handleRegister(interaction, authDb, config.REALMLIST);
+    else if (interaction.commandName === "bug") await interaction.showModal(buildBugModal());
     else if (interaction.commandName === "setpassword") await handleSetPassword(interaction, authDb);
     else if (interaction.commandName === "toprankers") await handleTopRankers(interaction, () => rankersCache.get());
     else if (interaction.commandName === "onlinelist") await handleOnlineList(interaction, () => onlineListCache.get());
