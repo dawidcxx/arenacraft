@@ -422,8 +422,10 @@ When the arena ends (or is destroyed without finishing) the core publishes
 is published once per soloq arena from `Arena::PreUpdateImpl`, the first time
 both rosters are complete in the starting rooms (`STATUS_WAIT_JOIN`). The
 Discord bot only moves players into their team voice rooms on this event
-(anti-snipe: the pop alone moves nobody). An arena that never fills (declined
-invites, short-handed cancel) never sends it.
+(anti-snipe: the pop alone moves nobody). The game voice rooms are hidden from
+everyone; the bot lets only the match's players see and join their team's room
+until the match ends. An arena that never fills (declined invites, short-handed
+cancel) never sends it.
 
 Both events are emitted exactly once per popped matchup: `OnBattlegroundEnd`
 takes the pending match (normal path) and `OnBattlegroundDestroy` takes it only
