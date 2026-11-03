@@ -100,7 +100,7 @@ public:
     CharacterDatabase.DirectExecute(
         "INSERT INTO fingerprint (account_id, guid, name, reason, created_by, macros, bindings, addons) "
         "VALUES ({}, {}, '{}', '{}', '{}', '{}', '{}', '{}')",
-        accountId, guid, Escaped(player.GetName()), Escaped(std::string(reason ? *reason : "")), Escaped(by),
+        accountId, guid, Escaped(player.GetName()), Escaped(reason ? std::string(*reason) : std::string()), Escaped(by),
         Escaped(raw.macros), Escaped(raw.bindings), Escaped(raw.addons));
 
     handler->PSendSysMessage("Fingerprint of {} stored: {} macro lines, {} bindings, {} addons.", player.GetName(),
