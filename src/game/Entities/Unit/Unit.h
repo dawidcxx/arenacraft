@@ -1823,6 +1823,10 @@ public:
   bool               IsImmunedToDamageOrSchool(SpellInfo const* spellInfo) const;
   virtual bool       IsImmunedToSpellEffect(SpellInfo const* spellInfo, uint32 index) const;
 
+  // arenacraft: a unit inside Cyclone (33786) is immune to friendly spells too - heals, dispels, buffs - not only to
+  // hostile ones (those are refused by Cyclone's school immunity). Its own spells are not affected.
+  [[nodiscard]] bool IsCycloneShieldedFrom(Unit const* caster, SpellInfo const* spellInfo) const;
+
   // Critic chances
   bool  isBlockCritical();
   float SpellDoneCritChance(Unit const* /*victim*/, SpellInfo const* spellProto, SpellSchoolMask schoolMask,

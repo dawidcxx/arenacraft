@@ -3576,6 +3576,9 @@ SpellMissInfo Unit::SpellHitResult(Unit* victim, SpellInfo const* spell, bool Ca
   if (victim->IsImmunedToSpell(spell))
     return SPELL_MISS_IMMUNE;
 
+  if (victim->IsCycloneShieldedFrom(this, spell))
+    return SPELL_MISS_IMMUNE;
+
   // All positive spells can`t miss
   /// @todo: client not show miss log for this spells - so need find info for this in dbc and use it!
   if ((spell->IsPositive() || spell->HasEffect(SPELL_EFFECT_DISPEL)) &&
@@ -3642,6 +3645,11 @@ SpellMissInfo Unit::SpellHitResult(Unit* victim, Spell const* spell, bool CanRef
 
   // Check for immune
   if (victim->IsImmunedToSpell(spellInfo, spell))
+  {
+    return SPELL_MISS_IMMUNE;
+  }
+
+  if (victim->IsCycloneShieldedFrom(this, spellInfo))
   {
     return SPELL_MISS_IMMUNE;
   }
@@ -13307,6 +13315,18 @@ bool Unit::IsImmunedToSpell(SpellInfo const* spellInfo, Spell const* spell)
   }
 
   return false;
+}
+
+bool Unit::IsCycloneShieldedFrom(Unit const* caster, SpellInfo const* spellInfo) const
+{
+  if (!caster || caster == this || !spellInfo || caster->IsHostileTo(this))
+    return false;
+
+  // spells that ignore every immunity (Mass Dispel, ...) still land
+  if (spellInfo->HasAttribute(SPELL_ATTR0_NO_IMMUNITIES))
+    return false;
+
+  return HasAura(33786); // Cyclone
 }
 
 bool Unit::IsImmunedToSpellEffect(SpellInfo const* spellInfo, uint32 index) const
