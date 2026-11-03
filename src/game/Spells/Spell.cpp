@@ -1529,6 +1529,10 @@ void Spell::SelectImplicitCasterDestTargets(SpellEffIndex effIndex, SpellImplici
       float tstX = 0.0f, tstY = 0.0f, tstZ = 0.0f, prevX = 0.0f, prevY = 0.0f, prevZ = 0.0f;
       float tstZ1 = 0.0f, tstZ2 = 0.0f, tstZ3 = 0.0f, destz1 = 0.0f, destz2 = 0.0f, destz3 = 0.0f, srange = 0.0f,
             srange1 = 0.0f, srange2 = 0.0f, srange3 = 0.0f;
+      // Arenacraft: height above the floor of the wall probe between two steps. Obstacles lower than this are
+      // stepped over (like TrinityCore's half collision height for a character).
+      constexpr float BlinkProbeHeight = 1.0f;
+
       // Arenacraft: max ground rise the blink path tolerates per 2yd step
       // (`step` below); past this the path is treated as a wall and the blink is
       // cut short. Slightly raised from the stock 2.65 so ramps/uneven arena
@@ -1657,11 +1661,27 @@ void Spell::SelectImplicitCasterDestTargets(SpellEffIndex effIndex, SpellImplici
           // path = {}, overdistance = {}", totalpath, overdistance);
         }
 
-        bool col = VMAP::VMapFactory::createOrGetVMapMgr()->GetObjectHitPos(mapid, prevX, prevY, prevZ + 0.5f, tstX,
-                                                                            tstY, tstZ + 0.5f, tstX, tstY, tstZ, -0.5f);
+        // Arenacraft: the wall probe runs BlinkProbeHeight above the floor (was 0.5yd, so the bumps of uneven
+        // floors - Ruins of Lordaeron, Blade's Edge - stopped the blink on its first step), and only the hit x/y is
+        // taken back: the hit z (probe height, or the probe end when nothing is hit) used to overwrite tstZ, which
+        // then raised every following step's floor lookup.
+        float hitX = tstX, hitY = tstY, hitZ = tstZ;
+        bool  col = VMAP::VMapFactory::createOrGetVMapMgr()->GetObjectHitPos(
+            mapid, prevX, prevY, prevZ + BlinkProbeHeight, tstX, tstY, tstZ + BlinkProbeHeight, hitX, hitY, hitZ,
+            -0.5f);
+        if (col)
+        {
+          tstX = hitX;
+          tstY = hitY;
+        }
         // check dynamic collision
-        bool dcol = m_caster->GetMap()->GetObjectHitPos(phasemask, prevX, prevY, prevZ + 0.5f, tstX, tstY, tstZ + 0.5f,
-                                                        tstX, tstY, tstZ, -0.5f);
+        bool dcol = m_caster->GetMap()->GetObjectHitPos(phasemask, prevX, prevY, prevZ + BlinkProbeHeight, tstX, tstY,
+                                                        tstZ + BlinkProbeHeight, hitX, hitY, hitZ, -0.5f);
+        if (dcol)
+        {
+          tstX = hitX;
+          tstY = hitY;
+        }
 
         // collision occured
         if (col || dcol || (overdistance > 0.0f && !map->IsInWater(phasemask, tstX, tstY, ground, collisionHeight)) ||
