@@ -25,6 +25,7 @@
 #include "CharacterPackets.h"
 #include "Common.h"
 #include "DatabaseEnv.h"
+#include "FingerprintScripts.hpp"
 #include "GameTime.h"
 #include "Group.h"
 #include "Guild.h"
@@ -1191,6 +1192,13 @@ void WorldSession::ReadAddonsInfo(ByteBuffer& data)
         /// @todo: Find out when to not use CRC/pubkey, and other possible states.
         m_addonsList.push_back(addon);
       }
+
+      // Arenacraft: kept for GM fingerprints (.fingerprint), which also work while the player is offline.
+      std::vector<std::string> enabledAddons;
+      for (AddonInfo const& addon : m_addonsList)
+        if (addon.Enabled)
+          enabledAddons.push_back(addon.Name);
+      arenacraft::fingerprint::RememberAddons(GetAccountId(), enabledAddons);
 
       uint32 currentTime;
       addonInfo >> currentTime;
