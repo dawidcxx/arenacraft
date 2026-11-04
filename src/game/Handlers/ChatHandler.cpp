@@ -148,7 +148,10 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recvData)
     }
   }
 
-  // pussywizard:
+  // Spectators (live arena spectators and replay viewers) may not talk in the arena. Their chat commands still
+  // have to run though: the spectator/replay addons send .spect and .replay pause/seek through SAY, so the message
+  // is dropped only after the command parsing below.
+  bool spectatorSilenced = false;
   switch (type)
   {
   case CHAT_MSG_SAY:
@@ -157,11 +160,10 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recvData)
   case CHAT_MSG_TEXT_EMOTE:
   case CHAT_MSG_AFK:
   case CHAT_MSG_DND:
-    if (sender->IsSpectator())
-    {
-      recvData.rfinish();
-      return;
-    }
+    spectatorSilenced = sender->IsSpectator();
+    break;
+  default:
+    break;
   }
 
   if (sender->HasAura(1852) && type != CHAT_MSG_WHISPER)
@@ -295,6 +297,9 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recvData)
       if (ChatHandler(this).ParseCommands(msg.c_str()))
         return;
 
+      if (spectatorSilenced)
+        return;
+
       if (!_player->CanSpeak())
       {
         std::string timeStr = secsToTimeString(m_muteTime - GameTime::GetGameTime().count());
@@ -303,6 +308,9 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recvData)
       }
     }
   }
+
+  if (spectatorSilenced)
+    return;
 
   // do message validity checks
   if (lang != LANG_ADDON)
