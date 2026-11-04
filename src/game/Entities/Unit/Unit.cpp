@@ -415,8 +415,22 @@ void Unit::Update(uint32 p_time)
     // another command is given.
     if (m_HostileRefMgr.IsEmpty())
     {
+      // arenacraft: Mind Control keeps both players in combat for as long as it lasts. Neither body acts on its own
+      // while possessed, so the 5s PvP combat timer used to run out mid Mind Control and cancelling it let the
+      // priest drink (and the victim leave combat). A charmed creature keeps its player in combat only while it
+      // fights, so Eyes of the Beast on an idle pet does not.
+      bool keepCombat = false;
+      if (IsPlayer())
+      {
+        if (Unit const* charm = GetCharm())
+          keepCombat = charm->IsPlayer() || charm->IsInCombat();
+        else
+          keepCombat = GetCharmerGUID().IsPlayer();
+      }
+      if (keepCombat)
+        m_CombatTimer = std::max<uint32>(m_CombatTimer, 5 * IN_MILLISECONDS);
       // m_CombatTimer set at aura start and it will be freeze until aura removing
-      if (m_CombatTimer <= p_time)
+      else if (m_CombatTimer <= p_time)
         ClearInCombat();
       else
         m_CombatTimer -= p_time;
