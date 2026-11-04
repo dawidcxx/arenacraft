@@ -3,7 +3,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import type { AuthDb } from "./authDb";
 import { logger } from "./logger";
-import { normalizeAccountName } from "./wowName";
 
 // Identifier-safe so addons can parse the in-game `ALIAS:<char>=<value>` line.
 const ALIAS_PATTERN = /^[\p{L}\p{N}_-]{1,32}$/u;
@@ -70,16 +69,17 @@ export async function handleAlias(
   }
 
   const target = interaction.options.getUser("discord_id", true);
-  const accountName = normalizeAccountName(target.username);
   const subcommand = interaction.options.getSubcommand();
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const accountId = await authDb.accountIdByName(accountName);
-  if (accountId === null) {
-    await interaction.editReply(`**${target.username}** has not registered an account yet.`);
+  const account = await authDb.accountByDiscordId(target.id);
+  if (account === null) {
+    await interaction.editReply(`<@${target.id}> has no Arenacraft account yet.`);
     return;
   }
+  const accountId = account.id;
+  const accountName = account.username;
 
   if (subcommand === "set") {
     const alias = normalizeAlias(interaction.options.getString("alias", true));
@@ -89,7 +89,7 @@ export async function handleAlias(
     }
 
     await authDb.setAlias(accountId, alias);
-    await interaction.editReply(`Alias for **${target.username}** set to \`${alias}\`.`);
+    await interaction.editReply(`Alias for <@${target.id}> set to \`${alias}\`.`);
     logger.info(`Set alias ${alias} for account ${accountName}`);
     return;
   }
@@ -97,7 +97,7 @@ export async function handleAlias(
   if (subcommand === "reset") {
     const removed = await authDb.resetAlias(accountId);
     await interaction.editReply(
-      removed ? `Alias for **${target.username}** removed.` : `**${target.username}** has no alias.`,
+      removed ? `Alias for <@${target.id}> removed.` : `<@${target.id}> has no alias.`,
     );
     logger.info(`Reset alias for account ${accountName} (removed=${removed})`);
     return;

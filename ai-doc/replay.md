@@ -23,6 +23,10 @@ participant's newest N.
 - `.replay <id>` / `.replay watch <id>` - watch
 - `.replay list [name]` - newest 10, optionally only matches of `name`
 - `.replay leave` - stop watching (`.spect leave` works too)
+- `.replay pause` / `.replay resume` - pause / resume the replay you watch
+- `.replay seek <target>` - jump on the timeline: `95` / `95s` (absolute seconds), `1:35` (m:ss), `+10` / `-10`
+  (relative seconds); clamped to the recording
+- `.replay state` - send the addon `STATE` message right away (for addons that just loaded)
 
 ## How it works
 
@@ -51,6 +55,48 @@ Playback (`Playback`):
   original timeline; `MSG_MOVE_*` timestamps are shifted to the current server
   clock. The recorded players exist only on the viewer's client.
 - after the last packet the viewer is sent back after 10 s.
+
+## Seeking and pause
+
+`Playback` keeps a timeline position (`positionMs`) instead of a start time; pausing stops it, the recorded
+packets stay in memory so the timeline can be revisited. Pure logic: `ReplayTimeline.hpp` (tests in
+`ReplayTimeline_test.cpp`).
+
+- **Forward**: the packets between the current position and the target are sent at once, except one-shot
+  effects (`isTransientOpcode`: spell start/go, combat log lines, visuals, sounds, emotes); of the movement
+  packets (`MSG_MOVE_*`, `SMSG_MONSTER_MOVE`) only the last one per object is sent (`planJump`).
+- **Back**: the client can't be rewound, so every recorded object the recording mentions (movers, aura targets,
+  casters, destroyed objects - `collectObjectGuids`) is destroyed on the client (`SMSG_DESTROY_OBJECT`) and the
+  timeline is rebuilt from 0 to the target the same way. Static objects that never move or cast (e.g. recorded
+  doors) are not destroyed; their re-sent create packets just refresh them.
+- Movement timestamps are rebased on every send (`now - recordStart - position`), so a jumped-to move looks as
+  if it happened `position - offset` ago.
+- **Pause** is approximate: the client keeps animating a movement spline that already started until it ends,
+  and aura timers keep counting down client-side.
+- At the end the viewer is sent back after 10 s unless paused; a seek back from the end resumes playing.
+
+## Addon API
+
+Commands (an addon sends them as chat: `SendChatMessage(".replay seek 95", "SAY")`):
+
+| Command | Effect |
+|---|---|
+| `.replay pause` | pause |
+| `.replay resume` | resume |
+| `.replay seek <target>` | jump; `<target>` = seconds (`95`), `m:ss` (`1:35`), `+N` / `-N` relative seconds |
+| `.replay state` | ask for a `STATE` message now |
+| `.replay leave` | stop watching (sends `END` first) |
+
+Server -> addon messages arrive like the ArenaSpectator ones: `CHAT_MSG_ADDON` with prefix `ACREPLAY`, i.e.
+`event == "CHAT_MSG_ADDON"`, `arg1 == "ACREPLAY"`, `arg2` = the body below. All times are milliseconds.
+
+| Body | When |
+|---|---|
+| `STATE;at=<pos>;len=<duration>;paused=<0/1>;` | on start, every second while watching, and right after pause / resume / seek / `.replay state` |
+| `END;` | the replay closes (end reached and not paused, or `.replay leave`) |
+
+The position only changes through playback and seeks, so a timeline UI can interpolate locally between
+`STATE` messages while `paused=0`.
 
 ## Limitations
 

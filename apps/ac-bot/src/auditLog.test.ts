@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { formatDuration, formatEnded, formatMatchup } from "./auditLog";
+import { formatDuration, formatEnded, formatMatchup, splitTeams } from "./auditLog";
 import type { MatchupEndedEvent, MatchupEvent, Participant } from "./types";
 
 const EMOJI: Record<number, string> = {
@@ -130,6 +130,42 @@ describe("formatEnded", () => {
     expect(text).toContain("⚠️ SoloQ #1234 · cancelled at start (team short-handed)");
     expect(text).toContain("🟦 Alpha, Beta, Gamma");
     expect(text).not.toContain("+9");
+  });
+});
+
+describe("splitTeams", () => {
+  // soloq teams mix factions: the side must not be derived from teamId
+  const mixed = [
+    player({ characterName: "A1", classId: 1, teamId: 0 }),
+    player({ characterName: "A2", classId: 5, teamId: 0 }),
+    player({ characterName: "A3", classId: 8, teamId: 1 }),
+    player({ characterName: "B1", classId: 11, teamId: 0 }),
+    player({ characterName: "B2", classId: 4, teamId: 0 }),
+    player({ characterName: "B3", classId: 7, teamId: 0 }),
+  ];
+  const names = (players: Participant[]) => players.map((p) => p.characterName);
+
+  test("falls back to the core's order (team A first) when side is missing", () => {
+    const { teamA, teamB } = splitTeams(mixed);
+    expect(names(teamA)).toEqual(["A1", "A2", "A3"]);
+    expect(names(teamB)).toEqual(["B1", "B2", "B3"]);
+  });
+
+  test("uses the explicit side when the core sends it", () => {
+    const sided = mixed.map((p, i) => ({ ...p, side: (i % 2 === 0 ? "teamA" : "teamB") as "teamA" | "teamB" }));
+    const { teamA, teamB } = splitTeams(sided);
+    expect(names(teamA)).toEqual(["A1", "A3", "B2"]);
+    expect(names(teamB)).toEqual(["A2", "B1", "B3"]);
+  });
+});
+
+describe("formatEnded with same-faction teams", () => {
+  test("an all-alliance match still fills both lines", () => {
+    const event = endedEvent();
+    event.players = event.players.map((p) => ({ ...p, teamId: 0, faction: "alliance" }));
+    const text = formatEnded(event, emoji);
+    expect(text).toContain("🟦 <:warrior:100>Alpha +9 · <:priest:101>Beta +9 · <:mage:102>Gamma +9");
+    expect(text).toContain("🟥 <:druid:103>Delta -7 · Epsilon -7 · Zeta -7");
   });
 });
 

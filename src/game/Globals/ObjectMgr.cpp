@@ -9202,6 +9202,11 @@ uint8 ObjectMgr::CheckPlayerName(std::string_view name, bool create)
   if (wname.size() < minName)
     return CHAR_NAME_TOO_SHORT;
 
+  // arenacraft: character names are plain A-Z letters - no Cyrillic, umlauts, accents or other non-ASCII letters
+  // (#69). Covers creation, renames and race/faction changes.
+  if (!isBasicLatinString(wname, false))
+    return CHAR_NAME_INVALID_CHARACTER;
+
   // Check for mixed languages
   uint32 strictMask = sWorld->getIntConfig(CONFIG_STRICT_PLAYER_NAMES);
   if (!isValidString(wname, strictMask, false, create))

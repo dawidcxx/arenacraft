@@ -24,6 +24,7 @@ EndScriptData */
 
 #include "AccountMgr.h"
 #include "Chat.h"
+#include "CommandHelp.hpp"
 #include "CommandScript.h"
 #include "DatabaseEnv.h"
 #include "Language.h"
@@ -49,9 +50,17 @@ public:
                                               {"list", HandleGMListFullCommand, SEC_ADMINISTRATOR, Console::Yes},
                                               {"visible", HandleGMVisibleCommand, SEC_GAMEMASTER, Console::No},
                                               {"on", HandleGMOnCommand, SEC_MODERATOR, Console::No},
-                                              {"off", HandleGMOffCommand, SEC_MODERATOR, Console::No}};
+                                              {"off", HandleGMOffCommand, SEC_MODERATOR, Console::No},
+                                              {"help", HandleGMHelpCommand, SEC_MODERATOR, Console::Yes}};
     static ChatCommandTable commandTable   = {{"gm", gmCommandTable}};
     return commandTable;
+  }
+
+  // arenacraft: staff command overview, or every command of one group (see CommandHelp.hpp)
+  static bool HandleGMHelpCommand(ChatHandler* handler, Optional<std::string> group)
+  {
+    arenacraft::ShowStaffHelp(handler, group ? std::string_view(*group) : std::string_view());
+    return true;
   }
 
   // Enables or disables the staff badge

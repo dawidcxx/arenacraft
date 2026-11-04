@@ -15,8 +15,9 @@
  * `--finished false` publishes an aborted match; `--winner teamA|teamB` picks
  * the winning side for a finished match (default teamA).
  *
- * Account names must match Discord usernames (the bot maps them case-
- * insensitively). Anything omitted falls back to a default set.
+ * Voice moves resolve accountId -> account_discord, so pass real account IDs
+ * or use `--team-a-ids` / `--team-b-ids` with Discord user IDs for a purely
+ * fake match. Anything omitted falls back to a default set.
  */
 import { Redis } from "ioredis";
 
@@ -52,12 +53,27 @@ function accountList(value: string | undefined, fallback: string[]): string[] {
     .filter(Boolean);
 }
 
-function makeParticipant(accountName: string, slot: number, teamId: 0 | 1, index: number): Participant {
+function discordIdList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+function makeParticipant(
+  accountName: string,
+  slot: number,
+  teamId: 0 | 1,
+  index: number,
+  discordId?: string,
+): Participant {
   return {
     guid: `0x${(0x1000 + index).toString(16).padStart(16, "0")}`,
     characterName: accountName.charAt(0) + accountName.slice(1).toLowerCase(),
     accountId: index + 1,
     accountName,
+    discordId,
     classId: CLASSES[index % CLASSES.length]!,
     specIndex: 0,
     role: ROLE_SLOTS[slot % ROLE_SLOTS.length]!,
@@ -88,10 +104,12 @@ async function main(): Promise<void> {
 
   const teamANames = accountList(args["team-a"], ["ALPHA", "BRAVO", "CHARLIE"]);
   const teamBNames = accountList(args["team-b"], ["DELTA", "ECHO", "FOXTROT"]);
+  const teamAIds = discordIdList(args["team-a-ids"]);
+  const teamBIds = discordIdList(args["team-b-ids"]);
 
-  const teamAPlayers = teamANames.map((name, index) => makeParticipant(name, index, 0, index));
+  const teamAPlayers = teamANames.map((name, index) => makeParticipant(name, index, 0, index, teamAIds[index]));
   const teamBPlayers = teamBNames.map((name, index) =>
-    makeParticipant(name, index, 1, teamANames.length + index),
+    makeParticipant(name, index, 1, teamANames.length + index, teamBIds[index]),
   );
   const players = [...teamAPlayers, ...teamBPlayers];
 
