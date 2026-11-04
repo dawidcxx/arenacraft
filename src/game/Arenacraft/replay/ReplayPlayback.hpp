@@ -51,6 +51,7 @@ private:
   [[nodiscard]] Player* viewerOnMap(Battleground* bg) const;
   [[nodiscard]] bool    controllable() const { return _state == State::Playing || _state == State::Finished; }
   void                  sendPacket(Player* viewer, std::size_t index) const;
+  void                  sendJumpPacket(Player* viewer, std::size_t index, uint32_t targetMs) const;
   void                  sendUpTo(Player* viewer, uint32_t limitMs);
   void                  destroyRecordedObjects(Player* viewer) const;
   void                  tickState(Player* viewer, uint32_t diff);
@@ -58,14 +59,15 @@ private:
   ObjectGuid            _viewer;
   uint32_t              _replayId;
   ReplayData            _data;
-  std::vector<uint64_t> _objects;        // recorded objects destroyed on a seek back
-  uint32_t              _durationMs = 0; // offset of the last packet
-  State                 _state      = State::WaitingForViewer;
-  uint32_t              _timer      = 0; // ms in the current state
-  uint32_t              _posMs      = 0; // timeline position
-  uint32_t              _stateTimer = 0; // ms since the last addon state message
-  std::size_t           _next       = 0; // next packet to send
-  bool                  _paused     = false;
+  std::vector<uint64_t> _objects;                  // recorded objects destroyed on a seek back
+  bool                  _hasSpectatorData = false; // matches recorded with the spectator addon data
+  uint32_t              _durationMs       = 0;     // offset of the last packet
+  State                 _state            = State::WaitingForViewer;
+  uint32_t              _timer            = 0; // ms in the current state
+  uint32_t              _posMs            = 0; // timeline position
+  uint32_t              _stateTimer       = 0; // ms since the last addon state message
+  std::size_t           _next             = 0; // next packet to send
+  bool                  _paused           = false;
 };
 
 // The playback `viewer` is watching, if any (world thread).

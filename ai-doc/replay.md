@@ -77,7 +77,9 @@ packets stay in memory so the timeline can be revisited. Pure logic: `ReplayTime
 
 ## Addon API
 
-Commands (an addon sends them as chat: `SendChatMessage(".replay seek 95", "SAY")`):
+Commands (an addon sends them as chat: `SendChatMessage(".replay seek 95", "SAY")`). The viewer is a spectator, and
+spectators may not talk in the arena, but `ChatHandler` runs their chat commands before dropping the message, so
+`.replay` / `.spect` typed in SAY work for them:
 
 | Command | Effect |
 |---|---|
@@ -98,6 +100,21 @@ Server -> addon messages arrive like the ArenaSpectator ones: `CHAT_MSG_ADDON` w
 The position only changes through playback and seeks, so a timeline UI can interpolate locally between
 `STATE` messages while `paused=0`.
 
+## Spectator addon data
+
+The ArenaSpectator addon (`ASSUN` addon whispers: names, classes, health, power, casts, cooldowns, auras, target)
+works in replays too:
+- while a match is recorded, `Player::NeedSendSpectatorData` is true even without live spectators
+  (`Battleground::GetReplayRecording`), and `ArenaSpectator::SendPacketTo(Map*)` stores every spectator message in
+  the recording (`Recording::addNow`) besides sending it to live spectators;
+- when the gates open the recorder stores the full state of every player at offset 0
+  (`ArenaSpectator::SendArenaState`, what a newly joined spectator gets);
+- playback resends them like any other packet; the viewer joined as a spectator, so the addon got `ENABLE` already.
+- Seeking: a jump drops casts (`SPE`) and shortens cooldown (`ACD`), aura (`AUR`) and arena timer (`TIM`) values by
+  the skipped time (`adjustSpectatorMessage`); a seek back sends `ENABLE` first so the addon starts over, then the
+  state at 0 rebuilds its frames.
+- Recordings made before this have no spectator data; the addon UI stays empty for them.
+
 ## Limitations
 
 - A character can't watch a match it played in (its client would get a second
@@ -107,4 +124,3 @@ The position only changes through playback and seeks, so a timeline UI can inter
   primary stay invisible.
 - If the primary or secondary leaves the arena early, the recording loses that
   stream from then on.
-- No seeking/pause; playback runs from the start at normal speed.

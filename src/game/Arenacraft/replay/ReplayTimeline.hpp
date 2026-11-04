@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -28,6 +29,16 @@ std::optional<uint32_t> parseSeekTarget(std::string_view text, uint32_t currentM
 // after `targetMs`.
 std::vector<std::size_t> planJump(std::vector<RecordedPacket> const& packets, std::size_t from, uint32_t targetMs,
                                   std::size_t& next);
+
+// Spectator addon data recorded with the match: the text of a recorded "ASSUN\t..." addon whisper
+// (ArenaSpectator::CreatePacket), or nullopt for any other packet.
+std::optional<std::string_view> spectatorMessageOf(RecordedPacket const& packet);
+
+// A spectator message sent `skippedMs` after it was recorded (while jumping): casts ("SPE") are dropped, cooldown
+// ("ACD", seconds) and aura ("AUR", ms) timers are shortened by the skipped time and dropped once they ran out, the
+// arena timer ("TIM") counts on.
+// nullopt = don't send it; other messages come back unchanged.
+std::optional<std::string> adjustSpectatorMessage(std::string_view message, uint32_t skippedMs);
 
 // Every object guid the recording mentions in a way that can be parsed cheaply (movement, splines, auras, spell
 // casts, destroys). A seek back destroys these on the client before replaying from the start.

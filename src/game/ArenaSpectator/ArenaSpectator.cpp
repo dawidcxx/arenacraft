@@ -21,6 +21,7 @@
 #include "Map.h"
 #include "Pet.h"
 #include "Player.h"
+#include "ReplayRecorder.hpp"
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
 #include "World.h"
@@ -230,6 +231,67 @@ void ArenaSpectator::CreatePacket(WorldPacket& data, std::string const& message)
   data << uint8(0);
 }
 
+namespace
+{
+// Everything the spectator addon needs to know about one arena player (sent once per player).
+template <class T> void SendPlayerState(T* to, Battleground* bg, ObjectGuid guid, Player* plr)
+{
+  using namespace ArenaSpectator;
+
+  SendCommand_String(to, guid, "NME", plr->GetName().c_str());
+  // Xinef: addon compatibility
+  SendCommand_UInt32Value(to, guid, "TEM", plr->GetBgTeamId() == TEAM_ALLIANCE ? ALLIANCE : HORDE);
+  SendCommand_UInt32Value(to, guid, "CLA", plr->getClass());
+  SendCommand_UInt32Value(to, guid, "MHP", plr->GetMaxHealth());
+  SendCommand_UInt32Value(to, guid, "CHP", plr->GetHealth());
+  SendCommand_UInt32Value(to, guid, "STA", plr->IsAlive() ? 1 : 0);
+  Powers ptype = plr->getPowerType();
+  SendCommand_UInt32Value(to, guid, "PWT", ptype);
+  SendCommand_UInt32Value(to, guid, "MPW",
+                          ptype == POWER_RAGE || ptype == POWER_RUNIC_POWER ? plr->GetMaxPower(ptype) / 10
+                                                                            : plr->GetMaxPower(ptype));
+  SendCommand_UInt32Value(to, guid, "CPW",
+                          ptype == POWER_RAGE || ptype == POWER_RUNIC_POWER ? plr->GetPower(ptype) / 10
+                                                                            : plr->GetPower(ptype));
+  Pet* pet = plr->GetPet();
+  SendCommand_UInt32Value(to, guid, "PHP", pet && pet->GetCreatureTemplate()->family ? (uint32)pet->GetHealthPct() : 0);
+  SendCommand_UInt32Value(to, guid, "PET", pet ? pet->GetCreatureTemplate()->family : 0);
+  SendCommand_GUID(to, guid, "TRG", plr->GetTarget());
+  SendCommand_UInt32Value(to, guid, "RES", 1);
+  SendCommand_UInt32Value(to, guid, "CDC", 1);
+  SendCommand_UInt32Value(to, guid, "TIM",
+                          (bg->GetStartTime() < 46 * MINUTE * IN_MILLISECONDS)
+                              ? (46 * MINUTE * IN_MILLISECONDS - bg->GetStartTime()) / IN_MILLISECONDS
+                              : 0);
+  // "SPE" not here (only possible to send starting a new cast)
+
+  // send all "CD"
+  SpellCooldowns const& sc = plr->GetSpellCooldownMap();
+  for (SpellCooldowns::const_iterator itrc = sc.begin(); itrc != sc.end(); ++itrc)
+    if (itrc->second.sendToSpectator && itrc->second.maxduration >= SPECTATOR_COOLDOWN_MIN * IN_MILLISECONDS &&
+        itrc->second.maxduration <= SPECTATOR_COOLDOWN_MAX * IN_MILLISECONDS)
+      if (uint32 cd = (getMSTimeDiff(getMSTime(), itrc->second.end) / 1000))
+        SendCommand_Cooldown(to, guid, "ACD", itrc->first, cd, itrc->second.maxduration / 1000);
+
+  // send all visible "AUR"
+  Unit::VisibleAuraMap const* visibleAuras = plr->GetVisibleAuras();
+  for (Unit::VisibleAuraMap::const_iterator aitr = visibleAuras->begin(); aitr != visibleAuras->end(); ++aitr)
+  {
+    Aura* aura = aitr->second->GetBase();
+    if (ShouldSendAura(aura, aitr->second->GetEffectMask(), plr->GetGUID(), false))
+      SendCommand_Aura(to, guid, "AUR", aura->GetCasterGUID(), aura->GetSpellInfo()->Id,
+                       aura->GetSpellInfo()->IsPositive(), aura->GetSpellInfo()->Dispel, aura->GetDuration(),
+                       aura->GetMaxDuration(), (aura->GetCharges() > 1 ? aura->GetCharges() : aura->GetStackAmount()),
+                       false);
+  }
+}
+} // namespace
+
+template <> AC_GAME_API void ArenaSpectator::SendPacketTo(MessageSink const* sink, std::string&& message)
+{
+  sink->out(std::move(message));
+}
+
 void ArenaSpectator::HandleResetCommand(Player* player)
 {
   if (!player->FindMap() || !player->IsInWorld() || !player->FindMap()->IsBattleArena())
@@ -242,60 +304,19 @@ void ArenaSpectator::HandleResetCommand(Player* player)
   Battleground::BattlegroundPlayerMap const& pl = bg->GetPlayers();
   for (Battleground::BattlegroundPlayerMap::const_iterator itr = pl.begin(); itr != pl.end(); ++itr)
   {
-    if (player->HasReceivedSpectatorResetFor(itr->first))
+    if (player->HasReceivedSpectatorResetFor(itr->first) || !itr->second)
       continue;
 
-    Player* plr = itr->second;
     player->AddReceivedSpectatorResetFor(itr->first);
-
-    SendCommand_String(player, itr->first, "NME", plr->GetName().c_str());
-    // Xinef: addon compatibility
-    SendCommand_UInt32Value(player, itr->first, "TEM", plr->GetBgTeamId() == TEAM_ALLIANCE ? ALLIANCE : HORDE);
-    SendCommand_UInt32Value(player, itr->first, "CLA", plr->getClass());
-    SendCommand_UInt32Value(player, itr->first, "MHP", plr->GetMaxHealth());
-    SendCommand_UInt32Value(player, itr->first, "CHP", plr->GetHealth());
-    SendCommand_UInt32Value(player, itr->first, "STA", plr->IsAlive() ? 1 : 0);
-    Powers ptype = plr->getPowerType();
-    SendCommand_UInt32Value(player, itr->first, "PWT", ptype);
-    SendCommand_UInt32Value(player, itr->first, "MPW",
-                            ptype == POWER_RAGE || ptype == POWER_RUNIC_POWER ? plr->GetMaxPower(ptype) / 10
-                                                                              : plr->GetMaxPower(ptype));
-    SendCommand_UInt32Value(player, itr->first, "CPW",
-                            ptype == POWER_RAGE || ptype == POWER_RUNIC_POWER ? plr->GetPower(ptype) / 10
-                                                                              : plr->GetPower(ptype));
-    Pet* pet = plr->GetPet();
-    SendCommand_UInt32Value(player, itr->first, "PHP",
-                            pet && pet->GetCreatureTemplate()->family ? (uint32)pet->GetHealthPct() : 0);
-    SendCommand_UInt32Value(player, itr->first, "PET", pet ? pet->GetCreatureTemplate()->family : 0);
-    SendCommand_GUID(player, itr->first, "TRG", plr->GetTarget());
-    SendCommand_UInt32Value(player, itr->first, "RES", 1);
-    SendCommand_UInt32Value(player, itr->first, "CDC", 1);
-    SendCommand_UInt32Value(player, itr->first, "TIM",
-                            (bg->GetStartTime() < 46 * MINUTE * IN_MILLISECONDS)
-                                ? (46 * MINUTE * IN_MILLISECONDS - bg->GetStartTime()) / IN_MILLISECONDS
-                                : 0);
-    // "SPE" not here (only possible to send starting a new cast)
-
-    // send all "CD"
-    SpellCooldowns const& sc = plr->GetSpellCooldownMap();
-    for (SpellCooldowns::const_iterator itrc = sc.begin(); itrc != sc.end(); ++itrc)
-      if (itrc->second.sendToSpectator && itrc->second.maxduration >= SPECTATOR_COOLDOWN_MIN * IN_MILLISECONDS &&
-          itrc->second.maxduration <= SPECTATOR_COOLDOWN_MAX * IN_MILLISECONDS)
-        if (uint32 cd = (getMSTimeDiff(getMSTime(), itrc->second.end) / 1000))
-          SendCommand_Cooldown(player, itr->first, "ACD", itrc->first, cd, itrc->second.maxduration / 1000);
-
-    // send all visible "AUR"
-    Unit::VisibleAuraMap const* visibleAuras = plr->GetVisibleAuras();
-    for (Unit::VisibleAuraMap::const_iterator aitr = visibleAuras->begin(); aitr != visibleAuras->end(); ++aitr)
-    {
-      Aura* aura = aitr->second->GetBase();
-      if (ShouldSendAura(aura, aitr->second->GetEffectMask(), plr->GetGUID(), false))
-        SendCommand_Aura(player, itr->first, "AUR", aura->GetCasterGUID(), aura->GetSpellInfo()->Id,
-                         aura->GetSpellInfo()->IsPositive(), aura->GetSpellInfo()->Dispel, aura->GetDuration(),
-                         aura->GetMaxDuration(), (aura->GetCharges() > 1 ? aura->GetCharges() : aura->GetStackAmount()),
-                         false);
-    }
+    SendPlayerState(player, bg, itr->first, itr->second);
   }
+}
+
+void ArenaSpectator::SendArenaState(Battleground* bg, MessageSink const& sink)
+{
+  for (auto const& [guid, plr] : bg->GetPlayers())
+    if (plr)
+      SendPlayerState(&sink, bg, guid, plr);
 }
 
 bool ArenaSpectator::ShouldSendAura(Aura* aura, uint8 effMask, ObjectGuid targetGUID, bool remove)
@@ -340,5 +361,8 @@ template <> AC_GAME_API void ArenaSpectator::SendPacketTo(const Map* map, std::s
 
   WorldPacket data;
   CreatePacket(data, message);
+  // Arenacraft: recorded matches keep the spectator data, so the addon works when the replay is watched
+  if (std::shared_ptr<arenacraft::replay::Recording> const& recording = bg->GetReplayRecording())
+    recording->addNow(data.GetOpcode(), data.contents(), data.size());
   bg->SpectatorsSendPacket(data);
 }

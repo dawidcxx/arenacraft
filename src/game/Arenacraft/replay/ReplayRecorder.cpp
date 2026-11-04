@@ -1,5 +1,6 @@
 #include "ReplayRecorder.hpp"
 
+#include "ArenaSpectator.h"
 #include "Battleground.h"
 #include "DatabaseEnv.h"
 #include "Log.h"
@@ -206,6 +207,11 @@ void Recording::onPacket(bool fromPrimary, uint16_t opcode, uint8_t const* data,
 
 void Recording::addInitial(uint16_t opcode, uint8_t const* data, std::size_t size) { append(0, opcode, data, size); }
 
+void Recording::addNow(uint16_t opcode, uint8_t const* data, std::size_t size)
+{
+  append(getMSTimeDiff(_startMs, getMSTime()), opcode, data, size);
+}
+
 void Recording::append(uint32_t offset, uint16_t opcode, uint8_t const* data, std::size_t size)
 {
   std::lock_guard<std::mutex> guard(_lock);
@@ -308,6 +314,17 @@ void ReplayRecorder::onGatesOpen(Battleground* bg)
   for (Unit* unit : units)
     appendAuras(*recording, unit);
 
+  // The spectator addon's view of the match (names, classes, health, cooldowns, auras), like a spectator who just
+  // joined gets it; the updates follow through ArenaSpectator::SendPacketTo while the match runs.
+  ArenaSpectator::MessageSink const sink{[&recording](std::string&& message)
+                                         {
+                                           WorldPacket chat;
+                                           ArenaSpectator::CreatePacket(chat, message);
+                                           recording->addInitial(chat.GetOpcode(), chat.contents(), chat.size());
+                                         }};
+  ArenaSpectator::SendArenaState(bg, sink);
+  bg->SetReplayRecording(recording);
+
   Active active;
   active.recording = recording;
   active.bracket   = bracket;
@@ -347,6 +364,8 @@ void ReplayRecorder::onArenaEnd(Battleground* bg, uint8_t winnerTeam)
 {
   if (!bg)
     return;
+
+  bg->SetReplayRecording(nullptr);
 
   Active active;
   {

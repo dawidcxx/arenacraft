@@ -36,6 +36,8 @@ public:
   void onPacket(bool fromPrimary, uint16_t opcode, uint8_t const* data, std::size_t size);
   // snapshot packets taken when recording starts, at offset 0
   void addInitial(uint16_t opcode, uint8_t const* data, std::size_t size);
+  // a packet that is not tapped from a session (spectator addon data), at the current time
+  void addNow(uint16_t opcode, uint8_t const* data, std::size_t size);
 
   // Stops accepting packets and returns everything captured so far.
   std::vector<RecordedPacket> finish();

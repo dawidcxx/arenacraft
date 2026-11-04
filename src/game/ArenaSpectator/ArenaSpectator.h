@@ -26,7 +26,10 @@
 #include "SpellMgr.h"
 #include "StringFormat.h"
 
+#include <functional>
+
 class Aura;
+class Battleground;
 class Player;
 class Map;
 class WorldPacket;
@@ -41,6 +44,12 @@ class WorldPacket;
 
 namespace ArenaSpectator
 {
+// Collects addon messages instead of sending them (the replay recorder stores them with the match).
+struct MessageSink
+{
+  std::function<void(std::string&&)> out;
+};
+
 template <class T> AC_GAME_API void SendPacketTo(const T* object, std::string&& message);
 
 template <class T, typename Format, typename... Args> inline void SendCommand(T* o, Format&& fmt, Args&&... args)
@@ -110,6 +119,8 @@ AC_GAME_API bool HandleSpectatorSpectateCommand(ChatHandler* handler, std::strin
 AC_GAME_API bool HandleSpectatorWatchCommand(ChatHandler* handler, std::string const& name);
 AC_GAME_API void CreatePacket(WorldPacket& data, std::string const& message);
 AC_GAME_API void HandleResetCommand(Player* player);
+// The full state of every player of the arena (what a new spectator gets), for the replay recorder.
+AC_GAME_API void SendArenaState(Battleground* bg, MessageSink const& sink);
 AC_GAME_API bool ShouldSendAura(Aura* aura, uint8 effMask, ObjectGuid targetGUID, bool remove);
 } // namespace ArenaSpectator
 

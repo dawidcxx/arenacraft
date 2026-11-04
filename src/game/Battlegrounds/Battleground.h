@@ -26,6 +26,8 @@
 #include "SharedDefines.h"
 #include "World.h"
 
+#include <memory>
+
 class Creature;
 class GameObject;
 class Group;
@@ -43,6 +45,11 @@ class BattlegroundSA;
 class BattlegroundDS;
 class BattlegroundRV;
 class BattlegroundIC;
+
+namespace arenacraft::replay
+{
+class Recording;
+}
 
 struct PvPDifficultyEntry;
 struct GraveyardStruct;
@@ -393,6 +400,15 @@ public:
   void SetRated(bool state) { m_IsRated = state; }
   // Arenacraft: rated arena created by the solo queue (not a team bracket)
   void SetSoloq(bool state) { m_IsSoloq = state; }
+  // Arenacraft: the replay recording of this arena while it runs (spectator addon data is recorded too)
+  void SetReplayRecording(std::shared_ptr<arenacraft::replay::Recording> recording)
+  {
+    m_replayRecording = std::move(recording);
+  }
+  [[nodiscard]] std::shared_ptr<arenacraft::replay::Recording> const& GetReplayRecording() const
+  {
+    return m_replayRecording;
+  }
   void SetArenaType(uint8 type) { m_ArenaType = type; }
   void SetArenaorBGType(bool _isArena) { m_IsArena = _isArena; }
   void SetWinner(PvPTeamId winner) { m_WinnerId = winner; }
@@ -851,6 +867,7 @@ private:
   int32       m_StartDelayTime;
   bool        m_IsRated; // is this battle rated?
   bool        m_IsSoloq{false};
+  std::shared_ptr<arenacraft::replay::Recording> m_replayRecording;
   bool        m_PrematureCountDown;
   uint32      m_PrematureCountDownTimer;
   std::string m_Name{};
