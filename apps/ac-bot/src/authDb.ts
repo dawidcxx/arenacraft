@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
-import { makeRegistrationData, verifyPassword as verifySrp6Password } from "./srp6";
+import { makeRegistrationData } from "./srp6";
 
 const EXPANSION_WOTLK = 2;
 
@@ -13,13 +13,8 @@ export interface AccountRef {
 export interface AccountSummary {
   id: number;
   username: string;
-  lastIp: string;
+  discordId: string | null;
   gmLevel: number;
-}
-
-export interface DiscordLink {
-  accountId: number;
-  discordId: string;
 }
 
 export class AuthDb {
@@ -42,14 +37,6 @@ export class AuthDb {
       }
       throw error;
     }
-  }
-
-  async accountExists(username: string): Promise<boolean> {
-    const [rows] = await this.pool.execute<RowDataPacket[]>(
-      "SELECT id FROM account WHERE username = ? LIMIT 1",
-      [username],
-    );
-    return rows.length > 0;
   }
 
   /** Resolves account ids to usernames. Missing ids are simply absent from the map. */
@@ -78,29 +65,22 @@ export class AuthDb {
     return row ? { id: Number(row.id), username: String(row.username) } : null;
   }
 
-  async discordIdByAccountId(accountId: number): Promise<string | null> {
-    const [rows] = await this.pool.execute<RowDataPacket[]>(
-      "SELECT discord_id FROM account_discord WHERE account_id = ? LIMIT 1",
-      [accountId],
-    );
-    const row = rows[0];
-    return row ? String(row.discord_id) : null;
-  }
-
   async discordIdsByAccountIds(ids: number[]): Promise<Map<number, string>> {
     const unique = [...new Set(ids)];
     if (unique.length === 0) return new Map();
 
     const placeholders = unique.map(() => "?").join(", ");
     const [rows] = await this.pool.execute<RowDataPacket[]>(
-      `SELECT account_id, discord_id FROM account_discord WHERE account_id IN (${placeholders})`,
+      `SELECT account_id AS accountId, discord_id AS discordId
+       FROM account_discord
+       WHERE account_id IN (${placeholders})`,
       unique,
     );
-    return new Map(rows.map((row) => [Number(row.account_id), String(row.discord_id)]));
+    return new Map(rows.map((row) => [Number(row.accountId), String(row.discordId)]));
   }
 
   /**
-   * Creates a fresh account bound to a Discord user. The caller must have
+   * Creates a fresh account owned by a Discord user. The caller must have
    * verified the account name and Discord ID are not already used.
    */
   async createAccount(discordId: string, username: string, password: string): Promise<void> {
@@ -139,13 +119,6 @@ export class AuthDb {
     }
   }
 
-  async bindDiscordId(accountId: number, discordId: string): Promise<void> {
-    await this.pool.execute("INSERT INTO account_discord (account_id, discord_id) VALUES (?, ?)", [
-      accountId,
-      discordId,
-    ]);
-  }
-
   /**
    * Replaces an existing account's credentials.
    */
@@ -165,52 +138,19 @@ export class AuthDb {
     ]);
   }
 
-  async verifyAccountPassword(accountId: number, password: string): Promise<boolean> {
-    const [rows] = await this.pool.execute<RowDataPacket[]>(
-      "SELECT username, salt, verifier FROM account WHERE id = ? LIMIT 1",
-      [accountId],
-    );
-    const row = rows[0];
-    if (!row) return false;
-    return verifySrp6Password(
-      String(row.username),
-      password,
-      row.salt as Buffer,
-      row.verifier as Buffer,
-    );
-  }
-
-  /** Resolves a (normalized) account name to its id, or null when it does not exist. */
-  async accountIdByName(username: string): Promise<number | null> {
-    const [rows] = await this.pool.execute<RowDataPacket[]>("SELECT id FROM account WHERE username = ? LIMIT 1", [
-      username,
-    ]);
-    const row = rows[0];
-    return row ? Number(row.id) : null;
-  }
-
   async listAccounts(): Promise<AccountSummary[]> {
     const [rows] = await this.pool.execute<RowDataPacket[]>(
-      `SELECT a.id, a.username, a.last_ip AS lastIp,
+      `SELECT a.id, a.username, d.discord_id AS discordId,
               COALESCE((SELECT MAX(aa.gmlevel) FROM account_access aa WHERE aa.id = a.id), 0) AS gmLevel
        FROM account a
+       LEFT JOIN account_discord d ON d.account_id = a.id
        ORDER BY a.id ASC`,
     );
     return rows.map((row) => ({
       id: Number(row.id),
       username: String(row.username),
-      lastIp: String(row.lastIp),
+      discordId: row.discordId === null ? null : String(row.discordId),
       gmLevel: Number(row.gmLevel),
-    }));
-  }
-
-  async listDiscordLinks(): Promise<DiscordLink[]> {
-    const [rows] = await this.pool.execute<RowDataPacket[]>(
-      "SELECT account_id AS accountId, discord_id AS discordId FROM account_discord",
-    );
-    return rows.map((row) => ({
-      accountId: Number(row.accountId),
-      discordId: String(row.discordId),
     }));
   }
 

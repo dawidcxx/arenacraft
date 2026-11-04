@@ -32,7 +32,7 @@ export function formatLookup(
     return `**${charName}** is on account \`${accountName}\`, but no matching Discord member was found.`;
   }
   if (!verified) {
-    return `**${charName}** is on account \`${accountName}\`; Discord match <@${discordId}> is unverified (legacy account not linked).`;
+    return `**${charName}** is on account \`${accountName}\`; Discord match <@${discordId}> is unverified (legacy account has no Discord owner).`;
   }
   return `**${charName}** is played by <@${discordId}> (\`${discordId}\`).`;
 }

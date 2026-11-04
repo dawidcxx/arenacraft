@@ -11,8 +11,8 @@
  * `--finished false` publishes an aborted match; `--winner teamA|teamB` picks
  * the winning side for a finished match (default teamA).
  *
- * Voice moves resolve accountId -> account_discord, so pass real linked account
- * IDs or use `--team-a-ids` / `--team-b-ids` with Discord user IDs for a purely
+ * Voice moves resolve accountId -> account_discord, so pass real account IDs
+ * or use `--team-a-ids` / `--team-b-ids` with Discord user IDs for a purely
  * fake match. Anything omitted falls back to a default set.
  */
 import { Redis } from "ioredis";

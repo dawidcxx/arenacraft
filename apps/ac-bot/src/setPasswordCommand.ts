@@ -19,7 +19,7 @@ export async function handleSetPassword(interaction: ChatInputCommandInteraction
   const account = await authDb.accountByDiscordId(interaction.user.id);
   if (!account) {
     await interaction.editReply(
-      "You don't have a linked Arenacraft account yet. Run `/register` first (use `old_password` if you already have a login).",
+      "You don't have an Arenacraft account yet. Run `/register` first. If you have a legacy account that isn't connected to Discord, contact an admin.",
     );
     return;
   }

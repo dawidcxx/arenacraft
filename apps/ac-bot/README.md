@@ -4,12 +4,12 @@ Rewritten Arenacraft Discord bot. Six jobs:
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
-   Ownership is stored in `acore_auth.account_discord` against the immutable
-   Discord user ID, so renaming a handle cannot take over an account. Calling it
-   again resets the password for the account linked to that Discord ID. On
-   startup the bot auto-links legacy accounts whose username still matches a
-   current member; anything ambiguous is logged for manual resolution. An
-   existing unlinked account can also be claimed by passing `old_password`.
+   Player accounts store their owner's immutable Discord user ID in
+   `acore_auth.account_discord`, so renaming a handle cannot take over an
+   account. Calling it again resets the password for that account. Legacy
+   player accounts with no owner are reported by the startup audit and must be
+   connected manually by an admin. Staff/GM accounts do not need a Discord
+   owner.
 2. **Greeting** - `/ping` greets the caller publicly in the channel.
 3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
    `soloq-matchup-ended` Redis events and moves players between the waiting room
@@ -41,31 +41,38 @@ bun run start
 
 The bot needs the **Server Members** privileged intent enabled in the Discord
 Developer Portal (Bot -> Privileged Gateway Intents). Members are resolved by
-the Discord user ID stored in `account_discord`, never by their current handle.
+the Discord user ID stored in `account_discord`, never by their current
+handle.
 
-On startup legacy accounts are auto-linked when exactly one current member still
-holds the matching handle. Conflicts are logged and left alone: no matching
-member, a member already linked to another account, or a linked account whose
-old handle is now held by a different member. Resolve those manually, e.g.:
+On startup the bot audits accounts: duplicate owners, reclaimed handles,
+lookalike names and player accounts with no Discord owner. IP addresses are not
+used for grouping; a proxy/VPN makes almost everyone share an IP.
+`gm=<level>` marks staff accounts. Conflicts are left alone and must be resolved
+manually, e.g.:
 
 ```sql
-INSERT INTO acore_auth.account_discord (account_id, discord_id) VALUES (<account id>, '<discord id>');
+INSERT INTO acore_auth.account_discord (account_id, discord_id)
+VALUES (<account id>, '<discord id>');
 ```
 
-To audit existing accounts for takeover/duplicate signals (duplicate links,
-reclaimed handles, lookalike names, shared IPs, orphaned legacy accounts):
+A player account without a Discord owner is an anomaly (legacy data or a ban),
+not a normal state. Staff/GM accounts are exempt. List unowned player accounts
+with:
 
-```bash
-bun run flag-accounts             # report only (exit 0)
-bun run flag-accounts --link      # auto-link legacy accounts, then report
-bun run flag-accounts --shared-ip # also show shared-IP groups (NAT/VPN noise)
-bun run flag-accounts --strict    # exit 1 when flags are found (for CI)
+```sql
+SELECT a.id, a.username
+FROM acore_auth.account a
+LEFT JOIN acore_auth.account_discord d ON d.account_id = a.id
+LEFT JOIN acore_auth.account_access aa ON aa.id = a.id AND aa.gmlevel > 0
+WHERE d.account_id IS NULL AND aa.id IS NULL
+ORDER BY a.id;
 ```
 
-Exit code 0 means the scan completed; it does not mean "no findings". Findings
-are listed in the output. Shared-IP groups are hidden by default because a
-proxy/VPN makes almost everyone share an IP. `gm=<level>` shows staff accounts
-so they are not mistaken for player alts.
+The bot is the only production entry point; there is no separate
+account-migration script. (`scripts/emit-fake-event.ts` remains a dev-only Redis
+helper for testing the voice flow.) The auth database URL comes from
+`AUTH_DB_URL` or, when unset, the core's `AC_LOGIN_DATABASE_INFO`
+(`host;port;user;password;database`).
 
 The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
 `hunter`, `rogue`, `priest`, `deathknight`, `shaman`, `mage`, `warlock`,
@@ -119,5 +126,6 @@ bun run scripts/emit-fake-event.ts --channel matchup --instance 42
 bun run scripts/emit-fake-event.ts --channel ended --instance 42
 ```
 
-Without `--team-a-ids` / `--team-b-ids` the fake `accountId`s are looked up in
-`account_discord`; pass IDs for a purely fake match with no DB accounts.
+Without `--team-a-ids` / `--team-b-ids` the bot resolves the fake `accountId`s
+through `account_discord`; pass IDs for a purely fake match with no DB
+accounts.

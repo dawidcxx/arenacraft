@@ -2,13 +2,12 @@ import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import type { InteractionReplyOptions } from "discord.js";
 
 import { ALIAS_COMMAND, handleAlias } from "./aliasCommand";
+import { auditAccounts } from "./accountAudit";
 import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
 import { getConfig } from "./config";
-import { buildAccountFlags } from "./duplicateAccounts";
 import { logger } from "./logger";
-import { autoLinkLegacyAccounts, formatLegacyConflict } from "./legacyLink";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
 import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
 import { PING_COMMAND, handlePing } from "./pingCommand";
@@ -23,7 +22,12 @@ const config = getConfig();
 const authDb = new AuthDb(config.AUTH_DB_URL);
 const characterDb = new CharacterDb(config.CHARACTER_DB_URL);
 
-await authDb.assertSchema();
+try {
+  await authDb.assertSchema();
+} catch (error) {
+  logger.error("Auth database schema check failed", error);
+  process.exit(1);
+}
 
 // Soloq leaderboard queries join several tables; one 30s snapshot per window is
 // plenty for a Discord leaderboard and keeps the DB load negligible.
@@ -65,30 +69,7 @@ client.once(Events.ClientReady, async (readyClient) => {
     const members = guild.members.cache
       .filter((member) => !member.user.bot)
       .map((member) => ({ id: member.id, username: member.user.username }));
-
-    logger.info(`Starting legacy account migration (${members.length} Discord member(s))`);
-    if (members.length === 0) {
-      logger.warn("No Discord members in cache; legacy account migration skipped");
-    }
-    const { linked, plan } = await autoLinkLegacyAccounts(authDb, members);
-    logger.info(`Legacy account migration: linked ${linked} account(s)`);
-    for (const conflict of plan.conflicts) logger.warn(formatLegacyConflict(conflict));
-
-    const [accounts, links] = await Promise.all([authDb.listAccounts(), authDb.listDiscordLinks()]);
-    const auditFlags = buildAccountFlags(accounts, links, members).filter((flag) => flag.kind !== "shared-ip");
-    if (auditFlags.length === 0) {
-      logger.info("Account audit: no duplicate or suspicious accounts found");
-    } else {
-      logger.warn(`Account audit: ${auditFlags.length} group(s) need review`);
-      for (const flag of auditFlags) {
-        logger.warn(`[${flag.kind}] ${flag.title}`);
-        for (const account of flag.accounts) {
-          logger.warn(
-            `  #${account.id} ${account.username} discord=${account.discordId ?? "unlinked"} gm=${account.gmLevel}`,
-          );
-        }
-      }
-    }
+    await auditAccounts(authDb, members);
 
     const rooms = new RoomManager(guild, config);
     await rooms.init();

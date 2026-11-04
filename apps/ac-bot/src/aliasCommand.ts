@@ -75,7 +75,7 @@ export async function handleAlias(
 
   const account = await authDb.accountByDiscordId(target.id);
   if (account === null) {
-    await interaction.editReply(`<@${target.id}> has not linked an account yet.`);
+    await interaction.editReply(`<@${target.id}> has no Arenacraft account yet.`);
     return;
   }
   const accountId = account.id;

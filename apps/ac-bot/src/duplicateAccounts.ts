@@ -1,13 +1,8 @@
 export interface AccountLike {
   id: number;
   username: string;
-  lastIp: string;
+  discordId: string | null;
   gmLevel?: number;
-}
-
-export interface LinkLike {
-  accountId: number;
-  discordId: string;
 }
 
 export interface MemberLike {
@@ -19,25 +14,21 @@ export interface AccountEntry {
   id: number;
   username: string;
   discordId: string | null;
-  lastIp: string;
   gmLevel: number;
 }
 
 export type AccountFlagKind =
-  | "duplicate-link"
+  | "duplicate-owner"
   | "handle-reclaimed"
-  | "member-already-linked"
+  | "member-already-owns-account"
   | "lookalike-name"
-  | "orphaned"
-  | "shared-ip";
+  | "unconnected";
 
 export interface AccountFlag {
   kind: AccountFlagKind;
   title: string;
   accounts: AccountEntry[];
 }
-
-const IGNORED_IPS = new Set(["", "0.0.0.0", "127.0.0.1", "::1"]);
 
 export function looseAccountKey(username: string): string {
   return username
@@ -63,17 +54,11 @@ function byUsername(a: AccountEntry, b: AccountEntry): number {
   return a.username.localeCompare(b.username, undefined, { sensitivity: "base" }) || a.id - b.id;
 }
 
-export function buildAccountFlags(
-  accounts: AccountLike[],
-  links: LinkLike[],
-  members: MemberLike[] = [],
-): AccountFlag[] {
-  const linkByAccount = new Map(links.map((link) => [link.accountId, link.discordId]));
+export function buildAccountFlags(accounts: AccountLike[], members: MemberLike[] = []): AccountFlag[] {
   const entries: AccountEntry[] = accounts.map((account) => ({
     id: account.id,
     username: account.username,
-    discordId: linkByAccount.get(account.id) ?? null,
-    lastIp: account.lastIp,
+    discordId: account.discordId,
     gmLevel: account.gmLevel ?? 0,
   }));
 
@@ -82,8 +67,8 @@ export function buildAccountFlags(
   for (const [discordId, group] of groupBy(entries, (entry) => entry.discordId)) {
     if (group.length < 2) continue;
     flags.push({
-      kind: "duplicate-link",
-      title: `Discord ID ${discordId} is linked to ${group.length} accounts`,
+      kind: "duplicate-owner",
+      title: `Discord ID ${discordId} owns ${group.length} accounts`,
       accounts: [...group].sort(byUsername),
     });
   }
@@ -97,32 +82,29 @@ export function buildAccountFlags(
     });
   }
 
-  for (const [ip, group] of groupBy(entries, (entry) => (IGNORED_IPS.has(entry.lastIp) ? null : entry.lastIp))) {
-    if (group.length < 2) continue;
-    flags.push({
-      kind: "shared-ip",
-      title: `${group.length} accounts share last IP ${ip}`,
-      accounts: [...group].sort(byUsername),
-    });
-  }
-
   if (members.length > 0) {
     const memberNames = new Set(members.map((member) => member.username.toLowerCase()));
-    const orphaned = entries.filter(
-      (entry) => entry.discordId === null && !memberNames.has(entry.username.toLowerCase()),
+    const unconnected = entries.filter(
+      (entry) =>
+        entry.gmLevel === 0 && entry.discordId === null && !memberNames.has(entry.username.toLowerCase()),
     );
-    if (orphaned.length > 0) {
+    if (unconnected.length > 0) {
       flags.push({
-        kind: "orphaned",
-        title: `${orphaned.length} unlinked account(s) match no current Discord member (rename/claim risk)`,
-        accounts: orphaned.sort(byUsername),
+        kind: "unconnected",
+        title: `${unconnected.length} account(s) have no Discord owner and match no current member`,
+        accounts: unconnected.sort(byUsername),
       });
     }
 
     const memberIdByUsername = new Map(members.map((member) => [member.username.toLowerCase(), member.id]));
     const reclaimed = entries.filter((entry) => {
       const currentMemberId = memberIdByUsername.get(entry.username.toLowerCase());
-      return entry.discordId !== null && currentMemberId !== undefined && currentMemberId !== entry.discordId;
+      return (
+        entry.gmLevel === 0 &&
+        entry.discordId !== null &&
+        currentMemberId !== undefined &&
+        currentMemberId !== entry.discordId
+      );
     });
     if (reclaimed.length > 0) {
       flags.push({
@@ -132,30 +114,29 @@ export function buildAccountFlags(
       });
     }
 
-    const linkedDiscordIds = new Set(
+    const ownedDiscordIds = new Set(
       entries.map((entry) => entry.discordId).filter((id): id is string => id !== null),
     );
     const blocked = entries.filter((entry) => {
-      if (entry.discordId !== null) return false;
+      if (entry.gmLevel !== 0 || entry.discordId !== null) return false;
       const memberId = memberIdByUsername.get(entry.username.toLowerCase());
-      return memberId !== undefined && linkedDiscordIds.has(memberId);
+      return memberId !== undefined && ownedDiscordIds.has(memberId);
     });
     if (blocked.length > 0) {
       flags.push({
-        kind: "member-already-linked",
-        title: `${blocked.length} unlinked account(s) match a Discord user who already owns another account`,
+        kind: "member-already-owns-account",
+        title: `${blocked.length} account(s) have no Discord owner but match a Discord user who already owns another account`,
         accounts: blocked.sort(byUsername),
       });
     }
   }
 
   const order: AccountFlagKind[] = [
-    "duplicate-link",
+    "duplicate-owner",
     "handle-reclaimed",
-    "member-already-linked",
-    "orphaned",
+    "member-already-owns-account",
+    "unconnected",
     "lookalike-name",
-    "shared-ip",
   ];
   return flags.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
 }

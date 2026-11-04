@@ -7,8 +7,7 @@
     "start": "bun run src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "emit": "bun run scripts/emit-fake-event.ts",
-    "flag-accounts": "bun run scripts/flag-accounts.ts"
+    "emit": "bun run scripts/emit-fake-event.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
