@@ -3,7 +3,6 @@ import type { ChatInputCommandInteraction } from "discord.js";
 
 import type { AuthDb } from "./authDb";
 import { logger } from "./logger";
-import { normalizeAccountName } from "./wowName";
 
 export const SET_PASSWORD_COMMAND = new SlashCommandBuilder()
   .setName("setpassword")
@@ -12,19 +11,20 @@ export const SET_PASSWORD_COMMAND = new SlashCommandBuilder()
   .toJSON();
 
 export async function handleSetPassword(interaction: ChatInputCommandInteraction, authDb: AuthDb): Promise<void> {
-  const discordUsername = interaction.user.username;
-  const accountName = normalizeAccountName(discordUsername);
   const password = interaction.options.getString("password", true);
 
   // Acknowledge within Discord's 3s window; the DB writes below can be slower.
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  if (!(await authDb.accountExists(accountName))) {
-    await interaction.editReply("You don't have an Arenacraft account yet. Run /register first.");
+  const account = await authDb.accountByDiscordId(interaction.user.id);
+  if (!account) {
+    await interaction.editReply(
+      "You don't have an Arenacraft account yet. Run `/register` first. If you have a legacy account that isn't connected to Discord, contact an admin.",
+    );
     return;
   }
 
-  await authDb.resetPassword(accountName, password);
-  await interaction.editReply("Password updated. Use it the next time you log in.");
-  logger.info(`Set password for account ${accountName} (Discord user ${discordUsername})`);
+  await authDb.resetPasswordForAccount(account.id, password);
+  await interaction.editReply(`Password updated for \`${account.username}\`. Use it the next time you log in.`);
+  logger.info(`Set password for account ${account.username} (Discord user ${interaction.user.id})`);
 }

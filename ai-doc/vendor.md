@@ -186,6 +186,12 @@ position reset is skipped too, so the character keeps the arena-hub homebind
 (`Player::_LoadHomeBind`) and its saved position instead of being moved to the
 new faction's capital.
 
+The **Change Race** option works the same way with `AT_LOGIN_CHANGE_RACE`
+(`ShowConfirmMenu` is shared by both): after logging out the player picks a new
+race **of the same faction** on the character screen; a race from the other
+faction is rejected by the core (`CHAR_CREATE_CHARACTER_SWAP_FACTION`), which is
+what Change Faction is for.
+
 Current lists: Wrathful Set & Weapons (270 set + 277 weapons, plus the ilvl-251
 Wintergrasp Titan-Forged shoulders 51572-51581), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator

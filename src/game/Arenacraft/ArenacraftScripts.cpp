@@ -4,6 +4,7 @@
 #include "GeneralGoodsVendor.hpp"
 #include "ItemVendor.hpp"
 #include "PreBuffs.hpp"
+#include "fingerprint/FingerprintScripts.hpp"
 #include "patrol/Patrol.hpp"
 #include "replay/ReplayScripts.hpp"
 #include "soloq/SoloqNpc.hpp"
@@ -32,4 +33,5 @@ void AddArenacraftScripts()
   arenacraft::replay::AddReplayScripts();
   arenacraft::patrol::AddPatrolScripts();
   arenacraft::vip::AddVipScripts();
+  arenacraft::fingerprint::AddFingerprintScripts();
 }

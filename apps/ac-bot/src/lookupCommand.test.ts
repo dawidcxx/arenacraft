@@ -29,4 +29,10 @@ describe("formatLookup", () => {
       "**Athene** is on account `venruki`, but no matching Discord member was found.",
     );
   });
+
+  test("marks username-based legacy matches as unverified", () => {
+    expect(formatLookup("Athene", "venruki", "111", false)).toBe(
+      "**Athene** is on account `venruki`; Discord match <@111> is unverified (legacy account has no Discord owner).",
+    );
+  });
 });

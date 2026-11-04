@@ -50,18 +50,22 @@ void CosmeticVendor::ShowMainMenu(Player* player, Creature* creature)
   menu.AddMenuItem(4, GOSSIP_ICON_CHAT, "Change Faction", 0, ActionChangeFaction, "", 0, false);
   menu.AddGossipMenuItemData(4, 0, 0);
 
+  menu.AddMenuItem(5, GOSSIP_ICON_CHAT, "Change Race", 0, ActionChangeRace, "", 0, false);
+  menu.AddGossipMenuItemData(5, 0, 0);
+
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
 }
 
-void CosmeticVendor::ShowFactionChangeMenu(Player* player, Creature* creature)
+void CosmeticVendor::ShowConfirmMenu(Player* player, Creature* creature, char const* yesText, uint32 yesAction,
+                                     char const* noText)
 {
   player->PlayerTalkClass->ClearMenus();
   GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
   menu.SetMenuId(GossipMenuId);
 
-  menu.AddMenuItem(0, GOSSIP_ICON_INTERACT_1, "Yes, change my faction", 0, ActionChangeFactionConfirm, "", 0, false);
+  menu.AddMenuItem(0, GOSSIP_ICON_INTERACT_1, yesText, 0, yesAction, "", 0, false);
   menu.AddGossipMenuItemData(0, 0, 0);
-  menu.AddMenuItem(1, GOSSIP_ICON_CHAT, "No, keep my faction", 0, ActionBack, "", 0, false);
+  menu.AddMenuItem(1, GOSSIP_ICON_CHAT, noText, 0, ActionBack, "", 0, false);
   menu.AddGossipMenuItemData(1, 0, 0);
 
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
@@ -131,7 +135,10 @@ bool CosmeticVendor::CanCreatureGossipSelect(Player* player, Creature* creature,
     return true;
   }
   case ActionChangeFaction:
-    ShowFactionChangeMenu(player, creature);
+    ShowConfirmMenu(player, creature, "Yes, change my faction", ActionChangeFactionConfirm, "No, keep my faction");
+    return true;
+  case ActionChangeRace:
+    ShowConfirmMenu(player, creature, "Yes, change my race", ActionChangeRaceConfirm, "No, keep my race");
     return true;
   case ActionChangeFactionConfirm:
   {
@@ -139,6 +146,17 @@ bool CosmeticVendor::CanCreatureGossipSelect(Player* player, Creature* creature,
     player->SetAtLoginFlag(AT_LOGIN_CHANGE_FACTION);
     ChatHandler(player->GetSession())
         .SendSysMessage("Faction change enabled. Log out to the character screen and back in to pick your new race.");
+    return true;
+  }
+  case ActionChangeRaceConfirm:
+  {
+    // Same-faction race change at the character screen. The core rejects a pick from the other faction here
+    // (CHAR_CREATE_CHARACTER_SWAP_FACTION); that is what "Change Faction" is for.
+    player->PlayerTalkClass->SendCloseGossip();
+    player->SetAtLoginFlag(AT_LOGIN_CHANGE_RACE);
+    ChatHandler(player->GetSession())
+        .SendSysMessage(
+            "Race change enabled. Log out to the character screen and back in to pick a new race of your faction.");
     return true;
   }
   default:

@@ -953,20 +953,6 @@ class spell_dru_savage_roar_aura : public AuraScript
   }
 };
 
-// -50294 - Starfall
-class spell_dru_starfall_aoe : public SpellScript
-{
-  PrepareSpellScript(spell_dru_starfall_aoe);
-
-  void FilterTargets(std::list<WorldObject*>& targets) { targets.remove(GetExplTargetUnit()); }
-
-  void Register() override
-  {
-    OnObjectAreaTargetSelect +=
-        SpellObjectAreaTargetSelectFn(spell_dru_starfall_aoe::FilterTargets, EFFECT_0, TARGET_UNIT_DEST_AREA_ENEMY);
-  }
-};
-
 // -50286 - Starfall
 class spell_dru_starfall_dummy : public SpellScript
 {
@@ -1254,7 +1240,6 @@ void AddSC_druid_spell_scripts()
   RegisterSpellScript(spell_dru_rip);
   RegisterSpellScript(spell_dru_savage_defense);
   RegisterSpellAndAuraScriptPair(spell_dru_savage_roar, spell_dru_savage_roar_aura);
-  RegisterSpellScript(spell_dru_starfall_aoe);
   RegisterSpellScript(spell_dru_starfall_dummy);
   RegisterSpellAndAuraScriptPair(spell_dru_survival_instincts, spell_dru_survival_instincts_aura);
   RegisterSpellScript(spell_dru_swift_flight_passive);

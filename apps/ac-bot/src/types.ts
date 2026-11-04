@@ -9,6 +9,7 @@ export const ParticipantSchema = z.object({
   characterName: z.string(),
   accountId: z.number(),
   accountName: z.string(),
+  discordId: z.string().optional(),
   classId: z.number(),
   specIndex: z.number(),
   role: z.string(),
@@ -16,6 +17,10 @@ export const ParticipantSchema = z.object({
   faction: z.string(),
   rating: z.number(),
   mmr: z.number(),
+  // Matchup side the player fought on. teamId/faction above are the character's race faction, which
+  // says nothing about the side: soloq teams mix factions. Only sent on matchup-ended events by
+  // newer cores; older ones list team A's three players first, then team B's.
+  side: z.enum(["teamA", "teamB"]).optional(),
   // Only present on matchup-ended events. Null when the match was aborted.
   ratingDelta: z.number().int().nullable().optional(),
   ratingAfter: z.number().int().nonnegative().nullable().optional(),

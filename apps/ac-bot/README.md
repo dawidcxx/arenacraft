@@ -4,7 +4,12 @@ Rewritten Arenacraft Discord bot. Six jobs:
 
 1. **Registration** - `/register` creates a Wow account (auth DB only) whose
    username is the caller's Discord handle and returns a generated password.
-   Calling it again resets the existing account's password.
+   Player accounts store their owner's immutable Discord user ID in
+   `acore_auth.account_discord`, so renaming a handle cannot take over an
+   account. Calling it again resets the password for that account. Legacy
+   player accounts with no owner are reported by the startup audit and must be
+   connected manually by an admin. Staff/GM accounts do not need a Discord
+   owner.
 2. **Greeting** - `/ping` greets the caller publicly in the channel.
 3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
    `soloq-matchup-ended` Redis events and moves players between the waiting room
@@ -30,12 +35,44 @@ commands removed from the code do not linger as unreachable "ghosts".
 ```bash
 bun install
 cp .env.example .env   # fill in the values
+scripts/db_sync        # applies data/sql/updates/db_auth (account_discord)
 bun run start
 ```
 
 The bot needs the **Server Members** privileged intent enabled in the Discord
 Developer Portal (Bot -> Privileged Gateway Intents). Members are resolved by
-matching the Wow account name against the Discord username (case-insensitive).
+the Discord user ID stored in `account_discord`, never by their current
+handle.
+
+On startup the bot audits accounts: duplicate owners, reclaimed handles,
+lookalike names and player accounts with no Discord owner. IP addresses are not
+used for grouping; a proxy/VPN makes almost everyone share an IP.
+`gm=<level>` marks staff accounts. Conflicts are left alone and must be resolved
+manually, e.g.:
+
+```sql
+INSERT INTO acore_auth.account_discord (account_id, discord_id)
+VALUES (<account id>, '<discord id>');
+```
+
+A player account without a Discord owner is an anomaly (legacy data or a ban),
+not a normal state. Staff/GM accounts are exempt. List unowned player accounts
+with:
+
+```sql
+SELECT a.id, a.username
+FROM acore_auth.account a
+LEFT JOIN acore_auth.account_discord d ON d.account_id = a.id
+LEFT JOIN acore_auth.account_access aa ON aa.id = a.id AND aa.gmlevel > 0
+WHERE d.account_id IS NULL AND aa.id IS NULL
+ORDER BY a.id;
+```
+
+The bot is the only production entry point; there is no separate
+account-migration script. (`scripts/emit-fake-event.ts` remains a dev-only Redis
+helper for testing the voice flow.) The auth database URL comes from
+`AUTH_DB_URL` or, when unset, the core's `AC_LOGIN_DATABASE_INFO`
+(`host;port;user;password;database`).
 
 The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
 `hunter`, `rogue`, `priest`, `deathknight`, `shaman`, `mage`, `warlock`,
@@ -76,6 +113,12 @@ Test the voice flow without the core:
 bun run scripts/emit-fake-event.ts --channel both --instance 42 \
   --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK
 
+# move real Discord users into the rooms (IDs from Discord, no DB lookup)
+bun run scripts/emit-fake-event.ts --channel both --instance 42 \
+  --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK \
+  --team-a-ids 111111111111111111,222222222222222222,333333333333333333 \
+  --team-b-ids 444444444444444444,555555555555555555,666666666666666666
+
 # just a matchup
 bun run scripts/emit-fake-event.ts --channel matchup --instance 42
 
@@ -83,4 +126,6 @@ bun run scripts/emit-fake-event.ts --channel matchup --instance 42
 bun run scripts/emit-fake-event.ts --channel ended --instance 42
 ```
 
-Account names must match Discord usernames; defaults are provided.
+Without `--team-a-ids` / `--team-b-ids` the bot resolves the fake `accountId`s
+through `account_discord`; pass IDs for a purely fake match with no DB
+accounts.

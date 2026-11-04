@@ -18,8 +18,21 @@ const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
+export function authDbUrlFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {
+  const direct = env.AUTH_DB_URL?.trim();
+  if (direct) return direct;
+
+  const core = env.AC_LOGIN_DATABASE_INFO?.trim();
+  if (!core) return null;
+
+  const [host, port, user, password, database] = core.split(";");
+  if (!host || !port || !user || password === undefined || !database) return null;
+  return `mysql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+}
+
 export function getConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = ConfigSchema.safeParse(env);
+  const authDbUrl = authDbUrlFromEnv(env);
+  const parsed = ConfigSchema.safeParse({ ...env, AUTH_DB_URL: authDbUrl ?? env.AUTH_DB_URL });
   if (!parsed.success) {
     const problems = parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
     throw new Error(`Invalid environment: ${problems}`);

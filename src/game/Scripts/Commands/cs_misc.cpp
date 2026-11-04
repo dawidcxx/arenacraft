@@ -21,6 +21,7 @@
 #include "CellImpl.h"
 #include "CharacterCache.h"
 #include "Chat.h"
+#include "CommandHelp.hpp"
 #include "CommandScript.h"
 #include "GameGraveyard.h"
 #include "GameTime.h"
@@ -1233,6 +1234,13 @@ public:
 
   static bool HandleHelpCommand(ChatHandler* handler, Tail cmd)
   {
+    // arenacraft: a bare .help lists the player commands with descriptions (see CommandHelp.hpp)
+    if (cmd.empty())
+    {
+      arenacraft::ShowPlayerHelp(handler);
+      return true;
+    }
+
     Acore::ChatCommands::SendCommandHelpFor(*handler, cmd);
 
     if (cmd.empty())

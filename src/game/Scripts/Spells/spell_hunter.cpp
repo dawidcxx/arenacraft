@@ -932,9 +932,12 @@ class spell_hun_disengage : public SpellScript
 {
   PrepareSpellScript(spell_hun_disengage);
 
+  // "Can only be used while in combat" (#70): out of combat it would be a free leap, e.g. in the arena starting room.
   SpellCastResult CheckCast()
   {
-    // arenacraft: allow also in out of combat state
+    Unit* caster = GetCaster();
+    if (caster->IsPlayer() && !caster->IsInCombat())
+      return SPELL_FAILED_CANT_DO_THAT_RIGHT_NOW;
     return SPELL_CAST_OK;
   }
 
