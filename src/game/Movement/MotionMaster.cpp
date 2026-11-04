@@ -647,6 +647,18 @@ void MotionMaster::MoveJump(float x, float y, float z, float speedXY, float spee
   init.SetVelocity(speedXY);
   if (target)
     init.SetFacing(target);
+
+  // arenacraft: same as MoveKnockbackFrom - do not mutate an active fleeing/confused generator. Replacing it finalizes
+  // the generator, and for players that finalize calls StopMoving(), which kills the jump spline launched above: Death
+  // Grip (and every other forced jump) silently did nothing on a feared, polymorphed or disoriented target. The
+  // fleeing/confused generators wait for the spline to finish before picking their next point.
+  MovementGeneratorType slotType = GetMotionSlotType(MOTION_SLOT_CONTROLLED);
+  if (slotType == FLEEING_MOTION_TYPE || slotType == CONFUSED_MOTION_TYPE)
+  {
+    init.Launch();
+    return;
+  }
+
   init.Launch();
   Mutate(new EffectMovementGenerator(id), MOTION_SLOT_CONTROLLED);
 }
