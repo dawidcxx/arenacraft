@@ -55,14 +55,45 @@ bool CreateSoloqTeam(Player* player)
   return true;
 }
 
-bool DeleteSoloqTeam(Player* player)
+bool ResetSoloqTeam(Player* player)
 {
   ArenaTeam* team = FindSoloqTeam(player);
   if (!team)
     return false;
 
-  team->Disband();
-  delete team;
+  ArenaTeamStats stats = team->GetStats();
+  stats.Rating         = static_cast<uint16>(tuning::InitialRating);
+  stats.WeekGames      = 0;
+  stats.WeekWins       = 0;
+  stats.SeasonGames    = 0;
+  stats.SeasonWins     = 0;
+
+  // Mirror ArenaTeam::FinishGame: rank is 1 + the number of teams of this type
+  // with a strictly higher rating.
+  stats.Rank = 1;
+  for (auto itr = sArenaTeamMgr->GetArenaTeamMapBegin(); itr != sArenaTeamMgr->GetArenaTeamMapEnd(); ++itr)
+    if (itr->second->GetType() == team->GetType() && itr->second->GetStats().Rating > stats.Rating)
+      ++stats.Rank;
+
+  if (ArenaTeamMember* member = team->GetMember(player->GetGUID()))
+  {
+    // Keep MatchMakerRating/MaxMMR: only the visible rating is reset.
+    member->PersonalRating = static_cast<uint16>(tuning::InitialRating);
+    member->WeekGames      = 0;
+    member->WeekWins       = 0;
+    member->SeasonGames    = 0;
+    member->SeasonWins     = 0;
+
+    uint8 const slot = team->GetSlot();
+    player->SetArenaTeamInfoField(slot, ARENA_TEAM_GAMES_WEEK, member->WeekGames);
+    player->SetArenaTeamInfoField(slot, ARENA_TEAM_GAMES_SEASON, member->SeasonGames);
+    player->SetArenaTeamInfoField(slot, ARENA_TEAM_WINS_SEASON, member->SeasonWins);
+    player->SetArenaTeamInfoField(slot, ARENA_TEAM_PERSONAL_RATING, member->PersonalRating);
+  }
+
+  team->SetArenaTeamStats(stats);
+  team->SaveToDB(true);
+  team->NotifyStatsChanged();
   return true;
 }
 

@@ -251,8 +251,9 @@ the NPC gossip page text (pure; unit-tested in `SoloqService_test.cpp`).
 
 The player's rating/MMR is **not** stored here - it lives in a real 5v5
 `ArenaTeam` (`SoloqTeam.hpp`): `FindSoloqTeam`, `CreateSoloqTeam` (starting
-1400/1500, named `<name>'s SoloQ`), `DeleteSoloqTeam` (disbands),
-`GetSoloqTeamInfo` and `ApplySoloqResult` (records a finished match; see the
+1400/1500, named `<name>'s SoloQ`), `ResetSoloqTeam` (back to the starting
+rating, keeps MMR), `GetSoloqTeamInfo` and `ApplySoloqResult` (records a
+finished match; see the
 post-match section). Because it is an arena team, it shows in the client's PvP
 pane and persists in the characters DB across restarts. `CreateSoloqTeam` and
 `ApplySoloqResult` both refresh the player's `PLAYER_FIELD_ARENA_TEAM_INFO_1_1`
@@ -268,7 +269,7 @@ fields, since `ArenaTeam::AddMember` only sets the team id/type.
 - **Leave SoloQ** - dequeues.
 - **Create SoloQ Team** - creates the 5v5 `ArenaTeam` at 1400 rating / 1500 MMR
   (shows in the PvP pane immediately).
-- **Delete SoloQ Team** - disbands the team (resets rating/MMR).
+- **Reset SoloQ Team** - resets rating/record to the starting values, keeping MMR.
 
 Opening the menu also replaces the NPC's default gossip page text with the live
 queue counts:
@@ -293,7 +294,7 @@ general core additions (nothing soloq-specific in them).
 Joining also calls `EnterArenaQueue` (`SoloqArenaQueue`): it adds the player to
 the real `BATTLEGROUND_QUEUE_5v5` queue and sends `SMSG_BATTLEFIELD_STATUS`
 (`STATUS_WAIT_QUEUE`, rated 5v5), which is what makes the client show the eye
-badge and re-request it on login/map change. Leaving (NPC, `Delete Team`, or the
+badge and re-request it on login/map change. Leaving (NPC, `Reset Team`, or the
 client's own "Leave Queue") removes the entry and clears the badge.
 The player's persistent `SoloqTeam` is a **5v5** `ArenaTeam` (so it lives in the
 5v5 PvP tab); only the match instance itself is 3v3.

@@ -22,8 +22,9 @@ ArenaTeam* FindSoloqTeam(Player* player);
 // player is already in a 5v5 team.
 bool CreateSoloqTeam(Player* player);
 
-// Disbands the player's solo-queue team (resets rating/MMR).
-bool DeleteSoloqTeam(Player* player);
+// Resets the player's solo-queue team back to the starting rating and clears
+// its games/wins, keeping the member's MMR (MatchMakerRating/MaxMMR) intact.
+bool ResetSoloqTeam(Player* player);
 
 std::optional<SoloqTeamInfo> GetSoloqTeamInfo(Player* player);
 
