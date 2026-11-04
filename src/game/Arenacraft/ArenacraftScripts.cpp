@@ -4,6 +4,7 @@
 #include "GeneralGoodsVendor.hpp"
 #include "ItemVendor.hpp"
 #include "PreBuffs.hpp"
+#include "fingerprint/FingerprintScripts.hpp"
 #include "replay/ReplayScripts.hpp"
 #include "soloq/SoloqNpc.hpp"
 #include "transmog/Transmogrification.hpp"
@@ -30,4 +31,5 @@ void AddArenacraftScripts()
   arenacraft::AddChallengeCommand();
   arenacraft::replay::AddReplayScripts();
   arenacraft::vip::AddVipScripts();
+  arenacraft::fingerprint::AddFingerprintScripts();
 }
