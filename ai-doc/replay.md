@@ -27,6 +27,9 @@ participant's newest N.
 - `.replay seek <target>` - jump on the timeline: `95` / `95s` (absolute seconds), `1:35` (m:ss), `+10` / `-10`
   (relative seconds); clamped to the recording
 - `.replay state` - send the addon `STATE` message right away (for addons that just loaded)
+- `.replay view [name]` - watch through a recorded player's eyes; no name (or the same player) = own camera.
+  `.spect watch <name>` does the same in a replay, so the spectator addon's frame clicks and left clicks on a player
+  in the world work in replays too
 
 ## How it works
 
@@ -99,6 +102,15 @@ Server -> addon messages arrive like the ArenaSpectator ones: `CHAT_MSG_ADDON` w
 
 The position only changes through playback and seeks, so a timeline UI can interpolate locally between
 `STATE` messages while `paused=0`.
+
+## Watching through a player's eyes
+
+Live arenas use Bind Sight; the recorded players exist only on the viewer's client, so `Playback::view` sets the
+viewer's `PLAYER_FARSIGHT` to the recorded guid instead: the client puts its camera on that object, the server's own
+view stays on the viewer (its `CMSG_FAR_SIGHT` finds no object and does nothing). A seek back destroys the recorded
+objects, so the field is cleared and set again `ReviewDelayMs` later (an unchanged value would not move the
+client's camera). `HandleMoveWorldportAck` clears a farsight left on an object of the old map, so leaving a replay
+can't leave the field set and block later Bind Sight / Far Sight.
 
 ## Spectator addon data
 
