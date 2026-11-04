@@ -415,8 +415,14 @@ void Unit::Update(uint32 p_time)
     // another command is given.
     if (m_HostileRefMgr.IsEmpty())
     {
+      // arenacraft: a player mind controlling (or otherwise charming) a unit that fights stays in combat itself. The
+      // own body does nothing while possessing, so the 5s PvP combat timer used to run out mid Mind Control and the
+      // priest left combat as soon as it ended (could drink in the arena).
+      Unit const* charm = IsPlayer() ? GetCharm() : nullptr;
+      if (charm && charm->IsInCombat())
+        m_CombatTimer = std::max<uint32>(m_CombatTimer, 5 * IN_MILLISECONDS);
       // m_CombatTimer set at aura start and it will be freeze until aura removing
-      if (m_CombatTimer <= p_time)
+      else if (m_CombatTimer <= p_time)
         ClearInCombat();
       else
         m_CombatTimer -= p_time;
