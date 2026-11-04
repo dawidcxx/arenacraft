@@ -975,12 +975,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          57623, // rank 2
          61999, // Raise Ally
          62158, // Rune of the Stoneskin Gargoyle
-                // Death Coil
-         62900, // rank 1
-         62901, // rank 2
-         62902, // rank 3
-         62903, // rank 4
-         62904, // rank 5
          70164, // Rune of the Nerubian Carapace
      }},
     {CLASS_SHAMAN,
