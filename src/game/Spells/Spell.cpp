@@ -39,6 +39,7 @@
 #include "Opcodes.h"
 #include "Pet.h"
 #include "Player.h"
+#include "ProcRolls.hpp"
 #include "ScriptMgr.h"
 #include "SharedDefines.h"
 #include "SpellAuraEffects.h"
@@ -2780,6 +2781,10 @@ void Spell::AddDestTarget(SpellDestination const& dest, uint32 effIndex) { m_des
 
 void Spell::DoAllEffectOnTarget(TargetInfo* target)
 {
+  // arenacraft: the spell landing on this target is one proc event - its hit triggers (Frostbite, ...) and the procs
+  // of the hit share rolls by chance (ProcRolls.hpp). A spell triggered from inside starts its own event.
+  arenacraft::ProcRollScope procRolls;
+
   if (!target || target->processed)
     return;
 
@@ -3550,7 +3555,9 @@ void Spell::DoTriggersOnSpellHit(Unit* unit, uint8 effMask)
     int _duration = 0;
     for (HitTriggerSpellList::const_iterator i = m_hitTriggerSpells.begin(); i != m_hitTriggerSpells.end(); ++i)
     {
-      if (CanExecuteTriggersOnHit(effMask, i->triggeredByAura) && roll_chance_i(i->chance))
+      // arenacraft: shared with the procs of this hit that have the same chance (ProcRolls.hpp)
+      if (CanExecuteTriggersOnHit(effMask, i->triggeredByAura) &&
+          arenacraft::RollProcChance(m_caster, float(i->chance)))
       {
         m_caster->CastSpell(unit, i->triggeredSpell->Id, true);
         LOG_DEBUG("spells.aura", "Spell {} triggered spell {} by SPELL_AURA_ADD_TARGET_TRIGGER aura", m_spellInfo->Id,

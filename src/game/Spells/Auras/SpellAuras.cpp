@@ -25,6 +25,7 @@
 #include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "Player.h"
+#include "ProcRolls.hpp"
 #include "ScriptMgr.h"
 #include "Spell.h"
 #include "SpellAuraEffects.h"
@@ -1471,25 +1472,8 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
           target->AddAura(74396, target);
       }
       break;
-      case 12494: // Frostbite, synchronise with Fingers of Frost
-      {
-        // Find Fingers of Frost
-        if (AuraEffect* aurEff = caster->GetAuraEffect(SPELL_AURA_PROC_TRIGGER_SPELL, SPELLFAMILY_MAGE, 2947, EFFECT_0))
-        {
-          if (SpellInfo const* triggeringSpellInfo = GetTriggeredByAuraSpellInfo())
-          {
-            uint8 fbRank  = sSpellMgr->GetSpellRank(triggeringSpellInfo->Id);
-            uint8 fofRank = sSpellMgr->GetSpellRank(aurEff->GetId());
-            uint8 chance  = uint8(std::ceil(fofRank * fbRank * 16.6f));
-
-            if (roll_chance_i(chance))
-            {
-              caster->CastSpell(caster, aurEff->GetSpellInfo()->Effects[EFFECT_0].TriggerSpell, true);
-            }
-          }
-        }
-        break;
-      }
+      // arenacraft: Frostbite (12494) is no longer synchronised with Fingers of Frost here; both roll the same
+      // shared roll when they have the same chance (ProcRolls.hpp).
       default:
         break;
       }
@@ -2352,7 +2336,7 @@ bool Aura::IsProcTriggeredOnEvent(AuraApplication* aurApp, ProcEventInfo& eventI
     }
   }
 
-  return roll_chance_f(CalcProcChance(*procEntry, eventInfo));
+  return arenacraft::RollProcChance(aurApp->GetTarget(), CalcProcChance(*procEntry, eventInfo));
 }
 
 float Aura::CalcProcChance(SpellProcEntry const& procEntry, ProcEventInfo& eventInfo) const

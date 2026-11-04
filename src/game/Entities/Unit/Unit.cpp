@@ -50,6 +50,7 @@
 #include "Pet.h"
 #include "PetAI.h"
 #include "Player.h"
+#include "ProcRolls.hpp"
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
 #include "Spell.h"
@@ -6521,6 +6522,10 @@ void Unit::ProcDamageAndSpell(Unit* actor, Unit* victim, uint32 procAttacker, ui
                               SpellInfo const* procAura, int8 procAuraEffectIndex, Spell const* procSpell,
                               DamageInfo* damageInfo, HealInfo* healInfo, uint32 procPhase)
 {
+  // arenacraft: one proc event (a melee/ranged swing, or the procs of a spell hit, which joins the hit's event):
+  // procs with the same chance share one roll (ProcRolls.hpp).
+  arenacraft::ProcRollScope procRolls(arenacraft::ProcRollScope::Join);
+
   // Not much to do if no flags are set.
   if (procAttacker && actor)
     actor->ProcDamageAndSpellFor(false, victim, procAttacker, procExtra, attType, procSpellInfo, amount, procAura,
@@ -10037,27 +10042,11 @@ bool Unit::HandleProcTriggerSpell(Unit* victim, uint32 damage, AuraEffect* trigg
   // Fingers of Frost, synchronise with Frostbite
   case 44544:
   {
-    // arenacraft: the talents' spell_proc_event rows (44543/44545) allow every spell phase, so Fingers of Frost
-    // also procced on cast and on finish, where the Frostbite roll below never ran, so FoF fired without Frostbite
-    // (and got extra proc rolls per chill). It now procs only when the chill lands, and every proc rolls Frostbite
-    // (100% with 3/3 Frostbite + 2/2 Fingers of Frost; Frostbite's own procs grant FoF the same way, see the 12494
-    // case in SpellAuras.cpp).
+    // arenacraft: Fingers of Frost comes from Chill effects, which apply when the spell lands. The talents'
+    // spell_proc_event rows (44543/44545) allow every spell phase, so it also procced on cast and on finish, outside
+    // the hit. Only on the hit does it share its roll with Frostbite (ProcRolls.hpp): same chance, same event.
     if (procPhase != PROC_SPELL_PHASE_HIT)
       return false;
-
-    // Find Frostbite
-    if (AuraEffect* aurEff = this->GetAuraEffect(SPELL_AURA_ADD_TARGET_TRIGGER, SPELLFAMILY_MAGE, 119, EFFECT_0))
-    {
-      if (!victim)
-        return false;
-
-      uint8 fofRank = sSpellMgr->GetSpellRank(triggeredByAura->GetId());
-      uint8 fbRank  = sSpellMgr->GetSpellRank(aurEff->GetId());
-      uint8 chance  = uint8(std::ceil(fofRank * fbRank * 16.6f));
-
-      if (roll_chance_i(chance))
-        CastSpell(victim, aurEff->GetSpellInfo()->Effects[EFFECT_0].TriggerSpell, true);
-    }
     break;
   }
   }
@@ -17911,7 +17900,7 @@ bool Unit::IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackTyp
     modOwner->ApplySpellMod(spellProto->Id, SPELLMOD_CHANCE_OF_SUCCESS, chance);
   }
 
-  return roll_chance_f(chance);
+  return arenacraft::RollProcChance(this, chance);
 }
 
 bool Unit::HandleAuraRaidProcFromChargeWithValue(AuraEffect* triggeredByAura)
