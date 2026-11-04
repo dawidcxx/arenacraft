@@ -26,6 +26,7 @@
 #include "StringFormat.h"
 #include "Tokenize.h"
 #include "WorldSession.h"
+#include <algorithm>
 
 using ChatSubCommandMap = std::map<std::string_view, Acore::Impl::ChatCommands::ChatCommandNode, StringCompareLessI_T>;
 
@@ -229,6 +230,33 @@ void Acore::Impl::ChatCommands::ChatCommandNode::SendCommandHelp(ChatHandler& ha
     handler.PSendSysMessage(subCommandHasSubCommand ? LANG_SUBCMDS_LIST_ENTRY_ELLIPSIS : LANG_SUBCMDS_LIST_ENTRY,
                             it->second._name);
   }
+}
+
+void Acore::Impl::ChatCommands::ChatCommandNode::CollectUsable(
+    ChatHandler const& handler, std::vector<Acore::ChatCommands::CommandListing>& out) const
+{
+  if (IsInvokerVisible(handler))
+  {
+    std::string help;
+    if (std::holds_alternative<AcoreStrings>(_help))
+      help = handler.GetAcoreString(std::get<AcoreStrings>(_help));
+    else if (std::holds_alternative<std::string>(_help))
+      help = std::get<std::string>(_help);
+    out.push_back({_name, _permission.RequiredLevel, std::move(help)});
+  }
+
+  for (auto const& [token, sub] : _subCommands)
+    sub.CollectUsable(handler, out);
+}
+
+/*static*/ std::vector<Acore::ChatCommands::CommandListing>
+Acore::Impl::ChatCommands::ChatCommandNode::ListUsableCommands(ChatHandler const& handler)
+{
+  std::vector<Acore::ChatCommands::CommandListing> out;
+  for (auto const& [token, node] : GetTopLevelMap())
+    node.CollectUsable(handler, out);
+  std::sort(out.begin(), out.end(), [](auto const& l, auto const& r) { return l.Name < r.Name; });
+  return out;
 }
 
 namespace Acore::Impl::ChatCommands
@@ -555,4 +583,8 @@ void Acore::ChatCommands::SendCommandHelpFor(ChatHandler& handler, std::string_v
 std::vector<std::string> Acore::ChatCommands::GetAutoCompletionsFor(ChatHandler const& handler, std::string_view cmd)
 {
   return Acore::Impl::ChatCommands::ChatCommandNode::GetAutoCompletionsFor(handler, cmd);
+}
+std::vector<Acore::ChatCommands::CommandListing> Acore::ChatCommands::ListUsableCommands(ChatHandler const& handler)
+{
+  return Acore::Impl::ChatCommands::ChatCommandNode::ListUsableCommands(handler);
 }

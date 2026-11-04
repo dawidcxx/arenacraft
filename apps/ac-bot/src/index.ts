@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import type { InteractionReplyOptions } from "discord.js";
 
 import { ALIAS_COMMAND, handleAlias } from "./aliasCommand";
+import { auditAccounts } from "./accountAudit";
 import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
@@ -20,6 +21,13 @@ import { RoomManager } from "./voiceRooms";
 const config = getConfig();
 const authDb = new AuthDb(config.AUTH_DB_URL);
 const characterDb = new CharacterDb(config.CHARACTER_DB_URL);
+
+try {
+  await authDb.assertSchema();
+} catch (error) {
+  logger.error("Auth database schema check failed", error);
+  process.exit(1);
+}
 
 // Soloq leaderboard queries join several tables; one 30s snapshot per window is
 // plenty for a Discord leaderboard and keeps the DB load negligible.
@@ -52,14 +60,23 @@ client.once(Events.ClientReady, async (readyClient) => {
       LOOKUP_COMMAND,
       ALIAS_COMMAND,
     ]);
-    await guild.members.fetch();
+    try {
+      await guild.members.fetch();
+    } catch (error) {
+      logger.warn("Failed to fetch guild members; continuing with the existing cache", error);
+    }
+
+    const members = guild.members.cache
+      .filter((member) => !member.user.bot)
+      .map((member) => ({ id: member.id, username: member.user.username }));
+    await auditAccounts(authDb, members);
 
     const rooms = new RoomManager(guild, config);
     await rooms.init();
 
     const auditLog = await AuditLog.create(guild, config.AUDIT_LOG_CHANNEL_NAME);
 
-    const redis = await startEventSubscriber(config.REDIS_URL, rooms, auditLog);
+    const redis = await startEventSubscriber(config.REDIS_URL, rooms, authDb, auditLog);
     const sweep = setInterval(() => void rooms.sweepStale(), 60_000);
 
     const shutdown = async () => {

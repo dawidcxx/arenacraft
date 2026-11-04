@@ -124,6 +124,11 @@ TEST_CASE("buildMatchupEndedPayload reports winner, timestamps and per-player ra
   CHECK(json.find("\"ratingDelta\":-9") != std::string::npos);
   CHECK(json.find("\"ratingAfter\":1509") != std::string::npos);
   CHECK(json.find("\"mmrAfter\":1141") != std::string::npos);
+  // explicit matchup side: participants 0-2 are team A, 3-5 team B, whatever their race faction
+  CHECK(json.find("\"side\":\"teamA\"") != std::string::npos);
+  CHECK(json.find("\"side\":\"teamB\"") != std::string::npos);
+  CHECK(json.find("\"side\":\"teamA\"") < json.find("\"characterName\":\"Delta\""));
+  CHECK(json.find("\"side\":\"teamB\"") > json.find("\"characterName\":\"Delta\""));
 
   event.finished            = false;
   event.reason              = MatchupEndReason::Declined;

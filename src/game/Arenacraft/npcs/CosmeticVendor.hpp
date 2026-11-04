@@ -15,7 +15,7 @@ std::vector<uint32> const& AllExoticMounts();
 
 // Hijacks Mama Wheeler (entry 19728) into the cosmetics NPC. Right-clicking
 // opens a gossip menu with "Exotic mounts" (a vendor list), "Transmog Item",
-// "Change Gender" and "Change Faction", which open the matching submenus.
+// "Change Gender", "Change Faction" and "Change Race", which open the matching submenus.
 class CosmeticVendor : public AllCreatureScript
 {
 public:
@@ -31,6 +31,8 @@ public:
   static constexpr uint32 ActionChangeGender         = 9200014;
   static constexpr uint32 ActionChangeFaction        = 9200015;
   static constexpr uint32 ActionChangeFactionConfirm = 9200016;
+  static constexpr uint32 ActionChangeRace           = 9200017;
+  static constexpr uint32 ActionChangeRaceConfirm    = 9200018;
   // One action per equipment slot for the clear menu.
   static constexpr uint32 ActionClearSlotBase = 9200100;
 
@@ -48,7 +50,9 @@ public:
 private:
   static void ShowMainMenu(Player* player, Creature* creature);
   static void ShowClearMenu(Player* player, Creature* creature);
-  static void ShowFactionChangeMenu(Player* player, Creature* creature);
+  // Yes/no submenu; "no" goes back to the main menu.
+  static void ShowConfirmMenu(Player* player, Creature* creature, char const* yesText, uint32 yesAction,
+                              char const* noText);
 };
 
 // Code-defined stock for the "Exotic mounts" list. Runs in OnStartup, after

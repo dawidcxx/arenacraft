@@ -112,7 +112,7 @@ export class RoomManager {
     logger.info(`Discovered ${this.rooms.length} game room(s) in ${this.guild.name}`);
   }
 
-  async book(instanceId: number, teamAAccounts: string[], teamBAccounts: string[]): Promise<void> {
+  async book(instanceId: number, teamADiscordIds: string[], teamBDiscordIds: string[]): Promise<void> {
     if (this.rooms.some((candidate) => candidate.instanceId === instanceId)) {
       logger.debug(`Instance ${instanceId} is already booked; ignoring duplicate event`);
       return;
@@ -129,16 +129,16 @@ export class RoomManager {
     room.bookedAt = Date.now();
 
     const [movedA, movedB] = await Promise.all([
-      this.moveAccounts(teamAAccounts, room.first),
-      this.moveAccounts(teamBAccounts, room.second),
+      this.moveDiscordIds(teamADiscordIds, room.first),
+      this.moveDiscordIds(teamBDiscordIds, room.second),
     ]);
     logger.info(`Booked ${roomName(room)} for instance ${instanceId} (moved ${movedA + movedB} players)`);
   }
 
-  async release(instanceId: number, accountNames: string[] = []): Promise<void> {
+  async release(instanceId: number, discordIds: string[] = []): Promise<void> {
     let room = this.rooms.find((candidate) => candidate.instanceId === instanceId);
     if (!room) {
-      room = this.findRoomByAccounts(accountNames);
+      room = this.findRoomByDiscordIds(discordIds);
       if (room) logger.warn(`Recovered ${roomName(room)} for unknown instance ${instanceId}`);
     }
     if (!room) {
@@ -177,12 +177,12 @@ export class RoomManager {
     return room.bookedAt === null && memberCount(room) === 0;
   }
 
-  private findRoomByAccounts(accountNames: string[]): Room | undefined {
-    if (accountNames.length === 0) return undefined;
-    const wanted = new Set(accountNames.map((name) => name.toLowerCase()));
+  private findRoomByDiscordIds(discordIds: string[]): Room | undefined {
+    if (discordIds.length === 0) return undefined;
+    const wanted = new Set(discordIds);
     return this.rooms.find((room) =>
       [room.first, room.second].some((channel) =>
-        [...channel.members.values()].some((member) => wanted.has(member.user.username.toLowerCase())),
+        [...channel.members.values()].some((member) => wanted.has(member.id)),
       ),
     );
   }
@@ -198,12 +198,12 @@ export class RoomManager {
 
   // Discord has no bulk voice-move endpoint; each move is its own request, so we
   // issue them all concurrently (a match is at most 6) instead of one at a time.
-  private async moveAccounts(accountNames: string[], channel: VoiceChannel): Promise<number> {
+  private async moveDiscordIds(discordIds: string[], channel: VoiceChannel): Promise<number> {
     const moves = await Promise.all(
-      accountNames.map(async (accountName) => {
-        const member = await this.resolveMember(accountName);
+      discordIds.map(async (discordId) => {
+        const member = await this.resolveMember(discordId);
         if (!member) {
-          logger.debug(`No Discord member for account ${accountName}`);
+          logger.debug(`No Discord member for id ${discordId}`);
           return false;
         }
         return this.moveMember(member, channel);
@@ -212,14 +212,11 @@ export class RoomManager {
     return moves.filter(Boolean).length;
   }
 
-  private async resolveMember(accountName: string): Promise<GuildMember | undefined> {
-    const target = accountName.toLowerCase();
-    const find = () => this.guild.members.cache.find((member) => member.user.username.toLowerCase() === target);
-
-    let member = find();
+  private async resolveMember(discordId: string): Promise<GuildMember | undefined> {
+    let member = this.guild.members.cache.get(discordId);
     if (!member) {
       await this.refreshMembers();
-      member = find();
+      member = this.guild.members.cache.get(discordId);
     }
     return member;
   }

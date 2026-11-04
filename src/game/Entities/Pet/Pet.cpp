@@ -1001,7 +1001,9 @@ bool Pet::CreateBaseAtTamed(CreatureTemplate const* cinfo, Map* map, uint32 phas
     return false;
 
   SetMaxPower(POWER_HAPPINESS, GetCreatePowers(POWER_HAPPINESS));
-  SetPower(POWER_HAPPINESS, 166500);
+  // Arenacraft: pets are always fully happy (Pet::LoseHappiness), a freshly tamed one too. It started unhappy
+  // (166500, 75% damage) until it was summoned again.
+  SetPower(POWER_HAPPINESS, GetMaxPower(POWER_HAPPINESS));
   setPowerType(POWER_FOCUS);
   SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, 0);
   SetUInt32Value(UNIT_FIELD_PETEXPERIENCE, 0);

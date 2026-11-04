@@ -135,6 +135,17 @@ template <class T> bool ConfusedMovementGenerator<T>::DoUpdate(T* unit, uint32 d
     i_nextMoveTime.Update(diff);
     if (i_nextMoveTime.Passed())
     {
+      // arenacraft: a forced movement (Death Grip, knockback) is still in flight - let it land
+      if (!unit->movespline->Finalized())
+        return true;
+
+      // arenacraft: we were displaced away from our wander area - wander around the new spot instead of walking back
+      if (unit->GetExactDist2d(i_waypoints[0][0], i_waypoints[0][1]) > 10.0f)
+      {
+        DoInitialize(unit);
+        return true;
+      }
+
       // start moving
       unit->AddUnitState(UNIT_STATE_CONFUSED_MOVE);
 
