@@ -2057,6 +2057,9 @@ bool Aura::IsAuraStronger(Aura const* newAura) const
   return false;
 }
 
+// Frostbolt cast by the mage's Mirror Image copies (npc 31216)
+static constexpr uint32 SPELL_MIRROR_IMAGE_FROSTBOLT = 59638;
+
 bool Aura::CanStackWith(Aura const* existingAura, bool remove) const
 {
   // Can stack with self
@@ -2065,6 +2068,13 @@ bool Aura::CanStackWith(Aura const* existingAura, bool remove) const
 
   SpellInfo const* existingSpellInfo = existingAura->GetSpellInfo();
   bool             sameCaster        = GetCasterGUID() == existingAura->GetCasterGUID();
+
+  // arenacraft: Mirror Image copies (3, or 4 with the glyph) each cast their own Frostbolt, and the spell is allowed to
+  // stack per caster, so the target carried one Frostbolt debuff per copy. The copies share a single debuff: a new
+  // copy Frostbolt replaces the previous one.
+  if (!sameCaster && m_spellInfo->Id == SPELL_MIRROR_IMAGE_FROSTBOLT &&
+      existingSpellInfo->Id == SPELL_MIRROR_IMAGE_FROSTBOLT)
+    return false;
 
   // Dynobj auras always stack
   // xinef: dont allow different ranks (or the same rank) of same spell to stack (many flamestrikes for example)
