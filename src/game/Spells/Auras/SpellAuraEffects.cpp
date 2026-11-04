@@ -7284,7 +7284,7 @@ void AuraEffect::HandleObsModPowerAuraTick(Unit* target, Unit* caster) const
   if (!target->IsAlive() || !target->GetMaxPower(PowerType))
     return;
 
-  if (target->HasUnitState(UNIT_STATE_ISOLATED))
+  if (target->IsShieldedFromSpellPowerGain())
   {
     SendTickImmune(target, caster);
     return;
@@ -7318,7 +7318,7 @@ void AuraEffect::HandlePeriodicEnergizeAuraTick(Unit* target, Unit* caster) cons
   if (!target->IsAlive() || !target->GetMaxPower(PowerType))
     return;
 
-  if (target->HasUnitState(UNIT_STATE_ISOLATED))
+  if (target->IsShieldedFromSpellPowerGain())
   {
     SendTickImmune(target, caster);
     return;

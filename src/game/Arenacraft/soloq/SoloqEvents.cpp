@@ -155,9 +155,16 @@ void AppendPlayer(std::string& out, ParticipantInfo const& player)
 
 // Ended-event variant: always emits the result fields, using null when the
 // match never finished and no rating was applied.
-void AppendPlayerWithResult(std::string& out, ParticipantInfo const& player, ParticipantResult const* result)
+void AppendPlayerWithResult(std::string& out, ParticipantInfo const& player, ParticipantResult const* result,
+                            bool teamA)
 {
   AppendPlayerBody(out, player);
+
+  // teamId/faction above are the character's race faction; soloq teams mix factions, so the matchup side
+  // is sent explicitly (participants 0-2 are team A, 3-5 team B)
+  out += ",\"side\":\"";
+  out += teamA ? "teamA" : "teamB";
+  out += "\"";
 
   out += ",\"ratingDelta\":";
   out += result ? std::to_string(result->ratingDelta) : "null";
@@ -360,7 +367,7 @@ std::string buildMatchupEndedPayload(MatchupEndedEvent const& event)
   {
     if (i)
       out += ',';
-    AppendPlayerWithResult(out, event.participants[i], event.finished ? &event.results[i] : nullptr);
+    AppendPlayerWithResult(out, event.participants[i], event.finished ? &event.results[i] : nullptr, i < 3);
   }
   out += "]}";
   return out;

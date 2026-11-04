@@ -2,23 +2,23 @@
 //
 //   bun run setup:discord                    dry run: prints what would change, changes nothing
 //   bun run setup:discord --apply            creates roles/categories/channels, moves channels, sets permissions
-//   bun run setup:discord --sync-players     (with --apply) gives the Player role to members who already have a
-//                                            game account, so nobody who registered before loses access
+//   bun run setup:discord --sync-players     (with --apply) gives the Player role to members who already own a
+//                                            game account (account_discord), so nobody who registered loses access
 //
 // Safe to run again: it only adds what is missing. Channels are never deleted or renamed (message history stays);
 // existing permission overwrites are merged, not replaced. Reads the bot's .env (DISCORD_TOKEN, DISCORD_GUILD_ID,
-// AUTH_DB_URL for --sync-players).
+// AUTH_DB_URL or AC_LOGIN_DATABASE_INFO for --sync-players).
 import { ChannelType, Client, Events, GatewayIntentBits, PermissionFlagsBits } from "discord.js";
 import type { CategoryChannel, ForumChannel, Guild, GuildBasedChannel, GuildChannel, Role } from "discord.js";
 
 import { botOverwrite, EVERYONE, overwritesFor } from "../src/access";
 import type { ChannelPermission } from "../src/access";
 import { AuthDb } from "../src/authDb";
+import { authDbUrlFromEnv } from "../src/config";
 import { LAYOUT, ROLE_PLAYER, ROLES } from "../src/serverLayout";
 import type { ChannelKind, ChannelSpec } from "../src/serverLayout";
 import { describePlan, planSetup } from "../src/setupPlan";
 import type { GuildSnapshot, SnapshotChannel } from "../src/setupPlan";
-import { normalizeAccountName } from "../src/wowName";
 
 const apply = process.argv.includes("--apply");
 const syncPlayers = process.argv.includes("--sync-players");
@@ -164,15 +164,16 @@ async function run(guild: Guild) {
 }
 
 async function givePlayerRole(guild: Guild) {
-  const authUrl = process.env.AUTH_DB_URL;
-  if (!authUrl) throw new Error("--sync-players needs AUTH_DB_URL");
+  const authUrl = authDbUrlFromEnv();
+  if (!authUrl) throw new Error("--sync-players needs AUTH_DB_URL (or AC_LOGIN_DATABASE_INFO)");
   const player = roleByName(guild, ROLE_PLAYER)!;
   const authDb = new AuthDb(authUrl);
   let granted = 0;
   try {
     for (const member of (await guild.members.fetch()).values()) {
       if (member.user.bot || member.roles.cache.has(player.id)) continue;
-      if (!(await authDb.accountExists(normalizeAccountName(member.user.username)))) continue;
+      // accounts are owned by Discord ids (account_discord), not by names
+      if (!(await authDb.accountByDiscordId(member.id))) continue;
       await member.roles.add(player, "Already has an Arenacraft account");
       ++granted;
     }

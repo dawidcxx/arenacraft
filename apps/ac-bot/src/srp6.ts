@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 // Port of Acore::Crypto::SRP6::MakeRegistrationData (src/common/Cryptography).
 // The auth core uppercases the client-sent login before SRP6 math
@@ -51,16 +51,31 @@ export interface RegistrationData {
   verifier: Buffer;
 }
 
-export function makeRegistrationData(username: string, password: string): RegistrationData {
+export function computeVerifier(username: string, password: string, salt: Uint8Array): Buffer {
   const upperUser = username.toUpperCase();
   const upperPass = password.toUpperCase();
-  const salt = randomBytes(32);
   const inner = sha1(
     Buffer.from(upperUser, "utf8"),
     Buffer.from(":", "utf8"),
     Buffer.from(upperPass, "utf8"),
   );
-  const x = sha1(salt, inner);
+  const x = sha1(Buffer.from(salt), inner);
   const verifier = modPow(G, bytesToBigIntLE(x), N);
-  return { salt, verifier: bigIntToBytesLE(verifier, 32) };
+  return bigIntToBytesLE(verifier, 32);
+}
+
+export function makeRegistrationData(username: string, password: string): RegistrationData {
+  const salt = randomBytes(32);
+  return { salt, verifier: computeVerifier(username, password, salt) };
+}
+
+export function verifyPassword(
+  username: string,
+  password: string,
+  salt: Uint8Array,
+  verifier: Uint8Array,
+): boolean {
+  const expected = computeVerifier(username, password, salt);
+  const stored = Buffer.from(verifier);
+  return stored.length === expected.length && timingSafeEqual(stored, expected);
 }

@@ -45,6 +45,7 @@
 #include "MovementGenerator.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
+#include "OmenOfClarity.hpp"
 #include "OutdoorPvP.h"
 #include "PassiveAI.h"
 #include "Pet.h"
@@ -3576,6 +3577,9 @@ SpellMissInfo Unit::SpellHitResult(Unit* victim, SpellInfo const* spell, bool Ca
   if (victim->IsImmunedToSpell(spell))
     return SPELL_MISS_IMMUNE;
 
+  if (victim->IsCycloneShieldedFrom(this, spell))
+    return SPELL_MISS_IMMUNE;
+
   // All positive spells can`t miss
   /// @todo: client not show miss log for this spells - so need find info for this in dbc and use it!
   if ((spell->IsPositive() || spell->HasEffect(SPELL_EFFECT_DISPEL)) &&
@@ -3642,6 +3646,11 @@ SpellMissInfo Unit::SpellHitResult(Unit* victim, Spell const* spell, bool CanRef
 
   // Check for immune
   if (victim->IsImmunedToSpell(spellInfo, spell))
+  {
+    return SPELL_MISS_IMMUNE;
+  }
+
+  if (victim->IsCycloneShieldedFrom(this, spellInfo))
   {
     return SPELL_MISS_IMMUNE;
   }
@@ -11533,6 +11542,10 @@ void Unit::SendEnergizeSpellLog(Unit* victim, uint32 spellID, uint32 damage, Pow
 
 void Unit::EnergizeBySpell(Unit* victim, uint32 spellID, uint32 damage, Powers powerType)
 {
+  // arenacraft: scripts energize through here too, bypassing the effect handlers' checks
+  if (victim->IsShieldedFromSpellPowerGain())
+    return;
+
   int32 gainedPower = victim->ModifyPower(powerType, damage, false);
 
   if (powerType != POWER_HAPPINESS && gainedPower)
@@ -13307,6 +13320,18 @@ bool Unit::IsImmunedToSpell(SpellInfo const* spellInfo, Spell const* spell)
   }
 
   return false;
+}
+
+bool Unit::IsCycloneShieldedFrom(Unit const* caster, SpellInfo const* spellInfo) const
+{
+  if (!caster || caster == this || !spellInfo || caster->IsHostileTo(this))
+    return false;
+
+  // spells that ignore every immunity (Mass Dispel, ...) still land
+  if (spellInfo->HasAttribute(SPELL_ATTR0_NO_IMMUNITIES))
+    return false;
+
+  return HasAura(33786); // Cyclone
 }
 
 bool Unit::IsImmunedToSpellEffect(SpellInfo const* spellInfo, uint32 index) const
@@ -17767,6 +17792,38 @@ bool Unit::InitTamedPet(Pet* pet, uint8 level, uint32 spell_id)
   return true;
 }
 
+// arenacraft: Omen of Clarity (16864) chance for a spell proc, see OmenOfClarity.hpp. 0 = this spell cannot proc it.
+static float OmenOfClaritySpellChance(Unit* caster, SpellInfo const* procSpell, Spell const* spell)
+{
+  using arenacraft::ooc::SpellKind;
+  using arenacraft::ooc::spellProcChance;
+
+  switch (procSpell->Id)
+  {
+  case 42230: // Hurricane damage, every rank
+  case 42231:
+  case 42232:
+  case 42233:
+  case 48466:
+    return spellProcChance(0, SpellKind::HurricaneTick);
+  default:
+    break;
+  }
+
+  // spells cast by other spells or procs (Starfall stars, ...) do not proc it
+  if (spell && spell->IsTriggered())
+    return 0.0f;
+
+  SpellInfo const* firstRank = procSpell->GetFirstRankSpell();
+  if (firstRank && (firstRank->Id == 48438 /*Wild Growth*/ || firstRank->Id == 50516 /*Typhoon*/))
+    return spellProcChance(0, SpellKind::MultiTarget);
+
+  int32 const castTime = spell ? spell->GetCastTime() : int32(procSpell->CalcCastTime(caster));
+  if (castTime <= 0 || procSpell->IsChanneled())
+    return spellProcChance(0, SpellKind::Instant);
+  return spellProcChance(uint32(castTime), SpellKind::CastTime);
+}
+
 bool Unit::IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackType attType, bool isVictim, bool active,
                                        SpellProcEventEntry const*& spellProcEvent, ProcEventInfo const& eventInfo)
 {
@@ -17882,6 +17939,15 @@ bool Unit::IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackTyp
       uint32 WeaponSpeed = victim->GetAttackTime(attType);
       chance             = victim->GetPPMProcChance(WeaponSpeed, spellProcEvent->ppmRate, spellProto);
     }
+  }
+
+  // arenacraft: Omen of Clarity on spells is measured on the spell's cast time, not on the druid's weapon speed (a
+  // staff made it ~20% per spell). Auto attacks and melee abilities keep the weapon-speed rate.
+  if (spellProto->Id == 16864 && !isVictim && procSpell && procSpell->DmgClass != SPELL_DAMAGE_CLASS_MELEE)
+  {
+    chance = OmenOfClaritySpellChance(this, procSpell, eventInfo.GetProcSpell());
+    if (chance <= 0.0f)
+      return false;
   }
 
   // Custom chances

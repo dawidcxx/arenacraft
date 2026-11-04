@@ -77,12 +77,15 @@ export function formatMatchup(event: MatchupEvent, emoji: EmojiResolver): string
   ].join("\n");
 }
 
-function splitTeams(players: Participant[]): { teamA: Participant[]; teamB: Participant[] } {
-  // Team A is the alliance side (teamId 0), team B the horde side (teamId 1);
-  // anything unexpected is grouped on side A so no player silently disappears.
+export function splitTeams(players: Participant[]): { teamA: Participant[]; teamB: Participant[] } {
+  // Never split by teamId/faction: that is the character's race, and soloq teams mix factions (an
+  // all-alliance match used to land every player in team A). Use the explicit side when the core sends
+  // it; otherwise fall back to the core's order, which lists team A's half of the players first.
+  const half = Math.ceil(players.length / 2);
+  const sideOf = (player: Participant, index: number) => player.side ?? (index < half ? "teamA" : "teamB");
   return {
-    teamA: players.filter((player) => player.teamId !== 1),
-    teamB: players.filter((player) => player.teamId === 1),
+    teamA: players.filter((player, index) => sideOf(player, index) === "teamA"),
+    teamB: players.filter((player, index) => sideOf(player, index) === "teamB"),
   };
 }
 

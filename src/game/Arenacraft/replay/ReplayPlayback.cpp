@@ -1,6 +1,7 @@
 #include "ReplayPlayback.hpp"
 
 #include "Arena.h"
+#include "ArenaSpectator.h"
 #include "BattlegroundMgr.h"
 #include "Chat.h"
 #include "DBCStores.h"
@@ -11,11 +12,14 @@
 #include "Player.h"
 #include "ReplayConfig.hpp"
 #include "ReplayRecorder.hpp"
+#include "ReplayTimeline.hpp"
 #include "Timer.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
 
+#include <algorithm>
 #include <memory>
+#include <unordered_map>
 
 namespace arenacraft::replay
 {
@@ -24,6 +28,17 @@ namespace
 constexpr uint32_t ViewerArrivalTimeoutMs = 60 * IN_MILLISECONDS;
 constexpr uint32_t LingerAfterEndMs       = 10 * IN_MILLISECONDS;
 constexpr uint32_t ViewerLeaveTimeoutMs   = 30 * IN_MILLISECONDS;
+constexpr uint32_t StateIntervalMs        = 1 * IN_MILLISECONDS; // addon STATE message cadence
+
+// Addon messages (ArenaSpectator addon whisper channel): "ACREPLAY\tSTATE;at=..;len=..;paused=..;" / "...END;"
+constexpr char const* ReplayAddonPrefix = "ACREPLAY\t";
+
+// viewer -> the playback they watch (world thread only)
+std::unordered_map<ObjectGuid, std::weak_ptr<Playback>>& Registry()
+{
+  static std::unordered_map<ObjectGuid, std::weak_ptr<Playback>> registry;
+  return registry;
+}
 
 void tell(Player* player, std::string const& text) { ChatHandler(player->GetSession()).SendSysMessage(text); }
 
@@ -84,7 +99,9 @@ void openReplay(Player* viewer, uint32_t id, uint32_t mapId, uint32_t bgTypeId, 
   sBattlegroundMgr->AddBattleground(bg);
   // keeps the empty arena from being deleted until the playback lets go
   bg->IncreaseInvitedCount(TEAM_ALLIANCE);
-  static_cast<Arena*>(bg)->StartReplay(std::make_shared<Playback>(viewer->GetGUID(), id, std::move(data)));
+  auto playback                 = std::make_shared<Playback>(viewer->GetGUID(), id, std::move(data));
+  Registry()[viewer->GetGUID()] = playback;
+  static_cast<Arena*>(bg)->StartReplay(std::move(playback));
 
   viewer->SetPendingSpectatorForBG(bg->GetInstanceID());
   viewer->SetBattlegroundId(bg->GetInstanceID(), bg->GetBgTypeID(), PLAYER_MAX_BATTLEGROUND_QUEUES, false, false,
@@ -106,27 +123,106 @@ Player* Playback::viewerOnMap(Battleground* bg) const
   return viewer;
 }
 
-void Playback::sendDue(Player* viewer)
+Playback::Playback(ObjectGuid viewer, uint32_t replayId, ReplayData data)
+    : _viewer(viewer), _replayId(replayId), _data(std::move(data))
 {
-  uint32_t const elapsed = getMSTimeDiff(_startMs, getMSTime());
-  // movement packets carry server timestamps from the recording
-  uint32_t const timeShift = _startMs - _data.recordStartMs;
+  _objects    = collectObjectGuids(_data.packets);
+  _durationMs = _data.packets.empty() ? 0 : _data.packets.back().offsetMs;
+}
 
-  WorldSession* session = viewer->GetSession();
-  while (_next < _data.packets.size() && _data.packets[_next].offsetMs <= elapsed)
+Playback::~Playback()
+{
+  // only drop the registry entry if it still points at a playback that is gone (this one)
+  if (auto it = Registry().find(_viewer); it != Registry().end() && it->second.expired())
+    Registry().erase(it);
+}
+
+void Playback::sendPacket(Player* viewer, std::size_t index) const
+{
+  RecordedPacket const& recorded = _data.packets[index];
+  WorldPacket           packet(recorded.opcode, recorded.data.size());
+  if (!recorded.data.empty())
   {
-    RecordedPacket& recorded = _data.packets[_next++];
     if (isMovementOpcode(recorded.opcode))
-      shiftMovementTime(recorded.data, timeShift);
-
-    WorldPacket packet(recorded.opcode, recorded.data.size());
-    if (!recorded.data.empty())
+    {
+      // movement packets carry server timestamps from the recording; rebase them so the client sees the move
+      // happen (positionMs - offset) ago
+      std::vector<uint8_t> data = recorded.data;
+      shiftMovementTime(data, getMSTime() - _data.recordStartMs - _posMs);
+      packet.append(data.data(), data.size());
+    }
+    else
       packet.append(recorded.data.data(), recorded.data.size());
-    session->SendPacket(&packet);
-
-    // sent packets are never needed again
-    std::vector<uint8_t>().swap(recorded.data);
   }
+  viewer->GetSession()->SendPacket(&packet);
+}
+
+void Playback::sendUpTo(Player* viewer, uint32_t limitMs)
+{
+  while (_next < _data.packets.size() && _data.packets[_next].offsetMs <= limitMs)
+    sendPacket(viewer, _next++);
+}
+
+void Playback::destroyRecordedObjects(Player* viewer) const
+{
+  for (uint64_t guid : _objects)
+  {
+    WorldPacket data(SMSG_DESTROY_OBJECT, 8 + 1);
+    data << uint64(guid);
+    data << uint8(0); // not a death animation
+    viewer->GetSession()->SendPacket(&data);
+  }
+}
+
+void Playback::sendState(Player* viewer) const
+{
+  ArenaSpectator::SendPacketTo(viewer, Acore::StringFormat("{}STATE;at={};len={};paused={};", ReplayAddonPrefix, _posMs,
+                                                           _durationMs, _paused ? 1 : 0));
+}
+
+void Playback::tickState(Player* viewer, uint32_t diff)
+{
+  _stateTimer += diff;
+  if (_stateTimer < StateIntervalMs)
+    return;
+  _stateTimer = 0;
+  sendState(viewer);
+}
+
+bool Playback::setPaused(Player* viewer, bool paused)
+{
+  if (!controllable())
+    return false;
+  _paused = paused;
+  sendState(viewer);
+  return true;
+}
+
+bool Playback::seek(Player* viewer, uint32_t targetMs)
+{
+  if (!controllable())
+    return false;
+
+  targetMs = std::min(targetMs, _durationMs);
+  if (targetMs < _posMs)
+  {
+    // the client can't go back: wipe the recorded objects and rebuild the state from the start
+    destroyRecordedObjects(viewer);
+    _next = 0;
+  }
+
+  _posMs           = targetMs;
+  std::size_t next = _next;
+  for (std::size_t index : planJump(_data.packets, _next, targetMs, next))
+    sendPacket(viewer, index);
+  _next = next;
+
+  if (_state == State::Finished && _next < _data.packets.size())
+    _state = State::Playing;
+  _timer = 0;
+
+  sendState(viewer);
+  return true;
 }
 
 bool Playback::update(Battleground* bg, uint32_t diff)
@@ -139,14 +235,18 @@ bool Playback::update(Battleground* bg, uint32_t diff)
   case State::WaitingForViewer:
     if (viewer)
     {
-      _state   = State::Playing;
-      _timer   = 0;
-      _startMs = getMSTime();
-      tell(viewer, "Replay #" + std::to_string(_replayId) + " started.");
-      sendDue(viewer);
+      _state = State::Playing;
+      _timer = 0;
+      _posMs = 0;
+      tell(viewer, "Replay #" + std::to_string(_replayId) +
+                       " started. .replay pause / resume / seek <seconds|m:ss|+N|-N> control it.");
+      sendUpTo(viewer, 0);
+      sendState(viewer);
     }
     else if (_timer >= ViewerArrivalTimeoutMs)
+    {
       _state = State::Done;
+    }
     break;
   case State::Playing:
     if (!viewer)
@@ -154,19 +254,32 @@ bool Playback::update(Battleground* bg, uint32_t diff)
       _state = State::Done;
       break;
     }
-    sendDue(viewer);
-    if (_next >= _data.packets.size())
+    if (!_paused)
+    {
+      _posMs = std::min(_posMs + diff, _durationMs);
+      sendUpTo(viewer, _posMs);
+    }
+    tickState(viewer, diff);
+    if (_next >= _data.packets.size() && _posMs >= _durationMs)
     {
       _state = State::Finished;
       _timer = 0;
-      tell(viewer, "Replay finished. Returning in 10 seconds (or type .replay leave).");
+      tell(viewer, "Replay finished. Returning in 10 seconds (.replay pause stays, .replay seek goes back, "
+                   ".replay leave exits).");
     }
     break;
   case State::Finished:
     if (!viewer)
+    {
       _state = State::Done;
+      break;
+    }
+    tickState(viewer, diff);
+    if (_paused)
+      _timer = 0; // a paused viewer stays at the end until they resume or leave
     else if (_timer >= LingerAfterEndMs)
     {
+      ArenaSpectator::SendPacketTo(viewer, Acore::StringFormat("{}END;", ReplayAddonPrefix));
       viewer->TeleportToEntryPoint();
       _timer = 0;
       _state = State::Done;
@@ -177,6 +290,14 @@ bool Playback::update(Battleground* bg, uint32_t diff)
     return viewer && _timer < ViewerLeaveTimeoutMs;
   }
   return true;
+}
+
+std::string cannotWatchReason(Player* player) { return whyCannotWatch(player); }
+
+std::shared_ptr<Playback> playbackOf(ObjectGuid viewer)
+{
+  auto it = Registry().find(viewer);
+  return it == Registry().end() ? nullptr : it->second.lock();
 }
 
 void watch(Player* viewer, uint32_t id)

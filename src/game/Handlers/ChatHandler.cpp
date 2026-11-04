@@ -430,7 +430,9 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recvData)
     if (!group)
     {
       group = sender->GetGroup();
-      if (!group || group->isBGGroup())
+      // arenacraft: in an arena /party talks to the own team. Solo queue players have no party of their own, only
+      // the arena's battleground group, which stock party chat ignores (only /bg worked).
+      if (!group || (group->isBGGroup() && !sender->InArena()))
         return;
     }
 

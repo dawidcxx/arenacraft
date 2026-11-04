@@ -6,6 +6,8 @@
  * matches. The SRP6 verifier is computed from the uppercased name (see
  * makeRegistrationData), keeping it consistent with what the client sends.
  */
+export const MAX_ACCOUNT_NAME_LENGTH = 20;
+
 export function normalizeAccountName(discordUsername: string): string {
   return discordUsername.trim().toLowerCase();
 }
