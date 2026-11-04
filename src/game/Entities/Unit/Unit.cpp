@@ -11541,6 +11541,10 @@ void Unit::SendEnergizeSpellLog(Unit* victim, uint32 spellID, uint32 damage, Pow
 
 void Unit::EnergizeBySpell(Unit* victim, uint32 spellID, uint32 damage, Powers powerType)
 {
+  // arenacraft: scripts energize through here too, bypassing the effect handlers' checks
+  if (victim->IsShieldedFromSpellPowerGain())
+    return;
+
   int32 gainedPower = victim->ModifyPower(powerType, damage, false);
 
   if (powerType != POWER_HAPPINESS && gainedPower)

@@ -2060,6 +2060,12 @@ public:
   [[nodiscard]] bool HasStunAura() const { return HasAuraType(SPELL_AURA_MOD_STUN); }
   [[nodiscard]] bool HasTauntAura() const { return HasAuraType(SPELL_AURA_MOD_TAUNT); }
   [[nodiscard]] bool HasStealthAura() const { return HasAuraType(SPELL_AURA_MOD_STEALTH); }
+  // arenacraft: spell-based resource gains (energize, Dispersion, Shadowfiend, Replenishment, ...) do not reach a unit
+  // that is banished or inside Cyclone (33786). Natural regeneration is unaffected.
+  [[nodiscard]] bool IsShieldedFromSpellPowerGain() const
+  {
+    return HasUnitState(UNIT_STATE_ISOLATED) || HasAura(33786);
+  }
   [[nodiscard]] bool HasStealthDetectAura() const { return HasAuraType(SPELL_AURA_MOD_STEALTH_DETECT); }
   [[nodiscard]] bool HasInvisibilityAura() const { return HasAuraType(SPELL_AURA_MOD_INVISIBILITY); }
   [[nodiscard]] bool HasInvisibilityDetectAura() const { return HasAuraType(SPELL_AURA_MOD_INVISIBILITY_DETECT); }
