@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * deploy - build the core image for the arm server and load it on the target's
+ * deploy - build the core image for the x86 server and load it on the target's
  * local container engine. No registry: the thin multi-stage image is streamed
  * over ssh as `save | gzip | ssh ... 'gunzip | load'`, and only that final image
  * is sent (zig/build caches live in build mounts).
@@ -8,21 +8,21 @@
  * Build + ship only. The running services pick the image up on their next
  * restart, so run ./scripts/restart_world afterwards.
  *
- * Works with podman or docker (auto-detected). Native arm64 builds directly; a
+ * Works with podman or docker (auto-detected). Native amd64 builds directly; a
  * cross-arch build on Linux falls back to binfmt/qemu emulation, slow but cached.
  *
  *   ./scripts/deploy
  *
- * ARENACRAFT_HOST overrides the ssh target (default arenacraft@hetznerbox).
+ * ARENACRAFT_HOST overrides the ssh target (default arenacraft@netcupbox).
  */
 import { $ } from "bun";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "./lib/repo.ts";
 
-const target = process.env.ARENACRAFT_HOST ?? "arenacraft@hetznerbox";
+const target = process.env.ARENACRAFT_HOST ?? "arenacraft@netcupbox";
 const image = "arenacraft:local";
-const platform = "linux/arm64";
+const platform = "linux/amd64";
 const remoteEngine = "podman";
 const fmt = "{{.Architecture}}";
 

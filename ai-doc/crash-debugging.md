@@ -34,7 +34,7 @@ report:   /app/crashes/worldserver_crash_..._<pid>.log
 fault address: 0x0
 si_code:       1 (SEGV_MAPERR (address not mapped))
 
-registers (x86_64):            # or aarch64 in production
+registers (x86_64):
   rip: ... rsp: ... rbp: ...
   ...
 
@@ -60,8 +60,8 @@ The faulting thread id is useful because the world uses several threads.
   lifecycle bugs.
 - `si_code` for `SIGABRT` sent by `abort()`/`raise()` is `SI_TKILL`/`SI_USER`;
   `si_addr` is then not a real fault address.
-- The register block is architecture specific: dev is usually `x86_64`,
-  production is `aarch64`.
+- The register block is architecture specific; dev and production are both
+  `x86_64`.
 
 ## Reading the backtrace
 

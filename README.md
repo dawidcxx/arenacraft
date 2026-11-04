@@ -25,29 +25,28 @@ Needs `nix`, `podman` (or docker), and a 3.3.5a client.
 - `zig build test` unit tests (needs `nix develop`)
 - `zig build test-build` dep/link smoke test
 - CI: `.github/workflows/build.yml` runs `zig build ac` on every pull request and on pushes to `local`
-- `scripts/deploy` build the arm64 image and ship it to the target
+- `scripts/deploy` build the amd64 image and ship it to the target
 - `scripts/restart_world` restart the world service on the target and prune old images
 
 ## Deploy
 
-The server is a small arm host, so the image is built elsewhere and shipped as
-a single stream to the target's local container engine - no registry involved:
+The server is an x86 host, so the image is built elsewhere and shipped as a
+single stream to the target's local container engine - no registry involved:
 
 ```bash
-scripts/deploy          # build linux/arm64 and stream the image to the target
+scripts/deploy          # build linux/amd64 and stream the image to the target
 scripts/restart_world   # restart the world service there + prune old images
 ```
 
 `scripts/deploy` only builds and ships the image (as `arenacraft:local`); the
 running systemd-managed containers pick it up on their next restart, which
 `scripts/restart_world` does (and then prunes the images left behind by repeated
-deploys). Both scripts ssh to `arenacraft@hetznerbox`; set `ARENACRAFT_HOST` to
+deploys). Both scripts ssh to `arenacraft@netcupbox`; set `ARENACRAFT_HOST` to
 override the target.
 
 `deploy` auto-detects **podman or docker** locally and loads into podman on the
-target. Building on a native arm64 machine (Apple Silicon) is direct and fast; a
-cross-arch build on x86 Linux uses binfmt/qemu emulation, slow the first time
-but cached.
+target. Building on a native amd64 machine is direct and fast; a cross-arch
+build uses binfmt/qemu emulation, slow the first time but cached.
 
 Only the final multi-stage runtime image is transferred; zig's caches live in
 `--mount=type=cache` mounts and never ship. The image lands as `arenacraft:local`.
