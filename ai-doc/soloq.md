@@ -399,7 +399,7 @@ When the arena ends (or is destroyed without finishing) the core publishes
   "startedAtMs": 1700000000000,
   "endedAtMs": 1700000252000,
   "players": [
-    { "...same fields as the matchup participant...", "ratingDelta": 9, "ratingAfter": 1459, "mmrAfter": 1559 }
+    { "...same fields as the matchup participant...", "side": "teamA", "ratingDelta": 9, "ratingAfter": 1459, "mmrAfter": 1559 }
   ]
 }
 ```
@@ -413,6 +413,10 @@ When the arena ends (or is destroyed without finishing) the core publishes
   `OnBattlegroundDestroy`.
 - `winner` is `"teamA"` (the alliance side), `"teamB"` (the horde side) or
   `null` when the match never finished.
+- `side` is the matchup side the player fought on (`"teamA"` / `"teamB"`;
+  team A's three players come first). Consumers must split teams by `side`,
+  never by `teamId`/`faction`: those are the character's race faction, and soloq
+  teams mix factions.
 - `startedAtMs` is the pop time echoed from the matchup event, so consumers can
   correlate the two events and compute a duration without keeping state.
 - `ratingDelta`/`ratingAfter`/`mmrAfter` are the `resolveMatch` results. They
