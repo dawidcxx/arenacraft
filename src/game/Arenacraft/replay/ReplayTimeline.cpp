@@ -148,6 +148,118 @@ std::vector<std::size_t> planJump(std::vector<RecordedPacket> const& packets, st
   return plan;
 }
 
+namespace
+{
+constexpr std::string_view SpectatorPrefix = "ASSUN\t";
+// ArenaSpectator::CreatePacket: u8 type, u32 lang, u64 sender, u32, u64 receiver, u32 length (incl. the 0), text
+constexpr std::size_t ChatHeaderSize = 1 + 4 + 8 + 4 + 8 + 4;
+
+std::optional<int64_t> parseInt(std::string_view text)
+{
+  int64_t value     = 0;
+  auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+  if (error != std::errc{} || end != text.data() + text.size() || text.empty())
+    return std::nullopt;
+  return value;
+}
+
+// Splits "a,b,c" into its fields.
+std::vector<std::string_view> splitFields(std::string_view text)
+{
+  std::vector<std::string_view> fields;
+  for (std::size_t start = 0;;)
+  {
+    std::size_t comma = text.find(',', start);
+    fields.push_back(text.substr(start, comma == std::string_view::npos ? std::string_view::npos : comma - start));
+    if (comma == std::string_view::npos)
+      return fields;
+    start = comma + 1;
+  }
+}
+
+std::string joinFields(std::vector<std::string_view> const& fields)
+{
+  std::string out;
+  for (std::size_t i = 0; i < fields.size(); ++i)
+  {
+    if (i)
+      out += ',';
+    out += fields[i];
+  }
+  return out;
+}
+} // namespace
+
+std::optional<std::string_view> spectatorMessageOf(RecordedPacket const& packet)
+{
+  if (packet.opcode != SMSG_MESSAGECHAT || packet.data.size() <= ChatHeaderSize)
+    return std::nullopt;
+  uint32_t length = 0;
+  for (int b = 3; b >= 0; --b)
+    length = (length << 8) | packet.data[ChatHeaderSize - 4 + std::size_t(b)];
+  if (length == 0 || ChatHeaderSize + length > packet.data.size())
+    return std::nullopt;
+  std::string_view text(reinterpret_cast<char const*>(packet.data.data()) + ChatHeaderSize, length - 1);
+  if (!text.starts_with(SpectatorPrefix))
+    return std::nullopt;
+  return text;
+}
+
+std::optional<std::string> adjustSpectatorMessage(std::string_view message, uint32_t skippedMs)
+{
+  // "ASSUN\t0x<guid>;KEY=value;"
+  std::size_t const keyStart = message.find(';');
+  std::size_t const eq       = message.find('=', keyStart);
+  std::size_t const end      = message.find(';', eq);
+  if (keyStart == std::string_view::npos || eq == std::string_view::npos || end == std::string_view::npos)
+    return std::string(message);
+
+  std::string_view const key   = message.substr(keyStart + 1, eq - keyStart - 1);
+  std::string_view const value = message.substr(eq + 1, end - eq - 1);
+  if (key == "SPE")
+    return std::nullopt; // a cast that started back then, long over
+
+  std::vector<std::string_view> fields = splitFields(value);
+  std::string                   number;
+  if (key == "ACD" && fields.size() == 3) // spell, seconds left, full cooldown
+  {
+    std::optional<int64_t> left = parseInt(fields[1]);
+    if (!left)
+      return std::string(message);
+    int64_t const now = *left - int64_t(skippedMs / 1000);
+    if (now <= 0)
+      return std::nullopt;
+    number    = std::to_string(now);
+    fields[1] = number;
+  }
+  else if (key == "TIM" && fields.size() == 1) // seconds until the arena times out
+  {
+    std::optional<int64_t> left = parseInt(fields[0]);
+    if (!left)
+      return std::string(message);
+    number    = std::to_string(std::max<int64_t>(*left - int64_t(skippedMs / 1000), 0));
+    fields[0] = number;
+  }
+  else if (key == "AUR" && fields.size() == 8) // removed, stacks, ms left, full duration, spell, dispel, debuff, caster
+  {
+    std::optional<int64_t> left = parseInt(fields[2]);
+    if (fields[0] != "0" || !left || *left <= 0) // removals and auras without a duration stay as they are
+      return std::string(message);
+    int64_t const now = *left - int64_t(skippedMs);
+    if (now <= 0)
+      return std::nullopt;
+    number    = std::to_string(now);
+    fields[2] = number;
+  }
+  else
+    return std::string(message);
+
+  std::string out(message.substr(0, eq + 1));
+  out += joinFields(fields);
+  out += message.substr(end);
+  return out;
+}
+
 std::vector<uint64_t> collectObjectGuids(std::vector<RecordedPacket> const& packets)
 {
   std::unordered_set<uint64_t> guids;

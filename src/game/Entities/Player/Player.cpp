@@ -15665,7 +15665,9 @@ bool Player::NeedSendSpectatorData() const
   if (FindMap() && FindMap()->IsBattleArena() && !IsSpectator())
   {
     Battleground* bg = ((BattlegroundMap*)FindMap())->GetBG();
-    if (bg && bg->HaveSpectators() && bg->GetStatus() == STATUS_IN_PROGRESS && !bg->GetPlayers().empty())
+    // Arenacraft: also while the match is recorded, so the replay carries the spectator addon data
+    if (bg && (bg->HaveSpectators() || bg->GetReplayRecording()) && bg->GetStatus() == STATUS_IN_PROGRESS &&
+        !bg->GetPlayers().empty())
       if (bg->GetPlayers().find(GetGUID()) != bg->GetPlayers().end())
         return true;
   }

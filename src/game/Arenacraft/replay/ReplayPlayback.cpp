@@ -126,8 +126,10 @@ Player* Playback::viewerOnMap(Battleground* bg) const
 Playback::Playback(ObjectGuid viewer, uint32_t replayId, ReplayData data)
     : _viewer(viewer), _replayId(replayId), _data(std::move(data))
 {
-  _objects    = collectObjectGuids(_data.packets);
-  _durationMs = _data.packets.empty() ? 0 : _data.packets.back().offsetMs;
+  _objects          = collectObjectGuids(_data.packets);
+  _hasSpectatorData = std::any_of(_data.packets.begin(), _data.packets.end(),
+                                  [](RecordedPacket const& packet) { return spectatorMessageOf(packet).has_value(); });
+  _durationMs       = _data.packets.empty() ? 0 : _data.packets.back().offsetMs;
 }
 
 Playback::~Playback()
@@ -154,6 +156,25 @@ void Playback::sendPacket(Player* viewer, std::size_t index) const
     else
       packet.append(recorded.data.data(), recorded.data.size());
   }
+  viewer->GetSession()->SendPacket(&packet);
+}
+
+// sendPacket while jumping to `targetMs`: spectator addon data is adjusted for the skipped time.
+void Playback::sendJumpPacket(Player* viewer, std::size_t index, uint32_t targetMs) const
+{
+  RecordedPacket const&                 recorded = _data.packets[index];
+  std::optional<std::string_view> const message  = spectatorMessageOf(recorded);
+  if (!message)
+  {
+    sendPacket(viewer, index);
+    return;
+  }
+  std::optional<std::string> adjusted =
+      adjustSpectatorMessage(*message, targetMs > recorded.offsetMs ? targetMs - recorded.offsetMs : 0);
+  if (!adjusted)
+    return;
+  WorldPacket packet;
+  ArenaSpectator::CreatePacket(packet, *adjusted);
   viewer->GetSession()->SendPacket(&packet);
 }
 
@@ -208,13 +229,16 @@ bool Playback::seek(Player* viewer, uint32_t targetMs)
   {
     // the client can't go back: wipe the recorded objects and rebuild the state from the start
     destroyRecordedObjects(viewer);
+    // the spectator addon starts over too (ENABLE resets it); the recorded state at 0 rebuilds its frames
+    if (_hasSpectatorData)
+      ArenaSpectator::SendCommand(viewer, "{}ENABLE", SPECTATOR_ADDON_PREFIX);
     _next = 0;
   }
 
   _posMs           = targetMs;
   std::size_t next = _next;
   for (std::size_t index : planJump(_data.packets, _next, targetMs, next))
-    sendPacket(viewer, index);
+    sendJumpPacket(viewer, index, targetMs);
   _next = next;
 
   if (_state == State::Finished && _next < _data.packets.size())
