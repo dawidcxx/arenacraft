@@ -542,6 +542,12 @@ struct AreaTableEntry
   {
     if (ID == 395)
       return true;
+    // Arenacraft: the arena hub (vendors, soloq NPC) is in Netherstorm, a contested zone - on a PvP realm, or with
+    // /pvp on, the factions could fight there. The whole zone is a sanctuary like Shattrath: no PvP between players,
+    // duels still allowed (they depend on AREA_FLAG_ALLOW_DUELS, not on this).
+    constexpr uint32 ArenaHubZone = 3523; // Netherstorm
+    if (ID == ArenaHubZone || zone == ArenaHubZone)
+      return true;
     if (mapid == 609)
       return true;
     return (flags & AREA_FLAG_SANCTUARY);
