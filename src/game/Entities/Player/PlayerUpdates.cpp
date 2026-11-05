@@ -1211,6 +1211,16 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
   // Treat players having a quest flagging for PvP as always in hostile area
   pvpInfo.IsHostile = pvpInfo.IsInHostileArea || HasPvPForcingQuest();
 
+  // Arenacraft: no PvP in the arena hub, not even on a PvP realm or with /pvp switched on before coming here
+  if (newZone == ARENACRAFT_HUB_ZONE)
+  {
+    pvpInfo.IsInHostileArea = false;
+    pvpInfo.IsHostile       = false;
+    RemovePlayerFlag(PLAYER_FLAGS_IN_PVP);
+    if (IsPvP())
+      UpdatePvP(false, true);
+  }
+
   if (zone->flags & AREA_FLAG_CAPITAL) // Is in a capital city
   {
     if (!pvpInfo.IsHostile || zone->IsSanctuary())
