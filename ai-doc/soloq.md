@@ -178,8 +178,8 @@ plain battlegrounds still block it). Both cleanup paths above run through
 `BattlegroundMap::RemovePlayerFromMap` -> `Battleground::RemovePlayerAtLeave`, so
 the soloq queue id is cleared and the match is resolved by `OnBattlegroundEnd`
 when the arena ends. `Arena::RemovePlayerAtLeave` also strips the arena
-dampening aura (29659), which is applied raw and would otherwise leak out of the
-match.
+dampening aura (29659, the "Dementia buff"), which is applied raw and would
+otherwise leak out of the match. See `dampening.md` for the full mechanic.
 
 The leaver's rating is still settled when the match ends (`OnBattlegroundEnd`):
 the result is applied to their persistent 5v5 team exactly like the other five,

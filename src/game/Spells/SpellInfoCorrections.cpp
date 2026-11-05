@@ -4638,6 +4638,19 @@ void SpellMgr::LoadSpellInfoCorrections()
                   // arena-only: never persist it on a saved pet or a player logging out mid-match
                   spellInfo->AttributesCu |= SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED;
                 });
+  // Arenacraft: 74410/74411 already apply -10% healing done (effect 0, left
+  // untouched). Add a separate -5% damage done effect so arena/BG burst is
+  // lower without replacing the healing reduction.
+  ApplySpellFix({74410, 74411},
+                [](SpellInfo* spellInfo)
+                {
+                  spellInfo->Effects[EFFECT_1].Effect        = SPELL_EFFECT_APPLY_AURA;
+                  spellInfo->Effects[EFFECT_1].ApplyAuraName = SPELL_AURA_MOD_DAMAGE_PERCENT_DONE;
+                  spellInfo->Effects[EFFECT_1].TargetA       = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
+                  spellInfo->Effects[EFFECT_1].DieSides      = 1;
+                  spellInfo->Effects[EFFECT_1].BasePoints    = -6; // -5%
+                  spellInfo->Effects[EFFECT_1].MiscValue     = SPELL_SCHOOL_MASK_ALL;
+                });
   // Earthliving Weapon (all ranks): mark the imbue's temporary enchant as
   // arena-legal so it survives arena entry, like poisons/DK runes. The flag is
   // what SpellMgr::LoadEnchantCustomAttr scans for; without it

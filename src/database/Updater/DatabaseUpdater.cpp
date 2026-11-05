@@ -141,17 +141,16 @@ namespace Acore::Database
 namespace
 {
 constexpr DatabaseUpdateTarget DATABASE_UPDATE_TARGETS[] = {
-    {"auth", "LoginDatabaseInfo", "db_auth", "account"},
-    {"characters", "CharacterDatabaseInfo", "db_characters", "characters"},
-    {"world", "WorldDatabaseInfo", "db_world", "creature_template"},
+    {"auth", "LoginDatabaseInfo", "db_auth"},
+    {"characters", "CharacterDatabaseInfo", "db_characters"},
+    {"world", "WorldDatabaseInfo", "db_world"},
 };
 } // namespace
 
 std::span<DatabaseUpdateTarget const> GetDatabaseUpdateTargets() { return DATABASE_UPDATE_TARGETS; }
 
-bool ApplyDatabaseUpdates(std::string_view label, std::string_view schemaMarkerTable, std::string_view connectionInfo,
-                          std::filesystem::path const& updateDirectory, bool dryRun, bool baselineOnEmpty,
-                          DatabaseUpdateResult& result)
+bool ApplyDatabaseUpdates(std::string_view label, std::string_view connectionInfo,
+                          std::filesystem::path const& updateDirectory, bool dryRun, DatabaseUpdateResult& result)
 {
   MySQLConnectionInfo info(connectionInfo);
   if (info.database.empty())
@@ -202,54 +201,8 @@ bool ApplyDatabaseUpdates(std::string_view label, std::string_view schemaMarkerT
 
     if (appliedCount == 0)
     {
-      if (!baselineOnEmpty)
-      {
-        fmt::print(stderr,
-                   "[{}] updates table is empty; refusing to replay the full migration history. "
-                   "Use --baseline (or AC_DB_UPDATE_BASELINE_ON_EMPTY=1) if the schema is already current.\n",
-                   label);
-        return false;
-      }
-
-      if (!schemaMarkerTable.empty())
-      {
-        std::unique_ptr<ResultSet> marker(connection.Query(fmt::format("SHOW TABLES LIKE '{}'", schemaMarkerTable)));
-        if (!marker || !marker->NextRow())
-        {
-          fmt::print(stderr, "[{}] refusing to baseline: schema marker table '{}' does not exist\n", label,
-                     schemaMarkerTable);
-          return false;
-        }
-      }
-
-      for (std::filesystem::path const& path : ListSqlFiles(updateDirectory))
-      {
-        std::string contents;
-        if (!ReadFile(path, contents))
-        {
-          fmt::print(stderr, "[{}] failed to read {}\n", label, path.string());
-          return false;
-        }
-
-        std::string const file = path.filename().string();
-        if (dryRun)
-        {
-          fmt::print("[{}] would baseline {} [dry run]\n", label, file);
-          ++result.baselined;
-          continue;
-        }
-
-        if (!RecordUpdate(connection, quotedUpdatesTable, file, Sha1Hex(contents), 0))
-        {
-          fmt::print(stderr, "[{}] failed to baseline {} in the updates table\n", label, file);
-          return false;
-        }
-
-        ++result.baselined;
-        fmt::print("[{}] baselined {}\n", label, file);
-      }
-
-      return true;
+      fmt::print(stderr, "[{}] updates table is empty; refusing to replay the full migration history\n", label);
+      return false;
     }
 
     std::unique_ptr<ResultSet> rows(

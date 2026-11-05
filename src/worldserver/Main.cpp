@@ -468,8 +468,7 @@ static bool RunStartupDatabaseUpdates()
     return false;
   }
 
-  bool const baselineOnEmpty = sConfigMgr->GetOption<bool>("DbUpdate.BaselineOnEmpty", false);
-  bool       success         = true;
+  bool success = true;
   for (Acore::Database::DatabaseUpdateTarget const& target : Acore::Database::GetDatabaseUpdateTargets())
   {
     std::string const connectionInfo = sConfigMgr->GetOption<std::string>(std::string(target.configKey), "");
@@ -489,15 +488,14 @@ static bool RunStartupDatabaseUpdates()
     }
 
     Acore::Database::DatabaseUpdateResult result;
-    if (!Acore::Database::ApplyDatabaseUpdates(target.name, target.schemaMarkerTable, connectionInfo, updateDirectory,
-                                               false, baselineOnEmpty, result))
+    if (!Acore::Database::ApplyDatabaseUpdates(target.name, connectionInfo, updateDirectory, false, result))
     {
       success = false;
       continue;
     }
 
-    LOG_INFO("server.loading", "[{}] db-update: {} applied, {} baselined, {} already recorded", target.name,
-             result.applied, result.baselined, result.skipped);
+    LOG_INFO("server.loading", "[{}] db-update: {} applied, {} already recorded", target.name, result.applied,
+             result.skipped);
   }
 
   return success;

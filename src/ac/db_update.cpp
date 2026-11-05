@@ -77,9 +77,6 @@ int db_update_main(int argc, char** argv)
       .help("comma separated subset of auth,characters,world")
       .default_value(std::string("auth,characters,world"));
   parser.add_argument("--dry-run").help("show what would be applied without executing").flag();
-  parser.add_argument("--baseline")
-      .help("record existing update files without executing them when the updates table is empty")
-      .flag();
 
   try
   {
@@ -124,7 +121,6 @@ int db_update_main(int argc, char** argv)
 
   std::filesystem::path const updatesRoot = std::filesystem::path(sqlDir) / "updates";
   bool const                  dryRun      = parser.get<bool>("--dry-run");
-  bool const                  baseline    = parser.get<bool>("--baseline");
 
   if (!std::filesystem::is_directory(updatesRoot))
   {
@@ -164,15 +160,14 @@ int db_update_main(int argc, char** argv)
     }
 
     Acore::Database::DatabaseUpdateResult result;
-    if (!Acore::Database::ApplyDatabaseUpdates(target->name, target->schemaMarkerTable, connectionInfo, updateDirectory,
-                                               dryRun, baseline, result))
+    if (!Acore::Database::ApplyDatabaseUpdates(target->name, connectionInfo, updateDirectory, dryRun, result))
     {
       success = false;
       continue;
     }
 
-    fmt::print("[{}] {}: {} applied, {} baselined, {} already recorded", target->name, dryRun ? "dry run" : "done",
-               result.applied, result.baselined, result.skipped);
+    fmt::print("[{}] {}: {} applied, {} already recorded", target->name, dryRun ? "dry run" : "done", result.applied,
+               result.skipped);
     if (result.hashMismatches > 0)
       fmt::print(", {} hash mismatches", result.hashMismatches);
     fmt::print("\n");
