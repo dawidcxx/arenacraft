@@ -39,9 +39,15 @@ struct GlyphEntry
 // vendor order.
 std::vector<GlyphEntry> const& AllGlyphs();
 
-// Flat enchant stock, defined in EnchantVendorItems.cpp. One shared list for
-// every player, already ordered by gear slot (head first, weapon last).
-std::vector<uint32> const& AllEnchants();
+// Enchant stock, defined in EnchantVendorItems.cpp, grouped by the gear slot the
+// enchant goes on (head first, weapon last). Shared by every player; the
+// "Enchantments" option opens a menu with one vendor list per slot.
+struct EnchantSlot
+{
+  std::string_view    Name;
+  std::vector<uint32> Items;
+};
+std::vector<EnchantSlot> const& EnchantsBySlot();
 
 // Flat gem stock, defined in GemVendorItems.cpp. AllGems() is the ordinary
 // WotLK epic socketables grouped by socket colour (red, blue, yellow, purple,
@@ -73,7 +79,7 @@ public:
   static constexpr uint32 VendorEntryBase = 9000000;
   // Per-class glyph vendor lists, indexed by class id (see GlyphsForClass).
   static constexpr uint32 GlyphVendorEntryBase = 9000100;
-  // Shared enchant vendor list (see AllEnchants).
+  // Shared enchant vendor lists, one per gear slot: EnchantVendorEntry + slot index (see EnchantsBySlot).
   static constexpr uint32 EnchantVendorEntry = 9000200;
   // Shared gem vendor lists (see AllGems / AllMetaGems).
   static constexpr uint32 GemVendorEntry     = 9000300;
@@ -87,6 +93,8 @@ public:
   static constexpr uint32 UtilGetPet              = 9000004;
   static constexpr uint32 UtilResetTalentsConfirm = 9000005;
   static constexpr uint32 UtilResetTalentsCancel  = 9000006;
+  static constexpr uint32 UtilEnchantMenu         = 9000007; // the per-slot enchant menu
+  static constexpr uint32 UtilBack                = 9000008; // back to the main menu
 
   struct Category
   {

@@ -114,9 +114,9 @@ bool ItemVendor::CanCreatureGossipHello(Player* player, Creature* creature)
   menu.AddGossipMenuItemData(menuIndex, GlyphVendorEntryBase + player->getClass(), 0);
   ++menuIndex;
 
-  // One shared, slot-ordered enchant list for every player.
-  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "Enchantments", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
-  menu.AddGossipMenuItemData(menuIndex, EnchantVendorEntry, 0);
+  // Enchants: a menu with one vendor list per gear slot (see CanCreatureGossipSelect).
+  menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, "Enchantments", 0, UtilEnchantMenu, "", 0, false);
+  menu.AddGossipMenuItemData(menuIndex, 0, 0);
   ++menuIndex;
 
   // Ordinary WotLK epic gems (grouped by colour), then the WotLK meta gems.
@@ -188,7 +188,29 @@ bool ItemVendor::CanCreatureGossipSelect(Player* player, Creature* creature, uin
       player->SendTalentsInfoData(false);
     return true;
   case UtilResetTalentsCancel:
+  case UtilBack:
     return CanCreatureGossipHello(player, creature);
+  case UtilEnchantMenu:
+  {
+    // One option per gear slot; each opens that slot's vendor list (stocked in ItemVendorStock::OnStartup).
+    player->PlayerTalkClass->ClearMenus();
+    GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
+    menu.SetMenuId(GossipMenuId);
+
+    std::vector<EnchantSlot> const& slots     = EnchantsBySlot();
+    uint32                          menuIndex = 0;
+    for (uint32 i = 0; i < uint32(slots.size()); ++i, ++menuIndex)
+    {
+      menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, std::string(slots[i].Name), 0, GOSSIP_OPTION_VENDOR, "", 0,
+                       false);
+      menu.AddGossipMenuItemData(menuIndex, EnchantVendorEntry + i, 0);
+    }
+    menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_CHAT, "Back", 0, UtilBack, "", 0, false);
+    menu.AddGossipMenuItemData(menuIndex, 0, 0);
+
+    SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
+    return true;
+  }
   case UtilLearnDualSpec:
     player->PlayerTalkClass->SendCloseGossip();
     if (player->GetSpecsCount() == 1 && player->GetLevel() >= sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))
@@ -223,9 +245,11 @@ void ItemVendorStock::OnStartup()
     for (uint32 item : ItemVendor::GlyphsForClass(uint8(classId)))
       StockVendorItem(ItemVendor::GlyphVendorEntryBase + classId, item);
 
-  // Shared enchant list, opened by the "Enchantments" option.
-  for (uint32 item : AllEnchants())
-    StockVendorItem(ItemVendor::EnchantVendorEntry, item);
+  // Shared enchant lists, one per gear slot, opened from the "Enchantments" menu.
+  std::vector<EnchantSlot> const& enchantSlots = EnchantsBySlot();
+  for (uint32 i = 0; i < uint32(enchantSlots.size()); ++i)
+    for (uint32 item : enchantSlots[i].Items)
+      StockVendorItem(ItemVendor::EnchantVendorEntry + i, item);
 
   // Shared gem lists, opened by the "Gems" / "Meta Gems" options.
   for (uint32 item : AllGems())
