@@ -514,8 +514,8 @@ void WorldSession::HandleLogoutCancelOpcode(WorldPackets::Character::LogoutCance
 
 void WorldSession::HandleTogglePvP(WorldPacket& recv_data)
 {
-  // Arenacraft: PvP can't be switched on in the arena hub (see ARENACRAFT_HUB_ZONE)
-  if (GetPlayer()->GetZoneId() == ARENACRAFT_HUB_ZONE)
+  // Arenacraft: PvP can't be switched on in the arena hub (see ARENACRAFT_HUB_AREA)
+  if (GetPlayer()->GetAreaId() == ARENACRAFT_HUB_AREA)
   {
     recv_data.rfinish();
     GetPlayer()->RemovePlayerFlag(PLAYER_FLAGS_IN_PVP);

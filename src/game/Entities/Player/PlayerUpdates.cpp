@@ -297,7 +297,13 @@ void Player::Update(uint32 p_time)
         // use area updates as well
         // needed for free far all arenas for example
         if (m_areaUpdateId != newarea)
-          UpdateArea(newarea);
+        {
+          // Arenacraft: entering or leaving the arena hub area changes the PvP rules, which UpdateZone works out
+          if (newarea == ARENACRAFT_HUB_AREA || m_areaUpdateId == ARENACRAFT_HUB_AREA)
+            UpdateZone(newzone, newarea);
+          else
+            UpdateArea(newarea);
+        }
       }
 
       m_zoneUpdateTimer = ZONE_UPDATE_INTERVAL;
@@ -1212,7 +1218,7 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
   pvpInfo.IsHostile = pvpInfo.IsInHostileArea || HasPvPForcingQuest();
 
   // Arenacraft: no PvP in the arena hub, not even on a PvP realm or with /pvp switched on before coming here
-  if (newZone == ARENACRAFT_HUB_ZONE)
+  if (newArea == ARENACRAFT_HUB_AREA)
   {
     pvpInfo.IsInHostileArea = false;
     pvpInfo.IsHostile       = false;
