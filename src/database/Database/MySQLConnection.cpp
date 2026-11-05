@@ -464,6 +464,8 @@ void MySQLConnection::Ping() { mysql_ping(m_Mysql); }
 
 uint32 MySQLConnection::GetLastError() { return mysql_errno(m_Mysql); }
 
+std::string MySQLConnection::GetLastErrorString() const { return m_Mysql ? mysql_error(m_Mysql) : ""; }
+
 bool MySQLConnection::LockIfReady() { return m_Mutex.try_lock(); }
 
 void MySQLConnection::Unlock() { m_Mutex.unlock(); }

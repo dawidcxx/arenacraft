@@ -90,6 +90,19 @@ std::string EscapeString(MySQLConnection& connection, std::string const& value)
   return escaped;
 }
 
+std::string QuoteIdentifier(std::string_view value)
+{
+  std::string quoted = "`";
+  for (char c : value)
+  {
+    if (c == '`')
+      quoted += '`';
+    quoted += c;
+  }
+  quoted += '`';
+  return quoted;
+}
+
 std::vector<std::filesystem::path> ListSqlFiles(std::filesystem::path const& directory)
 {
   std::vector<std::filesystem::path> files;
@@ -144,29 +157,55 @@ bool ApplyDatabaseUpdates(std::string_view label, std::string_view connectionInf
     return false;
   }
 
+  std::string updatesTable;
   {
     std::unique_ptr<ResultSet> table(connection.Query("SHOW TABLES LIKE 'updates'"));
-    if (!table || table->GetRowCount() == 0)
+    if (!table || !table->NextRow())
     {
       fmt::print(stderr, "[{}] database '{}' has not been seeded; run scripts/seed_db first\n", label, info.database);
       return false;
     }
+
+    updatesTable = table->Fetch()[0].Get<std::string>();
   }
+
+  std::string const quotedUpdatesTable = QuoteIdentifier(updatesTable);
 
   std::unordered_map<std::string, AppliedUpdate> applied;
   {
-    std::unique_ptr<ResultSet> rows(connection.Query("SELECT `name`, `hash`, `state` FROM `updates`"));
-    if (!rows)
+    // Query() reports an empty result set as null, so COUNT(*) is used to
+    // distinguish "no applied updates yet" from an actual query error.
+    std::unique_ptr<ResultSet> count(connection.Query(fmt::format("SELECT COUNT(*) FROM {}", quotedUpdatesTable)));
+    if (!count)
     {
-      fmt::print(stderr, "[{}] could not read the updates table\n", label);
+      fmt::print(stderr, "[{}] could not read the updates table: {}\n", label, connection.GetLastErrorString());
       return false;
     }
 
-    while (rows->NextRow())
+    if (!count->NextRow())
     {
-      Field* fields = rows->Fetch();
-      applied.emplace(fields[0].Get<std::string>(),
-                      AppliedUpdate{fields[1].Get<std::string>(), fields[2].Get<std::string>()});
+      fmt::print(stderr, "[{}] could not read the updates table: {}\n", label, connection.GetLastErrorString());
+      return false;
+    }
+
+    uint64 const appliedCount = count->Fetch()[0].Get<uint64>();
+
+    if (appliedCount > 0)
+    {
+      std::unique_ptr<ResultSet> rows(
+          connection.Query(fmt::format("SELECT `name`, `hash`, `state` FROM {}", quotedUpdatesTable)));
+      if (!rows)
+      {
+        fmt::print(stderr, "[{}] could not read the updates table: {}\n", label, connection.GetLastErrorString());
+        return false;
+      }
+
+      while (rows->NextRow())
+      {
+        Field* fields = rows->Fetch();
+        applied.emplace(fields[0].Get<std::string>(),
+                        AppliedUpdate{fields[1].Get<std::string>(), fields[2].Get<std::string>()});
+      }
     }
   }
 
