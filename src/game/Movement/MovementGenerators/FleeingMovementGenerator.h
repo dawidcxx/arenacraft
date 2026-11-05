@@ -40,16 +40,13 @@ public:
 
 private:
   void SetTargetLocation(T*);
-  void GetPoint(T*, Position& position, bool anyDirection);
+  void GetPoint(T*, Position& position);
 
   std::unique_ptr<PathGenerator> _path;
   ObjectGuid                     _fleeTargetGUID;
   TimeTracker                    _timer;
   bool                           _interrupt;
   uint8                          _invalidPathsCount;
-  // Arenacraft: where a feared player was when the fear started; they run around this spot instead of away for good.
-  Position _anchor;
-  bool     _anchored = false;
 };
 
 class TimedFleeingMovementGenerator : public FleeingMovementGenerator<Creature>

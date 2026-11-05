@@ -4639,13 +4639,14 @@ void SpellMgr::LoadSpellInfoCorrections()
                   spellInfo->AttributesCu |= SPELL_ATTR0_CU_AURA_CANNOT_BE_SAVED;
                 });
   // Arenacraft: 74410/74411 already apply -10% healing done (effect 0, left
-  // untouched). Add a separate -5% damage done effect so arena/BG burst is
-  // lower without replacing the healing reduction.
+  // untouched). Add a separate -5% damage taken effect so every hit a player
+  // receives in an arena/BG (melee, spell, pet) is reduced, without replacing
+  // the healing reduction.
   ApplySpellFix({74410, 74411},
                 [](SpellInfo* spellInfo)
                 {
                   spellInfo->Effects[EFFECT_1].Effect        = SPELL_EFFECT_APPLY_AURA;
-                  spellInfo->Effects[EFFECT_1].ApplyAuraName = SPELL_AURA_MOD_DAMAGE_PERCENT_DONE;
+                  spellInfo->Effects[EFFECT_1].ApplyAuraName = SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN;
                   spellInfo->Effects[EFFECT_1].TargetA       = SpellImplicitTargetInfo(TARGET_UNIT_CASTER);
                   spellInfo->Effects[EFFECT_1].DieSides      = 1;
                   spellInfo->Effects[EFFECT_1].BasePoints    = -6; // -5%

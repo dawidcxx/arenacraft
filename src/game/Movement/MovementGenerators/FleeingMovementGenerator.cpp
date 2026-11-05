@@ -23,8 +23,6 @@
 #include "ObjectAccessor.h"
 #include "Player.h"
 
-#include <type_traits>
-
 #define MIN_QUIET_DISTANCE 28.0f
 #define MAX_QUIET_DISTANCE 43.0f
 #define MIN_PATH_LENGTH    2.0f
@@ -33,9 +31,6 @@
 // snaps the destination to the ground, so a point past an edge lands well below.
 #define MAX_FLEE_DROP  3.0f
 #define MAX_FLEE_TRIES 5
-// Arenacraft: a feared player runs in random directions but stays within this distance (2D) of where the fear started.
-#define PLAYER_FLEE_ROAM_RADIUS 15.0f
-#define PLAYER_FLEE_ANGLE_TRIES 8
 
 template <class T> void FleeingMovementGenerator<T>::DoInitialize(T* owner)
 {
@@ -46,11 +41,6 @@ template <class T> void FleeingMovementGenerator<T>::DoInitialize(T* owner)
 
   owner->StopMoving();
   _path = nullptr;
-  if (!_anchored) // DoReset (e.g. a stun inside the fear ended) keeps the original spot
-  {
-    _anchor   = owner->GetPosition();
-    _anchored = true;
-  }
   owner->SetUnitFlag(UNIT_FLAG_FLEEING);
   owner->AddUnitState(UNIT_STATE_FLEEING);
   SetTargetLocation(owner);
@@ -129,8 +119,7 @@ template <class T> void FleeingMovementGenerator<T>::SetTargetLocation(T* owner)
   for (uint8 attempt = 0; attempt < MAX_FLEE_TRIES && !valid; ++attempt)
   {
     destination = owner->GetPosition();
-    // the last tries may leave the roam circle (cornered against a wall or pillar)
-    GetPoint(owner, destination, attempt + 2 >= MAX_FLEE_TRIES);
+    GetPoint(owner, destination);
 
     valid = destination.GetPositionZ() >= owner->GetPositionZ() - MAX_FLEE_DROP &&
             owner->IsWithinLOS(destination.GetPositionX(), destination.GetPositionY(), destination.GetPositionZ());
@@ -184,15 +173,10 @@ template <class T> void FleeingMovementGenerator<T>::SetTargetLocation(T* owner)
   init.MovebyPath(_path->GetPath());
   init.SetWalk(false);
   int32 traveltime = init.Launch();
-  // Arenacraft: a feared player keeps running - the next leg starts as soon as this one ends, instead of standing still
-  // for up to 1.5s (the creature behaviour). Even a short stop between legs made the run look like stop-and-go walking.
-  if constexpr (std::is_same_v<T, Player>)
-    _timer.Reset(traveltime);
-  else
-    _timer.Reset(traveltime + urand(800, 1500));
+  _timer.Reset(traveltime + urand(800, 1500));
 }
 
-template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position& position, bool anyDirection)
+template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position& position)
 {
   float casterDistance = 0.f;
   float casterAngle    = 0.f;
@@ -220,29 +204,6 @@ template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position
 
   float distance = 0.f;
   float angle    = 0.f;
-
-  // Arenacraft: feared players run short legs (6-12 yd) in a random direction, each leg ending within 15 yd of the spot
-  // the fear started, instead of the creature "flee until 28-43 yd from the caster" rule. That rule (and later leaning
-  // away from the caster on every leg) added up to one long run in one direction that could end far out of the fight.
-  // Short legs also keep the client on the server's path: a long leg the client could not finish (a pillar in the way)
-  // ended in a visible jump when the next leg started. `anyDirection` lifts the circle when cornered.
-  if constexpr (std::is_same_v<T, Player>)
-  {
-    distance  = frand(6.0f, 12.0f);
-    angle     = frand(0.0f, 2.0f * float(M_PI));
-    bool fits = anyDirection || !_anchored;
-    for (uint8 i = 0; i < PLAYER_FLEE_ANGLE_TRIES && !fits; ++i)
-    {
-      angle = frand(0.0f, 2.0f * float(M_PI));
-      fits  = _anchor.GetExactDist2d(owner->GetPositionX() + distance * std::cos(angle),
-                                     owner->GetPositionY() + distance * std::sin(angle)) <= PLAYER_FLEE_ROAM_RADIUS;
-    }
-    if (!fits) // at the edge: head back across the circle
-      angle = owner->GetAngle(&_anchor) + frand(-float(M_PI) / 4.0f, float(M_PI) / 4.0f);
-    angle -= owner->GetOrientation();
-    owner->MovePositionToFirstCollision(position, distance, angle);
-    return;
-  }
   if (casterDistance < MIN_QUIET_DISTANCE)
   {
     distance = frand(0.4f, 1.3f) * (MIN_QUIET_DISTANCE - casterDistance);
@@ -274,8 +235,8 @@ template bool FleeingMovementGenerator<Player>::DoUpdate(Player*, uint32);
 template bool FleeingMovementGenerator<Creature>::DoUpdate(Creature*, uint32);
 template void FleeingMovementGenerator<Player>::SetTargetLocation(Player*);
 template void FleeingMovementGenerator<Creature>::SetTargetLocation(Creature*);
-template void FleeingMovementGenerator<Player>::GetPoint(Player*, Position&, bool);
-template void FleeingMovementGenerator<Creature>::GetPoint(Creature*, Position&, bool);
+template void FleeingMovementGenerator<Player>::GetPoint(Player*, Position&);
+template void FleeingMovementGenerator<Creature>::GetPoint(Creature*, Position&);
 
 void TimedFleeingMovementGenerator::Finalize(Unit* owner)
 {

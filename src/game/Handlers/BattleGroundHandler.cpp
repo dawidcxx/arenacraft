@@ -434,7 +434,9 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPacket& recvData)
     return;
   }
 
-  if (_player->GetCharmGUID() || _player->IsInCombat())
+  // Arenacraft: accepting a queue invite must work in combat - the soloq popup
+  // can arrive while the player is fighting and combat should not block it.
+  if (_player->GetCharmGUID())
   {
     ChatHandler(_player->GetSession()).SendNotification(LANG_YOU_IN_COMBAT);
     return;

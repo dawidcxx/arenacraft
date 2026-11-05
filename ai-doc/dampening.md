@@ -28,9 +28,9 @@ Effects:
 | Effect | Spell | Value | Source |
 | ------ | ----- | ----- | ------ |
 | Healing done | `74410`, `74411` | **-10%** | DBC (`SPELL_AURA_MOD_HEALING_DONE_PERCENT`) |
-| Damage done | `74410`, `74411` | **-5%** | `ApplySpellFix` (`SPELL_AURA_MOD_DAMAGE_PERCENT_DONE`) |
+| Damage taken | `74410`, `74411` | **-5%** | `ApplySpellFix` (`SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN`) |
 
-The -5% damage effect is added server-side in
+The -5% damage-taken effect is added server-side in
 `src/game/Spells/SpellInfoCorrections.cpp:4644` as `EFFECT_1`; the DBC's
 `EFFECT_0` healing reduction is left untouched. Nothing in SQL changes: the
 same `spell_area` rows now carry both effects.
@@ -47,7 +47,8 @@ owner has either aura:
   (`IsArenacraftDampeningPet`, `src/game/Entities/Unit/Unit.cpp:118`), applied in
   `Unit::SpellDamageBonusTaken` (`:12137`) and `Unit::MeleeDamageBonusTaken`
   (`:13676`) using `ARENACRAFT_PET_DAMPENING_DAMAGE_TAKEN` (`:116`);
-- their damage output is unchanged (they do not get the -5% damage-done effect).
+- their damage output is unchanged. Player targets, however, take 5% less from
+  *all* sources (their own aura), including pet/guardian attacks.
 
 Totems and vehicles are excluded; only `IsPet()` / `IsGuardian()` units qualify.
 
@@ -83,22 +84,23 @@ Timer/stacking code lives in `Arena::PreUpdateImpl`
 ## Interaction between the layers
 
 Percent done/taken modifiers use `AddPct`, which applies them
-multiplicatively, so the two damage-done effects do not simply add:
+multiplicatively, so the ramp and the static reduction do not simply add:
 
-| State | Damage done multiplier | Net |
-| ----- | ---------------------- | --- |
-| BG, no `29659` | `0.95` | **-5%** |
+| State | Damage dealt × taken | Net |
+| ----- | -------------------- | --- |
+| BG, no `29659` | `1.00 * 0.95` | **-5%** |
 | Arena, 1 Dementia stack | `1.10 * 0.95` | **+4.5%** |
 | Arena, 2 Dementia stacks | `1.20 * 0.95` | **+14%** |
 
 Healing is **-10%** in both arenas and battlegrounds at all times. Pets take
 **-10% damage** whenever their owner has the static area aura, on top of their
-own resilience/defensive cooldowns.
+own resilience/defensive cooldowns; player targets take the static **-5%** from
+every source, pets included.
 
 ## Why
 
 Arena games were too bursty and healers were being pushed out. The static -5%
-damage done reduces burst from the start, while the pet -10% damage taken keeps
+damage taken reduces burst from the start, while the pet -10% damage taken keeps
 pets from being deleted before they can contribute. The ramping `29659` remains
 the end-of-match pressure valve.
 
