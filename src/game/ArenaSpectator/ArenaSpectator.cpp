@@ -21,6 +21,7 @@
 #include "Map.h"
 #include "Pet.h"
 #include "Player.h"
+#include "ReplayPlayback.hpp"
 #include "ReplayRecorder.hpp"
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
@@ -185,6 +186,10 @@ bool ArenaSpectator::HandleSpectatorWatchCommand(ChatHandler* handler, std::stri
     return true;
 
   if (!player->FindMap() || !player->FindMap()->IsBattleArena())
+    return true;
+
+  // Arenacraft: in a replay the recorded players exist only on the viewer's client; the replay moves the camera
+  if (arenacraft::replay::viewByName(player, name))
     return true;
 
   Battleground* bg = ((BattlegroundMap*)player->FindMap())->GetBG();

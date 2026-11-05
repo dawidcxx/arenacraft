@@ -3,6 +3,7 @@
 #include "Arena.h"
 #include "ArenaSpectator.h"
 #include "BattlegroundMgr.h"
+#include "CharacterCache.h"
 #include "Chat.h"
 #include "DBCStores.h"
 #include "DatabaseEnv.h"
@@ -32,6 +33,8 @@ constexpr uint32_t StateIntervalMs        = 1 * IN_MILLISECONDS; // addon STATE 
 
 // Addon messages (ArenaSpectator addon whisper channel): "ACREPLAY\tSTATE;at=..;len=..;paused=..;" / "...END;"
 constexpr char const* ReplayAddonPrefix = "ACREPLAY\t";
+// after a seek back, wait this long before putting the camera back on the watched player
+constexpr uint32_t ReviewDelayMs = 300;
 
 // viewer -> the playback they watch (world thread only)
 std::unordered_map<ObjectGuid, std::weak_ptr<Playback>>& Registry()
@@ -195,6 +198,26 @@ void Playback::destroyRecordedObjects(Player* viewer) const
   }
 }
 
+bool Playback::view(Player* viewer, ObjectGuid target)
+{
+  if (!target || target == _viewed)
+  {
+    _viewed      = ObjectGuid::Empty;
+    _reviewTimer = 0;
+    viewer->SetGuidValue(PLAYER_FARSIGHT, ObjectGuid::Empty);
+    return true;
+  }
+  if (!target.IsPlayer() || std::find(_objects.begin(), _objects.end(), target.GetRawValue()) == _objects.end())
+    return false;
+
+  // The recorded players exist only on the viewer's client, so no Bind Sight aura: the client puts its camera on
+  // whatever PLAYER_FARSIGHT names. The server's own view stays on the viewer (its CMSG_FAR_SIGHT finds no object).
+  _viewed      = target;
+  _reviewTimer = 0;
+  viewer->SetGuidValue(PLAYER_FARSIGHT, target);
+  return true;
+}
+
 void Playback::sendState(Player* viewer) const
 {
   ArenaSpectator::SendPacketTo(viewer, Acore::StringFormat("{}STATE;at={};len={};paused={};", ReplayAddonPrefix, _posMs,
@@ -229,6 +252,13 @@ bool Playback::seek(Player* viewer, uint32_t targetMs)
   {
     // the client can't go back: wipe the recorded objects and rebuild the state from the start
     destroyRecordedObjects(viewer);
+    // the watched player is gone from the client with the rest; the camera goes back on it once rebuilt, in a later
+    // update so the client sees the field change (an unchanged value would not move its camera)
+    if (_viewed)
+    {
+      viewer->SetGuidValue(PLAYER_FARSIGHT, ObjectGuid::Empty);
+      _reviewTimer = ReviewDelayMs;
+    }
     // the spectator addon starts over too (ENABLE resets it); the recorded state at 0 rebuilds its frames
     if (_hasSpectatorData)
       ArenaSpectator::SendCommand(viewer, "{}ENABLE", SPECTATOR_ADDON_PREFIX);
@@ -278,6 +308,12 @@ bool Playback::update(Battleground* bg, uint32_t diff)
       _state = State::Done;
       break;
     }
+    if (_reviewTimer && viewer)
+    {
+      _reviewTimer = _reviewTimer > diff ? _reviewTimer - diff : 0;
+      if (!_reviewTimer && _viewed)
+        viewer->SetGuidValue(PLAYER_FARSIGHT, _viewed);
+    }
     if (!_paused)
     {
       _posMs = std::min(_posMs + diff, _durationMs);
@@ -304,6 +340,7 @@ bool Playback::update(Battleground* bg, uint32_t diff)
     else if (_timer >= LingerAfterEndMs)
     {
       ArenaSpectator::SendPacketTo(viewer, Acore::StringFormat("{}END;", ReplayAddonPrefix));
+      view(viewer, ObjectGuid::Empty);
       viewer->TeleportToEntryPoint();
       _timer = 0;
       _state = State::Done;
@@ -317,6 +354,17 @@ bool Playback::update(Battleground* bg, uint32_t diff)
 }
 
 std::string cannotWatchReason(Player* player) { return whyCannotWatch(player); }
+
+bool viewByName(Player* viewer, std::string const& name)
+{
+  std::shared_ptr<Playback> playback = playbackOf(viewer->GetGUID());
+  if (!playback)
+    return false;
+  ObjectGuid const target = sCharacterCache->GetCharacterGuidByName(name);
+  if (!playback->view(viewer, target))
+    tell(viewer, name + " is not in this replay.");
+  return true;
+}
 
 std::shared_ptr<Playback> playbackOf(ObjectGuid viewer)
 {
