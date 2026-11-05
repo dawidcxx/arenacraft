@@ -3,6 +3,7 @@
 #include "Doomclaw.hpp"
 #include "GeneralGoodsVendor.hpp"
 #include "ItemVendor.hpp"
+#include "PetAutocast.hpp"
 #include "PreBuffs.hpp"
 #include "fingerprint/FingerprintScripts.hpp"
 #include "replay/ReplayScripts.hpp"
@@ -32,4 +33,5 @@ void AddArenacraftScripts()
   arenacraft::replay::AddReplayScripts();
   arenacraft::vip::AddVipScripts();
   arenacraft::fingerprint::AddFingerprintScripts();
+  arenacraft::petautocast::AddPetAutocastScripts();
 }

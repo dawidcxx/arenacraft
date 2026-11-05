@@ -19,6 +19,7 @@
 #include "Creature.h"
 #include "GameTime.h"
 #include "Map.h"
+#include "PetAutocast.hpp"
 #include "Player.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
@@ -128,7 +129,15 @@ void CharmInfo::InitCharmCreateSpells()
         newstate = ACT_PASSIVE;
       else
       {
-        if (spellInfo->NeedsExplicitUnitTarget())
+        bool enable = spellInfo->NeedsExplicitUnitTarget();
+        // Arenacraft: a guardian (Feral Spirit wolves, ...) uses the owner's last autocast choice for this spell,
+        // see PetAutocast.hpp
+        if (!_unit->IsPet() && _unit->GetOwnerGUID().IsPlayer())
+          if (std::optional<bool> const choice =
+                  arenacraft::petautocast::Choice(_unit->GetOwnerGUID().GetCounter(), _unit->GetEntry(), spellInfo->Id))
+            enable = *choice;
+
+        if (enable)
         {
           newstate = ACT_ENABLED;
           ToggleCreatureAutocast(spellInfo, true);
