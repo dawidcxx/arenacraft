@@ -132,6 +132,10 @@ pub const TestHarness = struct {
             },
         }
 
+        // revision symbols live outside common now; tests that pull any common
+        // object referencing GitRevision need them too
+        try src.linkRevision(b, mod);
+
         // final executable: resolve the unvendored system libs (openssl, ...)
         deps.linkSystemLibraries(mod);
     }

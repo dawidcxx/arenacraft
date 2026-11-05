@@ -155,6 +155,8 @@ pub const AcGraph = struct {
         try src.linkWorldserver(bl, module);
         try src.linkAuth(bl, module);
         try src.linkTools(bl, module);
+        // revision data is built separately so it never invalidates common
+        try src.linkRevision(bl, module);
         deps.linkArgparse(module);
         // db-update pulls in the logging headers, which need boost/fmt includes
         deps.linkFmt(module);

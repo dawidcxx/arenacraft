@@ -55,27 +55,41 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      # The Dockerfile keeps Zig's caches in RUN --mount=type=cache, which are
-      # not part of --cache-to/--cache-from. Cache dance moves them through the
-      # GitHub Actions cache; Docker layer cache lives in GHCR instead so it
-      # does not consume the 10 GB Actions cache quota.
-      - name: Cache Zig build
-        uses: actions/cache@v4
-        with:
-          path: zig-cache-dance
-          key: zig-cache-${{ runner.os }}-${{ github.sha }}
-          restore-keys: zig-cache-${{ runner.os }}-
+      # Zig's cache lives in RUN --mount=type=cache, which BuildKit cannot
+      # export through --cache-to/--cache-from. Keep it in a small GHCR image
+      # instead of the shared 10 GB Actions cache: pull it into the builder's
+      # cache mounts before the build and snapshot the mounts back afterwards.
+      # This keeps a fresh commit to "recompile changed files + link", without
+      # competing with check.yml (which is the workflow that fills the quota).
+      - name: Resolve Zig cache image
+        id: zigcache
+        run: |
+          if docker buildx imagetools inspect "$IMAGE:zigcache" >/dev/null 2>&1; then
+            echo "image=$IMAGE:zigcache" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=docker.io/library/busybox:latest" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Inject Zig cache
-        uses: reproducible-containers/buildkit-cache-dance@v3
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          cache-dir: zig-cache-dance
-          dockerfile: Dockerfile
+        env:
+          ZIGCACHE_IMAGE: ${{ steps.zigcache.outputs.image }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: |
+          ctx="$(mktemp -d)"
+          docker buildx build --builder "$BUILDER" --tag arenacraft-zigcache-inject:latest -f - "$ctx" <<EOF
+          # syntax=docker/dockerfile:1
+          FROM ${ZIGCACHE_IMAGE} AS cache
+          RUN mkdir -p /zig-cache /zig-pkg /zig-global
+          FROM docker.io/library/busybox:latest
+          RUN --mount=type=cache,id=arenacraft-zig-cache,target=/dst --mount=type=bind,from=cache,source=/zig-cache,target=/src cp -a /src/. /dst/
+          RUN --mount=type=cache,id=arenacraft-zig-pkg,target=/dst --mount=type=bind,from=cache,source=/zig-pkg,target=/src cp -a /src/. /dst/
+          RUN --mount=type=cache,id=arenacraft-zig-global,target=/dst --mount=type=bind,from=cache,source=/zig-global,target=/src cp -a /src/. /dst/
+          EOF
 
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
+          builder: ${{ steps.buildx.outputs.name }}
           context: .
           file: Dockerfile
           platforms: linux/amd64
@@ -87,8 +101,20 @@ jobs:
             GIT_BRANCH=${{ github.ref_name }}
             GIT_DATE=${{ steps.revision.outputs.date }}
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=min
           provenance: false
+
+      - name: Save Zig cache
+        if: github.ref == 'refs/heads/local'
+        env:
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: |
+          ctx="$(mktemp -d)"
+          docker buildx build --builder "$BUILDER" -f - "$ctx" --tag "$IMAGE:zigcache" --push <<'EOF'
+          # syntax=docker/dockerfile:1
+          FROM docker.io/library/busybox:latest
+          RUN --mount=type=cache,id=arenacraft-zig-cache,target=/c1 --mount=type=cache,id=arenacraft-zig-pkg,target=/c2 --mount=type=cache,id=arenacraft-zig-global,target=/c3 mkdir -p /zig-cache /zig-pkg /zig-global && cp -a /c1/. /zig-cache/ && cp -a /c2/. /zig-pkg/ && cp -a /c3/. /zig-global/
+          EOF
 
   cleanup:
     name: prune old GHCR versions

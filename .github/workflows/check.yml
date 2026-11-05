@@ -34,14 +34,17 @@ jobs:
           restore-prefixes-first-match: nix-${{ runner.os }}-
           gc-max-store-size-linux: 2G
 
+      # Separate namespace from the image workflow (which keeps its Zig cache in
+      # GHCR). Key by ref rather than SHA so each branch/PR writes at most one
+      # ~3 GB entry, instead of one per push refilling the shared 10 GB quota.
       - name: Restore Zig cache
         uses: actions/cache@v4
         with:
           path: |
             .zig-cache
             zig-pkg
-          key: zig-cache-${{ runner.os }}-${{ github.sha }}
-          restore-keys: zig-cache-${{ runner.os }}-
+          key: zig-check-${{ runner.os }}-${{ github.ref_name }}
+          restore-keys: zig-check-${{ runner.os }}-
 
       - name: Compile check
         run: nix develop .#ci --command zig build -j"$(nproc)" check-ac

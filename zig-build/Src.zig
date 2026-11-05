@@ -73,6 +73,11 @@ pub const Src = struct {
         BuildCommons.no_ubsan,
     };
 
+    revision: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+    } = .{},
+
     common: struct {
         module: *Build.Module = undefined,
         library: *Build.Step.Compile = undefined,
@@ -126,6 +131,7 @@ pub const Src = struct {
     }
 
     pub fn build(self: *Self, b: BuildRequest) !void {
+        try self.buildRevision(b);
         try self.buildCommon(b);
         try self.buildDatabase(b);
         try self.buildShared(b);
@@ -140,6 +146,14 @@ pub const Src = struct {
     // they cascade (CMake PUBLIC propagation parity): linking shared gives
     // you database and common includes too.
     //
+
+    /// Revision data changes on every commit, so it lives in its own library:
+    /// `common` must not depend on it or every push would invalidate `common`.
+    /// Final executables link it for the GitRevision symbols common references.
+    pub fn linkRevision(self: *Self, b: *Build, mod: *Build.Module) !void {
+        _ = b;
+        mod.linkLibrary(self.revision.library);
+    }
 
     pub fn linkCommon(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.common.library);
@@ -187,7 +201,11 @@ pub const Src = struct {
     // builds
     //
 
-    fn buildCommon(self: *Self, build_request: BuildRequest) !void {
+    /// `GitRevision.cpp` is the only translation unit that consumes the
+    /// generated `revision.h`. Keeping it out of `common` means a new
+    /// GIT_COMMIT/GIT_DATE only rebuilds this one file plus the final link,
+    /// instead of invalidating the whole `common` (and every module linking it).
+    fn buildRevision(self: *Self, build_request: BuildRequest) !void {
         const b = build_request[0];
         const target = build_request[1];
         const optimize = build_request[2];
@@ -198,8 +216,6 @@ pub const Src = struct {
             .link_libcpp = true,
         });
 
-        // common uses flat-name includes across subdirectories, mirroring
-        // the CMake CollectIncludeDirectories behavior
         try cpp.addFlatIncludes(b, "src/common", module);
 
         const git_hash = revisionValue(b, &.{ "GIT_COMMIT", "ARENACRAFT_GIT_COMMIT" }, &.{ "rev-parse", "HEAD" });
@@ -219,7 +235,39 @@ pub const Src = struct {
         revision_header.addValue("_MYSQL_EXECUTABLE", []const u8, "");
         module.addConfigHeader(revision_header);
 
+        module.addCSourceFile(.{
+            .file = b.path("src/common/GitRevision.cpp"),
+            .language = .cpp,
+            .flags = &core_cflags,
+        });
+
+        const library = b.addLibrary(.{
+            .name = "revision",
+            .root_module = module,
+            .linkage = .static,
+        });
+
+        self.revision.module = module;
+        self.revision.library = library;
+    }
+
+    fn buildCommon(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        });
+
+        // common uses flat-name includes across subdirectories, mirroring
+        // the CMake CollectIncludeDirectories behavior
+        try cpp.addFlatIncludes(b, "src/common", module);
+
         var sources = self.queryModuleSources("src/common");
+        sources.filterOut("GitRevision.cpp");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
