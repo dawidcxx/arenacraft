@@ -1,6 +1,8 @@
 #include "PetAutocast.hpp"
 
 #include "DatabaseEnv.h"
+#include "Field.h"
+#include "QueryResult.h"
 #include "Log.h"
 #include "WorldScript.h"
 
