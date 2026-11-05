@@ -2271,8 +2271,12 @@ void SpellMgr::LoadEnchantCustomAttr()
 
     /// @todo: find a better check
     // Xinef: commented second part, fixes warlock enchants like firestone, spellstone
+    // Arenacraft: shaman weapon imbues (Windfury, Flametongue, Frostbrand, Rockbiter, Earthliving) stay on too. They
+    // are free class spells the shaman would just cast again in the starting room; an enhancement shaman lost the
+    // off-hand imbue on every arena entry.
     if (!spellInfo->HasAttribute(
-            SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY) /* || !spellInfo->HasAttribute(SPELL_ATTR0_NOT_SHAPESHIFTED)*/)
+            SPELL_ATTR2_ENCHANT_OWN_ITEM_ONLY) /* || !spellInfo->HasAttribute(SPELL_ATTR0_NOT_SHAPESHIFTED)*/
+        && spellInfo->SpellFamilyName != SPELLFAMILY_SHAMAN)
       continue;
 
     for (uint32 j = 0; j < MAX_SPELL_EFFECTS; ++j)
