@@ -20,7 +20,7 @@
  * the running server overwrites the change.
  *
  * Connection: AC_CHARACTER_DATABASE_INFO "host;port;user;password;db" or
- * --characters (same format and defaults as ./scripts/db_sync).
+ * --characters (same format and defaults as the core database config).
  */
 import { Command } from "commander";
 import { mkdir, readdir } from "node:fs/promises";

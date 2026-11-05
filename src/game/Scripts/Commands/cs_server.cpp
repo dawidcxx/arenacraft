@@ -245,6 +245,8 @@ public:
     uint32      connPeak           = sWorld->GetMaxActiveSessionCount();
 
     handler->PSendSysMessage("{}", GitRevision::GetFullVersion());
+    handler->PSendSysMessage("Core revision: {} ({})", GitRevision::GetHash(), GitRevision::GetBranch());
+    handler->PSendSysMessage("Commit date: {}", GitRevision::GetDate());
     if (!queuedSessionCount)
       handler->PSendSysMessage("Connected players: {}. Characters in world: {}.", activeSessionCount, playerCount);
     else

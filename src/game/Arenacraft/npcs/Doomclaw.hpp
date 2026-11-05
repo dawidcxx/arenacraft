@@ -18,8 +18,10 @@ public:
   static constexpr uint32 Entry  = 19738;
   static constexpr uint32 Level  = 80;
   static constexpr uint32 Health = 1000000;
-  // Guaranteed drop, added to his loot template from code.
+  // Code-added drops (see DoomclawLoot), each rolled independently.
   static constexpr uint32 DropItem              = 32768;
+  static constexpr uint32 DropItem2             = 19902;
+  static constexpr float  DropChancePercent     = 50.0f;
   static constexpr float  MeleeDamageMultiplier = 24.0f;
   static constexpr uint32 SpellCloudOfDisease   = 41193;
   static constexpr uint32 SpellVenomBolt        = 54970;
@@ -74,7 +76,7 @@ public:
   void OnLoadSpellCustomAttr(SpellInfo* spell) override;
 };
 
-// Appends the code-defined 100% drop to Doomclaw's loot template once the loot
+// Appends the code-defined drops to Doomclaw's loot template once the loot
 // tables are loaded. Like the item vendors, this is code-only stock (no SQL).
 class DoomclawLoot : public WorldScript
 {

@@ -10,11 +10,11 @@
  *
  *   ./scripts/restart_world
  *
- * ARENACRAFT_HOST overrides the ssh target (default arenacraft@hetznerbox).
+ * ARENACRAFT_HOST overrides the ssh target (default arenacraft@netcupbox).
  */
 import { $ } from "bun";
 
-const target = process.env.ARENACRAFT_HOST ?? "arenacraft@hetznerbox";
+const target = process.env.ARENACRAFT_HOST ?? "arenacraft@netcupbox";
 
 console.log(`restarting podman-arenacraft-world on ${target}`);
 try {

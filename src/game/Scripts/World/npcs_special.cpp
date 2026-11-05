@@ -360,16 +360,21 @@ public:
 
     void UpdateAI(uint32 diff) override
     {
-      if (!UpdateVictim())
+      if (!me->IsInCombat())
         return;
 
+      // arenacraft: the 5s "no damage -> reset" timer runs whether or not the dummy still has a victim. It used to
+      // tick only while UpdateVictim() found one, so a dummy whose attacker walked away, stealthed or died stayed in
+      // combat for good and kept that player in combat too (no arena / solo queue until a relog).
       if (resetTimer <= diff)
       {
         EnterEvadeMode(EVADE_REASON_NO_HOSTILES);
         resetTimer = 5000;
+        return;
       }
-      else
-        resetTimer -= diff;
+      resetTimer -= diff;
+
+      UpdateVictim();
     }
 
     void MoveInLineOfSight(Unit* /*who*/) override {}

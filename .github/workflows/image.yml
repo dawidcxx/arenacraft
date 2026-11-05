@@ -1,0 +1,150 @@
+# Build and publish the linux/amd64 runtime image on every push to `local`.
+# PR compile checks live in check.yml and do not build Docker images.
+name: image
+
+on:
+  push:
+    branches: [local]
+    paths-ignore:
+      - 'ai-doc/**'
+      - '**/*.md'
+      - 'LICENSE'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# Queue instead of cancel: the Zig cache is only saved at the end of a run, so cancelling a running build whenever a
+# newer push lands (several merges an hour) meant no run ever reached "Save Zig cache" and every build started cold
+# (~40 min). The running build finishes and saves the cache; GitHub keeps only the newest pending run, which then
+# starts warm.
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/dawidcxx/arenacraft
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v4
+        id: buildx
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/local'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Revision
+        id: revision
+        run: echo "date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # Zig's cache lives in RUN --mount=type=cache, which BuildKit cannot
+      # export through --cache-to/--cache-from. Keep it in a small GHCR image
+      # instead of the shared 10 GB Actions cache: pull it into the builder's
+      # cache mounts before the build and snapshot the mounts back afterwards.
+      # This keeps a fresh commit to "recompile changed files + link", without
+      # competing with check.yml (which is the workflow that fills the quota).
+      - name: Resolve Zig cache image
+        id: zigcache
+        run: |
+          ref="$IMAGE:zigcache"
+          # Only reuse a plain image manifest. An OCI index (e.g. one carrying
+          # provenance attestations) has untagged child manifests that the
+          # cleanup job deletes, which leaves the tag unresolvable at pull time.
+          media="$(docker buildx imagetools inspect "$ref" --raw 2>/dev/null | jq -r '.mediaType // empty' 2>/dev/null || true)"
+          case "$media" in
+            application/vnd.oci.image.manifest.v1+json|application/vnd.docker.distribution.manifest.v2+json)
+              echo "image=$ref" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "image=docker.io/library/busybox:latest" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Inject Zig cache
+        env:
+          ZIGCACHE_IMAGE: ${{ steps.zigcache.outputs.image }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: |
+          ctx="$(mktemp -d)"
+          docker buildx build --builder "$BUILDER" --tag arenacraft-zigcache-inject:latest -f - "$ctx" <<EOF
+          # syntax=docker/dockerfile:1
+          FROM ${ZIGCACHE_IMAGE} AS cache
+          RUN mkdir -p /zig-cache /zig-pkg /zig-global
+          FROM docker.io/library/busybox:latest
+          RUN --mount=type=cache,id=arenacraft-zig-cache,target=/dst --mount=type=bind,from=cache,source=/zig-cache,target=/src cp -a /src/. /dst/
+          RUN --mount=type=cache,id=arenacraft-zig-pkg,target=/dst --mount=type=bind,from=cache,source=/zig-pkg,target=/src cp -a /src/. /dst/
+          RUN --mount=type=cache,id=arenacraft-zig-global,target=/dst --mount=type=bind,from=cache,source=/zig-global,target=/src cp -a /src/. /dst/
+          EOF
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.ref == 'refs/heads/local' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+            GIT_DATE=${{ steps.revision.outputs.date }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=min
+          provenance: false
+
+      # Push a single manifest: provenance/SBOM attestations turn the tag into
+      # an OCI index whose untagged child manifests the cleanup job removes,
+      # leaving the tag broken on the next pull. Keep in sync with the resolve
+      # check above (which refuses to reuse an index).
+      # Also after a failed build (e.g. a compile error): everything compiled until then is still worth keeping. Only
+      # when the build step actually ran - otherwise the mounts are empty and would overwrite a good cache.
+      - name: Save Zig cache
+        if: ${{ !cancelled() && github.ref == 'refs/heads/local' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
+        env:
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: |
+          ctx="$(mktemp -d)"
+          docker buildx build --builder "$BUILDER" -f - "$ctx" --platform linux/amd64 \
+            --tag "$IMAGE:zigcache" --provenance=false --sbom=false --push <<'EOF'
+          # syntax=docker/dockerfile:1
+          FROM docker.io/library/busybox:latest
+          RUN --mount=type=cache,id=arenacraft-zig-cache,target=/c1 --mount=type=cache,id=arenacraft-zig-pkg,target=/c2 --mount=type=cache,id=arenacraft-zig-global,target=/c3 mkdir -p /zig-cache /zig-pkg /zig-global && cp -a /c1/. /zig-cache/ && cp -a /c2/. /zig-pkg/ && cp -a /c3/. /zig-global/
+          EOF
+
+  cleanup:
+    name: prune old GHCR versions
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/local'
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: arenacraft
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0

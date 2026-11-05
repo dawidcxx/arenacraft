@@ -401,9 +401,14 @@ template <class T> void ChaseMovementGenerator<T>::MovementInform(T* owner)
 static Optional<float> GetVelocity(Unit* owner, Unit* target, G3D::Vector3 const& dest, bool playerPet)
 {
   Optional<float> speed = {};
+
+  // arenacraft: only a unit following its own master (or a critter following its owner) borrows the target's speed
+  // and, for player pets, the catch-up boost below. A pet sent to cast on another unit (e.g. a Felhunter told to
+  // Devour Magic a teammate 30 yards away, which moves via MoveFollow(target)) used to inherit that unit's speed times
+  // (1 + distance / 10) and covered the gap at several times run speed. It now runs at its own speed.
+  bool const followsMaster = owner->GetCharmerOrOwnerGUID() == target->GetGUID();
   if (!owner->IsInCombat() && !owner->IsVehicle() && !owner->HasUnitFlag(UNIT_FLAG_POSSESSED) &&
-      (owner->IsPet() || owner->IsGuardian() || owner->GetGUID() == target->GetCritterGUID() ||
-       owner->GetCharmerOrOwnerGUID() == target->GetGUID()))
+      (followsMaster || owner->GetGUID() == target->GetCritterGUID()))
   {
     uint32 moveFlags = target->GetUnitMovementFlags();
     if (target->movespline->isWalking())
@@ -413,7 +418,7 @@ static Optional<float> GetVelocity(Unit* owner, Unit* target, G3D::Vector3 const
 
     UnitMoveType moveType = Movement::SelectSpeedType(moveFlags);
     speed                 = target->GetSpeed(moveType);
-    if (playerPet)
+    if (playerPet && followsMaster)
     {
       float distance = owner->GetDistance2d(dest.x, dest.y) - target->GetObjectSize() - (*speed / 2.f);
       if (distance > 0.f)

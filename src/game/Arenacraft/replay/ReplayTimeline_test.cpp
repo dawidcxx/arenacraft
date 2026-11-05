@@ -4,6 +4,7 @@
 #include "ReplayTimeline.hpp"
 
 #include <algorithm>
+#include <string>
 
 using namespace arenacraft::replay;
 
@@ -99,4 +100,56 @@ TEST_CASE("collectObjectGuids finds movers, aura targets and destroyed objects")
   std::vector<uint64_t> guids = collectObjectGuids(packets);
   std::sort(guids.begin(), guids.end());
   CHECK(guids == std::vector<uint64_t>{0x10, 0x20, 0x77});
+}
+
+namespace
+{
+// The bytes ArenaSpectator::CreatePacket builds for an addon whisper.
+RecordedPacket chat(uint32_t offsetMs, std::string const& text)
+{
+  std::vector<uint8_t> data(1 + 4 + 8 + 4 + 8, 0);
+  data[0]             = 7;    // CHAT_MSG_WHISPER
+  data[1]             = 0xFF; // LANG_ADDON
+  data[2]             = 0xFF;
+  data[3]             = 0xFF;
+  data[4]             = 0xFF;
+  uint32_t const size = uint32_t(text.size() + 1);
+  for (int b = 0; b < 4; ++b)
+    data.push_back(uint8_t(size >> (b * 8)));
+  data.insert(data.end(), text.begin(), text.end());
+  data.push_back(0);
+  data.push_back(0);
+  return packet(offsetMs, SMSG_MESSAGECHAT, std::move(data));
+}
+} // namespace
+
+TEST_CASE("spectatorMessageOf finds the recorded spectator addon data")
+{
+  CHECK(spectatorMessageOf(chat(0, "ASSUN\t0x0000000000000011;CHP=100;")) == "ASSUN\t0x0000000000000011;CHP=100;");
+  CHECK_FALSE(spectatorMessageOf(chat(0, "ACREPLAY\tSTATE;")));
+  CHECK_FALSE(spectatorMessageOf(move(0, 0x11)));
+  RecordedPacket truncated = chat(0, "ASSUN\t0x11;CHP=1;");
+  truncated.data.resize(30);
+  CHECK_FALSE(spectatorMessageOf(truncated));
+}
+
+TEST_CASE("adjustSpectatorMessage fits recorded spectator data to a jump")
+{
+  std::string const guid = "ASSUN\t0x0000000000000011;";
+
+  // plain values stay
+  CHECK(adjustSpectatorMessage(guid + "CHP=100;", 60000) == guid + "CHP=100;");
+  // casts that started before the jump are over
+  CHECK_FALSE(adjustSpectatorMessage(guid + "SPE=118,1500;", 1000));
+  // cooldowns: seconds left shrink, gone once run out
+  CHECK(adjustSpectatorMessage(guid + "ACD=1953,15,15;", 10000) == guid + "ACD=1953,5,15;");
+  CHECK_FALSE(adjustSpectatorMessage(guid + "ACD=1953,15,15;", 15000));
+  // auras: ms left shrink; removals and auras without duration stay
+  std::string const caster = ",12826,1,1,0x0000000000000021;";
+  CHECK(adjustSpectatorMessage(guid + "AUR=0,1,10000,10000" + caster, 4000) == guid + "AUR=0,1,6000,10000" + caster);
+  CHECK_FALSE(adjustSpectatorMessage(guid + "AUR=0,1,10000,10000" + caster, 10000));
+  CHECK(adjustSpectatorMessage(guid + "AUR=1,1,0,0" + caster, 4000) == guid + "AUR=1,1,0,0" + caster);
+  CHECK(adjustSpectatorMessage(guid + "AUR=0,1,-1,-1" + caster, 4000) == guid + "AUR=0,1,-1,-1" + caster);
+  // the arena timer counts on
+  CHECK(adjustSpectatorMessage(guid + "TIM=2760;", 60000) == guid + "TIM=2700;");
 }

@@ -25,7 +25,7 @@ public:
   static constexpr uint32 ActionJoin   = 9100010;
   static constexpr uint32 ActionLeave  = 9100011;
   static constexpr uint32 ActionCreate = 9100012;
-  static constexpr uint32 ActionDelete = 9100013;
+  static constexpr uint32 ActionReset  = 9100013;
 
   SoloqNpc() : AllCreatureScript("arenacraft::soloq::SoloqNpc") {}
 

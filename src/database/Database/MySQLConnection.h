@@ -84,7 +84,8 @@ public:
   std::size_t EscapeString(char* to, const char* from, std::size_t length);
   void        Ping();
 
-  uint32 GetLastError();
+  uint32      GetLastError();
+  std::string GetLastErrorString() const;
 
 protected:
   /// Tries to acquire lock. If lock is acquired by another thread

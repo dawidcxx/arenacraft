@@ -6,6 +6,7 @@ import { auditAccounts } from "./accountAudit";
 import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
 import { CharacterDb } from "./characterDb";
+import { CHAR_LIST_COMMAND, handleCharList } from "./charlistCommand";
 import { getConfig } from "./config";
 import { logger } from "./logger";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
@@ -58,6 +59,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       TOP_RANKERS_COMMAND,
       ONLINE_LIST_COMMAND,
       LOOKUP_COMMAND,
+      CHAR_LIST_COMMAND,
       ALIAS_COMMAND,
     ]);
     try {
@@ -104,6 +106,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     else if (interaction.commandName === "toprankers") await handleTopRankers(interaction, () => rankersCache.get());
     else if (interaction.commandName === "onlinelist") await handleOnlineList(interaction, () => onlineListCache.get());
     else if (interaction.commandName === "lookup") await handleLookup(interaction, { authDb, characterDb });
+    else if (interaction.commandName === "charlist")
+      await handleCharList(interaction, { authDb, characterDb }, config.VIP_ROLE_NAME);
     else if (interaction.commandName === "ping") await handlePing(interaction);
     else if (interaction.commandName === "alias") await handleAlias(interaction, authDb, config.VIP_ROLE_NAME);
   } catch (error) {

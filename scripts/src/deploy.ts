@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * deploy - build the core image for the arm server and load it on the target's
+ * deploy - build the core image for the x86 server and load it on the target's
  * local container engine. No registry: the thin multi-stage image is streamed
  * over ssh as `save | gzip | ssh ... 'gunzip | load'`, and only that final image
  * is sent (zig/build caches live in build mounts).
@@ -8,21 +8,21 @@
  * Build + ship only. The running services pick the image up on their next
  * restart, so run ./scripts/restart_world afterwards.
  *
- * Works with podman or docker (auto-detected). Native arm64 builds directly; a
+ * Works with podman or docker (auto-detected). Native amd64 builds directly; a
  * cross-arch build on Linux falls back to binfmt/qemu emulation, slow but cached.
  *
  *   ./scripts/deploy
  *
- * ARENACRAFT_HOST overrides the ssh target (default arenacraft@hetznerbox).
+ * ARENACRAFT_HOST overrides the ssh target (default arenacraft@netcupbox).
  */
 import { $ } from "bun";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "./lib/repo.ts";
 
-const target = process.env.ARENACRAFT_HOST ?? "arenacraft@hetznerbox";
+const target = process.env.ARENACRAFT_HOST ?? "arenacraft@netcupbox";
 const image = "arenacraft:local";
-const platform = "linux/arm64";
+const platform = "linux/amd64";
 const remoteEngine = "podman";
 const fmt = "{{.Architecture}}";
 
@@ -53,6 +53,14 @@ async function capture(label: string, run: () => Promise<string>): Promise<strin
     const code = (err as { exitCode?: number }).exitCode ?? 1;
     console.error(`\n${label} failed (exit ${code})`);
     process.exit(code);
+  }
+}
+
+async function gitValue(args: string[], fallback: string): Promise<string> {
+  try {
+    return (await $`git -C ${repoRoot} ${args}`.text()).trim() || fallback;
+  } catch {
+    return fallback;
   }
 }
 
@@ -110,10 +118,23 @@ const mounts = engine === "podman" ? await qemuMounts() : [];
 const saveArgs = engine === "podman" ? ["--format", "docker-archive"] : [];
 const remoteLoad = `gunzip | ${remoteEngine} load`;
 
+const gitCommit = await gitValue(["rev-parse", "HEAD"], "unknown");
+const gitBranch = await gitValue(["rev-parse", "--abbrev-ref", "HEAD"], "unknown");
+const gitDate = await gitValue(["show", "-s", "--format=%cI", "HEAD"], "unknown");
+const buildArgs = [
+  "--build-arg",
+  `GIT_COMMIT=${gitCommit}`,
+  "--build-arg",
+  `GIT_BRANCH=${gitBranch}`,
+  "--build-arg",
+  `GIT_DATE=${gitDate}`,
+];
+
 const note = crossArch ? " (emulated; first run is slow)" : "";
 console.log(`building ${image} for ${platform} with ${engine}${note}`);
+console.log(`revision ${gitCommit.slice(0, 12)} (${gitBranch})`);
 await shell(`${engine} build`, () =>
-  $`${engine} build --platform ${platform} ${mounts} -f ${dockerfile} -t ${image} ${repoRoot}`,
+  $`${engine} build --platform ${platform} ${mounts} ${buildArgs} -f ${dockerfile} -t ${image} ${repoRoot}`,
 );
 
 const arch = await capture(`${engine} image inspect`, () =>

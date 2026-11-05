@@ -12,6 +12,52 @@ const AcGraph = @import("./BuildCommons.zig").AcGraph;
 const BuildRequest = @import("./BuildCommons.zig").BuildRequest;
 const BuildCommons = @import("./BuildCommons.zig");
 
+const unknown_revision = "Unknown";
+
+fn runGit(b: *Build, args: []const []const u8) ?[]const u8 {
+    const root = b.pathFromRoot(".");
+
+    var argv: std.ArrayListUnmanaged([]const u8) = .empty;
+    defer argv.deinit(b.allocator);
+    argv.appendSlice(b.allocator, &.{ "git", "-C", root }) catch @panic("OOM");
+    argv.appendSlice(b.allocator, args) catch @panic("OOM");
+
+    const result = std.process.run(b.allocator, b.graph.io, .{
+        .argv = argv.items,
+        .cwd = .{ .path = root },
+        .environ_map = &b.graph.environ_map,
+        .stdout_limit = .limited(64 * 1024),
+        .stderr_limit = .limited(64 * 1024),
+    }) catch return null;
+    defer b.allocator.free(result.stdout);
+    defer b.allocator.free(result.stderr);
+
+    const exit_code = switch (result.term) {
+        .exited => |code| code,
+        else => return null,
+    };
+    if (exit_code != 0) return null;
+
+    const trimmed = std.mem.trim(u8, result.stdout, " \t\r\n");
+    if (trimmed.len == 0) return null;
+    return b.dupe(trimmed);
+}
+
+/// Reads a revision value from the build environment first (Docker passes the
+/// commit in through build args, where .git is not part of the context), then
+/// falls back to git in the source checkout. Missing or broken values become
+/// "Unknown" rather than failing the build.
+fn revisionValue(b: *Build, env_names: []const []const u8, git_args: []const []const u8) []const u8 {
+    for (env_names) |name| {
+        if (b.graph.environ_map.get(name)) |value| {
+            const trimmed = std.mem.trim(u8, value, " \t\r\n");
+            if (trimmed.len != 0) return b.dupe(trimmed);
+        }
+    }
+
+    return runGit(b, git_args) orelse unknown_revision;
+}
+
 pub const Src = struct {
     pub const core_cflags = [_][]const u8{
         "-std=c++23",
@@ -26,6 +72,11 @@ pub const Src = struct {
         "-fno-omit-frame-pointer",
         BuildCommons.no_ubsan,
     };
+
+    revision: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+    } = .{},
 
     common: struct {
         module: *Build.Module = undefined,
@@ -80,6 +131,7 @@ pub const Src = struct {
     }
 
     pub fn build(self: *Self, b: BuildRequest) !void {
+        try self.buildRevision(b);
         try self.buildCommon(b);
         try self.buildDatabase(b);
         try self.buildShared(b);
@@ -94,6 +146,14 @@ pub const Src = struct {
     // they cascade (CMake PUBLIC propagation parity): linking shared gives
     // you database and common includes too.
     //
+
+    /// Revision data changes on every commit, so it lives in its own library:
+    /// `common` must not depend on it or every push would invalidate `common`.
+    /// Final executables link it for the GitRevision symbols common references.
+    pub fn linkRevision(self: *Self, b: *Build, mod: *Build.Module) !void {
+        _ = b;
+        mod.linkLibrary(self.revision.library);
+    }
 
     pub fn linkCommon(self: *Self, b: *Build, mod: *Build.Module) !void {
         mod.linkLibrary(self.common.library);
@@ -141,6 +201,56 @@ pub const Src = struct {
     // builds
     //
 
+    /// `GitRevision.cpp` is the only translation unit that consumes the
+    /// generated `revision.h`. Keeping it out of `common` means a new
+    /// GIT_COMMIT/GIT_DATE only rebuilds this one file plus the final link,
+    /// instead of invalidating the whole `common` (and every module linking it).
+    fn buildRevision(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libcpp = true,
+        });
+
+        try cpp.addFlatIncludes(b, "src/common", module);
+
+        const git_hash = revisionValue(b, &.{ "GIT_COMMIT", "ARENACRAFT_GIT_COMMIT" }, &.{ "rev-parse", "HEAD" });
+        const git_branch = revisionValue(b, &.{ "GIT_BRANCH", "ARENACRAFT_GIT_BRANCH" }, &.{ "rev-parse", "--abbrev-ref", "HEAD" });
+        const git_date = revisionValue(b, &.{ "GIT_DATE", "ARENACRAFT_GIT_DATE" }, &.{ "show", "-s", "--format=%cI", "HEAD" });
+
+        const revision_header = std.Build.Step.ConfigHeader.create(b, .{});
+        revision_header.include_path = "revision.h";
+        revision_header.addValue("_HASH", []const u8, git_hash);
+        revision_header.addValue("_DATE", []const u8, git_date);
+        revision_header.addValue("_BRANCH", []const u8, git_branch);
+        revision_header.addValue("_CMAKE_COMMAND", []const u8, "zig build");
+        revision_header.addValue("_CMAKE_VERSION", []const u8, "0.16.0");
+        revision_header.addValue("_CMAKE_HOST_SYSTEM", []const u8, "nix");
+        revision_header.addValue("_BUILD_DIRECTORY", []const u8, "");
+        revision_header.addValue("_SOURCE_DIRECTORY", []const u8, "");
+        revision_header.addValue("_MYSQL_EXECUTABLE", []const u8, "");
+        module.addConfigHeader(revision_header);
+
+        module.addCSourceFile(.{
+            .file = b.path("src/common/GitRevision.cpp"),
+            .language = .cpp,
+            .flags = &core_cflags,
+        });
+
+        const library = b.addLibrary(.{
+            .name = "revision",
+            .root_module = module,
+            .linkage = .static,
+        });
+
+        self.revision.module = module;
+        self.revision.library = library;
+    }
+
     fn buildCommon(self: *Self, build_request: BuildRequest) !void {
         const b = build_request[0];
         const target = build_request[1];
@@ -156,22 +266,8 @@ pub const Src = struct {
         // the CMake CollectIncludeDirectories behavior
         try cpp.addFlatIncludes(b, "src/common", module);
 
-        // placeholder revision data, mirrors the old zig build; real values
-        // need a git describe run step
-        const revision_header = std.Build.Step.ConfigHeader.create(b, .{});
-        revision_header.include_path = "revision.h";
-        revision_header.addValue("_HASH", []const u8, "");
-        revision_header.addValue("_DATE", []const u8, "");
-        revision_header.addValue("_BRANCH", []const u8, "");
-        revision_header.addValue("_CMAKE_COMMAND", []const u8, "zig build");
-        revision_header.addValue("_CMAKE_VERSION", []const u8, "0.16.0");
-        revision_header.addValue("_CMAKE_HOST_SYSTEM", []const u8, "nix");
-        revision_header.addValue("_BUILD_DIRECTORY", []const u8, "");
-        revision_header.addValue("_SOURCE_DIRECTORY", []const u8, "");
-        revision_header.addValue("_MYSQL_EXECUTABLE", []const u8, "");
-        module.addConfigHeader(revision_header);
-
         var sources = self.queryModuleSources("src/common");
+        sources.filterOut("GitRevision.cpp");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -206,7 +302,7 @@ pub const Src = struct {
         isolated.dependOn(&library.step);
     }
 
-    /// DB migration machinery (Updater/) is intentionally not ported.
+    /// Database library; Updater/ holds the native `ac db-update` implementation.
     fn buildDatabase(self: *Self, build_request: BuildRequest) !void {
         const b = build_request[0];
         const target = build_request[1];

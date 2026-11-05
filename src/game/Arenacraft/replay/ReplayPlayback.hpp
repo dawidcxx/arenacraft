@@ -32,6 +32,9 @@ public:
   // Viewer controls (world thread). false while the playback has not started or is over.
   bool setPaused(Player* viewer, bool paused);
   bool seek(Player* viewer, uint32_t targetMs);
+  // Puts the viewer's camera on recorded player `target`, like Bind Sight does in a live arena. An empty guid, or the
+  // player already watched, puts it back on the viewer. false if `target` is no player of the recording.
+  bool view(Player* viewer, ObjectGuid target);
   // Sends the addon state message (see ai-doc/replay.md, "Addon API").
   void sendState(Player* viewer) const;
 
@@ -51,6 +54,7 @@ private:
   [[nodiscard]] Player* viewerOnMap(Battleground* bg) const;
   [[nodiscard]] bool    controllable() const { return _state == State::Playing || _state == State::Finished; }
   void                  sendPacket(Player* viewer, std::size_t index) const;
+  void                  sendJumpPacket(Player* viewer, std::size_t index, uint32_t targetMs) const;
   void                  sendUpTo(Player* viewer, uint32_t limitMs);
   void                  destroyRecordedObjects(Player* viewer) const;
   void                  tickState(Player* viewer, uint32_t diff);
@@ -61,16 +65,19 @@ private:
   ObjectGuid            _viewer;
   uint32_t              _replayId;
   ReplayData            _data;
-  std::vector<uint64_t> _objects;        // recorded objects destroyed on a seek back
-  uint32_t              _durationMs = 0; // offset of the last packet
-  State                 _state      = State::WaitingForViewer;
-  uint32_t              _timer      = 0; // ms in the current state
-  uint32_t              _posMs      = 0; // timeline position
-  uint32_t              _stateTimer = 0; // ms since the last addon state message
-  std::size_t           _next       = 0; // next packet to send
-  bool                  _paused     = false;
-  bool                  _started    = false;
-  bool                  _ended      = false;
+  std::vector<uint64_t> _objects;                  // recorded objects destroyed on a seek back
+  bool                  _hasSpectatorData = false; // matches recorded with the spectator addon data
+  uint32_t              _durationMs       = 0;     // offset of the last packet
+  State                 _state            = State::WaitingForViewer;
+  uint32_t              _timer            = 0; // ms in the current state
+  uint32_t              _posMs            = 0; // timeline position
+  uint32_t              _stateTimer       = 0; // ms since the last addon state message
+  std::size_t           _next             = 0; // next packet to send
+  bool                  _paused           = false;
+  bool                  _started          = false;
+  bool                  _ended            = false;
+  ObjectGuid            _viewed;          // recorded player the camera is on (empty: the viewer)
+  uint32_t              _reviewTimer = 0; // ms until the camera goes back on _viewed after a seek back
 };
 
 // The playback `viewer` is watching, if any (world thread).
@@ -79,6 +86,10 @@ std::shared_ptr<Playback> playbackOf(ObjectGuid viewer);
 // Starts watching replay `id` for `viewer`: loads it, opens a private arena and
 // moves the viewer in as a spectator. Reports problems to the viewer's chat.
 void watch(Player* viewer, uint32_t id);
+
+// `.spect watch <name>` while watching a replay: the camera goes on that recorded player (see Playback::view).
+// false if `viewer` watches no replay; problems are reported to the viewer's chat.
+bool viewByName(Player* viewer, std::string const& name);
 
 // Why `player` cannot watch a replay right now, or an empty string.
 std::string cannotWatchReason(Player* player);

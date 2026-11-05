@@ -8,6 +8,7 @@
  *   .replay seek <s|m:ss|+N|-N>              jump on its timeline (forward or back)
  *   .replay state                            send the addon state message now (ACREPLAY, see ai-doc/replay.md)
  *   .replay report <id> <name> <category>   report a player of a match you played in (see Patrol.hpp)
+ *   .replay view [name]                      watch through a recorded player's eyes (no name: own camera)
  */
 #include "ReplayScripts.hpp"
 
@@ -71,7 +72,7 @@ public:
         {"leave", HandleLeave, SEC_PLAYER, Console::No}, {"watch", HandleWatch, SEC_PLAYER, Console::No},
         {"pause", HandlePause, SEC_PLAYER, Console::No}, {"resume", HandleResume, SEC_PLAYER, Console::No},
         {"seek", HandleSeek, SEC_PLAYER, Console::No},   {"state", HandleState, SEC_PLAYER, Console::No},
-        {"", HandleWatch, SEC_PLAYER, Console::No},
+        {"view", HandleView, SEC_PLAYER, Console::No},   {"", HandleWatch, SEC_PLAYER, Console::No},
     };
     static ChatCommandTable commandTable = {{"replay", replayTable}};
     return commandTable;
@@ -171,6 +172,20 @@ public:
     if (!player)
       return false;
     patrol::Report(handler, player, id, suspect, category);
+    return true;
+  }
+
+  // .replay view [name]: watch through a recorded player's eyes; no name (or the same one) = your own camera again
+  static bool HandleView(ChatHandler* handler, Optional<std::string> name)
+  {
+    Player* player = nullptr;
+    if (std::shared_ptr<Playback> playback = watchedBy(handler, player))
+    {
+      if (!name)
+        playback->view(player, ObjectGuid::Empty);
+      else
+        viewByName(player, *name);
+    }
     return true;
   }
 

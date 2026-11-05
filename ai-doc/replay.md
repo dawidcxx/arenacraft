@@ -30,6 +30,9 @@ participant's newest N.
 - `.replay state` - send the addon `STATE` message right away (for addons that just loaded)
 - `.replay report <id> <name> <category>` - report a player of a match you played in to the patrol
   (see `patrol.md`)
+- `.replay view [name]` - watch through a recorded player's eyes; no name (or the same player) = own camera.
+  `.spect watch <name>` does the same in a replay, so the spectator addon's frame clicks and left clicks on a player
+  in the world work in replays too
 
 ## How it works
 
@@ -80,7 +83,9 @@ packets stay in memory so the timeline can be revisited. Pure logic: `ReplayTime
 
 ## Addon API
 
-Commands (an addon sends them as chat: `SendChatMessage(".replay seek 95", "SAY")`):
+Commands (an addon sends them as chat: `SendChatMessage(".replay seek 95", "SAY")`). The viewer is a spectator, and
+spectators may not talk in the arena, but `ChatHandler` runs their chat commands before dropping the message, so
+`.replay` / `.spect` typed in SAY work for them:
 
 | Command | Effect |
 |---|---|
@@ -101,6 +106,30 @@ Server -> addon messages arrive like the ArenaSpectator ones: `CHAT_MSG_ADDON` w
 The position only changes through playback and seeks, so a timeline UI can interpolate locally between
 `STATE` messages while `paused=0`.
 
+## Watching through a player's eyes
+
+Live arenas use Bind Sight; the recorded players exist only on the viewer's client, so `Playback::view` sets the
+viewer's `PLAYER_FARSIGHT` to the recorded guid instead: the client puts its camera on that object, the server's own
+view stays on the viewer (its `CMSG_FAR_SIGHT` finds no object and does nothing). A seek back destroys the recorded
+objects, so the field is cleared and set again `ReviewDelayMs` later (an unchanged value would not move the
+client's camera). `HandleMoveWorldportAck` clears a farsight left on an object of the old map, so leaving a replay
+can't leave the field set and block later Bind Sight / Far Sight.
+
+## Spectator addon data
+
+The ArenaSpectator addon (`ASSUN` addon whispers: names, classes, health, power, casts, cooldowns, auras, target)
+works in replays too:
+- while a match is recorded, `Player::NeedSendSpectatorData` is true even without live spectators
+  (`Battleground::GetReplayRecording`), and `ArenaSpectator::SendPacketTo(Map*)` stores every spectator message in
+  the recording (`Recording::addNow`) besides sending it to live spectators;
+- when the gates open the recorder stores the full state of every player at offset 0
+  (`ArenaSpectator::SendArenaState`, what a newly joined spectator gets);
+- playback resends them like any other packet; the viewer joined as a spectator, so the addon got `ENABLE` already.
+- Seeking: a jump drops casts (`SPE`) and shortens cooldown (`ACD`), aura (`AUR`) and arena timer (`TIM`) values by
+  the skipped time (`adjustSpectatorMessage`); a seek back sends `ENABLE` first so the addon starts over, then the
+  state at 0 rebuilds its frames.
+- Recordings made before this have no spectator data; the addon UI stays empty for them.
+
 ## Limitations
 
 - A character can't watch a match it played in (its client would get a second
@@ -110,4 +139,3 @@ The position only changes through playback and seeks, so a timeline UI can inter
   primary stay invisible.
 - If the primary or secondary leaves the arena early, the recording loses that
   stream from then on.
-- No seeking/pause; playback runs from the start at normal speed.

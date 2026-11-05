@@ -47,29 +47,8 @@ services:
       - 6664:8080
 
   # --- full profile: runs the core against db/valkey with ./data mounted ---
-  # one-shot: applies data/sql into the databases (idempotent, always attempted)
-  # db_sync is pure bun/typescript: no cpp involved, so it runs in the bun
-  # image directly instead of the core image
-  db-migrate:
-    profiles: [full]
-    image: docker.io/oven/bun:1
-    working_dir: /app
-    command: >-
-      sh -c 'bun install --production --frozen-lockfile --cwd scripts
-      && bun scripts/src/db_sync.ts'
-    environment:
-      AC_ROOT_DATABASE_INFO: "db;3306;root;acore"
-      AC_LOGIN_DATABASE_INFO: "db;3306;acore;acore;acore_auth"
-      AC_CHARACTER_DATABASE_INFO: "db;3306;acore;acore;acore_characters"
-      AC_WORLD_DATABASE_INFO: "db;3306;acore;acore;acore_world"
-    volumes:
-      - ./scripts:/app/scripts
-      - ./data:/app/data
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-
+  # fresh mysql-data volumes need a one-time base seed before first start:
+  #   ./scripts/seed_db mysql://root:acore@localhost:3306
   auth:
     profiles: [full]
     build: { context: ., dockerfile: Dockerfile }
@@ -91,8 +70,6 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
-      db-migrate:
-        condition: service_completed_successfully
 
   # RA is the built-in remote console (same commands as the local one):
   #   nc localhost 3443  ->  account with account_access.gmlevel >= 3, RealmID = -1
@@ -124,8 +101,6 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
-      db-migrate:
-        condition: service_completed_successfully
 
 volumes:
   mysql-data:

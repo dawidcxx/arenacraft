@@ -149,7 +149,7 @@ options fall through to the core handler):
 Item ids are checked against wotlk.evowow.com; skip anything tagged
 "Not available to players". No `npc_vendor` SQL is involved (`persist = false`).
 Soul Shards (`6265`) are made stackable (stack size 20) by the world migration
-`data/sql/updates/db_world/2026_09_19_00.sql` (applied by `scripts/db_sync`).
+`data/sql/updates/db_world/2026_09_19_00.sql` (applied by `ac db-update`).
 
 The vendor creature (entry 20921 "Shauly Pore") gets a guild-style `subname`
 ("<THE Vendor>", set in `ItemVendorStock::OnStartup`) so players recognise it as

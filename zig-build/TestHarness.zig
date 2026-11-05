@@ -23,6 +23,7 @@ const Src = @import("./Src.zig").Src;
 /// Modules that have a `Tests.cpp` entrypoint and can be unit tested.
 pub const Target = enum {
     common,
+    database,
     game,
 };
 
@@ -116,6 +117,11 @@ pub const TestHarness = struct {
                 deps.linkDetour(mod);
                 deps.linkG3DLite(mod);
             },
+            .database => {
+                try src.linkDatabase(b, mod);
+                deps.linkFmt(mod);
+                deps.linkBoost(mod);
+            },
             .game => {
                 try src.linkGame(b, mod);
                 deps.linkFmt(mod);
@@ -125,6 +131,10 @@ pub const TestHarness = struct {
                 deps.linkDetour(mod);
             },
         }
+
+        // revision symbols live outside common now; tests that pull any common
+        // object referencing GitRevision need them too
+        try src.linkRevision(b, mod);
 
         // final executable: resolve the unvendored system libs (openssl, ...)
         deps.linkSystemLibraries(mod);

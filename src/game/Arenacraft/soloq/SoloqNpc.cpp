@@ -105,7 +105,7 @@ bool SoloqNpc::CanCreatureGossipHello(Player* player, Creature* creature)
   addOption(GOSSIP_ICON_BATTLE, "Join SoloQ", ActionJoin);
   addOption(GOSSIP_ICON_CHAT, "Leave SoloQ", ActionLeave);
   addOption(GOSSIP_ICON_INTERACT_1, "Create SoloQ Team", ActionCreate);
-  addOption(GOSSIP_ICON_INTERACT_1, "Delete SoloQ Team", ActionDelete);
+  addOption(GOSSIP_ICON_INTERACT_1, "Reset SoloQ Team", ActionReset);
 
   // The gossip page text is built at runtime from the shared queue. It is
   // cached/registered in ObjectMgr under a custom id and pushed to the client
@@ -143,11 +143,15 @@ bool SoloqNpc::CanCreatureGossipSelect(Player* player, Creature* creature, uint3
     else
       SendMessage(player, "SoloQ: could not create a team.");
     break;
-  case ActionDelete:
+  case ActionReset:
     LeaveArenaQueue(player);
     service.leave(id);
-    SendMessage(player, DeleteSoloqTeam(player) ? "SoloQ: team deleted; rating and MMR reset."
-                                                : "SoloQ: you do not have a team.");
+    if (ResetSoloqTeam(player))
+    {
+      SendMessage(player, "SoloQ: rating reset to " + std::to_string(tuning::InitialRating) + "; MMR kept.");
+    }
+    else
+      SendMessage(player, "SoloQ: you do not have a team.");
     break;
   case ActionJoin:
     JoinSoloqQueue(player);

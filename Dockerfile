@@ -10,8 +10,9 @@
 # and exists for amd64 and arm64 alike, so no third-party repo is needed and
 # the image builds on either architecture.
 #
-# bun is deliberately absent: db_sync runs in the oven/bun image (see
-# docker-compose.yml) and the cpp binary never shells out to it.
+# bun is deliberately absent: database updates run natively via `ac db-update`
+# and the runtime image only carries data/sql/updates (base seeding is a
+# one-time development operation done by scripts/seed_db).
 
 ARG UBUNTU_VERSION=22.04
 # keep in sync with flake.nix's zig (host-libc detection is 0.16 behaviour)
@@ -20,8 +21,15 @@ ARG ZIG_VERSION=0.16.0
 # --- builder ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS builder
 ARG ZIG_VERSION
+# passed by scripts/deploy (the Docker build context does not include .git)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG GIT_DATE=unknown
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+ENV GIT_DATE=${GIT_DATE}
 
 # gcc is only here so zig can introspect the host libc: when link_libc is set
 # and a native C compiler is present, zig uses the system libc (/usr/include
@@ -67,10 +75,13 @@ COPY deps deps
 RUN --mount=type=cache,id=arenacraft-zig-cache,target=/app/.zig-cache \
     --mount=type=cache,id=arenacraft-zig-pkg,target=/app/zig-pkg \
     --mount=type=cache,id=arenacraft-zig-global,target=/root/.cache/zig \
-    zig build -Doptimize=ReleaseFast ac
+    zig build -j"$(nproc)" -Doptimize=ReleaseFast ac
 
 # --- runtime ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS runtime
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG GIT_DATE=unknown
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -81,4 +92,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /app/zig-out/bin/ac /usr/local/bin/ac
 
+# only pending migrations ship with the image; base dumps are seeded once in
+# development (scripts/seed_db) and never enter the runtime image
+COPY data/sql/updates /app/sql/updates
+ENV AC_SQL_DIR=/app/sql
+
 WORKDIR /app
+RUN printf 'commit=%s\nbranch=%s\ndate=%s\n' "${GIT_COMMIT}" "${GIT_BRANCH}" "${GIT_DATE}" > /app/server-info

@@ -106,6 +106,28 @@ static bool isAlwaysTriggeredAura[TOTAL_AURAS];
 // Prepare lists
 static bool procPrepared = InitTriggerAuraData();
 
+// Arenacraft: the hidden area auras 74410/74411 reduce player healing/damage
+// inside arenas and battlegrounds. Pets and guardians only take less damage;
+// they do not have the auras themselves.
+namespace
+{
+constexpr uint32 ARENACRAFT_ARENA_DAMPENING            = 74410;
+constexpr uint32 ARENACRAFT_BATTLEGROUND_DAMPENING     = 74411;
+constexpr float  ARENACRAFT_PET_DAMPENING_DAMAGE_TAKEN = -10.0f;
+
+bool IsArenacraftDampeningPet(Unit const* unit)
+{
+  if (!unit->IsPet() && !unit->IsGuardian())
+    return false;
+
+  Unit* owner = unit->GetOwner();
+  if (!owner || !owner->IsPlayer())
+    return false;
+
+  return owner->HasAura(ARENACRAFT_ARENA_DAMPENING) || owner->HasAura(ARENACRAFT_BATTLEGROUND_DAMPENING);
+}
+} // namespace
+
 DamageInfo::DamageInfo(Unit* _attacker, Unit* _victim, uint32 _damage, SpellInfo const* _spellInfo,
                        SpellSchoolMask _schoolMask, DamageEffectType _damageType, uint32 cleanDamage)
     : m_attacker(_attacker), m_victim(_victim), m_damage(_damage), m_spellInfo(_spellInfo), m_schoolMask(_schoolMask),
@@ -415,8 +437,22 @@ void Unit::Update(uint32 p_time)
     // another command is given.
     if (m_HostileRefMgr.IsEmpty())
     {
+      // arenacraft: Mind Control keeps both players in combat for as long as it lasts. Neither body acts on its own
+      // while possessed, so the 5s PvP combat timer used to run out mid Mind Control and cancelling it let the
+      // priest drink (and the victim leave combat). A charmed creature keeps its player in combat only while it
+      // fights, so Eyes of the Beast on an idle pet does not.
+      bool keepCombat = false;
+      if (IsPlayer())
+      {
+        if (Unit const* charm = GetCharm())
+          keepCombat = charm->IsPlayer() || charm->IsInCombat();
+        else
+          keepCombat = GetCharmerGUID().IsPlayer();
+      }
+      if (keepCombat)
+        m_CombatTimer = std::max<uint32>(m_CombatTimer, 5 * IN_MILLISECONDS);
       // m_CombatTimer set at aura start and it will be freeze until aura removing
-      if (m_CombatTimer <= p_time)
+      else if (m_CombatTimer <= p_time)
         ClearInCombat();
       else
         m_CombatTimer -= p_time;
@@ -4031,7 +4067,7 @@ void Unit::_UpdateAutoRepeatSpell()
   static uint32 const HUNTER_AUTOSHOOT = 75;
 
   // Check "realtime" interrupts
-  if ((IsPlayer() && ToPlayer()->isMoving()) ||
+  if ((IsPlayer() && ToPlayer()->isMoving() && spellProto->Id != HUNTER_AUTOSHOOT) ||
       IsNonMeleeSpellCast(false, false, true, spellProto->Id == HUNTER_AUTOSHOOT))
   {
     // cancel wand shoot
@@ -4041,7 +4077,8 @@ void Unit::_UpdateAutoRepeatSpell()
     return;
   }
 
-  if (m_AutoRepeatFirstCast && getAttackTimer(RANGED_ATTACK) < 500)
+  // Apply delay (Hunter's autoshoot not affected)
+  if (m_AutoRepeatFirstCast && getAttackTimer(RANGED_ATTACK) < 500 && spellProto->Id != HUNTER_AUTOSHOOT)
   {
     setAttackTimer(RANGED_ATTACK, 500);
   }
@@ -12098,6 +12135,9 @@ uint32 Unit::SpellDamageBonusTaken(Unit* caster, SpellInfo const* spellProto, ui
       if (spellProto->ValidateAttribute6SpellDamageMods(caster, *i, damagetype == DOT))
         AddPct(TakenTotalMod, (*i)->GetAmount());
 
+  if (IsArenacraftDampeningPet(this))
+    AddPct(TakenTotalMod, ARENACRAFT_PET_DAMPENING_DAMAGE_TAKEN);
+
   TakenTotalMod = processDummyAuras(TakenTotalMod);
 
   // From caster spells
@@ -13633,6 +13673,9 @@ uint32 Unit::MeleeDamageBonusTaken(Unit* attacker, uint32 pdamage, WeaponAttackT
   float TakenTotalMod = 1.0f;
 
   TakenTotalMod *= GetTotalAuraMultiplierByMiscMask(SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN, damageSchoolMask);
+
+  if (IsArenacraftDampeningPet(this))
+    AddPct(TakenTotalMod, ARENACRAFT_PET_DAMPENING_DAMAGE_TAKEN);
 
   // .. taken pct (special attacks)
   if (spellProto)

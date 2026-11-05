@@ -33,7 +33,7 @@ export class AuthDb {
       await this.pool.query("SELECT 1 FROM account_discord LIMIT 1");
     } catch (error) {
       if ((error as { code?: string }).code === "ER_NO_SUCH_TABLE") {
-        throw new Error("account_discord table is missing; run scripts/db_sync to apply data/sql updates");
+        throw new Error("account_discord table is missing; run `ac db-update` to apply data/sql updates");
       }
       throw error;
     }
@@ -50,6 +50,18 @@ export class AuthDb {
       unique,
     );
     return new Map(rows.map((row) => [Number(row.id), String(row.username)]));
+  }
+
+  /** All account ids owned by a Discord user, ordered by account id. */
+  async accountIdsByDiscordId(discordId: string): Promise<number[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT account_id AS accountId
+       FROM account_discord
+       WHERE discord_id = ?
+       ORDER BY account_id ASC`,
+      [discordId],
+    );
+    return rows.map((row) => Number(row.accountId));
   }
 
   async accountByDiscordId(discordId: string): Promise<AccountRef | null> {
