@@ -2,8 +2,8 @@
 
 #include "DatabaseEnv.h"
 #include "Field.h"
-#include "QueryResult.h"
 #include "Log.h"
+#include "QueryResult.h"
 #include "WorldScript.h"
 
 #include <mutex>
