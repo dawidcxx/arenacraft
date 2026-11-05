@@ -75,7 +75,7 @@ COPY deps deps
 RUN --mount=type=cache,id=arenacraft-zig-cache,target=/app/.zig-cache \
     --mount=type=cache,id=arenacraft-zig-pkg,target=/app/zig-pkg \
     --mount=type=cache,id=arenacraft-zig-global,target=/root/.cache/zig \
-    zig build -Doptimize=ReleaseFast ac
+    zig build -j"$(nproc)" -Doptimize=ReleaseFast ac
 
 # --- runtime ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS runtime

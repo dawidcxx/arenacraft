@@ -44,4 +44,4 @@ jobs:
           restore-keys: zig-cache-${{ runner.os }}-
 
       - name: Compile check
-        run: nix develop .#ci --command zig build check-ac
+        run: nix develop .#ci --command zig build -j"$(nproc)" check-ac
