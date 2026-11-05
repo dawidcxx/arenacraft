@@ -89,10 +89,12 @@ arena guides come first (then the remaining major glyphs), and minor glyphs are
 always kept last; the guides and their glyphs are recorded in
 `ai-doc/class_guides.md`, and the priority block is regenerated from those notes.
 
-The menu also has a shared **Enchantments** option. `EnchantVendorItems.cpp`
-holds a flat `std::vector<uint32>` of permanent-enhancement item ids exposed as
-`AllEnchants()`, already ordered by gear slot (head first, weapon last); the
-option points at `EnchantVendorEntry`. The list is curated from the Wowhead
+The menu also has a shared **Enchantments** option. It opens a second menu with
+one option per gear slot (Head, Shoulder, Back, Chest, Wrist, Hands, Waist,
+Legs, Feet, Shield, Ranged, Weapon) and a Back option; each slot is its own
+vendor list (`EnchantVendorEntry + slot index`). `EnchantVendorItems.cpp` holds
+the permanent-enhancement item ids grouped by slot, exposed as
+`EnchantsBySlot()` (head first, weapon last). The list is curated from the Wowhead
 WotLK per-spec PvP Arena Season 8 BiS guides, with the per-spec PvE "Enchants
 and Gems" guides supplying the remaining general alternatives (all recorded in
 `ai-doc/enchant_guides.md`): only recommended, non-profession enchants are kept
