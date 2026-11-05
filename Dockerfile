@@ -10,8 +10,9 @@
 # and exists for amd64 and arm64 alike, so no third-party repo is needed and
 # the image builds on either architecture.
 #
-# bun is deliberately absent: db_sync runs in the oven/bun image (see
-# docker-compose.yml) and the cpp binary never shells out to it.
+# bun is deliberately absent: database updates run natively via `ac db-update`
+# and the runtime image only carries data/sql/updates (base seeding is a
+# one-time development operation done by scripts/seed_db).
 
 ARG UBUNTU_VERSION=22.04
 # keep in sync with flake.nix's zig (host-libc detection is 0.16 behaviour)
@@ -80,5 +81,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/zig-out/bin/ac /usr/local/bin/ac
+
+# only pending migrations ship with the image; base dumps are seeded once in
+# development (scripts/seed_db) and never enter the runtime image
+COPY data/sql/updates /app/sql/updates
+ENV AC_SQL_DIR=/app/sql
 
 WORKDIR /app

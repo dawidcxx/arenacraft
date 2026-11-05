@@ -33,7 +33,7 @@ export class AuthDb {
       await this.pool.query("SELECT 1 FROM account_discord LIMIT 1");
     } catch (error) {
       if ((error as { code?: string }).code === "ER_NO_SUCH_TABLE") {
-        throw new Error("account_discord table is missing; run scripts/db_sync to apply data/sql updates");
+        throw new Error("account_discord table is missing; run `ac db-update` to apply data/sql updates");
       }
       throw error;
     }

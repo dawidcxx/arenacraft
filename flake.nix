@@ -35,7 +35,7 @@
               clang-tools
               lldb
               python3 # llms love python..
-              bun # scripts tooling (db_sync, extract_assets, deploy)
+              bun # scripts tooling (seed_db, extract_assets, deploy)
               gdb
               netcat
               skopeo # inspect/copy container images

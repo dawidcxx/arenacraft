@@ -35,7 +35,7 @@ commands removed from the code do not linger as unreachable "ghosts".
 ```bash
 bun install
 cp .env.example .env   # fill in the values
-scripts/db_sync        # applies data/sql/updates/db_auth (account_discord)
+ac db-update           # applies data/sql/updates/db_auth (account_discord)
 bun run start
 ```
 

@@ -67,10 +67,12 @@ pub const AcGraph = struct {
         const bl = b[0];
 
         const common_run = try self.tests.build(b, .common);
+        const database_run = try self.tests.build(b, .database);
         const game_run = try self.tests.build(b, .game);
 
         const test_step = bl.step("test", "Build and run all unit tests");
         test_step.dependOn(common_run);
+        test_step.dependOn(database_run);
         test_step.dependOn(game_run);
     }
 
@@ -144,7 +146,7 @@ pub const AcGraph = struct {
 
         module.addCSourceFiles(.{
             .root = bl.path("src/ac"),
-            .files = &.{"main.cpp"},
+            .files = &.{ "main.cpp", "db_update.cpp" },
             .language = .cpp,
             .flags = &Src.core_cflags,
         });
@@ -157,6 +159,9 @@ pub const AcGraph = struct {
         try src.linkAuth(bl, module);
         try src.linkTools(bl, module);
         deps.linkArgparse(module);
+        // db-update pulls in the logging headers, which need boost/fmt includes
+        deps.linkFmt(module);
+        deps.linkBoost(module);
         deps.linkSystemLibraries(module);
 
         const exe = bl.addExecutable(.{

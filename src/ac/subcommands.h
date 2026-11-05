@@ -15,3 +15,6 @@ int vmap4_assembler_main(int argc, char* argv[]);
 // servers
 int authserver_main(int argc, char** argv);
 int worldserver_main(int argc, char** argv);
+
+// database
+int db_update_main(int argc, char** argv);

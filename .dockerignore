@@ -11,7 +11,12 @@ zig-out
 .direnv
 .cache
 compile_commands.json
-/data
+# only the SQL updates are baked into the runtime image; base/maps stay out
+/data/*
+!/data/sql
+/data/sql/*
+!/data/sql/updates
+!/data/sql/updates/**
 /backups
 *.log
 OLD_SCRIPTS.md

@@ -1,16 +1,14 @@
-DROP USER IF EXISTS 'acore'@'%';
-CREATE USER 'acore'@'%' IDENTIFIED BY 'acore' WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0;
+-- Idempotent development bootstrap: databases and the `acore` application user.
+-- Applied by scripts/seed_db with root/admin credentials.
 
-GRANT ALL PRIVILEGES ON * . * TO 'acore'@'%' WITH GRANT OPTION;
+CREATE DATABASE IF NOT EXISTS `acore_world` DEFAULT CHARACTER SET UTF8MB4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `acore_characters` DEFAULT CHARACTER SET UTF8MB4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS `acore_auth` DEFAULT CHARACTER SET UTF8MB4 COLLATE utf8mb4_unicode_ci;
 
-CREATE DATABASE `acore_world` DEFAULT CHARACTER SET UTF8MB4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'acore'@'%' IDENTIFIED BY 'acore'
+    WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0;
+ALTER USER 'acore'@'%' IDENTIFIED BY 'acore';
 
-CREATE DATABASE `acore_characters` DEFAULT CHARACTER SET UTF8MB4 COLLATE utf8mb4_unicode_ci;
-
-CREATE DATABASE `acore_auth` DEFAULT CHARACTER SET UTF8MB4 COLLATE utf8mb4_unicode_ci;
-
-GRANT ALL PRIVILEGES ON `acore_world` . * TO 'acore'@'%' WITH GRANT OPTION;
-
-GRANT ALL PRIVILEGES ON `acore_characters` . * TO 'acore'@'%' WITH GRANT OPTION;
-
-GRANT ALL PRIVILEGES ON `acore_auth` . * TO 'acore'@'%' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON `acore_world`.* TO 'acore'@'%';
+GRANT ALL PRIVILEGES ON `acore_characters`.* TO 'acore'@'%';
+GRANT ALL PRIVILEGES ON `acore_auth`.* TO 'acore'@'%';

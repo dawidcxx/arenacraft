@@ -9,18 +9,20 @@ Needs `nix`, `podman` (or docker), and a 3.3.5a client.
 1. `nix develop`
 2. `podman compose up -d db valkey`
 3. `cp .env.example .env` (db credentials, realm id, ...)
-4. `zig build -Doptimize=ReleaseFast ac`
-5. `scripts/db_sync` populates the `acore_*` databases from `data/sql`
+4. `./scripts/seed_db mysql://root:acore@localhost:3306` — one-time base seed
+5. `zig build -Doptimize=ReleaseFast ac`
 6. `scripts/extract_assets --client-dir <client>` writes `data/{dbc,maps,vmaps}`;
    add `--with-mmaps` to also build mmaps (slow, needs the ReleaseFast build
    because the extractors abort in debug)
-7. `./zig-out/bin/ac authserver` or `./zig-out/bin/ac worldserver`
+7. `./zig-out/bin/ac db-update` applies pending `data/sql/updates`
+8. `./zig-out/bin/ac authserver` or `./zig-out/bin/ac worldserver`
 
 `.env` is loaded automatically; set `AC_DATA_DIR` if `data/` isn't next to the binary.
 
 ## Commands
 
 - `zig build ac` debug build
+- `zig build run-ac -- db-update` apply pending database updates
 - `zig build run-ac -- worldserver` build and run
 - `zig build test` unit tests (needs `nix develop`)
 - `zig build test-build` dep/link smoke test
@@ -35,8 +37,12 @@ single stream to the target's local container engine - no registry involved:
 
 ```bash
 scripts/deploy          # build linux/amd64 and stream the image to the target
+podman run --rm --network <net> --env-file <env> arenacraft:local ac db-update
 scripts/restart_world   # restart the world service there + prune old images
 ```
+
+The runtime image carries only `data/sql/updates`; base seeding stays a
+one-time development operation.
 
 `scripts/deploy` only builds and ships the image (as `arenacraft:local`); the
 running systemd-managed containers pick it up on their next restart, which

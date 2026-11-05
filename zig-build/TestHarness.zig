@@ -23,6 +23,7 @@ const Src = @import("./Src.zig").Src;
 /// Modules that have a `Tests.cpp` entrypoint and can be unit tested.
 pub const Target = enum {
     common,
+    database,
     game,
 };
 
@@ -115,6 +116,11 @@ pub const TestHarness = struct {
                 deps.linkBoost(mod);
                 deps.linkDetour(mod);
                 deps.linkG3DLite(mod);
+            },
+            .database => {
+                try src.linkDatabase(b, mod);
+                deps.linkFmt(mod);
+                deps.linkBoost(mod);
             },
             .game => {
                 try src.linkGame(b, mod);

@@ -36,7 +36,8 @@ patch the code path instead when the rule is ours.
   it is not part of the default build. **Never read/parse it**: to check a change
   compiles, just run `zig build ac`.
 - Single unified binary `ac`; subcommands: `ac worldserver`, `ac authserver`,
-  `ac map_extractor`, `ac vmap4_extractor`, `ac vmap4_assembler`, `ac mmaps_generator`.
+  `ac db-update`, `ac map_extractor`, `ac vmap4_extractor`, `ac vmap4_assembler`,
+  `ac mmaps_generator`.
 - Services: `podman compose up -d db valkey` (mysql 8.0 + valkey).
 - Config is env-only, no .conf files: `./.env` auto-loaded (template
   `.env.example`); `AC_DATA_DIR` resolves relative to the binary.
@@ -51,7 +52,7 @@ patch the code path instead when the rule is ours.
   `*_test.cpp` files next to the code they cover and are picked up
   automatically — no source lists. `Tests.cpp` and `*_test.cpp` are excluded
   from the normal module libraries by `Src.queryModuleSources`.
-- Currently enabled: `common`, `game`.
+- Currently enabled: `common`, `database`, `game`.
 - `zig build test` — build + run every enabled module's tests.
 - Per module: `zig build <module>-test-build` (build + install the executable)
   and `zig build run-<module>-test [-- <doctest args>]` (build + run).
@@ -61,8 +62,15 @@ patch the code path instead when the rule is ours.
 
 ## Database
 
-- `scripts/db_sync` (bun) — forward-only sync of `data/sql` into `acore_*` dbs.
-  No rollbacks; the AC in-core updater was removed on purpose.
+- First-time base seed: `./scripts/seed_db mysql://root:acore@localhost:3306`
+  (or `host;port;user;password`). Creates the databases/user and applies
+  `data/sql/base/*`. One-time development operation; never shipped in images.
+- Pending updates: `ac db-update` (or `zig build run-ac -- db-update`). Reads the
+  normal `AC_*_DATABASE_INFO` config and applies `data/sql/updates/*`
+  forward-only. The runtime image carries only `data/sql/updates` under
+  `/app/sql/updates` (`AC_SQL_DIR=/app/sql`).
+- No rollbacks; the AC in-core updater was replaced by our native
+  `src/database/Updater` implementation.
 - Schema = squashed base in `data/sql/base/db_{auth,characters,world}`.
 - New migration: add `data/sql/updates/db_<name>/YYYY_MM_DD_NN.sql`. Never edit
   an applied file — sha1-tracked, modified files get skipped.
