@@ -19,6 +19,11 @@ export interface OnlineCharacter {
   classId: number;
 }
 
+export interface CharacterSummary {
+  charName: string;
+  classId: number;
+}
+
 export class CharacterDb {
   private readonly pool: Pool;
 
@@ -52,6 +57,26 @@ export class CharacterDb {
       rating: Number(row.rating),
       seasonWins: Number(row.seasonWins),
       seasonGames: Number(row.seasonGames),
+    }));
+  }
+
+  /** Characters owned by any of the given accounts, ordered by name. */
+  async charactersByAccountIds(accountIds: number[]): Promise<CharacterSummary[]> {
+    const unique = [...new Set(accountIds)];
+    if (unique.length === 0) return [];
+
+    const placeholders = unique.map(() => "?").join(", ");
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT name AS charName, class AS classId
+       FROM characters
+       WHERE account IN (${placeholders})
+       ORDER BY name ASC`,
+      unique,
+    );
+
+    return rows.map((row) => ({
+      charName: String(row.charName),
+      classId: Number(row.classId),
     }));
   }
 

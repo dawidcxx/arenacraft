@@ -52,6 +52,18 @@ export class AuthDb {
     return new Map(rows.map((row) => [Number(row.id), String(row.username)]));
   }
 
+  /** All account ids owned by a Discord user, ordered by account id. */
+  async accountIdsByDiscordId(discordId: string): Promise<number[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT account_id AS accountId
+       FROM account_discord
+       WHERE discord_id = ?
+       ORDER BY account_id ASC`,
+      [discordId],
+    );
+    return rows.map((row) => Number(row.accountId));
+  }
+
   async accountByDiscordId(discordId: string): Promise<AccountRef | null> {
     const [rows] = await this.pool.execute<RowDataPacket[]>(
       `SELECT a.id, a.username

@@ -15,9 +15,11 @@ Rewritten Arenacraft Discord bot. Six jobs:
    `soloq-matchup-ended` Redis events and moves players between the waiting room
    and paired `game-<n>-<k>` voice channels.
 4. **Info commands** - `/toprankers` (soloQ leaderboard), `/onlinelist`
-   (characters currently online) and `/lookup <character>` (the Discord user
-   behind a character name). All reply ephemerally; the leaderboard and online
-   list are served from a 30s cache to keep repeated calls off the DB.
+   (characters currently online), `/lookup <character>` (the Discord user
+   behind a character name) and `/charlist <discord>` (characters owned by a
+   Discord member, matched by username, display name, mention, or user ID;
+   VIP-only). All reply ephemerally; the leaderboard and online list are served
+   from a 30s cache to keep repeated calls off the DB.
 5. **Match audit log** - posts one compact message per solo queue event to
    `AUDIT_LOG_CHANNEL_NAME` (default `audit-log`): match formed (teams, class
    icons, ratings), match finished (winner, duration, per-player rating
@@ -79,11 +81,12 @@ The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
 `druid`). Any missing emoji simply render as the bare character name. Set
 `AUDIT_LOG_CHANNEL_NAME` to an empty string to disable these messages.
 
-`/alias` is registered with `default_member_permissions: 0`, so it is hidden
-from regular members. Allow the `VIP_ROLE_NAME` role once in **Server Settings
--> Integrations -> arenacraft -> Manage -> /alias**; Discord only accepts an
-OAuth2 bearer token for that overwrite, so the bot cannot set it itself.
-Registration is an upsert by command name, so the overwrite survives restarts.
+`/alias` and `/charlist` are registered with `default_member_permissions: 0`,
+so they are hidden from regular members. Allow the `VIP_ROLE_NAME` role once in
+**Server Settings -> Integrations -> arenacraft -> Manage -> /alias** (and
+`/charlist`); Discord only accepts an OAuth2 bearer token for those overwrites,
+so the bot cannot set them itself. Registration is an upsert by command name,
+so the overwrites survive restarts.
 
 The in-game GM command `.alias get [character]` resolves character -> account
 -> alias and prints one machine-readable line for future addons:
