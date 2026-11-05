@@ -1,0 +1,102 @@
+# Build and publish the linux/amd64 runtime image on every push to `local`.
+# PR compile checks live in check.yml and do not build Docker images.
+name: image
+
+on:
+  push:
+    branches: [local]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/dawidcxx/arenacraft
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v4
+        id: buildx
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/local'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Revision
+        id: revision
+        run: echo "date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # The Dockerfile keeps Zig's caches in RUN --mount=type=cache, which are
+      # not part of --cache-to/--cache-from. Cache dance moves them through the
+      # GitHub Actions cache; Docker layer cache lives in GHCR instead so it
+      # does not consume the 10 GB Actions cache quota.
+      - name: Cache Zig build
+        uses: actions/cache@v4
+        with:
+          path: zig-cache-dance
+          key: zig-cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: zig-cache-${{ runner.os }}-
+
+      - name: Inject Zig cache
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-dir: zig-cache-dance
+          dockerfile: Dockerfile
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.ref == 'refs/heads/local' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            GIT_BRANCH=${{ github.ref_name }}
+            GIT_DATE=${{ steps.revision.outputs.date }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+          provenance: false
+
+  cleanup:
+    name: prune old GHCR versions
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/local'
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: arenacraft
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0

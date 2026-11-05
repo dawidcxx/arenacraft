@@ -127,10 +127,7 @@ pub const AcGraph = struct {
         step.dependOn(&run.step);
     }
 
-    /// The `ac` master executable: an argparse router (src/ac/main.cpp) that
-    /// forwards arguments 1:1 to the ported sub programs. Sub programs live in
-    /// the src modules (auth, tools); the router only needs their entry points.
-    fn buildAc(self: *Self, b: BuildRequest) !void {
+    fn createAcModule(self: *Self, b: BuildRequest) !*Build.Module {
         const bl = b[0];
         const target = b[1];
         const optimize = b[2];
@@ -164,9 +161,18 @@ pub const AcGraph = struct {
         deps.linkBoost(module);
         deps.linkSystemLibraries(module);
 
+        return module;
+    }
+
+    /// The `ac` master executable: an argparse router (src/ac/main.cpp) that
+    /// forwards arguments 1:1 to the ported sub programs. Sub programs live in
+    /// the src modules (auth, tools); the router only needs their entry points.
+    fn buildAc(self: *Self, b: BuildRequest) !void {
+        const bl = b[0];
+
         const exe = bl.addExecutable(.{
             .name = "ac",
-            .root_module = module,
+            .root_module = try self.createAcModule(b),
         });
         // export symbols into the dynamic table so the crash handler's
         // backtrace_symbols()/backtrace_symbols_fd() can resolve function names
@@ -186,6 +192,18 @@ pub const AcGraph = struct {
 
         const run_step = bl.step("run-ac", "Build and run the ac master executable");
         run_step.dependOn(&run.step);
+
+        // `zig build check-ac` - compile everything without emitting a binary.
+        // The compile step has no install/run artifact, so Zig passes
+        // -fno-emit-bin; this is the PR compile check.
+        const check = bl.addExecutable(.{
+            .name = "ac-check",
+            .root_module = try self.createAcModule(b),
+        });
+        check.rdynamic = true;
+
+        const check_step = bl.step("check-ac", "Compile ac without emitting a binary");
+        check_step.dependOn(&check.step);
     }
 };
 

@@ -1,0 +1,47 @@
+# Fast PR compile check on the bare runner using the flake's CI shell.
+# The image pipeline is separate; this workflow never builds Docker images.
+name: check
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-check:
+    name: zig build check-ac
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: nixbuild/nix-quick-install-action@v30
+        with:
+          nix_conf: |
+            keep-env-derivations = true
+            keep-outputs = true
+
+      - name: Restore Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 2G
+
+      - name: Restore Zig cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .zig-cache
+            zig-pkg
+          key: zig-cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: zig-cache-${{ runner.os }}-
+
+      - name: Compile check
+        run: nix develop .#ci --command zig build check-ac

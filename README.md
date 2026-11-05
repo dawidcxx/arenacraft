@@ -22,13 +22,30 @@ Needs `nix`, `podman` (or docker), and a 3.3.5a client.
 ## Commands
 
 - `zig build ac` debug build
+- `zig build check-ac` compile everything without emitting an executable (PR CI)
 - `zig build run-ac -- db-update` apply pending database updates
 - `zig build run-ac -- worldserver` build and run
 - `zig build test` unit tests (needs `nix develop`)
 - `zig build test-build` dep/link smoke test
-- CI: `.github/workflows/build.yml` runs `zig build ac` on every pull request and on pushes to `local`
+- CI: `.github/workflows/check.yml` runs `zig build check-ac` on every pull
+  request; `.github/workflows/image.yml` publishes the amd64 image on pushes to
+  `local`
 - `scripts/deploy` build the amd64 image and ship it to the target
 - `scripts/restart_world` restart the world service on the target and prune old images
+
+## CI image
+
+Pushes to `local` build and publish:
+
+```text
+ghcr.io/dawidcxx/arenacraft:latest
+```
+
+Only the current `latest` version is retained; older untagged GHCR versions are
+pruned after each publish. The package must be public for unauthenticated pulls,
+and pruning requires the repo to have Admin access to the package. PRs use the
+Nix CI shell (`nix develop .#ci`) to run the compile-only check and never build
+or push an image.
 
 ## Deploy
 
