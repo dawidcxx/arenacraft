@@ -64,11 +64,17 @@ jobs:
       - name: Resolve Zig cache image
         id: zigcache
         run: |
-          if docker buildx imagetools inspect "$IMAGE:zigcache" >/dev/null 2>&1; then
-            echo "image=$IMAGE:zigcache" >> "$GITHUB_OUTPUT"
-          else
-            echo "image=docker.io/library/busybox:latest" >> "$GITHUB_OUTPUT"
-          fi
+          ref="$IMAGE:zigcache"
+          # Only reuse a plain image manifest. An OCI index (e.g. one carrying
+          # provenance attestations) has untagged child manifests that the
+          # cleanup job deletes, which leaves the tag unresolvable at pull time.
+          media="$(docker buildx imagetools inspect "$ref" --raw 2>/dev/null | jq -r '.mediaType // empty' 2>/dev/null || true)"
+          case "$media" in
+            application/vnd.oci.image.manifest.v1+json|application/vnd.docker.distribution.manifest.v2+json)
+              echo "image=$ref" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "image=docker.io/library/busybox:latest" >> "$GITHUB_OUTPUT" ;;
+          esac
 
       - name: Inject Zig cache
         env:
@@ -104,13 +110,18 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=min
           provenance: false
 
+      # Push a single manifest: provenance/SBOM attestations turn the tag into
+      # an OCI index whose untagged child manifests the cleanup job removes,
+      # leaving the tag broken on the next pull. Keep in sync with the resolve
+      # check above (which refuses to reuse an index).
       - name: Save Zig cache
         if: github.ref == 'refs/heads/local'
         env:
           BUILDER: ${{ steps.buildx.outputs.name }}
         run: |
           ctx="$(mktemp -d)"
-          docker buildx build --builder "$BUILDER" -f - "$ctx" --tag "$IMAGE:zigcache" --push <<'EOF'
+          docker buildx build --builder "$BUILDER" -f - "$ctx" --platform linux/amd64 \
+            --tag "$IMAGE:zigcache" --provenance=false --sbom=false --push <<'EOF'
           # syntax=docker/dockerfile:1
           FROM docker.io/library/busybox:latest
           RUN --mount=type=cache,id=arenacraft-zig-cache,target=/c1 --mount=type=cache,id=arenacraft-zig-pkg,target=/c2 --mount=type=cache,id=arenacraft-zig-global,target=/c3 mkdir -p /zig-cache /zig-pkg /zig-global && cp -a /c1/. /zig-cache/ && cp -a /c2/. /zig-pkg/ && cp -a /c3/. /zig-global/
