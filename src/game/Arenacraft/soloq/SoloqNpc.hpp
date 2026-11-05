@@ -27,6 +27,14 @@ public:
   static constexpr uint32 ActionCreate = 9100012;
   static constexpr uint32 ActionReset  = 9100013;
 
+  // Avoid list (#77)
+  static constexpr uint32 AvoidTextId           = 9100003; // runtime npc_text of the avoid page, never persisted
+  static constexpr uint32 ActionAvoidMenu       = 9100014;
+  static constexpr uint32 ActionAvoidByName     = 9100015; // coded: the name comes from the gossip text box
+  static constexpr uint32 ActionAvoidBack       = 9100016;
+  static constexpr uint32 ActionAvoidRemoveBase = 9100020; // + slot
+  static constexpr uint32 ActionAvoidRecentBase = 9100030; // + index in the recent teammates list
+
   SoloqNpc() : AllCreatureScript("arenacraft::soloq::SoloqNpc") {}
 
   void OnCreatureAddWorld(Creature* creature) override;
@@ -34,6 +42,9 @@ public:
   bool CanCreatureGossipHello(Player* player, Creature* creature) override;
 
   bool CanCreatureGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override;
+
+  bool CanCreatureGossipSelectCode(Player* player, Creature* creature, uint32 sender, uint32 action,
+                                   char const* code) override;
 };
 
 // Sets up the SoloQ NPC's shared creature template at startup.

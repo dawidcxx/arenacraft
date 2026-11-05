@@ -157,6 +157,11 @@ bool SoloqQueue::betterThan(Candidate const& left, Candidate const& right)
   return left.spread < right.spread;
 }
 
+bool SoloqQueue::teamAvoids(QueuedPlayer const& x, QueuedPlayer const& y, QueuedPlayer const& z) const
+{
+  return _avoids && (_avoids(x.id, y.id) || _avoids(x.id, z.id) || _avoids(y.id, z.id));
+}
+
 std::optional<SoloqQueue::Candidate> SoloqQueue::makeStandardCandidate(std::array<Entry const*, 6> const& six) const
 {
   QueuedPlayer const& m0 = six[0]->player;
@@ -183,6 +188,8 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeStandardCandidate(std::arra
     if (m0.classId == casterA.classId || m0.classId == healerA.classId || casterA.classId == healerA.classId)
       continue;
     if (m1.classId == casterB.classId || m1.classId == healerB.classId || casterB.classId == healerB.classId)
+      continue;
+    if (teamAvoids(m0, casterA, healerA) || teamAvoids(m1, casterB, healerB))
       continue;
 
     uint64_t const sumA      = static_cast<uint64_t>(m0.mmr) + casterA.mmr + healerA.mmr;
@@ -251,6 +258,8 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeFlexCandidate(std::array<En
         QueuedPlayer const& dpsB1 = six[complement[1]]->player;
 
         if (flexTeamStacksClass(dpsA0, dpsA1, healerA) || flexTeamStacksClass(dpsB0, dpsB1, healerB))
+          continue;
+        if (teamAvoids(dpsA0, dpsA1, healerA) || teamAvoids(dpsB0, dpsB1, healerB))
           continue;
 
         uint64_t const sumA      = static_cast<uint64_t>(dpsA0.mmr) + dpsA1.mmr + healerA.mmr;
