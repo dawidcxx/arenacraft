@@ -5,6 +5,10 @@ name: image
 on:
   push:
     branches: [local]
+    paths-ignore:
+      - 'ai-doc/**'
+      - '**/*.md'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
