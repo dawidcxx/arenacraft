@@ -126,7 +126,7 @@ template <class T> bool ConfusedMovementGenerator<T>::DoUpdate(T* unit, uint32 d
     if (unit->movespline->Finalized())
     {
       i_nextMove = urand(1, MAX_CONF_WAYPOINTS);
-      i_nextMoveTime.Reset(urand(600, 1200)); // Guessed
+      i_nextMoveTime.Reset(urand(800, 1500)); // arenacraft: pause between steps as in TrinityCore 3.3.5
     }
   }
   else
@@ -155,6 +155,9 @@ template <class T> bool ConfusedMovementGenerator<T>::DoUpdate(T* unit, uint32 d
       float                    z = i_waypoints[i_nextMove][2];
       Movement::MoveSplineInit init(unit);
       init.MoveTo(x, y, z, true);
+      // arenacraft: a confused unit (Scatter Shot, Blind, Dragon's Breath, ...) stumbles around at walk speed, as in
+      // 3.3.5 (TrinityCore's generator walks too). Running made scattered players cover a much larger area.
+      init.SetWalk(true);
       init.Launch();
     }
   }
