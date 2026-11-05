@@ -206,7 +206,7 @@ pub const Src = struct {
         isolated.dependOn(&library.step);
     }
 
-    /// DB migration machinery (Updater/) is intentionally not ported.
+    /// Database library; Updater/ holds the native `ac db-update` implementation.
     fn buildDatabase(self: *Self, build_request: BuildRequest) !void {
         const b = build_request[0];
         const target = build_request[1];

@@ -134,6 +134,12 @@ int db_update_main(int argc, char** argv)
   std::filesystem::path const updatesRoot = std::filesystem::path(sqlDir) / "updates";
   bool const                  dryRun      = parser.get<bool>("--dry-run");
 
+  if (!std::filesystem::is_directory(updatesRoot))
+  {
+    fmt::print(stderr, "updates directory not found: {}\n", updatesRoot.string());
+    return 1;
+  }
+
   MySQL::Library_Init();
 
   bool success = true;
@@ -149,6 +155,14 @@ int db_update_main(int argc, char** argv)
       }
     }
 
+    std::filesystem::path const updateDirectory = updatesRoot / target->sqlDirectory;
+    if (!std::filesystem::is_directory(updateDirectory))
+    {
+      fmt::print(stderr, "[{}] updates directory not found: {}\n", target->name, updateDirectory.string());
+      success = false;
+      continue;
+    }
+
     std::string const connectionInfo = sConfigMgr->GetOption<std::string>(target->configKey, "");
     if (connectionInfo.empty())
     {
@@ -158,8 +172,7 @@ int db_update_main(int argc, char** argv)
     }
 
     Acore::Database::DatabaseUpdateResult result;
-    if (!Acore::Database::ApplyDatabaseUpdates(target->name, connectionInfo, updatesRoot / target->sqlDirectory, dryRun,
-                                               result))
+    if (!Acore::Database::ApplyDatabaseUpdates(target->name, connectionInfo, updateDirectory, dryRun, result))
     {
       success = false;
       continue;

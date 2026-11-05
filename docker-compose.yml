@@ -47,6 +47,8 @@ services:
       - 6664:8080
 
   # --- full profile: runs the core against db/valkey with ./data mounted ---
+  # fresh mysql-data volumes need a one-time base seed before first start:
+  #   ./scripts/seed_db mysql://root:acore@localhost:3306
   auth:
     profiles: [full]
     build: { context: ., dockerfile: Dockerfile }

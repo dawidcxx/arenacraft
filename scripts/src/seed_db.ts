@@ -94,12 +94,18 @@ async function listSqlFiles(dir: string): Promise<string[]> {
   }
 }
 
-async function hasUpdatesTable(info: DbInfo): Promise<boolean> {
+async function isSeeded(info: DbInfo): Promise<boolean> {
   const sql = connect(info);
-  const rows = await sql`SELECT table_name AS name FROM information_schema.tables
-    WHERE table_schema = ${info.database} AND table_name = 'updates'`;
-  sql.end();
-  return rows.length > 0;
+  try {
+    // An empty table means the seed was interrupted before updates.sql could
+    // finish inserting its bookkeeping rows; treat that as unseeded.
+    const rows = await sql`SELECT COUNT(*) AS count FROM updates`;
+    return Number(rows[0]?.count ?? 0) > 0;
+  } catch {
+    return false;
+  } finally {
+    sql.end();
+  }
 }
 
 async function applyCreateScript(info: DbInfo): Promise<void> {
@@ -117,7 +123,7 @@ async function seedDatabase(name: DbName): Promise<void> {
   const label = `[${name}]`;
   const info = { ...admin, database: DATABASE_FOR_DB[name] };
 
-  if (await hasUpdatesTable(info)) {
+  if (await isSeeded(info)) {
     console.log(`${label} already seeded, skipping base`);
     return;
   }
