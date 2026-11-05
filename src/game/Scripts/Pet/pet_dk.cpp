@@ -21,6 +21,8 @@
 #include "CreatureScript.h"
 #include "GridNotifiers.h"
 #include "PassiveAI.h"
+#include "Pet.h"
+#include "Player.h"
 #include "ScriptedCreature.h"
 #include "SpellAuraEffects.h"
 #include "SpellScript.h"
@@ -44,6 +46,7 @@ enum DeathKnightSpells
   SPELL_DK_SANCTUARY         = 54661,
   SPELL_DK_NIGHT_OF_THE_DEAD = 62137,
   SPELL_DK_PET_SCALING       = 61017,
+  SPELL_DK_MASTER_OF_GHOULS  = 52143,
   // Risen Ally
   SPELL_DK_RAISE_ALLY = 46619,
   SPELL_GHOUL_FRENZY  = 62218,
@@ -100,9 +103,35 @@ public:
       _initialCastTimer = 0;
     }
 
+    // arenacraft (#68): with Master of Ghouls the ghoul is a controllable pet, and the gargoyle goes for whatever the
+    // ghoul attacks - the pet's attack / switch commands steer both, like the water elemental and mirror images.
+    Unit* GhoulTarget(Unit* owner) const
+    {
+      Player* player = owner ? owner->ToPlayer() : nullptr;
+      if (!player || !player->HasAura(SPELL_DK_MASTER_OF_GHOULS))
+        return nullptr;
+      Pet* ghoul = player->GetPet();
+      if (!ghoul || !ghoul->IsAlive())
+        return nullptr;
+      Unit* target = ghoul->GetVictim();
+      if (!target || !me->IsValidAttackTarget(target) || !owner->CanSeeOrDetect(target) ||
+          target->IsImmunedToSpell(sSpellMgr->GetSpellInfo(51963)))
+        return nullptr;
+      return target;
+    }
+
     void MySelectNextTarget()
     {
       Unit* owner = me->GetOwner();
+      if (Unit* ghoulTarget = GhoulTarget(owner))
+      {
+        if (ghoulTarget != me->GetVictim())
+        {
+          me->GetMotionMaster()->Clear(false);
+          SetGazeOn(ghoulTarget);
+        }
+        return;
+      }
       if (owner && owner->IsPlayer() &&
           (!me->GetVictim() || me->GetVictim()->IsImmunedToSpell(sSpellMgr->GetSpellInfo(51963)) ||
            !me->IsValidAttackTarget(me->GetVictim()) || !owner->CanSeeOrDetect(me->GetVictim())))
