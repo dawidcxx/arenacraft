@@ -12,11 +12,23 @@ const ConfigSchema = z.object({
   LADDER_SIZE: z.coerce.number().int().min(1).max(MAX_LADDER_SIZE).default(MAX_LADDER_SIZE),
   // How long a ladder snapshot is reused before the database is asked again.
   CACHE_TTL_SECONDS: z.coerce.number().int().min(1).max(3600).default(30),
-  // Value of Access-Control-Allow-Origin. The ladder is public read-only data, so "*" is safe;
-  // set the site origin (e.g. https://example.workers.dev) to keep other sites from embedding it.
+  // Value of Access-Control-Allow-Origin. Set the site origin (e.g. https://example.workers.dev) so
+  // only that site can make authenticated cross-origin requests; "*" is convenient for local dev.
   CORS_ORIGIN: z.string().min(1).default("*"),
   // Per-query timeout, so a stuck database cannot pile up requests.
   DB_TIMEOUT_MS: z.coerce.number().int().min(100).max(30000).default(3000),
+  // HTTP Basic auth tokens, comma-separated (one or many). A request may send any of them as either
+  // the Basic username or password; the other half is ignored.
+  AUTH_TOKENS: z
+    .string()
+    .min(1)
+    .transform((raw) =>
+      raw
+        .split(",")
+        .map((token) => token.trim())
+        .filter(Boolean),
+    )
+    .refine((tokens) => tokens.length > 0, "at least one token is required"),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

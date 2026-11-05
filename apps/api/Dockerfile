@@ -1,4 +1,4 @@
-# ladder-api: read-only public SoloQ ladder (see README.md). Built from apps/ladder-api.
+# api: read-only public SoloQ ladder (see README.md). Built from apps/api.
 FROM docker.io/oven/bun:1-alpine AS deps
 WORKDIR /app
 COPY package.json bun.lock ./

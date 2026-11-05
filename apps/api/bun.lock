@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ladder-api",
+      "name": "api",
       "dependencies": {
         "mysql2": "^3.24.4",
         "zod": "^4.6.5",

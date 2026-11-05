@@ -136,7 +136,7 @@ bool JoinSoloqQueue(Player* player)
     return false;
   }
 
-  // the public ladder (apps/ladder-api) shows the role a character last queued as
+  // the public ladder (apps/api) shows the role a character last queued as
   if (std::optional<Role> const role =
           roleFor(static_cast<Classes>(player->getClass()), player->GetMostPointsTalentTree()))
     CharacterDatabase.Execute("REPLACE INTO character_soloq_role (guid, role) VALUES ({}, {})",

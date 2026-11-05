@@ -121,7 +121,7 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
 `JoinSoloqQueue` (`SoloqArenaQueue.cpp`) writes the role the character queued as
 (`roleFor(class, main talent tree)`, stored as the `Role` enum value) into
 `character_soloq_role` (characters DB, migration `2026_11_02_01.sql`). It is not
-a matchmaking input: only `apps/ladder-api` reads it, to tag rows of the public
+a matchmaking input: only `apps/api` reads it, to tag rows of the public
 ladder as Melee / Caster / Healer.
 
 ## Post-match adjustment (`resolveMatch`)

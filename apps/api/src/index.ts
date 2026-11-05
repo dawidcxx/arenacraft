@@ -27,6 +27,7 @@ const server = Bun.serve({
     ladder: () => cache.get(),
     corsOrigin: config.CORS_ORIGIN,
     cacheTtlSeconds: config.CACHE_TTL_SECONDS,
+    authTokens: config.AUTH_TOKENS,
   }),
   error(error) {
     logger.error("unhandled request error", error);
@@ -37,7 +38,7 @@ const server = Bun.serve({
   },
 });
 
-logger.info(`ladder-api listening on ${server.hostname}:${server.port}`);
+logger.info(`api listening on ${server.hostname}:${server.port}`);
 
 async function shutdown(signal: string): Promise<void> {
   logger.info(`${signal} received, shutting down`);
