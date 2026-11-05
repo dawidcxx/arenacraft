@@ -3243,7 +3243,11 @@ void Spell::EffectSummonPet(SpellEffIndex effIndex)
   // if pet requested type already exist
   if (OldSummon)
   {
-    if (petentry == 0 || OldSummon->GetEntry() == petentry)
+    // Arenacraft: re-summoning the Water Elemental while one is alive (after Cold Snap) gives a fresh one at the mage's
+    // side, as on 3.3.5: the old one is dismissed below. The "move the existing pet back" path left it where it stood.
+    bool const freshWaterElemental = OldSummon->IsAlive() && (OldSummon->GetEntry() == NPC_WATER_ELEMENTAL_TEMP ||
+                                                              OldSummon->GetEntry() == NPC_WATER_ELEMENTAL_PERM);
+    if ((petentry == 0 || OldSummon->GetEntry() == petentry) && !freshWaterElemental)
     {
       // pet in corpse state can't be summoned
       if (OldSummon->isDead())
