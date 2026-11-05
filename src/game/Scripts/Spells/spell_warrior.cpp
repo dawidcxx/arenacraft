@@ -260,9 +260,11 @@ class spell_warr_deep_wounds : public SpellScript
     Unit* caster = GetCaster();
     if (Unit* target = GetHitUnit())
     {
-      // include target dependant auras
-      damage = target->MeleeDamageBonusTaken(caster, damage, BASE_ATTACK, GetSpellInfo());
-      // apply percent damage mods
+      // arenacraft: no target damage-taken modifiers here. Every tick of the bleed (12721) already applies them
+      // (SpellDamageBonusTaken in HandlePeriodicDamageAurasTick), so applying them at the proc too counted them twice:
+      // Barkskin, Pain Suppression, Defensive Stance & co. cut Deep Wounds twice, bleed bonuses (Mangle, Trauma)
+      // doubled. TrinityCore 3.3.5 does not apply them here either.
+      // 16% of the average weapon damage per rank over 6 ticks
       ApplyPct(damage, 16.0f * GetSpellInfo()->GetRank() / 6.0f);
       target->CastDelayedSpellWithPeriodicAmount(caster, SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC,
                                                  SPELL_AURA_PERIODIC_DAMAGE, damage, EFFECT_0);
