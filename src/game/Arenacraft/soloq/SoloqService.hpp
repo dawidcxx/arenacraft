@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AvoidList.hpp"
 #include "CharacterCheck.hpp"
 #include "SoloqQueue.hpp"
 #include "Types.hpp"
@@ -76,8 +77,17 @@ public:
   void               setFlexMode(bool value) { _queue.setFlexMode(value); }
   [[nodiscard]] bool flexMode() const { return _queue.flexMode(); }
 
+  // Avoid list (#77): the matchmaker never puts two players on the same team when one avoids the other. Characters
+  // are low guids; stored in the characters DB (soloq_avoid), see SoloqNpc.cpp.
+  [[nodiscard]] AvoidList&       avoidList() { return _avoid; }
+  [[nodiscard]] RecentTeammates& recentTeammates() { return _recent; }
+
 private:
-  SoloqService() = default;
+  SoloqService()
+  {
+    _queue.setAvoidCheck([this](PlayerId x, PlayerId y)
+                         { return _avoid.avoids(static_cast<uint32_t>(x), static_cast<uint32_t>(y)); });
+  }
 
   void refreshRoleCounts();
 
@@ -86,5 +96,7 @@ private:
   std::unordered_set<PlayerId>             _validatedCharacters;
   RoleCounts                               _roleCounts{};
   bool                                     _skipCharacterChecks = false;
+  AvoidList                                _avoid;
+  RecentTeammates                          _recent;
 };
 } // namespace arenacraft::soloq

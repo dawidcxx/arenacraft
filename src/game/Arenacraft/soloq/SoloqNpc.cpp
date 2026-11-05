@@ -5,8 +5,11 @@
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
 #include "BattlegroundQueue.h"
+#include "CharacterCache.h"
 #include "CharacterCheck.hpp"
 #include "Chat.h"
+#include "DatabaseEnv.h"
+#include "GameTime.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
 #include "ObjectGuid.h"
@@ -73,6 +76,169 @@ void ClearSoloqQueueId(Player* player, uint32 bgInstanceId)
 }
 } // namespace
 
+namespace
+{
+// --- Avoid list (#77) ---------------------------------------------------------------------------------------------
+
+int64_t Now() { return GameTime::GetGameTime().count(); }
+
+std::string NameOf(uint32 guid)
+{
+  std::string name;
+  if (!sCharacterCache->GetCharacterNameByGuid(ObjectGuid::Create<HighGuid::Player>(guid), name))
+    name = "#" + std::to_string(guid);
+  return name;
+}
+
+void SaveAvoidSlot(uint32 owner, std::size_t index, AvoidSlot const& slot)
+{
+  CharacterDatabase.Execute("REPLACE INTO soloq_avoid (guid, slot, avoided_guid, used_at) VALUES ({}, {}, {}, {})",
+                            owner, index, slot.avoided, slot.usedAt);
+}
+
+std::string AvoidPageText(uint32 owner)
+{
+  AvoidList const& list = SoloqService::instance().avoidList();
+  int64_t const    now  = Now();
+  std::string      text = "SoloQ Avoid List\n-----------------------\n\nYou are never put on a team with these "
+                          "players.\n\n";
+  AvoidList::OwnerSlots const slots = list.slots(owner);
+  for (std::size_t i = 0; i < AvoidList::Slots; ++i)
+  {
+    int64_t const cooldown = list.cooldownLeft(owner, i, now);
+    text += "Slot " + std::to_string(i + 1) + ": " + (slots[i].avoided ? NameOf(slots[i].avoided) : "empty") +
+            (cooldown ? " (free to change in " + formatCooldown(cooldown) + ")" : "") + "\n";
+  }
+  text += "\nAdding a player starts a 6 hour cooldown on the slot. Removing a player does not end it - choose "
+          "carefully.";
+  return text;
+}
+
+void ShowAvoidMenu(Player* player, Creature* creature)
+{
+  uint32 const owner = player->GetGUID().GetCounter();
+  AvoidList&   list  = SoloqService::instance().avoidList();
+
+  player->PlayerTalkClass->ClearMenus();
+  GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
+  menu.SetMenuId(SoloqNpc::GossipMenuId);
+  uint32 menuIndex = 0;
+  auto   addOption = [&](uint8 icon, std::string const& text, uint32 action, std::string const& box, bool coded)
+  {
+    menu.AddMenuItem(int32(menuIndex), icon, text, 0, action, box, 0, coded);
+    menu.AddGossipMenuItemData(menuIndex, 0, 0);
+    ++menuIndex;
+  };
+
+  addOption(GOSSIP_ICON_CHAT, "Avoid a player by name...", SoloqNpc::ActionAvoidByName,
+            "Type the character name. The slot then cools down for 6 hours.", true);
+
+  std::vector<RecentTeammates::Mate> const recent = SoloqService::instance().recentTeammates().of(owner);
+  for (std::size_t i = 0; i < recent.size(); ++i)
+    if (!list.listed(owner, recent[i].guid))
+      addOption(GOSSIP_ICON_CHAT, "Avoid " + recent[i].name + " (recent teammate)",
+                SoloqNpc::ActionAvoidRecentBase + uint32(i),
+                "Avoid " + recent[i].name + "? The slot then cools down for 6 hours.", false);
+
+  AvoidList::OwnerSlots const slots = list.slots(owner);
+  for (std::size_t i = 0; i < AvoidList::Slots; ++i)
+    if (slots[i].avoided)
+    {
+      std::string const name = NameOf(slots[i].avoided);
+      addOption(GOSSIP_ICON_INTERACT_1, "Stop avoiding " + name, SoloqNpc::ActionAvoidRemoveBase + uint32(i),
+                "Stop avoiding " + name + "? The slot's cooldown keeps running.", false);
+    }
+
+  addOption(GOSSIP_ICON_CHAT, "Back", SoloqNpc::ActionAvoidBack, "", false);
+
+  sObjectMgr->AddOrUpdateGossipText(SoloqNpc::AvoidTextId, AvoidPageText(owner));
+  player->GetSession()->SendNpcTextUpdate(SoloqNpc::AvoidTextId);
+  SendGossipMenuFor(player, SoloqNpc::AvoidTextId, creature);
+}
+
+void AddToAvoidList(Player* player, uint32 avoided, std::string const& name)
+{
+  uint32 const  owner = player->GetGUID().GetCounter();
+  AvoidList&    list  = SoloqService::instance().avoidList();
+  int64_t const now   = Now();
+  std::size_t   slot  = 0;
+  switch (list.add(owner, avoided, now, &slot))
+  {
+  case AvoidList::AddResult::Added:
+    SaveAvoidSlot(owner, slot, list.slots(owner)[slot]);
+    SendMessage(player, "SoloQ: you will not be put on a team with " + name + ".");
+    break;
+  case AvoidList::AddResult::Self:
+    SendMessage(player, "SoloQ: you can't avoid yourself.");
+    break;
+  case AvoidList::AddResult::AlreadyAvoided:
+    SendMessage(player, "SoloQ: " + name + " is already on your avoid list.");
+    break;
+  case AvoidList::AddResult::NoFreeSlot:
+  {
+    AvoidList::OwnerSlots const slots = list.slots(owner);
+    int64_t                     wait  = -1;
+    for (std::size_t i = 0; i < AvoidList::Slots; ++i)
+      if (!slots[i].avoided)
+      {
+        int64_t const left = list.cooldownLeft(owner, i, now);
+        wait               = wait < 0 ? left : std::min(wait, left);
+      }
+    SendMessage(player, wait < 0 ? "SoloQ: both avoid slots are taken - remove a player first."
+                                 : "SoloQ: no free avoid slot, the next one frees in " + formatCooldown(wait) + ".");
+    break;
+  }
+  }
+}
+
+void RemoveFromAvoidList(Player* player, std::size_t index)
+{
+  uint32 const                owner = player->GetGUID().GetCounter();
+  AvoidList&                  list  = SoloqService::instance().avoidList();
+  AvoidList::OwnerSlots const slots = list.slots(owner);
+  if (index >= AvoidList::Slots || !slots[index].avoided)
+    return;
+  std::string const name = NameOf(slots[index].avoided);
+  if (list.remove(owner, slots[index].avoided))
+  {
+    SaveAvoidSlot(owner, index, list.slots(owner)[index]);
+    SendMessage(player, "SoloQ: " + name + " removed from your avoid list; the slot's cooldown keeps running.");
+  }
+}
+
+void LoadAvoidLists()
+{
+  AvoidList& list   = SoloqService::instance().avoidList();
+  uint32     loaded = 0;
+  if (QueryResult result = CharacterDatabase.Query("SELECT guid, slot, avoided_guid, used_at FROM soloq_avoid"))
+    do
+    {
+      Field* fields = result->Fetch();
+      list.load(fields[0].Get<uint32>(), fields[1].Get<uint8>(),
+                AvoidSlot{fields[2].Get<uint32>(), static_cast<int64_t>(fields[3].Get<uint32>())});
+      ++loaded;
+    } while (result->NextRow());
+  LOG_INFO("server.loading", "soloq: loaded {} avoid list slots", loaded);
+}
+
+void RecordTeammates(Match const& match)
+{
+  auto mate = [](QueuedPlayer const& queued)
+  {
+    ObjectGuid const guid = ObjectGuid{queued.id};
+    std::string      name;
+    if (Player* player = ObjectAccessor::FindPlayer(guid))
+      name = player->GetName();
+    else
+      sCharacterCache->GetCharacterNameByGuid(guid, name);
+    return RecentTeammates::Mate{guid.GetCounter(), name};
+  };
+  RecentTeammates& recent = SoloqService::instance().recentTeammates();
+  for (Team const* team : {&match.a, &match.b})
+    recent.record({mate(team->melee), mate(team->caster), mate(team->healer)});
+}
+} // namespace
+
 void SoloqNpc::OnCreatureAddWorld(Creature* creature)
 {
   if (creature->GetEntry() == Entry)
@@ -81,6 +247,8 @@ void SoloqNpc::OnCreatureAddWorld(Creature* creature)
 
 void SoloqNpcSetup::OnStartup()
 {
+  LoadAvoidLists();
+
   if (CreatureTemplate* proto = const_cast<CreatureTemplate*>(sObjectMgr->GetCreatureTemplate(SoloqNpc::Entry)))
     proto->SubName = "SoloQ Master";
 }
@@ -106,6 +274,7 @@ bool SoloqNpc::CanCreatureGossipHello(Player* player, Creature* creature)
   addOption(GOSSIP_ICON_CHAT, "Leave SoloQ", ActionLeave);
   addOption(GOSSIP_ICON_INTERACT_1, "Create SoloQ Team", ActionCreate);
   addOption(GOSSIP_ICON_INTERACT_1, "Reset SoloQ Team", ActionReset);
+  addOption(GOSSIP_ICON_TALK, "Avoid list", ActionAvoidMenu);
 
   // The gossip page text is built at runtime from the shared queue. It is
   // cached/registered in ObjectMgr under a custom id and pushed to the client
@@ -129,6 +298,33 @@ bool SoloqNpc::CanCreatureGossipSelect(Player* player, Creature* creature, uint3
 
   PlayerId const id      = player->GetGUID().GetRawValue();
   SoloqService&  service = SoloqService::instance();
+
+  // avoid list pages stay open
+  if (action == ActionAvoidMenu)
+  {
+    ShowAvoidMenu(player, creature);
+    return true;
+  }
+  if (action == ActionAvoidBack)
+  {
+    player->PlayerTalkClass->SendCloseGossip();
+    return CanCreatureGossipHello(player, creature);
+  }
+  if (action >= ActionAvoidRemoveBase && action < ActionAvoidRemoveBase + AvoidList::Slots)
+  {
+    RemoveFromAvoidList(player, action - ActionAvoidRemoveBase);
+    ShowAvoidMenu(player, creature);
+    return true;
+  }
+  if (action >= ActionAvoidRecentBase && action < ActionAvoidRecentBase + RecentTeammates::Kept)
+  {
+    std::vector<RecentTeammates::Mate> const recent = service.recentTeammates().of(player->GetGUID().GetCounter());
+    std::size_t const                        index  = action - ActionAvoidRecentBase;
+    if (index < recent.size())
+      AddToAvoidList(player, recent[index].guid, recent[index].name);
+    ShowAvoidMenu(player, creature);
+    return true;
+  }
 
   player->PlayerTalkClass->SendCloseGossip();
 
@@ -167,6 +363,30 @@ bool SoloqNpc::CanCreatureGossipSelect(Player* player, Creature* creature, uint3
   return true;
 }
 
+bool SoloqNpc::CanCreatureGossipSelectCode(Player* player, Creature* creature, uint32 /*sender*/, uint32 action,
+                                           char const* code)
+{
+  if (creature->GetEntry() != Entry)
+    return false;
+  if (!player || action != ActionAvoidByName)
+    return true;
+
+  std::string name = code ? code : "";
+  if (!normalizePlayerName(name))
+  {
+    SendMessage(player, "SoloQ: type a character name.");
+    ShowAvoidMenu(player, creature);
+    return true;
+  }
+  ObjectGuid const guid = sCharacterCache->GetCharacterGuidByName(name);
+  if (!guid)
+    SendMessage(player, "SoloQ: there is no character named " + name + ".");
+  else
+    AddToAvoidList(player, guid.GetCounter(), name);
+  ShowAvoidMenu(player, creature);
+  return true;
+}
+
 void SoloqDriver::OnUpdate(uint32 diff)
 {
   SoloqService& service = SoloqService::instance();
@@ -197,6 +417,7 @@ void SoloqDriver::OnUpdate(uint32 diff)
       continue;
     }
 
+    RecordTeammates(match);
     for (QueuedPlayer const* queued : playersOf(match))
       if (Player* player = ObjectAccessor::FindPlayer(ObjectGuid{queued->id}))
         SendMessage(player, "SoloQ: match found - accept the arena invite to enter.");

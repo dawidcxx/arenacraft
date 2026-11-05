@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <set>
+#include <utility>
 #include <vector>
 
 using arenacraft::soloq::Match;
@@ -458,4 +459,64 @@ TEST_CASE("standard mode ignores flex-only pools")
 
   CHECK(queue.update(0ms).empty());
   CHECK(queue.size() == 6);
+}
+
+namespace
+{
+bool sameTeam(Match const& match, PlayerId x, PlayerId y)
+{
+  for (SoloqTeam const* team : {&match.a, &match.b})
+  {
+    std::set<PlayerId> const ids{team->melee.id, team->caster.id, team->healer.id};
+    if (ids.contains(x) && ids.contains(y))
+      return true;
+  }
+  return false;
+}
+
+SoloqQueue::AvoidCheck avoiding(std::set<std::pair<PlayerId, PlayerId>> pairs)
+{
+  return [pairs](PlayerId x, PlayerId y) { return pairs.contains({x, y}) || pairs.contains({y, x}); };
+}
+} // namespace
+
+TEST_CASE("avoid list: avoided players end up on opposite teams")
+{
+  SoloqQueue queue;
+  queue.setAvoidCheck(avoiding({{100, 102}, {104, 103}}));
+  addSet(queue, 100, 1500, 1500, 1500);
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(matches.size() == 1);
+  CHECK_FALSE(sameTeam(matches[0], 100, 102));
+  CHECK_FALSE(sameTeam(matches[0], 103, 104));
+}
+
+TEST_CASE("avoid list: a six-set with no avoid-free split does not pop")
+{
+  SoloqQueue queue;
+  // the melee 100 avoids both casters: whichever team it lands on has one of them
+  queue.setAvoidCheck(avoiding({{100, 102}, {100, 103}}));
+  addSet(queue, 100, 1500, 1500, 1500);
+
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 6);
+}
+
+TEST_CASE("avoid list: flex teams respect it too")
+{
+  SoloqQueue queue;
+  queue.setFlexMode(true);
+  queue.setAvoidCheck(avoiding({{1, 2}, {1, 5}}));
+  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
+  queue.playerAddToQueue(player(2, CLASS_ROGUE, 0));
+  queue.playerAddToQueue(player(3, CLASS_DEATH_KNIGHT, 0));
+  queue.playerAddToQueue(player(4, CLASS_HUNTER, 0));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));  // healer
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0)); // healer
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(matches.size() == 1);
+  CHECK_FALSE(sameTeam(matches[0], 1, 2));
+  CHECK_FALSE(sameTeam(matches[0], 1, 5));
 }

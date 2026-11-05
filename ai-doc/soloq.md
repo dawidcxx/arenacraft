@@ -26,6 +26,7 @@ invites the six players (see `CreateArenaForMatch`).
 | `Types.hpp` | `Role`, `QueuedPlayer`, `Team`, `Match`, `playersOf`, tuning constants |
 | `Roles.hpp/.cpp` | `roleFor(Classes, specIndex) -> optional<Role>` |
 | `SoloqQueue.hpp/.cpp` | the queue container + exhaustive best-fit matchmaker |
+| `AvoidList.hpp/.cpp` | avoid list slots/cooldowns and the recent teammates list (pure) |
 | `Outcome.hpp/.cpp` | `resolveMatch(Match, MatchResult)` - post-match Elo adjustment |
 | `SoloqService.hpp/.cpp` | singleton: queue + pending arenas + `tick`/`registerMatch`/`takeMatch` |
 | `SoloqTeam.hpp/.cpp` | the player's real 5v5 `ArenaTeam` (visible in the PvP pane, persisted in the characters DB) |
@@ -115,6 +116,24 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
   `Team::melee`/`Team::caster` fields are just the two DPS slots in this mode,
   so the real role is derived from class/spec when reporting participants.
 - `update` returns the drained `std::vector<Match>`; matched players are removed.
+
+## Avoid list (#77)
+
+A player can name up to **2** characters they never want as teammates (`AvoidList`, pure, tested in
+`AvoidList_test.cpp`). The matchmaker skips every team partition that puts an avoiding pair on the same team, the
+same way it skips class stacking (`SoloqQueue::setAvoidCheck`, a constant-time lookup per partition, so the
+enumeration cost is unchanged). Only one side needs to avoid the other. Avoided players can still be opponents.
+If no partition of a six-set avoids every pair, that set is skipped and the players stay queued.
+
+- **Slots and cooldown**: filling a slot starts a **6 hour** cooldown on it (`SlotCooldownSeconds`). Removing a player
+  empties the slot but keeps the cooldown, so the list can't be churned (e.g. to dodge players for rating). A filled
+  slot stays filled after its cooldown; to swap, remove the player and add another once the cooldown is over.
+- **Menu** (SoloQ NPC -> "Avoid list"): a page with both slots and their cooldowns, "Avoid a player by name..." (gossip
+  text box, `CanCreatureGossipSelectCode`), one option per recent teammate (last 10, in memory only:
+  `RecentTeammates`, recorded when a match pops) and "Stop avoiding <name>" per filled slot (with a confirmation).
+- **Storage**: characters DB `soloq_avoid (guid, slot, avoided_guid, used_at)`
+  (`data/sql/updates/db_characters/2026_11_05_00.sql`), loaded at startup (`SoloqNpcSetup`), one `REPLACE` per change.
+- No bias towards either side yet: when an avoid pair blocks a set, both players simply wait for another set.
 
 ## Post-match adjustment (`resolveMatch`)
 
