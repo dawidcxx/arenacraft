@@ -15,9 +15,13 @@ permissions:
   contents: read
   packages: write
 
+# Queue instead of cancel: the Zig cache is only saved at the end of a run, so cancelling a running build whenever a
+# newer push lands (several merges an hour) meant no run ever reached "Save Zig cache" and every build started cold
+# (~40 min). The running build finishes and saves the cache; GitHub keeps only the newest pending run, which then
+# starts warm.
 concurrency:
   group: image-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   IMAGE: ghcr.io/dawidcxx/arenacraft
@@ -93,6 +97,7 @@ jobs:
           EOF
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7
         with:
           builder: ${{ steps.buildx.outputs.name }}
@@ -114,8 +119,10 @@ jobs:
       # an OCI index whose untagged child manifests the cleanup job removes,
       # leaving the tag broken on the next pull. Keep in sync with the resolve
       # check above (which refuses to reuse an index).
+      # Also after a failed build (e.g. a compile error): everything compiled until then is still worth keeping. Only
+      # when the build step actually ran - otherwise the mounts are empty and would overwrite a good cache.
       - name: Save Zig cache
-        if: github.ref == 'refs/heads/local'
+        if: ${{ !cancelled() && github.ref == 'refs/heads/local' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
         env:
           BUILDER: ${{ steps.buildx.outputs.name }}
         run: |
