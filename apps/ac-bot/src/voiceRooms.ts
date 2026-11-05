@@ -1,4 +1,4 @@
-import { ChannelType } from "discord.js";
+import { ChannelType, OverwriteType } from "discord.js";
 import type { Guild, GuildMember, TextChannel, VoiceChannel } from "discord.js";
 
 import type { Config } from "./config";
@@ -100,6 +100,8 @@ export class RoomManager {
       bookedAt: null,
     }));
 
+    await Promise.all(this.rooms.map((room) => this.hideRoom(room)));
+
     const now = Date.now();
     for (const room of this.rooms) {
       if (memberCount(room) > 0) {
@@ -129,8 +131,8 @@ export class RoomManager {
     room.bookedAt = Date.now();
 
     const [movedA, movedB] = await Promise.all([
-      this.moveDiscordIds(teamADiscordIds, room.first),
-      this.moveDiscordIds(teamBDiscordIds, room.second),
+      this.admitAndMove(teamADiscordIds, room.first),
+      this.admitAndMove(teamBDiscordIds, room.second),
     ]);
     logger.info(`Booked ${roomName(room)} for instance ${instanceId} (moved ${movedA + movedB} players)`);
   }
@@ -162,6 +164,34 @@ export class RoomManager {
     }
   }
 
+  // Anti-snipe: game rooms are hidden from everyone; book() lets the players of a match see and join their team's
+  // room (a per-member overwrite) and freeRoom() takes it back. Hiding is restored on every startup, and leftover
+  // per-member grants of empty rooms (bot crash mid-match) are dropped. The bot keeps access to move people.
+  private async hideRoom(room: Room): Promise<void> {
+    for (const channel of [room.first, room.second]) {
+      try {
+        await channel.permissionOverwrites.edit(this.guild.roles.everyone, { ViewChannel: false });
+        const me = this.guild.members.me;
+        if (me) await channel.permissionOverwrites.edit(me, { ViewChannel: true, Connect: true, MoveMembers: true });
+        if (channel.members.size === 0) await this.revokeMembers(channel);
+      } catch (error) {
+        logger.warn(`Failed to hide game room "${channel.name}"`, error);
+      }
+    }
+  }
+
+  private async revokeMembers(channel: VoiceChannel): Promise<void> {
+    const me = this.guild.members.me?.id;
+    const grants = channel.permissionOverwrites.cache.filter(
+      (overwrite) => overwrite.type === OverwriteType.Member && overwrite.id !== me,
+    );
+    await Promise.all(
+      grants.map((overwrite) =>
+        overwrite.delete("Match over").catch((error) => logger.warn(`Failed to revoke ${overwrite.id} on ${channel.name}`, error)),
+      ),
+    );
+  }
+
   async sweepStale(): Promise<void> {
     const maxAgeMs = this.config.STALE_ROOM_MINUTES * 60_000;
     const now = Date.now();
@@ -191,20 +221,27 @@ export class RoomManager {
     const members = [...room.first.members.values(), ...room.second.members.values()];
     const moves = await Promise.all(members.map((member) => this.moveMember(member, this.waitingRoom)));
     const moved = moves.filter(Boolean).length;
+    await Promise.all([this.revokeMembers(room.first), this.revokeMembers(room.second)]);
     room.instanceId = null;
     room.bookedAt = null;
     logger.info(`Released ${roomName(room)} (moved ${moved} players back)`);
   }
 
-  // Discord has no bulk voice-move endpoint; each move is its own request, so we
-  // issue them all concurrently (a match is at most 6) instead of one at a time.
-  private async moveDiscordIds(discordIds: string[], channel: VoiceChannel): Promise<number> {
+  // Lets each player of the team see and join the (hidden) room, then moves the ones already in voice. Players
+  // not in voice keep the access and can join by themselves. Discord has no bulk voice-move endpoint; each move
+  // is its own request, so we issue them all concurrently (a match is at most 6) instead of one at a time.
+  private async admitAndMove(discordIds: string[], channel: VoiceChannel): Promise<number> {
     const moves = await Promise.all(
       discordIds.map(async (discordId) => {
         const member = await this.resolveMember(discordId);
         if (!member) {
           logger.debug(`No Discord member for id ${discordId}`);
           return false;
+        }
+        try {
+          await channel.permissionOverwrites.edit(member, { ViewChannel: true, Connect: true }, { reason: "Soloq match" });
+        } catch (error) {
+          logger.warn(`Failed to admit ${member.user.username} to ${channel.name}`, error);
         }
         return this.moveMember(member, channel);
       }),

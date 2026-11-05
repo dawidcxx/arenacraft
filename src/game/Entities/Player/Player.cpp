@@ -12536,6 +12536,24 @@ bool Player::InArena() const
   return true;
 }
 
+// arenacraft (anti-snipe): the zone other players see in /who, the friend list and the guild roster. Inside an
+// arena it is the zone the player entered from, so nobody can tell from the outside who is in an arena.
+uint32 Player::GetPublicZoneId() const
+{
+  if (!InArena())
+    return GetZoneId();
+
+  WorldLocation const& entry = GetEntryPoint();
+  if (entry.GetMapId() != MAPID_INVALID)
+    if (uint32 zone = sMapMgr->GetZoneId(PHASEMASK_NORMAL, entry))
+      return zone;
+
+  // no recorded entry point (e.g. logged in inside the arena): show the home zone
+  if (AreaTableEntry const* area = sAreaTableStore.LookupEntry(m_homebindAreaId))
+    return area->zone ? area->zone : area->ID;
+  return 0;
+}
+
 void Player::SetBattlegroundId(uint32 id, BattlegroundTypeId bgTypeId, uint32 queueSlot, bool invited, bool isRandom,
                                TeamId teamId)
 {

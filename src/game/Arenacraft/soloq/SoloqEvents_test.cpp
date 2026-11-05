@@ -6,6 +6,7 @@
 
 using arenacraft::soloq::buildMatchupEndedPayload;
 using arenacraft::soloq::buildMatchupPayload;
+using arenacraft::soloq::buildMatchupReadyPayload;
 using arenacraft::soloq::MatchupEndedEvent;
 using arenacraft::soloq::MatchupEndReason;
 using arenacraft::soloq::MatchupEvent;
@@ -157,4 +158,10 @@ TEST_CASE("buildMatchupEndedPayload reports team B as the winner")
   event.participants = source.participants;
 
   CHECK(buildMatchupEndedPayload(event).find("\"winner\":\"teamB\"") != std::string::npos);
+}
+
+TEST_CASE("buildMatchupReadyPayload names the arena instance and the ready time")
+{
+  CHECK(buildMatchupReadyPayload(77, 1700000060000ULL) ==
+        "{\"event\":\"soloq.matchup.ready\",\"instanceId\":77,\"readyAtMs\":1700000060000}");
 }

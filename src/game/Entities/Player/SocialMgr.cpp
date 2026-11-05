@@ -236,7 +236,7 @@ void SocialMgr::GetFriendInfo(Player* player, ObjectGuid friendGUID, FriendInfo&
       friendInfo.Status = FRIEND_STATUS_AFK;
     if (pFriend->isDND())
       friendInfo.Status = FRIEND_STATUS_DND;
-    friendInfo.Area  = pFriend->GetZoneId();
+    friendInfo.Area  = pFriend->GetPublicZoneId(); // arenacraft: never reveals an arena
     friendInfo.Level = pFriend->GetLevel();
     friendInfo.Class = pFriend->getClass();
   }

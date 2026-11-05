@@ -316,6 +316,25 @@ std::string buildMatchupPayload(MatchupEvent const& event)
   return out;
 }
 
+std::string buildMatchupReadyPayload(uint32_t bgInstanceId, uint64_t readyAtMs)
+{
+  std::string out;
+  out.reserve(96);
+  out += "{\"event\":\"";
+  out += MatchupReadyEventName;
+  out += "\",\"instanceId\":";
+  out += std::to_string(bgInstanceId);
+  out += ",\"readyAtMs\":";
+  out += std::to_string(readyAtMs);
+  out += "}";
+  return out;
+}
+
+bool publishMatchupReady(uint32_t bgInstanceId)
+{
+  return sRedisConn.publish(MatchupReadyChannel, buildMatchupReadyPayload(bgInstanceId, NowMs()));
+}
+
 bool publishMatchup(MatchupEvent const& event)
 {
   return sRedisConn.publish(MatchupChannel, buildMatchupPayload(event));

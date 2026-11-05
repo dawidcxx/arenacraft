@@ -534,7 +534,7 @@ void Guild::Member::SetStats(Player* player)
   m_level     = player->GetLevel();
   m_class     = player->getClass();
   m_gender    = player->getGender();
-  m_zoneId    = player->GetZoneId();
+  m_zoneId    = player->GetPublicZoneId(); // arenacraft: never reveals an arena
   m_accountId = player->GetSession()->GetAccountId();
 }
 

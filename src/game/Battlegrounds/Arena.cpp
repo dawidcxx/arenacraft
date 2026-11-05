@@ -27,6 +27,8 @@
 #include "ReplayPlayback.hpp"
 #include "ReplayRecorder.hpp"
 #include "ScriptMgr.h"
+#include "SoloqEvents.hpp"
+#include "SoloqService.hpp"
 #include "World.h"
 #include "WorldSession.h"
 // #include "WorldStatePackets.h"
@@ -236,6 +238,16 @@ bool Arena::PreUpdateImpl(uint32 diff)
       DecreaseInvitedCount(TEAM_ALLIANCE);
     }
     return true;
+  }
+
+  // Arenacraft: tell the Discord bot once every soloq player is inside, so it only then moves them into their
+  // team voice rooms (anti-snipe: a pop alone reveals nothing).
+  if (!m_RosterReadyAnnounced && GetStatus() == STATUS_WAIT_JOIN &&
+      GetPlayersCountByTeam(TEAM_ALLIANCE) >= GetArenaType() && GetPlayersCountByTeam(TEAM_HORDE) >= GetArenaType())
+  {
+    m_RosterReadyAnnounced = true;
+    if (arenacraft::soloq::SoloqService::instance().hasPendingMatch(GetInstanceID()))
+      arenacraft::soloq::publishMatchupReady(GetInstanceID());
   }
 
   if (!m_TeamsMarked)

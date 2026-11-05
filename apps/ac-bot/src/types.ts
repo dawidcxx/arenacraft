@@ -3,6 +3,8 @@ import { z } from "zod";
 // Mirrors the JSON published by the core (see src/game/Arenacraft/soloq/SoloqEvents.cpp).
 export const MATCHUP_CHANNEL = "soloq-matchup";
 export const MATCHUP_ENDED_CHANNEL = "soloq-matchup-ended";
+// Sent once all six players are inside the arena; voice rooms are only booked then (anti-snipe).
+export const MATCHUP_READY_CHANNEL = "soloq-matchup-ready";
 
 export const ParticipantSchema = z.object({
   guid: z.string(),
@@ -68,6 +70,13 @@ export const MatchupEndedEventSchema = z.object({
   players: z.array(ParticipantSchema),
 });
 
+export const MatchupReadyEventSchema = z.object({
+  event: z.literal("soloq.matchup.ready"),
+  instanceId: z.number(),
+  readyAtMs: z.number().int(),
+});
+
 export type Participant = z.infer<typeof ParticipantSchema>;
 export type MatchupEvent = z.infer<typeof MatchupEventSchema>;
 export type MatchupEndedEvent = z.infer<typeof MatchupEndedEventSchema>;
+export type MatchupReadyEvent = z.infer<typeof MatchupReadyEventSchema>;

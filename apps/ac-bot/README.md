@@ -11,9 +11,14 @@ Rewritten Arenacraft Discord bot. Six jobs:
    connected manually by an admin. Staff/GM accounts do not need a Discord
    owner.
 2. **Greeting** - `/ping` greets the caller publicly in the channel.
-3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
-   `soloq-matchup-ended` Redis events and moves players between the waiting room
-   and paired `game-<n>-<k>` voice channels.
+3. **Voice room shuffling** - subscribes to the core's `soloq-matchup`,
+   `soloq-matchup-ready` and `soloq-matchup-ended` Redis events and moves players
+   between the waiting room and paired `game-<n>-<k>` voice channels. Anti-snipe:
+   a pop (`soloq-matchup`) only remembers the two rosters; players are moved once
+   the core reports all six inside the arena (`soloq-matchup-ready`). The game
+   rooms are hidden from everyone: only the players of a match see and can join
+   their team's room while it lasts. The core and the bot have to be deployed
+   together for this.
 4. **Info commands** - `/toprankers` (soloQ leaderboard), `/onlinelist`
    (characters currently online), `/lookup <character>` (the Discord user
    behind a character name) and `/charlist <discord>` (characters owned by a
@@ -102,6 +107,11 @@ alias is set).
   server-muted outside the lobby.
 - `game-<n>-1` / `game-<n>-2` - one room per `<n>`. Team A goes to `-1`, team B
   to `-2`. Rooms are discovered dynamically and reused once released.
+- Game rooms are hidden: on startup the bot denies `View Channel` to everyone on
+  them (keeping its own access). When a match is ready each player gets a
+  per-member allow on their team's room (so players not in voice can still join
+  it by hand); releasing the room moves everyone back and removes those grants.
+  Leftover grants on empty rooms are cleared on startup.
 
 Players without voice are skipped, so a room may hold fewer than six. If the bot
 restarts, rooms that still contain members are treated as taken; a room held
@@ -112,7 +122,7 @@ longer than `STALE_ROOM_MINUTES` (default 60) is reclaimed.
 Test the voice flow without the core:
 
 ```bash
-# full cycle (publish matchup, wait, publish ended)
+# full cycle (publish matchup, wait, ready, wait, ended)
 bun run scripts/emit-fake-event.ts --channel both --instance 42 \
   --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK
 
@@ -122,8 +132,11 @@ bun run scripts/emit-fake-event.ts --channel both --instance 42 \
   --team-a-ids 111111111111111111,222222222222222222,333333333333333333 \
   --team-b-ids 444444444444444444,555555555555555555,666666666666666666
 
-# just a matchup
+# just a matchup (nobody is moved yet)
 bun run scripts/emit-fake-event.ts --channel matchup --instance 42
+
+# everyone is in the arena: book the rooms
+bun run scripts/emit-fake-event.ts --channel ready --instance 42
 
 # just an end (test crash recovery / unknown instance)
 bun run scripts/emit-fake-event.ts --channel ended --instance 42
