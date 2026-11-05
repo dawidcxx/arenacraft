@@ -38,10 +38,11 @@ Needs `nix`, `podman` (or docker), and a 3.3.5a client.
 Pushes to `local` build and publish:
 
 ```text
-ghcr.io/dawidcxx/arenacraft:latest
+ghcr.io/dawidcxx/arenacraft:local
 ```
 
-Only the current `latest` version is retained; older untagged GHCR versions are
+`local` is the application built from the `local` branch. Only the current
+`local` version is retained; older untagged GHCR versions are
 pruned after each publish. The package must be public for unauthenticated pulls,
 and pruning requires the repo to have Admin access to the package. PRs use the
 Nix CI shell (`nix develop .#ci`) to run the compile-only check and never build
