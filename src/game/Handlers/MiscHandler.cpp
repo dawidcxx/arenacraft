@@ -514,6 +514,17 @@ void WorldSession::HandleLogoutCancelOpcode(WorldPackets::Character::LogoutCance
 
 void WorldSession::HandleTogglePvP(WorldPacket& recv_data)
 {
+  // Arenacraft: PvP can't be switched on in the arena hub (see ARENACRAFT_HUB_AREA)
+  if (GetPlayer()->GetAreaId() == ARENACRAFT_HUB_AREA)
+  {
+    recv_data.rfinish();
+    GetPlayer()->RemovePlayerFlag(PLAYER_FLAGS_IN_PVP);
+    if (GetPlayer()->IsPvP())
+      GetPlayer()->UpdatePvP(false, true);
+    ChatHandler(this).SendNotification("You can't enable PvP in the arena hub.");
+    return;
+  }
+
   // this opcode can be used in two ways: Either set explicit new status or toggle old status
   if (recv_data.size() == 1)
   {

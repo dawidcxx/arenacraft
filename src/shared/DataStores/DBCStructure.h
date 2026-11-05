@@ -523,6 +523,11 @@ struct AchievementCriteriaEntry
   // uint32 showOrder;                                     // 30 show order
 };
 
+// Arenacraft: the area of the arena hub (vendors, soloq NPC): Midrealm Post, in Netherstorm. A sanctuary where PvP
+// can't be enabled (AreaTableEntry::IsSanctuary, Player::UpdateZone, WorldSession::HandleTogglePvP); the rest of
+// Netherstorm is unchanged.
+inline constexpr uint32 ARENACRAFT_HUB_AREA = 3851;
+
 struct AreaTableEntry
 {
   uint32 ID;          // 0
@@ -541,6 +546,11 @@ struct AreaTableEntry
   [[nodiscard]] bool IsSanctuary() const
   {
     if (ID == 395)
+      return true;
+    // Arenacraft: the arena hub (Midrealm Post) is in Netherstorm, a contested zone - on a PvP realm, or with /pvp on,
+    // the factions could fight there. The hub area is a sanctuary like Shattrath: no PvP between players, duels still
+    // allowed (they depend on AREA_FLAG_ALLOW_DUELS, not on this).
+    if (ID == ARENACRAFT_HUB_AREA || zone == ARENACRAFT_HUB_AREA)
       return true;
     if (mapid == 609)
       return true;
@@ -1405,10 +1415,7 @@ struct MapEntry
   [[nodiscard]] bool IsBattleground() const { return map_type == MAP_BATTLEGROUND; }
   [[nodiscard]] bool IsBattleArena() const { return map_type == MAP_ARENA; }
   [[nodiscard]] bool IsBattlegroundOrArena() const { return map_type == MAP_BATTLEGROUND || map_type == MAP_ARENA; }
-  [[nodiscard]] bool IsArenacraftWhitelistedMap() const
-  {
-    return map_type == MAP_ARENA || MapID == 530;
-  }
+  [[nodiscard]] bool IsArenacraftWhitelistedMap() const { return map_type == MAP_ARENA || MapID == 530; }
   [[nodiscard]] bool IsWorldMap() const { return map_type == MAP_COMMON; }
 
   bool GetEntrancePos(int32& mapid, float& x, float& y) const
