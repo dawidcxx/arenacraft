@@ -42,6 +42,7 @@ std::vector<uint32> const& AllGeneralGoods()
       5565,  // Infernal Stone
       21177, // Symbol of Kings
       34722, // Heavy Frostweave Bandage
+      5976,  // Guild Tabard
   };
   return items;
 }

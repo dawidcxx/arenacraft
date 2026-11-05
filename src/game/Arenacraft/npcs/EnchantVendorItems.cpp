@@ -11,8 +11,9 @@
 // those guides recommend are listed; vanilla/BC-era filler, strictly-dominated
 // budget duplicates and everything that needs a profession to apply (the server
 // has none) is dropped. A few applied items are added by hand (they are used
-// directly, so no profession is needed): the Titanium Weapon Chain, the Scroll
-// of Enchant Weapon - Executioner, Titanium Plating and the two ranged scopes.
+// directly, so no profession is needed): the Titanium Weapon Chain, the Scrolls
+// of Enchant Weapon - Executioner and Blade Ward, Titanium Plating and the two
+// ranged scopes.
 // Head/shoulder/leg entries are the applied Arcanum/Inscription/Spellthread/Leg
 // Armor items; the waist and weapon sections also hold the applied Eternal Belt
 // Buckle and Titanium Weapon Chain; the rest are "Scroll of Enchant ..."
@@ -130,6 +131,7 @@ std::vector<EnchantSlot> const& EnchantsBySlot()
            38925, // Scroll of Enchant Weapon - Mongoose
            38948, // Scroll of Enchant Weapon - Executioner
            46098, // Scroll of Enchant Weapon - Blood Draining
+           46026, // Scroll of Enchant Weapon - Blade Ward
            38918, // Scroll of Enchant Weapon - Major Intellect
            38963, // Scroll of Enchant Weapon - Exceptional Spirit
            41976, // Titanium Weapon Chain
