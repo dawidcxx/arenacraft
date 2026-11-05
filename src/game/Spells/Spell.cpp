@@ -1338,7 +1338,22 @@ void Spell::SelectImplicitAreaTargets(SpellEffIndex effIndex, SpellImplicitTarge
         if ((*j)->IsAffectedOnSpell(m_spellInfo))
           maxTargets += (*j)->GetAmount();
 
-      Acore::Containers::RandomResize(targets, maxTargets);
+      // Arenacraft: a hunter trap catches the enemy who set it off. Its effect (Freezing Trap, Freezing Arrow, ...) is
+      // cast by the trap's trigger as an area spell limited to one target, so a random pick among the enemies in the
+      // radius could freeze whoever stood next to it (a healer behind the melee that stepped in). GameObject::CastSpell
+      // puts the triggering unit in the trigger's target field.
+      Unit* trapVictim = nullptr;
+      if (m_caster->IsCreature() && m_caster->GetEntry() == WORLD_TRIGGER && m_caster->GetOwnerGUID().IsPlayer())
+        trapVictim = ObjectAccessor::GetUnit(*m_caster, m_caster->GetGuidValue(UNIT_FIELD_TARGET));
+      auto const victim = trapVictim ? std::find(targets.begin(), targets.end(), trapVictim) : targets.end();
+      if (victim != targets.end())
+      {
+        targets.erase(victim);
+        Acore::Containers::RandomResize(targets, maxTargets - 1);
+        targets.push_front(trapVictim);
+      }
+      else
+        Acore::Containers::RandomResize(targets, maxTargets);
     }
 
     for (std::list<WorldObject*>::iterator itr = targets.begin(); itr != targets.end(); ++itr)
@@ -2827,8 +2842,7 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
   // window and pull a melded night elf right back out.
   if (getState() == SPELL_STATE_DELAYED && !m_spellInfo->IsTargetingArea() && !m_spellInfo->IsPositive() &&
       (GameTime::GetGameTimeMS().count() - target->timeDelay) <= effectUnit->m_lastSanctuaryTime &&
-      (GameTime::GetGameTimeMS().count() < (effectUnit->m_lastSanctuaryTime + 500) ||
-       effectUnit->HasStealthAura()) &&
+      (GameTime::GetGameTimeMS().count() < (effectUnit->m_lastSanctuaryTime + 500) || effectUnit->HasStealthAura()) &&
       effectUnit->FindMap() && !effectUnit->FindMap()->IsDungeon())
     return; // No missinfo in that case
 

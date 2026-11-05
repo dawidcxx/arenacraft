@@ -2171,7 +2171,11 @@ void GameObject::CastSpell(Unit* target, uint32 spellId)
     trigger->SetImmuneToNPC(false);
     // xinef: set proper orientation, fixes cast against stealthed targets
     if (target)
+    {
       trigger->SetInFront(target);
+      // arenacraft: remember who set the trap off, the trap's effect goes to them (Spell::SelectImplicitAreaTargets)
+      trigger->SetGuidValue(UNIT_FIELD_TARGET, target->GetGUID());
+    }
     trigger->CastSpell(target ? target : trigger, spellInfo, true, 0, 0, owner->GetGUID());
   }
   else
