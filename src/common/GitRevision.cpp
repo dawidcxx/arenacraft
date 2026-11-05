@@ -17,6 +17,7 @@
 
 #include "GitRevision.h"
 #include "revision.h"
+#include <string>
 
 char const* GitRevision::GetHash() { return _HASH; }
 
@@ -54,5 +55,22 @@ char const* GitRevision::GetMySQLExecutable() { return _MYSQL_EXECUTABLE; }
 
 char const* GitRevision::GetFullVersion()
 {
-  return "Arenacraft v0";
+  static std::string const version = []
+  {
+    std::string hash = _HASH;
+    if (hash.empty() || hash == "Unknown")
+      return std::string("Arenacraft (unknown revision)");
+
+    if (hash.size() > 12)
+      hash.resize(12);
+
+    std::string       result = "Arenacraft " + hash;
+    std::string const branch = _BRANCH;
+    if (!branch.empty() && branch != "HEAD")
+      result += " (" + branch + ")";
+
+    return result;
+  }();
+
+  return version.c_str();
 }

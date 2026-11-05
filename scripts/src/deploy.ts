@@ -56,6 +56,14 @@ async function capture(label: string, run: () => Promise<string>): Promise<strin
   }
 }
 
+async function gitValue(args: string[], fallback: string): Promise<string> {
+  try {
+    return (await $`git -C ${repoRoot} ${args}`.text()).trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function hostArch(): string {
   switch (process.arch) {
     case "x64":
@@ -110,10 +118,23 @@ const mounts = engine === "podman" ? await qemuMounts() : [];
 const saveArgs = engine === "podman" ? ["--format", "docker-archive"] : [];
 const remoteLoad = `gunzip | ${remoteEngine} load`;
 
+const gitCommit = await gitValue(["rev-parse", "HEAD"], "unknown");
+const gitBranch = await gitValue(["rev-parse", "--abbrev-ref", "HEAD"], "unknown");
+const gitDate = await gitValue(["show", "-s", "--format=%cI", "HEAD"], "unknown");
+const buildArgs = [
+  "--build-arg",
+  `GIT_COMMIT=${gitCommit}`,
+  "--build-arg",
+  `GIT_BRANCH=${gitBranch}`,
+  "--build-arg",
+  `GIT_DATE=${gitDate}`,
+];
+
 const note = crossArch ? " (emulated; first run is slow)" : "";
 console.log(`building ${image} for ${platform} with ${engine}${note}`);
+console.log(`revision ${gitCommit.slice(0, 12)} (${gitBranch})`);
 await shell(`${engine} build`, () =>
-  $`${engine} build --platform ${platform} ${mounts} -f ${dockerfile} -t ${image} ${repoRoot}`,
+  $`${engine} build --platform ${platform} ${mounts} ${buildArgs} -f ${dockerfile} -t ${image} ${repoRoot}`,
 );
 
 const arch = await capture(`${engine} image inspect`, () =>

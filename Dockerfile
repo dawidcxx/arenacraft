@@ -21,8 +21,15 @@ ARG ZIG_VERSION=0.16.0
 # --- builder ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS builder
 ARG ZIG_VERSION
+# passed by scripts/deploy (the Docker build context does not include .git)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG GIT_DATE=unknown
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+ENV GIT_DATE=${GIT_DATE}
 
 # gcc is only here so zig can introspect the host libc: when link_libc is set
 # and a native C compiler is present, zig uses the system libc (/usr/include
@@ -72,6 +79,9 @@ RUN --mount=type=cache,id=arenacraft-zig-cache,target=/app/.zig-cache \
 
 # --- runtime ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS runtime
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG GIT_DATE=unknown
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -88,3 +98,4 @@ COPY data/sql/updates /app/sql/updates
 ENV AC_SQL_DIR=/app/sql
 
 WORKDIR /app
+RUN printf 'commit=%s\nbranch=%s\ndate=%s\n' "${GIT_COMMIT}" "${GIT_BRANCH}" "${GIT_DATE}" > /app/server-info

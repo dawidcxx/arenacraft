@@ -42,7 +42,9 @@ scripts/restart_world   # restart the world service there + prune old images
 ```
 
 The runtime image carries only `data/sql/updates`; base seeding stays a
-one-time development operation.
+one-time development operation. Deployments without a separate migration step
+can set `AC_DB_UPDATE_ON_STARTUP=1` so `worldserver` applies pending updates
+before opening its DB pools.
 
 `scripts/deploy` only builds and ships the image (as `arenacraft:local`); the
 running systemd-managed containers pick it up on their next restart, which
@@ -56,6 +58,11 @@ build uses binfmt/qemu emulation, slow the first time but cached.
 
 Only the final multi-stage runtime image is transferred; zig's caches live in
 `--mount=type=cache` mounts and never ship. The image lands as `arenacraft:local`.
+
+The source revision is baked into the binary at build time: `ac worldserver
+--version`, the startup banner and the in-game `.server info` command all show
+the commit. The image also carries `/app/server-info` with the full commit,
+branch and commit date for quick deployment checks.
 
 On NixOS a binfmt entry without the `F` flag cannot see its interpreter inside a
 container - the script detects this and bind-mounts `/run/binfmt` and `/nix/store`

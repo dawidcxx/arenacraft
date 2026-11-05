@@ -31,8 +31,8 @@
 #include "CrashHandler.h"
 #include "DatabaseEnv.h"
 #include "DatabaseLoader.h"
+#include "DatabaseUpdater.h"
 #include "DeadlineTimer.h"
-#include "GitRevision.h"
 #include "GitRevision.h"
 #include "IoContext.h"
 #include "MapMgr.h"
@@ -50,8 +50,8 @@
 #include "World.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
-#include <boost/asio/signal_set.hpp>
 #include <argparse/argparse.hpp>
+#include <boost/asio/signal_set.hpp>
 #include <csignal>
 #include <filesystem>
 #include <iostream>
@@ -112,9 +112,9 @@ void           ShutdownCLIThread(std::thread* cliThread);
 void           WorldUpdateLoop();
 struct ConsoleArguments
 {
-    bool help = false;
-    bool version = false;
-    std::string envFile;
+  bool        help    = false;
+  bool        version = false;
+  std::string envFile;
 };
 
 static ConsoleArguments GetConsoleArguments(int argc, char** argv);
@@ -126,7 +126,7 @@ int worldserver_main(int argc, char** argv)
   signal(SIGABRT, &Acore::AbortHandler);
 
   // Command line parsing
-  auto        args       = GetConsoleArguments(argc, argv);
+  auto args = GetConsoleArguments(argc, argv);
 
   // exit if help or version is enabled
   if (args.help)
@@ -455,11 +455,57 @@ int worldserver_main(int argc, char** argv)
   return World::GetExitCode();
 }
 
+static bool RunStartupDatabaseUpdates()
+{
+  std::string sqlDir = sConfigMgr->GetOption<std::string>("SqlDir", "");
+  if (sqlDir.empty())
+    sqlDir = sConfigMgr->GetDataPath() + "/sql";
+
+  fs::path const updatesRoot = fs::path(sqlDir) / "updates";
+  if (!fs::is_directory(updatesRoot))
+  {
+    LOG_ERROR("server.worldserver", "db-update: updates directory not found: {}", updatesRoot.string());
+    return false;
+  }
+
+  bool success = true;
+  for (Acore::Database::DatabaseUpdateTarget const& target : Acore::Database::GetDatabaseUpdateTargets())
+  {
+    std::string const connectionInfo = sConfigMgr->GetOption<std::string>(std::string(target.configKey), "");
+    if (connectionInfo.empty())
+    {
+      LOG_ERROR("server.worldserver", "db-update: {} is not set", target.configKey);
+      success = false;
+      continue;
+    }
+
+    fs::path const updateDirectory = updatesRoot / std::filesystem::path(target.sqlDirectory);
+    if (!fs::is_directory(updateDirectory))
+    {
+      LOG_ERROR("server.worldserver", "db-update: updates directory not found: {}", updateDirectory.string());
+      success = false;
+      continue;
+    }
+
+    Acore::Database::DatabaseUpdateResult result;
+    if (!Acore::Database::ApplyDatabaseUpdates(target.name, connectionInfo, updateDirectory, false, result))
+    {
+      success = false;
+      continue;
+    }
+
+    LOG_INFO("server.loading", "[{}] db-update: {} applied, {} already recorded", target.name, result.applied,
+             result.skipped);
+  }
+
+  return success;
+}
+
 /// Initialize connection to the databases
 static bool StartDB()
 {
   // database connectivity comes from the environment only - no config files
-  for (char const* name : { "AC_LOGIN_DATABASE_INFO", "AC_CHARACTER_DATABASE_INFO", "AC_WORLD_DATABASE_INFO" })
+  for (char const* name : {"AC_LOGIN_DATABASE_INFO", "AC_CHARACTER_DATABASE_INFO", "AC_WORLD_DATABASE_INFO"})
   {
     char const* value = std::getenv(name);
     if (!value || !*value)
@@ -474,6 +520,9 @@ static bool StartDB()
   }
 
   MySQL::Library_Init();
+
+  if (sConfigMgr->GetOption<bool>("DbUpdate.OnStartup", false) && !RunStartupDatabaseUpdates())
+    return false;
 
   // Load databases
   DatabaseLoader loader("server.worldserver", DatabaseLoader::DATABASE_NONE);
@@ -817,7 +866,7 @@ static ConsoleArguments GetConsoleArguments(int argc, char** argv)
     parser.parse_args(known);
 
     out.envFile = parser.get<std::string>("--env-file");
-    out.help = parser.get<bool>("--help");
+    out.help    = parser.get<bool>("--help");
     out.version = parser.get<bool>("--version");
 
     if (parser.get<bool>("--dry-run"))

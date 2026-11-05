@@ -21,11 +21,21 @@
 
 #include "Define.h"
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
 
 namespace Acore::Database
 {
+struct DatabaseUpdateTarget
+{
+  std::string_view name;
+  std::string_view configKey;
+  std::string_view sqlDirectory;
+};
+
+[[nodiscard]] std::span<DatabaseUpdateTarget const> GetDatabaseUpdateTargets();
+
 struct DatabaseUpdateResult
 {
   uint32 applied        = 0;

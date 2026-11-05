@@ -12,6 +12,52 @@ const AcGraph = @import("./BuildCommons.zig").AcGraph;
 const BuildRequest = @import("./BuildCommons.zig").BuildRequest;
 const BuildCommons = @import("./BuildCommons.zig");
 
+const unknown_revision = "Unknown";
+
+fn runGit(b: *Build, args: []const []const u8) ?[]const u8 {
+    const root = b.pathFromRoot(".");
+
+    var argv: std.ArrayListUnmanaged([]const u8) = .empty;
+    defer argv.deinit(b.allocator);
+    argv.appendSlice(b.allocator, &.{ "git", "-C", root }) catch @panic("OOM");
+    argv.appendSlice(b.allocator, args) catch @panic("OOM");
+
+    const result = std.process.run(b.allocator, b.graph.io, .{
+        .argv = argv.items,
+        .cwd = .{ .path = root },
+        .environ_map = &b.graph.environ_map,
+        .stdout_limit = .limited(64 * 1024),
+        .stderr_limit = .limited(64 * 1024),
+    }) catch return null;
+    defer b.allocator.free(result.stdout);
+    defer b.allocator.free(result.stderr);
+
+    const exit_code = switch (result.term) {
+        .exited => |code| code,
+        else => return null,
+    };
+    if (exit_code != 0) return null;
+
+    const trimmed = std.mem.trim(u8, result.stdout, " \t\r\n");
+    if (trimmed.len == 0) return null;
+    return b.dupe(trimmed);
+}
+
+/// Reads a revision value from the build environment first (Docker passes the
+/// commit in through build args, where .git is not part of the context), then
+/// falls back to git in the source checkout. Missing or broken values become
+/// "Unknown" rather than failing the build.
+fn revisionValue(b: *Build, env_names: []const []const u8, git_args: []const []const u8) []const u8 {
+    for (env_names) |name| {
+        if (b.graph.environ_map.get(name)) |value| {
+            const trimmed = std.mem.trim(u8, value, " \t\r\n");
+            if (trimmed.len != 0) return b.dupe(trimmed);
+        }
+    }
+
+    return runGit(b, git_args) orelse unknown_revision;
+}
+
 pub const Src = struct {
     pub const core_cflags = [_][]const u8{
         "-std=c++23",
@@ -156,13 +202,15 @@ pub const Src = struct {
         // the CMake CollectIncludeDirectories behavior
         try cpp.addFlatIncludes(b, "src/common", module);
 
-        // placeholder revision data, mirrors the old zig build; real values
-        // need a git describe run step
+        const git_hash = revisionValue(b, &.{ "GIT_COMMIT", "ARENACRAFT_GIT_COMMIT" }, &.{ "rev-parse", "HEAD" });
+        const git_branch = revisionValue(b, &.{ "GIT_BRANCH", "ARENACRAFT_GIT_BRANCH" }, &.{ "rev-parse", "--abbrev-ref", "HEAD" });
+        const git_date = revisionValue(b, &.{ "GIT_DATE", "ARENACRAFT_GIT_DATE" }, &.{ "show", "-s", "--format=%cI", "HEAD" });
+
         const revision_header = std.Build.Step.ConfigHeader.create(b, .{});
         revision_header.include_path = "revision.h";
-        revision_header.addValue("_HASH", []const u8, "");
-        revision_header.addValue("_DATE", []const u8, "");
-        revision_header.addValue("_BRANCH", []const u8, "");
+        revision_header.addValue("_HASH", []const u8, git_hash);
+        revision_header.addValue("_DATE", []const u8, git_date);
+        revision_header.addValue("_BRANCH", []const u8, git_branch);
         revision_header.addValue("_CMAKE_COMMAND", []const u8, "zig build");
         revision_header.addValue("_CMAKE_VERSION", []const u8, "0.16.0");
         revision_header.addValue("_CMAKE_HOST_SYSTEM", []const u8, "nix");

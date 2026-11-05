@@ -15,23 +15,11 @@
 #include <fmt/format.h>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
 {
-struct Target
-{
-  char const* name;
-  char const* configKey;
-  char const* sqlDirectory;
-};
-
-Target const TARGETS[] = {
-    {"auth", "LoginDatabaseInfo", "db_auth"},
-    {"characters", "CharacterDatabaseInfo", "db_characters"},
-    {"world", "WorldDatabaseInfo", "db_world"},
-};
-
 std::vector<std::string> ParseDatabaseList(std::string const& value, bool& valid)
 {
   std::vector<std::string> result;
@@ -53,8 +41,8 @@ std::vector<std::string> ParseDatabaseList(std::string const& value, bool& valid
     if (!token.empty())
     {
       bool known = false;
-      for (Target const& target : TARGETS)
-        known = known || token == target.name;
+      for (Acore::Database::DatabaseUpdateTarget const& target : Acore::Database::GetDatabaseUpdateTargets())
+        known = known || std::string_view(token) == target.name;
 
       if (!known)
       {
@@ -145,17 +133,17 @@ int db_update_main(int argc, char** argv)
   bool success = true;
   for (std::string const& name : selected)
   {
-    Target const* target = nullptr;
-    for (Target const& candidate : TARGETS)
+    Acore::Database::DatabaseUpdateTarget const* target = nullptr;
+    for (Acore::Database::DatabaseUpdateTarget const& candidate : Acore::Database::GetDatabaseUpdateTargets())
     {
-      if (name == candidate.name)
+      if (std::string_view(name) == candidate.name)
       {
         target = &candidate;
         break;
       }
     }
 
-    std::filesystem::path const updateDirectory = updatesRoot / target->sqlDirectory;
+    std::filesystem::path const updateDirectory = updatesRoot / std::filesystem::path(target->sqlDirectory);
     if (!std::filesystem::is_directory(updateDirectory))
     {
       fmt::print(stderr, "[{}] updates directory not found: {}\n", target->name, updateDirectory.string());
@@ -163,7 +151,7 @@ int db_update_main(int argc, char** argv)
       continue;
     }
 
-    std::string const connectionInfo = sConfigMgr->GetOption<std::string>(target->configKey, "");
+    std::string const connectionInfo = sConfigMgr->GetOption<std::string>(std::string(target->configKey), "");
     if (connectionInfo.empty())
     {
       fmt::print(stderr, "[{}] {} is not set\n", target->name, target->configKey);

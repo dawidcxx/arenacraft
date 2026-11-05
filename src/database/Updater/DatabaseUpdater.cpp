@@ -116,6 +116,17 @@ std::vector<std::filesystem::path> ListSqlFiles(std::filesystem::path const& dir
 
 namespace Acore::Database
 {
+namespace
+{
+constexpr DatabaseUpdateTarget DATABASE_UPDATE_TARGETS[] = {
+    {"auth", "LoginDatabaseInfo", "db_auth"},
+    {"characters", "CharacterDatabaseInfo", "db_characters"},
+    {"world", "WorldDatabaseInfo", "db_world"},
+};
+} // namespace
+
+std::span<DatabaseUpdateTarget const> GetDatabaseUpdateTargets() { return DATABASE_UPDATE_TARGETS; }
+
 bool ApplyDatabaseUpdates(std::string_view label, std::string_view connectionInfo,
                           std::filesystem::path const& updateDirectory, bool dryRun, DatabaseUpdateResult& result)
 {
