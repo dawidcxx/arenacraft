@@ -1,0 +1,65 @@
+# Build and publish the public SoloQ ladder API image (apps/api) to GHCR.
+# The core runtime image lives in image.yml; PR compile checks live in check.yml.
+name: api-image
+
+on:
+  push:
+    branches: [local]
+    paths:
+      - 'apps/api/**'
+      - '.github/workflows/api-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: api-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/dawidcxx/arenacraft-api
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v4
+        id: buildx
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/local'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: apps/api
+          file: apps/api/Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.ref == 'refs/heads/local' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+          provenance: false

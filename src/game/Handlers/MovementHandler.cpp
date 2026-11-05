@@ -156,6 +156,11 @@ void WorldSession::HandleMoveWorldportAck()
     }
   }
 
+  // Arenacraft: a camera left on an object of the old map (a replay's recorded player, see Playback::view) would
+  // keep PLAYER_FARSIGHT set and make every later Bind Sight / Far Sight fail to apply
+  if (_player->GetGuidValue(PLAYER_FARSIGHT) && !_player->GetViewpoint())
+    _player->SetGuidValue(PLAYER_FARSIGHT, ObjectGuid::Empty);
+
   // pussywizard: arena spectator stuff
   {
     if (newMap->IsBattleArena() && ((BattlegroundMap*)newMap)->GetBG() &&

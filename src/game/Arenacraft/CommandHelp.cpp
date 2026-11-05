@@ -28,6 +28,7 @@ std::map<std::string, std::string, std::less<>> const Descriptions = {
     {"replay watch", ".replay watch <id>: same as .replay <id>"},
     {"replay list", ".replay list [name]: newest recordings, or only those of a character"},
     {"replay leave", "stop watching a replay"},
+    {"replay view", ".replay view [name]: watch the replay through a player's eyes; no name = your own camera"},
     {"spect", "arena spectator commands"},
     {"spect spectate", ".spect spectate <name>: watch a live arena a player is in"},
     {"spect watch", ".spect watch <name>: follow another player of the arena you spectate"},
