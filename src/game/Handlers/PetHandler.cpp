@@ -26,6 +26,7 @@
 #include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "Pet.h"
+#include "PetAutocast.hpp"
 #include "PetPackets.h"
 #include "Player.h"
 #include "Spell.h"
@@ -1016,7 +1017,13 @@ void WorldSession::HandlePetSpellAutocastOpcode(WorldPackets::Pet::PetSpellAutoc
     if (Pet* summon = pet->ToPet())
       summon->ToggleAutocast(spellInfo, packet.AutocastEnabled);
     else
+    {
       charmInfo->ToggleCreatureAutocast(spellInfo, packet.AutocastEnabled);
+      // Arenacraft: guardians are summoned fresh every time; remember the choice for the next summon
+      if (pet->GetOwnerGUID() == _player->GetGUID())
+        arenacraft::petautocast::Remember(_player->GetGUID().GetCounter(), pet->GetEntry(), packet.SpellID,
+                                          packet.AutocastEnabled);
+    }
 
     charmInfo->SetSpellAutocast(spellInfo, packet.AutocastEnabled);
   }
