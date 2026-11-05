@@ -53,8 +53,9 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE }}
+          # `local` = the application built from the `local` branch (the one that runs on the server)
           tags: |
-            type=raw,value=latest
+            type=raw,value=local
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
