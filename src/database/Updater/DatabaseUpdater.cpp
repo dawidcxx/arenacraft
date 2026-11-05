@@ -103,6 +103,15 @@ std::string QuoteIdentifier(std::string_view value)
   return quoted;
 }
 
+bool RecordUpdate(MySQLConnection& connection, std::string const& quotedUpdatesTable, std::string const& file,
+                  std::string const& hash, uint32 speed)
+{
+  std::string const insert =
+      fmt::format("INSERT INTO {} (`name`, `hash`, `state`, `speed`) VALUES ('{}', '{}', 'RELEASED', {})",
+                  quotedUpdatesTable, EscapeString(connection, file), EscapeString(connection, hash), speed);
+  return connection.Execute(insert);
+}
+
 std::vector<std::filesystem::path> ListSqlFiles(std::filesystem::path const& directory)
 {
   std::vector<std::filesystem::path> files;
@@ -132,16 +141,17 @@ namespace Acore::Database
 namespace
 {
 constexpr DatabaseUpdateTarget DATABASE_UPDATE_TARGETS[] = {
-    {"auth", "LoginDatabaseInfo", "db_auth"},
-    {"characters", "CharacterDatabaseInfo", "db_characters"},
-    {"world", "WorldDatabaseInfo", "db_world"},
+    {"auth", "LoginDatabaseInfo", "db_auth", "account"},
+    {"characters", "CharacterDatabaseInfo", "db_characters", "characters"},
+    {"world", "WorldDatabaseInfo", "db_world", "creature_template"},
 };
 } // namespace
 
 std::span<DatabaseUpdateTarget const> GetDatabaseUpdateTargets() { return DATABASE_UPDATE_TARGETS; }
 
-bool ApplyDatabaseUpdates(std::string_view label, std::string_view connectionInfo,
-                          std::filesystem::path const& updateDirectory, bool dryRun, DatabaseUpdateResult& result)
+bool ApplyDatabaseUpdates(std::string_view label, std::string_view schemaMarkerTable, std::string_view connectionInfo,
+                          std::filesystem::path const& updateDirectory, bool dryRun, bool baselineOnEmpty,
+                          DatabaseUpdateResult& result)
 {
   MySQLConnectionInfo info(connectionInfo);
   if (info.database.empty())
@@ -190,22 +200,71 @@ bool ApplyDatabaseUpdates(std::string_view label, std::string_view connectionInf
 
     uint64 const appliedCount = count->Fetch()[0].Get<uint64>();
 
-    if (appliedCount > 0)
+    if (appliedCount == 0)
     {
-      std::unique_ptr<ResultSet> rows(
-          connection.Query(fmt::format("SELECT `name`, `hash`, `state` FROM {}", quotedUpdatesTable)));
-      if (!rows)
+      if (!baselineOnEmpty)
       {
-        fmt::print(stderr, "[{}] could not read the updates table: {}\n", label, connection.GetLastErrorString());
+        fmt::print(stderr,
+                   "[{}] updates table is empty; refusing to replay the full migration history. "
+                   "Use --baseline (or AC_DB_UPDATE_BASELINE_ON_EMPTY=1) if the schema is already current.\n",
+                   label);
         return false;
       }
 
-      while (rows->NextRow())
+      if (!schemaMarkerTable.empty())
       {
-        Field* fields = rows->Fetch();
-        applied.emplace(fields[0].Get<std::string>(),
-                        AppliedUpdate{fields[1].Get<std::string>(), fields[2].Get<std::string>()});
+        std::unique_ptr<ResultSet> marker(connection.Query(fmt::format("SHOW TABLES LIKE '{}'", schemaMarkerTable)));
+        if (!marker || !marker->NextRow())
+        {
+          fmt::print(stderr, "[{}] refusing to baseline: schema marker table '{}' does not exist\n", label,
+                     schemaMarkerTable);
+          return false;
+        }
       }
+
+      for (std::filesystem::path const& path : ListSqlFiles(updateDirectory))
+      {
+        std::string contents;
+        if (!ReadFile(path, contents))
+        {
+          fmt::print(stderr, "[{}] failed to read {}\n", label, path.string());
+          return false;
+        }
+
+        std::string const file = path.filename().string();
+        if (dryRun)
+        {
+          fmt::print("[{}] would baseline {} [dry run]\n", label, file);
+          ++result.baselined;
+          continue;
+        }
+
+        if (!RecordUpdate(connection, quotedUpdatesTable, file, Sha1Hex(contents), 0))
+        {
+          fmt::print(stderr, "[{}] failed to baseline {} in the updates table\n", label, file);
+          return false;
+        }
+
+        ++result.baselined;
+        fmt::print("[{}] baselined {}\n", label, file);
+      }
+
+      return true;
+    }
+
+    std::unique_ptr<ResultSet> rows(
+        connection.Query(fmt::format("SELECT `name`, `hash`, `state` FROM {}", quotedUpdatesTable)));
+    if (!rows)
+    {
+      fmt::print(stderr, "[{}] could not read the updates table: {}\n", label, connection.GetLastErrorString());
+      return false;
+    }
+
+    while (rows->NextRow())
+    {
+      Field* fields = rows->Fetch();
+      applied.emplace(fields[0].Get<std::string>(),
+                      AppliedUpdate{fields[1].Get<std::string>(), fields[2].Get<std::string>()});
     }
   }
 
@@ -263,11 +322,8 @@ bool ApplyDatabaseUpdates(std::string_view label, std::string_view connectionInf
 
     uint32 const      speed = getMSTimeDiff(start, getMSTime());
     std::string const hash  = Sha1Hex(contents);
-    std::string const insert =
-        fmt::format("INSERT INTO `updates` (`name`, `hash`, `state`, `speed`) VALUES ('{}', '{}', 'RELEASED', {})",
-                    EscapeString(connection, file), EscapeString(connection, hash), speed);
 
-    if (!connection.Execute(insert))
+    if (!RecordUpdate(connection, quotedUpdatesTable, file, hash, speed))
     {
       fmt::print(stderr, "[{}] failed to record {} in the updates table\n", label, file);
       return false;

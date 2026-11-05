@@ -74,6 +74,11 @@ patch the code path instead when the rule is ours.
   `/app/sql/updates` (`AC_SQL_DIR=/app/sql`).
 - `AC_DB_UPDATE_ON_STARTUP=1` makes `worldserver` apply pending updates before
   opening its DB pools (opt-in; the DB user needs DDL privileges).
+- An empty `updates` table is refused by default. For a schema restored without
+  update tracking, baseline once with `ac db-update --baseline` or
+  `AC_DB_UPDATE_BASELINE_ON_EMPTY=1`; this records the files without executing
+  them. The schema marker table (`account`, `characters`, `creature_template`)
+  must exist, so a genuinely unseeded DB is still rejected.
 - No rollbacks; the AC in-core updater was replaced by our native
   `src/database/Updater` implementation.
 - Schema = squashed base in `data/sql/base/db_{auth,characters,world}`.

@@ -44,7 +44,9 @@ scripts/restart_world   # restart the world service there + prune old images
 The runtime image carries only `data/sql/updates`; base seeding stays a
 one-time development operation. Deployments without a separate migration step
 can set `AC_DB_UPDATE_ON_STARTUP=1` so `worldserver` applies pending updates
-before opening its DB pools.
+before opening its DB pools. If a database has a current schema but an empty
+`updates` table (e.g. restored schema-only), baseline it once with
+`ac db-update --baseline` or `AC_DB_UPDATE_BASELINE_ON_EMPTY=1`.
 
 `scripts/deploy` only builds and ships the image (as `arenacraft:local`); the
 running systemd-managed containers pick it up on their next restart, which

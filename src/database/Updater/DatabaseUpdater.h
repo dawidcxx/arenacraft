@@ -32,6 +32,7 @@ struct DatabaseUpdateTarget
   std::string_view name;
   std::string_view configKey;
   std::string_view sqlDirectory;
+  std::string_view schemaMarkerTable;
 };
 
 [[nodiscard]] std::span<DatabaseUpdateTarget const> GetDatabaseUpdateTargets();
@@ -39,16 +40,20 @@ struct DatabaseUpdateTarget
 struct DatabaseUpdateResult
 {
   uint32 applied        = 0;
+  uint32 baselined      = 0;
   uint32 skipped        = 0;
   uint32 hashMismatches = 0;
 };
 
 /// Applies pending files from `updateDirectory` to the database described by
 /// `connectionInfo`. The database must already be seeded (the `updates` table
-/// must exist). Returns false on a fatal error.
-[[nodiscard]] bool ApplyDatabaseUpdates(std::string_view label, std::string_view connectionInfo,
-                                        std::filesystem::path const& updateDirectory, bool dryRun,
-                                        DatabaseUpdateResult& result);
+/// must exist). When `baselineOnEmpty` is set and no updates are recorded yet,
+/// existing files are recorded without being executed, which is meant for
+/// databases whose schema predates update tracking. Returns false on a fatal
+/// error.
+[[nodiscard]] bool ApplyDatabaseUpdates(std::string_view label, std::string_view schemaMarkerTable,
+                                        std::string_view connectionInfo, std::filesystem::path const& updateDirectory,
+                                        bool dryRun, bool baselineOnEmpty, DatabaseUpdateResult& result);
 } // namespace Acore::Database
 
 #endif // DATABASEUPDATER_H
