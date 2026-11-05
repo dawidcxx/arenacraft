@@ -23,6 +23,8 @@
 #include "ObjectAccessor.h"
 #include "Player.h"
 
+#include <type_traits>
+
 #define MIN_QUIET_DISTANCE 28.0f
 #define MAX_QUIET_DISTANCE 43.0f
 #define MIN_PATH_LENGTH    2.0f
@@ -173,7 +175,12 @@ template <class T> void FleeingMovementGenerator<T>::SetTargetLocation(T* owner)
   init.MovebyPath(_path->GetPath());
   init.SetWalk(false);
   int32 traveltime = init.Launch();
-  _timer.Reset(traveltime + urand(800, 1500));
+  // Arenacraft: a feared player keeps running - only a short beat between legs instead of standing still for up to
+  // 1.5s (the creature behaviour)
+  if constexpr (std::is_same_v<T, Player>)
+    _timer.Reset(traveltime + urand(100, 300));
+  else
+    _timer.Reset(traveltime + urand(800, 1500));
 }
 
 template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position& position)
@@ -204,6 +211,19 @@ template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position
 
   float distance = 0.f;
   float angle    = 0.f;
+
+  // Arenacraft: feared players run short legs (6-12 yd) in a random direction leaning away from whoever feared them,
+  // instead of the creature "flee until 28-43 yd from the caster" rule that sent them across the arena in long
+  // straight runs. Short legs also keep the client on the server's path: a long leg the client could not finish (a
+  // pillar in the way) ended in a visible jump when the next leg started.
+  if constexpr (std::is_same_v<T, Player>)
+  {
+    distance = frand(6.0f, 12.0f);
+    angle    = casterAngle + frand(-float(M_PI) / 2.0f, float(M_PI) / 2.0f);
+    angle -= owner->GetOrientation();
+    owner->MovePositionToFirstCollision(position, distance, angle);
+    return;
+  }
   if (casterDistance < MIN_QUIET_DISTANCE)
   {
     distance = frand(0.4f, 1.3f) * (MIN_QUIET_DISTANCE - casterDistance);
