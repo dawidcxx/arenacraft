@@ -16,7 +16,6 @@
  */
 
 #include "Battleground.h"
-#include "ReplayRecorder.hpp"
 #include "ArenaSpectator.h"
 #include "ArenaTeam.h"
 #include "BattlegroundBE.h"
@@ -40,6 +39,7 @@
 #include "ObjectMgr.h"
 #include "Pet.h"
 #include "Player.h"
+#include "ReplayRecorder.hpp"
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
 #include "SpellAuras.h"
@@ -1192,6 +1192,30 @@ void Battleground::AddPlayer(Player* player)
     player->RemoveArenaEnchantments(TEMP_ENCHANTMENT_SLOT);
     player->DestroyConjuredItems(true);
     player->UnsummonPetTemporaryIfAny();
+
+    // Arenacraft: a warrior enters the arena in a stance (#81). The stance aura is lost on death, so a warrior who
+    // died in the previous match (or lost it any other way) arrived without one; put back the last stance they used,
+    // Battle Stance if they never picked one.
+    if (player->getClass() == CLASS_WARRIOR && player->IsAlive() && player->GetShapeshiftForm() == FORM_NONE)
+    {
+      constexpr uint32 BattleStance = 2457, DefensiveStance = 71, BerserkerStance = 2458;
+      uint32           stance = BattleStance;
+      switch (player->GetLastWarriorStance())
+      {
+      case FORM_DEFENSIVESTANCE:
+        stance = DefensiveStance;
+        break;
+      case FORM_BERSERKERSTANCE:
+        stance = BerserkerStance;
+        break;
+      default:
+        break;
+      }
+      if (!player->HasSpell(stance))
+        stance = BattleStance;
+      if (player->HasSpell(stance))
+        player->CastSpell(player, stance, true);
+    }
 
     if (GetStatus() == STATUS_WAIT_JOIN) // not started yet
     {

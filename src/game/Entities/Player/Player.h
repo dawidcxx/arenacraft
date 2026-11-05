@@ -2738,6 +2738,10 @@ public:
   [[nodiscard]] bool IsSpectator() const { return m_ExtraFlags & PLAYER_EXTRA_SPECTATOR_ON; }
   void               SetIsSpectator(bool on);
   [[nodiscard]] bool NeedSendSpectatorData() const;
+  // Arenacraft: the stance a warrior was last in, put back when they enter an arena without one (#81)
+  [[nodiscard]] ShapeshiftForm GetLastWarriorStance() const { return m_lastWarriorStance; }
+  void                         SetLastWarriorStance(ShapeshiftForm form) { m_lastWarriorStance = form; }
+
   void               SetPendingSpectatorForBG(uint32 bgInstanceId) { m_pendingSpectatorForBG = bgInstanceId; }
   [[nodiscard]] bool HasPendingSpectatorForBG(uint32 bgInstanceId) const
   {
@@ -3097,6 +3101,8 @@ protected:
   bool m_needZoneUpdate;
 
 private:
+  ShapeshiftForm m_lastWarriorStance = FORM_NONE;
+
   // internal common parts for CanStore/StoreItem functions
   InventoryResult CanStoreItem_InSpecificSlot(uint8 bag, uint8 slot, ItemPosCountVec& dest, ItemTemplate const* pProto,
                                               uint32& count, bool swap, Item* pSrcItem) const;

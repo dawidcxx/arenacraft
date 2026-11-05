@@ -2120,6 +2120,10 @@ void AuraEffect::HandleAuraModShapeshift(AuraApplication const* aurApp, uint8 mo
       return;
 
     target->SetShapeshiftForm(form);
+    // Arenacraft: remember a warrior's stance, see Battleground::AddPlayer (#81)
+    if (form == FORM_BATTLESTANCE || form == FORM_DEFENSIVESTANCE || form == FORM_BERSERKERSTANCE)
+      if (Player* player = target->ToPlayer())
+        player->SetLastWarriorStance(form);
     // xinef: allow shapeshift to override model id if forced transform aura is not present!
     if (modelid > 0)
     {
