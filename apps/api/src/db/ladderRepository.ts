@@ -41,20 +41,26 @@ export class LadderRepository {
       .toSQL();
 
     // Execute through the underlying pool rather than Drizzle's prepared query so the per-query
-    // timeout (DB_TIMEOUT_MS) is still enforced by mysql2.
+    // timeout (DB_TIMEOUT_MS) is still enforced by mysql2. Drizzle's SQL has no column aliases
+    // (`characters`.`name`, `arena_team_member`.`personalRating`, ...), so rows keyed by name would
+    // not carry the select keys above (charName, rating, ...). Read them as arrays, in select order,
+    // the way Drizzle itself maps results.
     const [rows] = await this.db.$client.query<RowDataPacket[]>({
       sql: query.sql,
       values: query.params,
       timeout: this.timeoutMs,
+      rowsAsArray: true,
     });
 
-    return rows.map((row) => ({
-      charName: String(row.charName),
-      classId: Number(row.classId),
-      storedRole: row.storedRole === null || row.storedRole === undefined ? null : Number(row.storedRole),
-      rating: Number(row.rating),
-      seasonWins: Number(row.seasonWins),
-      seasonGames: Number(row.seasonGames),
-    }));
+    return (rows as unknown as unknown[][]).map(
+      ([charName, classId, storedRole, rating, seasonWins, seasonGames]) => ({
+        charName: String(charName),
+        classId: Number(classId),
+        storedRole: storedRole === null || storedRole === undefined ? null : Number(storedRole),
+        rating: Number(rating),
+        seasonWins: Number(seasonWins),
+        seasonGames: Number(seasonGames),
+      }),
+    );
   }
 }
