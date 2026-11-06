@@ -22,6 +22,10 @@
 #include "MoveSplineInit.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
+#include "WorldSession.h"
+
+#include <algorithm>
+#include <type_traits>
 
 #define MIN_QUIET_DISTANCE 28.0f
 #define MAX_QUIET_DISTANCE 43.0f
@@ -31,6 +35,9 @@
 // snaps the destination to the ground, so a point past an edge lands well below.
 #define MAX_FLEE_DROP  3.0f
 #define MAX_FLEE_TRIES 5
+// Arenacraft: how long a feared player waits for their client's stop packet before the first leg (see DoInitialize).
+#define FLEE_PLAYER_START_DELAY 150
+#define FLEE_PLAYER_MAX_LATENCY 300
 
 template <class T> void FleeingMovementGenerator<T>::DoInitialize(T* owner)
 {
@@ -43,6 +50,20 @@ template <class T> void FleeingMovementGenerator<T>::DoInitialize(T* owner)
   _path = nullptr;
   owner->SetUnitFlag(UNIT_FLAG_FLEEING);
   owner->AddUnitState(UNIT_STATE_FLEEING);
+
+  // Arenacraft: a player's first flee leg waits for the client's own position. The server only knows where a running
+  // player was at their last movement packet (up to ~0.5 s and several yards behind), and while a server spline runs
+  // their movement packets are dropped (WorldSession::VerifyMovementInfo). Launching the leg right away started it
+  // from that stale spot: the player snapped back to it - the "teleport" at the start of a fear, worst when feared on
+  // the run. Unit::SetFeared takes client control away in the same tick; the client then stops and reports where it
+  // really is, and that packet is accepted while no spline runs. DoUpdate starts the leg once the timer passes.
+  if constexpr (std::is_same_v<T, Player>)
+  {
+    _timer.Reset(FLEE_PLAYER_START_DELAY +
+                 std::min<uint32>(owner->GetSession()->GetLatency(), FLEE_PLAYER_MAX_LATENCY));
+    return;
+  }
+
   SetTargetLocation(owner);
 }
 
