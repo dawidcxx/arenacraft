@@ -16,6 +16,8 @@ databases and to Valkey/Redis.
 | `/lookup <character>` | everyone | The Discord user behind a character name. |
 | `/charlist <discord>` | VIP | Characters owned by a Discord member. |
 | `/alias set/reset` | VIP | Solo queue display alias; resolved in game by `.alias get`. |
+| `/permaban <discord_id> <reason>` | VIP | Permanently bans the Discord user and their linked core account. |
+| `/baninfo <discord_acc>` | VIP | Current core ban and Discord server ban status for a user. |
 
 Replies to info commands are ephemeral. On startup the bot replaces the guild command list,
 so removed commands do not linger as unreachable "ghosts".
@@ -58,16 +60,25 @@ The bot needs the **Server Members** privileged intent enabled in the Discord De
 | `GAME_CHANNEL_PATTERN` | `^game-(\d+)-(\d+)$` | Paired voice room names. |
 | `INFO_CHANNEL_NAME` | `bot` | Channel for "no free room" notices. |
 | `AUDIT_LOG_CHANNEL_NAME` | `audit-log` | Match audit messages; empty disables them. |
-| `VIP_ROLE_NAME` | `vip` | Role allowed to use `/alias` and `/charlist`. |
+| `VIP_ROLE_NAME` | `vip` | Role allowed to use `/alias`, `/charlist`, `/permaban` and `/baninfo`. |
 | `STALE_ROOM_MINUTES` | `60` | Reclaim a room whose ended event never arrived. |
 
 \* optional when `AC_LOGIN_DATABASE_INFO` is set.
 
-`/alias` and `/charlist` are registered with `default_member_permissions: 0`, so they are
-hidden from regular members. Allow the VIP role once in **Server Settings -> Integrations ->
-arenacraft -> Manage -> /alias** (and `/charlist`); Discord only accepts an OAuth2 bearer token
-for those overwrites, so the bot cannot set them itself. Registration is an upsert by command
-name, so the overwrites survive restarts.
+`/alias`, `/charlist`, `/permaban` and `/baninfo` are registered with
+`default_member_permissions: 0`, so they are hidden from regular members. Allow the VIP role
+once in **Server Settings -> Integrations -> arenacraft -> Manage -> /alias** (and `/charlist`,
+`/permaban` and `/baninfo`); Discord only accepts an OAuth2 bearer token for those overwrites,
+so the bot cannot set them itself. Registration is an upsert by command name, so the overwrites
+survive restarts.
+
+`/permaban` writes a permanent row to `acore_auth.account_banned` (a ban is permanent when
+`unbandate = bandate`) and needs the bot's **Ban Members** permission to remove the user from
+the guild. An unlinked Discord user is still banned from Discord. The core checks the ban at
+login, so a character already in the world keeps playing until it disconnects or relogs.
+
+`/baninfo` shows the current active core ban (permanent or temporary) from `account_banned`
+and checks the guild's Discord ban list for the same user.
 
 ## Voice rooms
 

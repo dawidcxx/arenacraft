@@ -5,12 +5,14 @@ import { ALIAS_COMMAND, handleAlias } from "./aliasCommand";
 import { auditAccounts } from "./accountAudit";
 import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
+import { BANINFO_COMMAND, handleBanInfo } from "./baninfoCommand";
 import { CharacterDb } from "./characterDb";
 import { CHAR_LIST_COMMAND, handleCharList } from "./charlistCommand";
 import { getConfig } from "./config";
 import { logger } from "./logger";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
 import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
+import { handlePermaBan, PERMABAN_COMMAND } from "./permabanCommand";
 import { PING_COMMAND, handlePing } from "./pingCommand";
 import { startEventSubscriber } from "./redisEvents";
 import { handleRegister, REGISTER_COMMAND } from "./registerCommand";
@@ -61,6 +63,8 @@ client.once(Events.ClientReady, async (readyClient) => {
       LOOKUP_COMMAND,
       CHAR_LIST_COMMAND,
       ALIAS_COMMAND,
+      PERMABAN_COMMAND,
+      BANINFO_COMMAND,
     ]);
     try {
       await guild.members.fetch();
@@ -110,6 +114,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleCharList(interaction, { authDb, characterDb }, config.VIP_ROLE_NAME);
     else if (interaction.commandName === "ping") await handlePing(interaction);
     else if (interaction.commandName === "alias") await handleAlias(interaction, authDb, config.VIP_ROLE_NAME);
+    else if (interaction.commandName === "permaban")
+      await handlePermaBan(interaction, authDb, config.VIP_ROLE_NAME);
+    else if (interaction.commandName === "baninfo")
+      await handleBanInfo(interaction, authDb, config.VIP_ROLE_NAME);
   } catch (error) {
     logger.error(`Failed to handle /${interaction.commandName}`, error);
     const reply: InteractionReplyOptions = { content: "Something went wrong, try again later.", flags: MessageFlags.Ephemeral };

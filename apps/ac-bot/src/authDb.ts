@@ -17,6 +17,14 @@ export interface AccountSummary {
   gmLevel: number;
 }
 
+export interface AccountBan {
+  bandate: number;
+  unbandate: number;
+  bannedBy: string;
+  reason: string;
+  active: boolean;
+}
+
 export class AuthDb {
   private readonly pool: Pool;
 
@@ -148,6 +156,50 @@ export class AuthDb {
       verifier,
       accountId,
     ]);
+  }
+
+  /**
+   * Permanently bans an account, mirroring BanMgr::BanAccount. The core treats
+   * a ban as permanent when unbandate equals bandate.
+   */
+  async banAccount(accountId: number, reason: string, bannedBy: string): Promise<void> {
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      // Keep only one active ban, as the core does before inserting a new one.
+      await connection.execute("UPDATE account_banned SET active = 0 WHERE id = ? AND active != 0", [accountId]);
+      await connection.execute(
+        `INSERT INTO account_banned (id, bandate, unbandate, bannedby, banreason, active)
+         VALUES (?, UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), ?, ?, 1)
+         ON DUPLICATE KEY UPDATE unbandate = VALUES(unbandate), bannedby = VALUES(bannedby),
+                                 banreason = VALUES(banreason), active = 1`,
+        [accountId, bannedBy, reason],
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /** All ban records for an account, newest first. */
+  async accountBans(accountId: number): Promise<AccountBan[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT bandate, unbandate, bannedby AS bannedBy, banreason AS reason, active
+       FROM account_banned
+       WHERE id = ?
+       ORDER BY bandate DESC`,
+      [accountId],
+    );
+    return rows.map((row) => ({
+      bandate: Number(row.bandate),
+      unbandate: Number(row.unbandate),
+      bannedBy: String(row.bannedBy),
+      reason: String(row.reason),
+      active: Number(row.active) === 1,
+    }));
   }
 
   async listAccounts(): Promise<AccountSummary[]> {
