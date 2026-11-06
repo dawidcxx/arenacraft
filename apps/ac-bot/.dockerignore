@@ -1,0 +1,9 @@
+node_modules
+*.test.ts
+.env
+.env.*
+README.md
+tsconfig.json
+.gitignore
+Dockerfile
+.dockerignore

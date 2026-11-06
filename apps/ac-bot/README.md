@@ -1,134 +1,120 @@
 # ac-bot
 
-Rewritten Arenacraft Discord bot. Six jobs:
+The Arenacraft Discord bot. It handles account self-service, solo queue voice rooms, info
+commands and the match audit log. Bun + discord.js; it talks to the auth/characters MySQL
+databases and to Valkey/Redis.
 
-1. **Registration** - `/register` creates a Wow account (auth DB only) whose
-   username is the caller's Discord handle and returns a generated password.
-   Player accounts store their owner's immutable Discord user ID in
-   `acore_auth.account_discord`, so renaming a handle cannot take over an
-   account. Calling it again resets the password for that account. Legacy
-   player accounts with no owner are reported by the startup audit and must be
-   connected manually by an admin. Staff/GM accounts do not need a Discord
-   owner.
-2. **Greeting** - `/ping` greets the caller publicly in the channel.
-3. **Voice room shuffling** - subscribes to the core's `soloq-matchup` /
-   `soloq-matchup-ended` Redis events and moves players between the waiting room
-   and paired `game-<n>-<k>` voice channels.
-4. **Info commands** - `/toprankers` (soloQ leaderboard), `/onlinelist`
-   (characters currently online), `/lookup <character>` (the Discord user
-   behind a character name) and `/charlist <discord>` (characters owned by a
-   Discord member, matched by username, display name, mention, or user ID;
-   VIP-only). All reply ephemerally; the leaderboard and online list are served
-   from a 30s cache to keep repeated calls off the DB.
-5. **Match audit log** - posts one compact message per solo queue event to
-   `AUDIT_LOG_CHANNEL_NAME` (default `audit-log`): match formed (teams, class
-   icons, ratings), match finished (winner, duration, per-player rating
-   change), plus aborted (invites declined) and cancelled-at-start
-   (short-handed) matches.
-6. **Aliases** - `/alias set` / `/alias reset`, restricted to the `VIP_ROLE_NAME`
-   role. Stores a per-account display alias in `acore_auth.account_alias`; the
-   in-game GM command `.alias get [character]` resolves it.
+## Commands
 
-On startup the bot overwrites both its global and guild command lists, so
-commands removed from the code do not linger as unreachable "ghosts".
+| Command | Who | What |
+| --- | --- | --- |
+| `/register` | everyone | Creates a WoW account named after the Discord handle and DMs the generated password. Running it again resets the password. |
+| `/setpassword` | everyone | Sets a new password for the caller's account. |
+| `/ping` | everyone | Public greeting in the channel. |
+| `/toprankers` | everyone | Top 10 SoloQ players (30s cache). |
+| `/onlinelist` | everyone | Characters currently online (30s cache). |
+| `/lookup <character>` | everyone | The Discord user behind a character name. |
+| `/charlist <discord>` | VIP | Characters owned by a Discord member. |
+| `/alias set/reset` | VIP | Solo queue display alias; resolved in game by `.alias get`. |
 
-## Setup
+Replies to info commands are ephemeral. On startup the bot replaces the guild command list,
+so removed commands do not linger as unreachable "ghosts".
 
-```bash
-bun install
-cp .env.example .env   # fill in the values
-ac db-update           # applies data/sql/updates/db_auth (account_discord)
-bun run start
-```
-
-The bot needs the **Server Members** privileged intent enabled in the Discord
-Developer Portal (Bot -> Privileged Gateway Intents). Members are resolved by
-the Discord user ID stored in `account_discord`, never by their current
-handle.
-
-On startup the bot audits accounts: duplicate owners, reclaimed handles,
-lookalike names and player accounts with no Discord owner. IP addresses are not
-used for grouping; a proxy/VPN makes almost everyone share an IP.
-`gm=<level>` marks staff accounts. Conflicts are left alone and must be resolved
-manually, e.g.:
+Accounts are owned by Discord user ID (`acore_auth.account_discord`), not by handle, so
+renaming a Discord account cannot take over a WoW account. Staff/GM accounts are exempt from
+ownership checks. Player accounts without an owner are reported by the startup audit and must
+be linked by an admin:
 
 ```sql
 INSERT INTO acore_auth.account_discord (account_id, discord_id)
 VALUES (<account id>, '<discord id>');
 ```
 
-A player account without a Discord owner is an anomaly (legacy data or a ban),
-not a normal state. Staff/GM accounts are exempt. List unowned player accounts
-with:
-
-```sql
-SELECT a.id, a.username
-FROM acore_auth.account a
-LEFT JOIN acore_auth.account_discord d ON d.account_id = a.id
-LEFT JOIN acore_auth.account_access aa ON aa.id = a.id AND aa.gmlevel > 0
-WHERE d.account_id IS NULL AND aa.id IS NULL
-ORDER BY a.id;
-```
-
-The bot is the only production entry point; there is no separate
-account-migration script. (`scripts/emit-fake-event.ts` remains a dev-only Redis
-helper for testing the voice flow.) The auth database URL comes from
-`AUTH_DB_URL` or, when unset, the core's `AC_LOGIN_DATABASE_INFO`
-(`host;port;user;password;database`).
-
-The match audit log uses the guild's custom class emoji (`warrior`, `paladin`,
-`hunter`, `rogue`, `priest`, `deathknight`, `shaman`, `mage`, `warlock`,
-`druid`). Any missing emoji simply render as the bare character name. Set
-`AUDIT_LOG_CHANNEL_NAME` to an empty string to disable these messages.
-
-`/alias` and `/charlist` are registered with `default_member_permissions: 0`,
-so they are hidden from regular members. Allow the `VIP_ROLE_NAME` role once in
-**Server Settings -> Integrations -> arenacraft -> Manage -> /alias** (and
-`/charlist`); Discord only accepts an OAuth2 bearer token for those overwrites,
-so the bot cannot set them itself. Registration is an upsert by command name,
-so the overwrites survive restarts.
-
-The in-game GM command `.alias get [character]` resolves character -> account
--> alias and prints one machine-readable line for future addons:
-`ALIAS:<character>=<alias-or-account>` (the account name is hidden whenever an
-alias is set).
-
-`/register` is registered as a guild command, so it appears instantly.
-
-### Voice channels
-
-- `Waiting Room` - lobby everyone returns to. The bot denies `Speak` on the
-  channel so the queue stays quiet; channel-scoped means it cannot leave anyone
-  server-muted outside the lobby.
-- `game-<n>-1` / `game-<n>-2` - one room per `<n>`. Team A goes to `-1`, team B
-  to `-2`. Rooms are discovered dynamically and reused once released.
-
-Players without voice are skipped, so a room may hold fewer than six. If the bot
-restarts, rooms that still contain members are treated as taken; a room held
-longer than `STALE_ROOM_MINUTES` (default 60) is reclaimed.
-
-## Fake events
-
-Test the voice flow without the core:
+## Setup
 
 ```bash
-# full cycle (publish matchup, wait, publish ended)
-bun run scripts/emit-fake-event.ts --channel both --instance 42 \
-  --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK
-
-# move real Discord users into the rooms (IDs from Discord, no DB lookup)
-bun run scripts/emit-fake-event.ts --channel both --instance 42 \
-  --team-a ALICE,BOB,CAROL --team-b DAVE,ERIN,FRANK \
-  --team-a-ids 111111111111111111,222222222222222222,333333333333333333 \
-  --team-b-ids 444444444444444444,555555555555555555,666666666666666666
-
-# just a matchup
-bun run scripts/emit-fake-event.ts --channel matchup --instance 42
-
-# just an end (test crash recovery / unknown instance)
-bun run scripts/emit-fake-event.ts --channel ended --instance 42
+bun install
+cp .env.example .env   # fill in the values
+ac db-update           # applies data/sql/updates/db_auth (account_discord/account_alias)
+bun run start
 ```
 
-Without `--team-a-ids` / `--team-b-ids` the bot resolves the fake `accountId`s
-through `account_discord`; pass IDs for a purely fake match with no DB
-accounts.
+The bot needs the **Server Members** privileged intent enabled in the Discord Developer Portal
+(Bot -> Privileged Gateway Intents).
+
+`AUTH_DB_URL` may be omitted when the core's `AC_LOGIN_DATABASE_INFO`
+(`host;port;user;password;database`) is present; the bot derives the URI from it.
+
+## Configuration
+
+| Variable | Default | |
+| --- | --- | --- |
+| `DISCORD_TOKEN` | required | Bot token from the Developer Portal. |
+| `DISCORD_GUILD_ID` | required | The single guild the bot serves. |
+| `AUTH_DB_URL` | required* | `mysql://user:pass@host:3306/acore_auth` |
+| `CHARACTER_DB_URL` | required | `mysql://user:pass@host:3306/acore_characters` |
+| `REDIS_URL` | `redis://127.0.0.1:6379` | Core event stream. |
+| `WAITING_ROOM_NAME` | `Waiting Room` | Lobby everyone returns to. |
+| `GAME_CHANNEL_PATTERN` | `^game-(\d+)-(\d+)$` | Paired voice room names. |
+| `INFO_CHANNEL_NAME` | `bot` | Channel for "no free room" notices. |
+| `AUDIT_LOG_CHANNEL_NAME` | `audit-log` | Match audit messages; empty disables them. |
+| `VIP_ROLE_NAME` | `vip` | Role allowed to use `/alias` and `/charlist`. |
+| `STALE_ROOM_MINUTES` | `60` | Reclaim a room whose ended event never arrived. |
+
+\* optional when `AC_LOGIN_DATABASE_INFO` is set.
+
+`/alias` and `/charlist` are registered with `default_member_permissions: 0`, so they are
+hidden from regular members. Allow the VIP role once in **Server Settings -> Integrations ->
+arenacraft -> Manage -> /alias** (and `/charlist`); Discord only accepts an OAuth2 bearer token
+for those overwrites, so the bot cannot set them itself. Registration is an upsert by command
+name, so the overwrites survive restarts.
+
+## Voice rooms
+
+The bot subscribes to the core's `soloq-matchup` / `soloq-matchup-ended` Redis events:
+
+- `Waiting Room` - lobby everyone returns to. The bot denies `Speak` there so the queue stays
+  quiet; the denial is channel-scoped, so it cannot server-mute anyone outside the lobby.
+- `game-<n>-1` / `game-<n>-2` - one room per `<n>`. Team A goes to `-1`, team B to `-2`.
+  Rooms are discovered dynamically and reused once released.
+
+Players without voice are skipped, so a room may hold fewer than six. If the bot restarts,
+rooms that still contain members are treated as taken; a room held longer than
+`STALE_ROOM_MINUTES` is reclaimed.
+
+The in-game GM command `.alias get [character]` resolves character -> account -> alias and
+prints one machine-readable line: `ALIAS:<character>=<alias-or-account>`.
+
+## Audit log
+
+One compact message per event is posted to `AUDIT_LOG_CHANNEL_NAME`:
+
+- match formed - instance, arena type and map, both teams with class icons and ratings;
+- match finished - winner, duration and per-player rating change;
+- aborted - invites declined;
+- cancelled at start - team short-handed.
+
+The class icons come from the guild's custom emoji (`warrior`, `paladin`, `hunter`, `rogue`,
+`priest`, `deathknight`, `shaman`, `mage`, `warlock`, `druid`). Missing emoji simply render as
+the bare character name.
+
+## Docker
+
+The image compiles the bot to a single executable and runs it as an unprivileged user:
+
+```bash
+docker build -t arenacraft-ac-bot:local apps/ac-bot
+```
+
+It reads `DISCORD_TOKEN` and `DISCORD_GUILD_ID` from `.env`. The CI workflow
+`ac-bot-image.yml` publishes `ghcr.io/dawidcxx/arenacraft-bot:latest` on pushes to `local`
+that touch `apps/ac-bot`. The `ac-bot-deploy` workflow is the manual, `local`-only
+deployment hook (currently a placeholder for the downstream webhook); it verifies the
+requested image tag exists before running.
+
+## Development
+
+```bash
+bun test
+bun run typecheck
+```

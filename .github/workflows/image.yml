@@ -1,14 +1,22 @@
-# Build and publish the linux/amd64 runtime image on every push to `local`.
-# PR compile checks live in check.yml and do not build Docker images.
+# Build and publish the linux/amd64 runtime image on pushes to `local` that
+# touch its build inputs. Only rebuild when something the Dockerfile actually
+# consumes changes - API/docs/compose-only commits must not pay for a fat image
+# build. PR compile checks live in check.yml and do not build Docker images.
 name: image
 
 on:
   push:
     branches: [local]
-    paths-ignore:
-      - 'ai-doc/**'
-      - '**/*.md'
-      - 'LICENSE'
+    paths:
+      - 'src/**'
+      - 'deps/**'
+      - 'zig-build/**'
+      - 'build.zig'
+      - 'build.zig.zon'
+      - 'data/sql/updates/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/image.yml'
   workflow_dispatch:
 
 permissions:

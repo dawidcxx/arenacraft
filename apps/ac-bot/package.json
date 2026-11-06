@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "start": "bun run src/index.ts",
+    "build": "bun build --compile --minify --outfile ac-bot src/index.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "emit": "bun run scripts/emit-fake-event.ts"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest"

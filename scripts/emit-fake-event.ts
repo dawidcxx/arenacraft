@@ -1,6 +1,10 @@
 /**
- * Publishes fake soloq events to Redis so the bot's voice-room flow can be
- * exercised without running the WoW core.
+ * Publishes fake soloq events to Redis so soloq listeners (the Discord bot,
+ * custom tooling, ...) can be exercised without running the WoW core.
+ *
+ * The payload contract mirrors the JSON published by the core (see
+ * src/game/Arenacraft/soloq/SoloqEvents.cpp). This script is deliberately
+ * standalone: it does not import from apps/ac-bot.
  *
  * Usage:
  *   bun run scripts/emit-fake-event.ts --channel matchup --instance 123 \
@@ -14,16 +18,75 @@
  * Voice moves resolve accountId -> account_discord, so pass real account IDs
  * or use `--team-a-ids` / `--team-b-ids` with Discord user IDs for a purely
  * fake match. Anything omitted falls back to a default set.
+ *
+ * Set REDIS_URL to target a non-default Redis/Valkey.
  */
 import { Redis } from "ioredis";
+import { z } from "zod";
 
-import {
-  MATCHUP_CHANNEL,
-  MATCHUP_ENDED_CHANNEL,
-  MatchupEndedEventSchema,
-  MatchupEventSchema,
-} from "../src/types";
-import type { Participant } from "../src/types";
+const MATCHUP_CHANNEL = "soloq-matchup";
+const MATCHUP_ENDED_CHANNEL = "soloq-matchup-ended";
+
+const ParticipantSchema = z.object({
+  guid: z.string(),
+  characterName: z.string(),
+  accountId: z.number(),
+  accountName: z.string(),
+  discordId: z.string().optional(),
+  classId: z.number(),
+  specIndex: z.number(),
+  role: z.string(),
+  teamId: z.number(),
+  faction: z.string(),
+  rating: z.number(),
+  mmr: z.number(),
+  side: z.enum(["teamA", "teamB"]).optional(),
+  ratingDelta: z.number().int().nullable().optional(),
+  ratingAfter: z.number().int().nonnegative().nullable().optional(),
+  mmrAfter: z.number().int().nonnegative().nullable().optional(),
+});
+
+const TeamSchema = z.object({
+  teamId: z.number(),
+  faction: z.string(),
+  averageRating: z.number(),
+  averageMmr: z.number(),
+  players: z.array(ParticipantSchema),
+});
+
+const MatchupEventSchema = z.object({
+  event: z.literal("soloq.matchup"),
+  instanceId: z.number(),
+  arenaType: z.number(),
+  matchup: z.object({
+    instanceId: z.number(),
+    arenaType: z.number(),
+    mapId: z.number(),
+    bracketId: z.number(),
+    queueType: z.number(),
+    startedAtMs: z.number(),
+  }),
+  players: z.array(ParticipantSchema),
+  teamA: TeamSchema,
+  teamB: TeamSchema,
+  rating: z.object({
+    teamA: z.object({ averageRating: z.number(), averageMmr: z.number(), winDelta: z.number(), lossDelta: z.number() }),
+    teamB: z.object({ averageRating: z.number(), averageMmr: z.number(), winDelta: z.number(), lossDelta: z.number() }),
+  }),
+});
+
+const MatchupEndedEventSchema = z.object({
+  event: z.literal("soloq.matchup.ended"),
+  instanceId: z.number(),
+  finished: z.boolean(),
+  reason: z.enum(["finished", "cancelled", "declined"]).optional(),
+  winner: z.enum(["teamA", "teamB"]).nullable(),
+  startedAtMs: z.number().int(),
+  endedAtMs: z.number().int(),
+  players: z.array(ParticipantSchema),
+});
+
+type Participant = z.infer<typeof ParticipantSchema>;
 
 const ROLE_SLOTS = ["melee", "caster", "healer"] as const;
 const CLASSES = [1, 3, 5, 8, 9, 11];
