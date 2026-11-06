@@ -126,16 +126,15 @@ export async function handleBanInfo(
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const account = await authDb.accountByDiscordId(discordId);
-  const bans = account ? await authDb.accountBans(account.id) : [];
-
-  let discordBan: DiscordBanStatus;
-  try {
-    discordBan = await fetchDiscordBan(guild, discordId);
-  } catch (error) {
+  const discordBanPromise = fetchDiscordBan(guild, discordId).catch((error) => {
     logger.warn(`Could not fetch Discord ban for ${discordId}`, error);
-    discordBan = { banned: null };
-  }
+    return { banned: null } satisfies DiscordBanStatus;
+  });
+  const [account, discordBan] = await Promise.all([
+    authDb.accountByDiscordId(discordId),
+    discordBanPromise,
+  ]);
+  const bans = account ? await authDb.accountBans(account.id) : [];
 
   const now = Math.floor(Date.now() / 1000);
   await interaction.editReply(formatBanInfo(discordId, account, bans, discordBan, now));

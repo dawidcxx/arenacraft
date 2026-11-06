@@ -13,12 +13,12 @@
     "@types/bun": "latest"
   },
   "peerDependencies": {
-    "typescript": "^7"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
-    "discord.js": "^14.27.0",
+    "discord.js": "^14.28.1",
     "ioredis": "^6.0.0",
-    "mysql2": "^3.24.4",
-    "zod": "^4.6.5"
+    "mysql2": "^3.24.6",
+    "zod": "^4.6.7"
   }
 }

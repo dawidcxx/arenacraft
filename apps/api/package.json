@@ -13,12 +13,12 @@
     "@types/bun": "latest"
   },
   "peerDependencies": {
-    "typescript": "^7"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.16",
-    "mysql2": "^3.24.4",
-    "zod": "^4.6.5"
+    "mysql2": "^3.24.6",
+    "zod": "^4.6.7"
   }
 }

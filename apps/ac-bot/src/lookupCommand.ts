@@ -65,14 +65,18 @@ export async function handleLookup(interaction: ChatInputCommandInteraction, dep
     return;
   }
 
-  const accountName = (await deps.authDb.accountNames([accountId])).get(accountId);
+  const [names, discordIds] = await Promise.all([
+    deps.authDb.accountNames([accountId]),
+    deps.authDb.discordIdsByAccountIds([accountId]),
+  ]);
+  const accountName = names.get(accountId);
   if (!accountName) {
     await interaction.editReply(`Character **${charName}** is not attached to an account.`);
     return;
   }
 
   const guild = interaction.guild;
-  const discordId = (await deps.authDb.discordIdsByAccountIds([accountId])).get(accountId) ?? null;
+  const discordId = discordIds.get(accountId) ?? null;
   const member = await resolveMember(guild, discordId);
   if (member) {
     await interaction.editReply(formatLookup(charName, accountName, member.id, true));
