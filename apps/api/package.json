@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "start": "bun run src/index.ts",
+    "build": "bun build --compile --minify --outfile api src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
@@ -15,6 +16,8 @@
     "typescript": "^7"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.16",
     "mysql2": "^3.24.4",
     "zod": "^4.6.5"
   }
