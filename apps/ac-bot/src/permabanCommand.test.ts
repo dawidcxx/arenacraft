@@ -1,6 +1,32 @@
 import { describe, expect, test } from "bun:test";
 
-import { formatPermaBanReply, PERMABAN_COMMAND } from "./permabanCommand";
+import { buildPermaBanModal, formatPermaBanReply, isPermaBanConfirmed, PERMABAN_COMMAND } from "./permabanCommand";
+
+describe("isPermaBanConfirmed", () => {
+  test("requires the confirmation word, case-insensitively", () => {
+    expect(isPermaBanConfirmed("BAN")).toBe(true);
+    expect(isPermaBanConfirmed(" ban ")).toBe(true);
+  });
+
+  test("rejects anything else", () => {
+    expect(isPermaBanConfirmed("")).toBe(false);
+    expect(isPermaBanConfirmed("BANN")).toBe(false);
+    expect(isPermaBanConfirmed("yes")).toBe(false);
+  });
+});
+
+describe("buildPermaBanModal", () => {
+  test("shows the target/reason and requires BAN", () => {
+    const modal = buildPermaBanModal("permaban-confirm:test", "123", "cheating").toJSON();
+    expect(modal.custom_id).toBe("permaban-confirm:test");
+    expect(modal.title).toBe("Confirm permanent ban");
+
+    const json = JSON.stringify(modal);
+    expect(json).toContain("cheating");
+    expect(json).toContain("Type BAN to confirm");
+    expect(json).toContain('"custom_id":"confirm"');
+  });
+});
 
 describe("formatPermaBanReply", () => {
   test("mentions the banned user and the core account", () => {

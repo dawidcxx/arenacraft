@@ -12,7 +12,12 @@ import { getConfig } from "./config";
 import { logger } from "./logger";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
 import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
-import { handlePermaBan, PERMABAN_COMMAND } from "./permabanCommand";
+import {
+  handlePermaBan,
+  handlePermaBanConfirmation,
+  PERMABAN_COMMAND,
+  PERMABAN_MODAL_PREFIX,
+} from "./permabanCommand";
 import { PING_COMMAND, handlePing } from "./pingCommand";
 import { startEventSubscriber } from "./redisEvents";
 import { handleRegister, REGISTER_COMMAND } from "./registerCommand";
@@ -102,24 +107,42 @@ client.once(Events.ClientReady, async (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
   try {
-    if (interaction.commandName === "register") await handleRegister(interaction, authDb);
-    else if (interaction.commandName === "setpassword") await handleSetPassword(interaction, authDb);
-    else if (interaction.commandName === "toprankers") await handleTopRankers(interaction, () => rankersCache.get());
-    else if (interaction.commandName === "onlinelist") await handleOnlineList(interaction, () => onlineListCache.get());
-    else if (interaction.commandName === "lookup") await handleLookup(interaction, { authDb, characterDb });
-    else if (interaction.commandName === "charlist")
-      await handleCharList(interaction, { authDb, characterDb }, config.VIP_ROLE_NAME);
-    else if (interaction.commandName === "ping") await handlePing(interaction);
-    else if (interaction.commandName === "alias") await handleAlias(interaction, authDb, config.VIP_ROLE_NAME);
-    else if (interaction.commandName === "permaban")
-      await handlePermaBan(interaction, authDb, config.VIP_ROLE_NAME);
-    else if (interaction.commandName === "baninfo")
-      await handleBanInfo(interaction, authDb, config.VIP_ROLE_NAME);
+    if (interaction.isChatInputCommand()) {
+      if (interaction.commandName === "register") await handleRegister(interaction, authDb);
+      else if (interaction.commandName === "setpassword") await handleSetPassword(interaction, authDb);
+      else if (interaction.commandName === "toprankers") await handleTopRankers(interaction, () => rankersCache.get());
+      else if (interaction.commandName === "onlinelist")
+        await handleOnlineList(interaction, () => onlineListCache.get());
+      else if (interaction.commandName === "lookup") await handleLookup(interaction, { authDb, characterDb });
+      else if (interaction.commandName === "charlist")
+        await handleCharList(interaction, { authDb, characterDb }, config.VIP_ROLE_NAME);
+      else if (interaction.commandName === "ping") await handlePing(interaction);
+      else if (interaction.commandName === "alias") await handleAlias(interaction, authDb, config.VIP_ROLE_NAME);
+      else if (interaction.commandName === "permaban") await handlePermaBan(interaction, config.VIP_ROLE_NAME);
+      else if (interaction.commandName === "baninfo")
+        await handleBanInfo(interaction, authDb, config.VIP_ROLE_NAME);
+      return;
+    }
+
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith(`${PERMABAN_MODAL_PREFIX}:`)) {
+        await handlePermaBanConfirmation(interaction, authDb, config.VIP_ROLE_NAME);
+      } else {
+        await interaction
+          .reply({ content: "Unknown action.", flags: MessageFlags.Ephemeral })
+          .catch(() => {});
+      }
+    }
   } catch (error) {
-    logger.error(`Failed to handle /${interaction.commandName}`, error);
+    const label = interaction.isChatInputCommand()
+      ? `/${interaction.commandName}`
+      : interaction.isModalSubmit()
+        ? `modal ${interaction.customId}`
+        : "interaction";
+    logger.error(`Failed to handle ${label}`, error);
+    if (!interaction.isRepliable()) return;
+
     const reply: InteractionReplyOptions = { content: "Something went wrong, try again later.", flags: MessageFlags.Ephemeral };
     if (interaction.replied || interaction.deferred) await interaction.followUp(reply).catch(() => {});
     else await interaction.reply(reply).catch(() => {});

@@ -72,7 +72,8 @@ once in **Server Settings -> Integrations -> arenacraft -> Manage -> /alias** (a
 so the bot cannot set them itself. Registration is an upsert by command name, so the overwrites
 survive restarts.
 
-`/permaban` writes a permanent row to `acore_auth.account_banned` (a ban is permanent when
+`/permaban` opens a confirmation modal showing the target and reason; type `BAN` to apply it.
+It writes a permanent row to `acore_auth.account_banned` (a ban is permanent when
 `unbandate = bandate`) and needs the bot's **Ban Members** permission to remove the user from
 the guild. An unlinked Discord user is still banned from Discord. The core checks the ban at
 login, so a character already in the world keeps playing until it disconnects or relogs.
