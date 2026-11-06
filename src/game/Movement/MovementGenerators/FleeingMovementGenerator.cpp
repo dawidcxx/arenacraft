@@ -30,6 +30,12 @@
 #define MIN_QUIET_DISTANCE 28.0f
 #define MAX_QUIET_DISTANCE 43.0f
 #define MIN_PATH_LENGTH    2.0f
+// Arenacraft: a feared player runs short legs and stays within a smaller ring around the caster than a fleeing
+// creature (28-43 yd): run away while closer than 10 yd, wander between 10 and 20 yd, turn back beyond 20 yd.
+#define PLAYER_MIN_QUIET_DISTANCE 10.0f
+#define PLAYER_MAX_QUIET_DISTANCE 20.0f
+#define PLAYER_MIN_LEG            5.0f
+#define PLAYER_MAX_LEG            10.0f
 // Arenacraft: largest height drop a flee destination may have before we treat it
 // as an edge (bridge/ledge) and pick another point. MovePositionToFirstCollision
 // snaps the destination to the ground, so a point past an edge lands well below.
@@ -194,7 +200,12 @@ template <class T> void FleeingMovementGenerator<T>::SetTargetLocation(T* owner)
   init.MovebyPath(_path->GetPath());
   init.SetWalk(false);
   int32 traveltime = init.Launch();
-  _timer.Reset(traveltime + urand(800, 1500));
+  // Arenacraft: a feared player only takes a short beat between legs; standing still for up to 1.5 s (the creature
+  // pause) made the fear look like stop-and-go.
+  if constexpr (std::is_same_v<T, Player>)
+    _timer.Reset(traveltime + urand(200, 400));
+  else
+    _timer.Reset(traveltime + urand(800, 1500));
 }
 
 template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position& position)
@@ -225,7 +236,24 @@ template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position
 
   float distance = 0.f;
   float angle    = 0.f;
-  if (casterDistance < MIN_QUIET_DISTANCE)
+  // Arenacraft: casterAngle points from the caster to the owner, so "back towards the caster" is casterAngle + pi. The
+  // inherited -casterAngle mirrored the angle instead, so a unit past the outer ring did not come back and kept
+  // drifting further away - the "fear leads you far away" bug.
+  float const towardsCaster = casterAngle + float(M_PI);
+  if constexpr (std::is_same_v<T, Player>)
+  {
+    // Arenacraft: players run short legs (5-10 yd, then a new direction) in a 10-20 yd ring around the caster. The
+    // creature numbers sent a player up to ~30 yd in one straight leg and kept them 28-43 yd out, i.e. out of the
+    // fight.
+    distance = frand(PLAYER_MIN_LEG, PLAYER_MAX_LEG);
+    if (casterDistance < PLAYER_MIN_QUIET_DISTANCE)
+      angle = casterAngle + frand(-float(M_PI) / 4.0f, float(M_PI) / 4.0f);
+    else if (casterDistance > PLAYER_MAX_QUIET_DISTANCE)
+      angle = towardsCaster + frand(-float(M_PI) / 4.0f, float(M_PI) / 4.0f);
+    else
+      angle = frand(0.0f, 2.0f * float(M_PI));
+  }
+  else if (casterDistance < MIN_QUIET_DISTANCE)
   {
     distance = frand(0.4f, 1.3f) * (MIN_QUIET_DISTANCE - casterDistance);
     angle    = casterAngle + frand(-float(M_PI) / 8.0f, float(M_PI) / 8.0f);
@@ -233,7 +261,7 @@ template <class T> void FleeingMovementGenerator<T>::GetPoint(T* owner, Position
   else if (casterDistance > MAX_QUIET_DISTANCE)
   {
     distance = frand(0.4f, 1.0f) * (MAX_QUIET_DISTANCE - MIN_QUIET_DISTANCE);
-    angle    = -casterAngle + frand(-float(M_PI) / 4.0f, float(M_PI) / 4.0f);
+    angle    = towardsCaster + frand(-float(M_PI) / 4.0f, float(M_PI) / 4.0f);
   }
   else // we are inside quiet range
   {
