@@ -8,14 +8,15 @@
             "type": "lldb",
             "request": "launch",
             "name": "Worldserver",
-            "program": "~/.local/arenacraft/bin/worldserver",
+            "program": "${workspaceFolder}/zig-out/bin/ac",
+            "args": ["worldserver"],
             "preLaunchTask": "install&kill"
         },
         {
             "type": "lldb",
             "request": "attach",
             "name": "Attach to worldserver",
-            "program": "~/.local/arenacraft/bin/worldserver"
-        },
+            "program": "${workspaceFolder}/zig-out/bin/ac"
+        }
     ]
 }

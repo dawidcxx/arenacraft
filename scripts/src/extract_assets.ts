@@ -14,8 +14,8 @@
  * destination afterwards and the client directory is left untouched.
  */
 import { Command } from "commander";
-import { join, resolve } from "node:path";
-import { cpSync, existsSync, mkdtempSync, renameSync, rmSync, symlinkSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { repoRoot } from "./lib/repo.ts";
 
@@ -27,12 +27,24 @@ program
   .option("--dest <dir>", "output directory for the extracted data", join(repoRoot, "data"))
   .option("--bin <path>", "path to the ac binary", join(repoRoot, "zig-out", "bin", "ac"))
   .option("--with-mmaps", "also run the (slow) mmaps_generator", false)
+  .option("--force", "allow writing outside data/", false)
   .parse(process.argv);
 
-const opts = program.opts<{ clientDir: string; dest: string; bin: string; withMmaps: boolean }>();
+const opts = program.opts<{ clientDir: string; dest: string; bin: string; withMmaps: boolean; force: boolean }>();
 const clientDir = resolve(opts.clientDir);
 const dest = resolve(opts.dest);
 const bin = resolve(opts.bin);
+
+const dataDir = join(repoRoot, "data");
+const forbiddenDests = new Set([resolve("/"), resolve(repoRoot), ...(process.env.HOME ? [resolve(process.env.HOME)] : [])]);
+if (forbiddenDests.has(dest)) {
+  console.error(`refusing to extract into ${dest}`);
+  process.exit(1);
+}
+if (!opts.force && dest !== dataDir && !dest.startsWith(dataDir + sep)) {
+  console.error(`refusing to extract outside ${dataDir} without --force: ${dest}`);
+  process.exit(1);
+}
 
 if (!existsSync(clientDir)) {
   console.error(`client dir not found: ${clientDir}`);
@@ -46,6 +58,8 @@ if (!existsSync(bin)) {
   console.error(`ac binary not found: ${bin} (run 'zig build ac' first)`);
   process.exit(1);
 }
+mkdirSync(dest, { recursive: true });
+
 const workdir = mkdtempSync(join(tmpdir(), "ac-extract-"));
 symlinkSync(join(clientDir, "Data"), join(workdir, "Data"), "dir");
 console.log(`client:   ${clientDir}`);

@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * Publishes fake soloq events to Redis so soloq listeners (the Discord bot,
  * custom tooling, ...) can be exercised without running the WoW core.
@@ -7,10 +8,10 @@
  * standalone: it does not import from apps/ac-bot.
  *
  * Usage:
- *   bun run scripts/emit-fake-event.ts --channel matchup --instance 123 \
+ *   bun run scripts/emit_fake_event --channel matchup --instance 123 \
  *       --team-a ALPHA,BRAVO,CHARLIE --team-b DELTA,ECHO,FOXTROT
- *   bun run scripts/emit-fake-event.ts --channel ended --instance 123 --winner teamB
- *   bun run scripts/emit-fake-event.ts --channel both --delay 5000
+ *   bun run scripts/emit_fake_event --channel ended --instance 123 --winner teamB
+ *   bun run scripts/emit_fake_event --channel both --delay 5000
  *
  * `--finished false` publishes an aborted match; `--winner teamA|teamB` picks
  * the winning side for a finished match (default teamA).
@@ -149,7 +150,7 @@ function average(values: number[]): number {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (args.help !== undefined) {
-    console.log("See the header of scripts/emit-fake-event.ts for usage.");
+    console.log("See the header of scripts/emit_fake_event for usage.");
     return;
   }
 

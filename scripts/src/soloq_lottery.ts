@@ -22,8 +22,10 @@
  * printed alongside the account id. Bun loads .env automatically when run from
  * the repo root. Read-only, so the worldserver does not need a restart.
  */
+import { randomInt } from "node:crypto";
+
 import { Command } from "commander";
-import { connect, parseDbInfo, type DbInfo } from "./src/lib/db.ts";
+import { connect, parseDbInfo, type DbInfo } from "./lib/db.ts";
 
 const SOLOQ_ARENA_TYPE = 5; // ARENA_TYPE_5v5
 const DEFAULT_MIN_WINS = 5;
@@ -90,7 +92,7 @@ const rows = await sql`
   HAVING MAX(atm.seasonWins) >= ${minWins}
   ORDER BY games DESC`;
 
-const entries: Entry[] = rows.map((row) => {
+const entries: Entry[] = rows.map((row: { account: number; games: number | string; wins: number | string; characters: number | string }) => {
   const games = Number((row as { games: number | string }).games);
   const wins = Number((row as { wins: number | string }).wins);
   return {
@@ -150,7 +152,13 @@ if (entries.length === 0) {
   process.exit(1);
 }
 
-let roll = Math.floor(Math.random() * totalTickets);
+if (totalTickets <= 0) {
+  console.error("[characters] no tickets to draw");
+  await sql.end();
+  process.exit(1);
+}
+
+let roll = randomInt(totalTickets);
 let winner = entries[entries.length - 1]!;
 for (const entry of entries) {
   roll -= Math.max(entry.games, 0);

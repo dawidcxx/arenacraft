@@ -12,8 +12,9 @@
  *   ./scripts/bracket reset [--bracket ...] --yes
  *                                              save a snapshot, then reset ratings
  *                                              and records (teams/rosters are kept)
- *   ./scripts/bracket restore <name|file> --yes
- *                                              put a snapshot's standings back
+ *   ./scripts/bracket restore <name> --yes       restore from var/brackets/<name>.json
+ *   ./scripts/bracket restore <path> --file --yes
+ *                                              restore from an explicit path
  *
  * The worldserver keeps arena teams in memory and writes them back after every
  * game, so stop it (or restart it right after) before reset/restore - otherwise
@@ -50,6 +51,7 @@ const DEFAULT_CHARACTERS: DbInfo = {
   database: "acore_characters",
 };
 const snapshotDir = join(repoRoot, "var", "brackets");
+const SNAPSHOT_NAME_RE = /^[A-Za-z0-9._-]+$/;
 
 interface Snapshot {
   savedAt: string;
@@ -73,7 +75,7 @@ function db(): SQL {
 function parseBrackets(value: string): Bracket[] {
   const names = value.split(",").map((s) => s.trim()).filter(Boolean);
   for (const n of names) {
-    if (!(n in BRACKETS)) {
+    if (!Object.hasOwn(BRACKETS, n)) {
       console.error(`unknown bracket '${n}' (expected: ${Object.keys(BRACKETS).join(", ")})`);
       process.exit(1);
     }
@@ -87,6 +89,33 @@ function requireYes(yes: boolean | undefined, what: string): void {
   process.exit(1);
 }
 
+function snapshotPath(name: string): string {
+  const base = name.endsWith(".json") ? name.slice(0, -".json".length) : name;
+  if (base === "." || base === ".." || !SNAPSHOT_NAME_RE.test(base)) {
+    console.error(`invalid snapshot name '${name}' (use letters, digits, '.', '_' or '-')`);
+    process.exit(1);
+  }
+  return join(snapshotDir, `${base}.json`);
+}
+
+function assertSnapshot(snap: unknown): asserts snap is Snapshot {
+  if (snap === null || typeof snap !== "object") {
+    console.error("invalid snapshot: expected a JSON object");
+    process.exit(1);
+  }
+  const candidate = snap as Partial<Snapshot>;
+  if (typeof candidate.database !== "string" || typeof candidate.savedAt !== "string") {
+    console.error("invalid snapshot: missing savedAt/database");
+    process.exit(1);
+  }
+  for (const table of ["arena_team", "arena_team_member", "character_arena_stats"] as const) {
+    if (!Array.isArray(candidate[table])) {
+      console.error(`invalid snapshot: '${table}' is not an array`);
+      process.exit(1);
+    }
+  }
+}
+
 async function save(sql: SQL, name?: string): Promise<string> {
   const savedAt = new Date().toISOString();
   const snapshot: Snapshot = {
@@ -97,7 +126,7 @@ async function save(sql: SQL, name?: string): Promise<string> {
     character_arena_stats: [...(await sql`SELECT * FROM character_arena_stats`)],
   };
   await mkdir(snapshotDir, { recursive: true });
-  const file = join(snapshotDir, `${name ?? savedAt.replaceAll(":", "-")}.json`);
+  const file = snapshotPath(name ?? savedAt.replaceAll(":", "-"));
   if (await Bun.file(file).exists()) {
     console.error(`snapshot ${file} already exists, pick another name`);
     process.exit(1);
@@ -116,7 +145,7 @@ program
   .action(async (name?: string) => {
     const sql = db();
     await save(sql, name);
-    sql.end();
+    await sql.end();
   });
 
 program
@@ -157,19 +186,27 @@ program
         console.log(`[${b}] reset ${teams.count} teams, ${members.count} members, ${mmr.count} mmr rows`);
       }
     });
-    sql.end();
+    await sql.end();
     console.log("done - restart the world server (./scripts/restart_world) so it reloads the standings");
   });
 
 program
   .command("restore <snapshot>")
-  .description("restore standings from a snapshot name or .json path")
+  .description("restore standings from a snapshot name in var/brackets, or from a path with --file")
+  .option("-f, --file", "treat <snapshot> as a path instead of a snapshot name")
   .option("--yes", "actually do it")
-  .action(async (ref: string, opts: { yes?: boolean }) => {
+  .action(async (ref: string, opts: { yes?: boolean; file?: boolean }) => {
     requireYes(opts.yes, "restore");
-    const file = ref.endsWith(".json") ? resolve(ref) : join(snapshotDir, `${ref}.json`);
-    const snap = (await Bun.file(file).json()) as Snapshot;
+    const file = opts.file ? resolve(ref) : snapshotPath(ref);
+    const snap: unknown = await Bun.file(file).json();
+    assertSnapshot(snap);
     const sql = db();
+    const currentDatabase = String((await sql`SELECT DATABASE() AS db`)[0].db);
+    if (snap.database !== currentDatabase) {
+      console.error(`snapshot is from database '${snap.database}', connected to '${currentDatabase}'`);
+      await sql.end();
+      process.exit(1);
+    }
     await sql.begin(async (tx) => {
       for (const table of ["arena_team", "arena_team_member", "character_arena_stats"] as const) {
         await tx.unsafe(`DELETE FROM \`${table}\``);
@@ -179,7 +216,7 @@ program
         console.log(`restored ${rows.length} rows into ${table}`);
       }
     });
-    sql.end();
+    await sql.end();
     console.log(`restored snapshot from ${snap.savedAt} - restart the world server so it reloads the standings`);
   });
 

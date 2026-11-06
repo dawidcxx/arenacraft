@@ -1,16 +1,13 @@
 {
   "name": "scripts",
-  "module": "index.ts",
   "type": "module",
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "7"
+    "@types/bun": "latest",
+    "typescript": "^7"
   },
   "dependencies": {
     "commander": "^15.0.0",

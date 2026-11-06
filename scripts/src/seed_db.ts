@@ -7,16 +7,18 @@
  * updates are intentionally not applied; run `ac db-update` for those.
  *
  * Usage:
- *   ./scripts/seed_db mysql://root:acore@localhost:3306
- *   ./scripts/seed_db 'localhost;3306;root;acore'
- *   ./scripts/seed_db 'root;acore'                 (localhost:3306)
+ *   ./scripts/seed_db [--yes] mysql://root:acore@localhost:3306
+ *   ./scripts/seed_db [--yes] 'localhost;3306;root;acore'
+ *   ./scripts/seed_db [--yes] 'root;acore'         (localhost:3306)
  *
+ * Prompts before writing; --yes skips the confirmation.
  * No AC_* environment variables are read.
  */
 import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { connect, splitStatements, type DbInfo } from "./lib/db.ts";
 import { repoRoot } from "./lib/repo.ts";
+import { confirmDestructive, describeTarget } from "./lib/safety.ts";
 
 const DBS = ["auth", "characters", "world"] as const;
 type DbName = (typeof DBS)[number];
@@ -27,12 +29,14 @@ const DATABASE_FOR_DB: Record<DbName, string> = {
   world: "acore_world",
 };
 
-const USAGE = `usage: seed_db <admin-connection>
+const USAGE = `usage: seed_db [--yes] <admin-connection>
 
   admin-connection:
     mysql://user:password@host:port
     host;port;user;password
     user;password                  (uses localhost:3306)
+
+  --yes    skip the interactive confirmation
 
 example:
   ./scripts/seed_db mysql://root:acore@localhost:3306`;
@@ -48,11 +52,11 @@ function parseAdminConnection(value: string): DbInfo {
     try {
       url = new URL(value);
     } catch {
-      fail(`invalid connection URL: ${value}`);
+      fail("invalid connection URL (expected mysql://user:password@host:port)");
     }
 
     if (!url.username)
-      fail(`missing username in connection URL: ${value}`);
+      fail("missing username in connection URL");
 
     return {
       hostname: url.hostname || "127.0.0.1",
@@ -77,7 +81,7 @@ function parseAdminConnection(value: string): DbInfo {
     };
   }
 
-  fail(`invalid connection string: ${value}\n\n${USAGE}`);
+  fail(`invalid connection string\n\n${USAGE}`);
 }
 
 async function listSqlFiles(dir: string): Promise<string[]> {
@@ -149,7 +153,9 @@ async function seedDatabase(name: DbName): Promise<void> {
   console.log(`${label} seeded ${files.length} base files (${statements} statements)`);
 }
 
-const args = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
+const yes = rawArgs.includes("--yes") || rawArgs.includes("-y");
+const args = rawArgs.filter((arg) => arg !== "--yes" && arg !== "-y");
 const connectionArg = args[0];
 if (args.length !== 1 || !connectionArg || connectionArg === "-h" || connectionArg === "--help") {
   console.log(USAGE);
@@ -157,6 +163,11 @@ if (args.length !== 1 || !connectionArg || connectionArg === "-h" || connectionA
 }
 
 const admin = parseAdminConnection(connectionArg);
+await confirmDestructive({
+  action: "create and seed the acore databases on",
+  target: describeTarget(admin),
+  yes,
+});
 
 console.log("creating databases and the acore user");
 await applyCreateScript(admin);

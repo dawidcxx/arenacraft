@@ -4,10 +4,10 @@
         {
             "label": "install",
             "type": "shell",
-            "command": "bun",
+            "command": "zig",
             "args": [
-                "run",
-                "${workspaceFolder}/scripts/bin/install"
+                "build",
+                "ac"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -16,7 +16,7 @@
         {
             "label": "kill",
             "type": "shell",
-            "command": "pkill -9 worldserver || true",
+            "command": "pkill -9 -f 'ac worldserver' || true",
             "options": {
                 "cwd": "${workspaceFolder}"
             }

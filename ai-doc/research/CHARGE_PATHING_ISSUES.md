@@ -160,7 +160,7 @@ verbatim at `MotionMaster.cpp:729-736` with no ground re-check at finalize
 ## Useful commands / tooling
 
 - `zig build ac` to verify a change compiles. Do not parse `compile_commands.json`.
-- Re-extract with mmaps: `bun scripts/extract_assets.ts --with-mmaps`.
+- Re-extract with mmaps: `bun scripts/extract_assets --with-mmaps`.
 - Generator knobs actually supported: `--maxAngle` (45–60), `--bigBaseUnit`,
   `--skipLiquid`, `--skipContinents`, `--skipJunkMaps`, `--skipBattlegrounds`,
   `--tile`, `--threads`, `--file` (`src/tools/mmaps_generator/PathGenerator.cpp:62-235`).

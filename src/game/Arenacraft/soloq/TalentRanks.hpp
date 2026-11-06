@@ -6,7 +6,7 @@
 // that knows the first rank without the max rank. Keep this list conservative:
 // only single-rank talents are included, so a multi-rank partial build is never
 // flagged. Regenerate with:
-//   bun scripts/src/gen_talent_rank_rules.ts
+//   bun scripts/gen_talent_rank_rules
 #pragma once
 
 #include <array>

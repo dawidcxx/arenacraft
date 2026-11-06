@@ -7,8 +7,10 @@
  * rating (MMR) plus its high-water mark reset to 1500, and all win/loss counters
  * (season and week) zeroed out.
  *
- *   ./scripts/reset_soloq
  *   ./scripts/reset_soloq --dry-run
+ *   ./scripts/reset_soloq --yes
+ *
+ * Interactive confirmation is required unless --yes is passed.
  *
  * Connects to the characters database via AC_CHARACTER_DATABASE_INFO (same
  * "host;port;user;password;db" format the core uses); defaults to the local
@@ -20,7 +22,8 @@
  * ratings back over the reset.
  */
 import { Command } from "commander";
-import { connect, parseDbInfo, type DbInfo } from "./src/lib/db.ts";
+import { connect, parseDbInfo, type DbInfo } from "./lib/db.ts";
+import { confirmDestructive, describeTarget } from "./lib/safety.ts";
 
 const SOLOQ_ARENA_TYPE = 5; // ARENA_TYPE_5v5
 const SOLOQ_ARENA_SLOT = 2; // ARENA_SLOT_5v5
@@ -40,6 +43,7 @@ interface Options {
   rating: string;
   mmr: string;
   dryRun: boolean;
+  yes: boolean;
 }
 
 const program = new Command();
@@ -50,6 +54,7 @@ program
   .option("--rating <value>", "team and personal rating to set", String(DEFAULT_RATING))
   .option("--mmr <value>", "matchmaker rating to set", String(DEFAULT_MMR))
   .option("--dry-run", "show what would be reset without changing anything")
+  .option("--yes", "skip the interactive confirmation")
   .parse(process.argv);
 
 const opts = program.opts<Options>();
@@ -76,42 +81,53 @@ const memberRows = await sql`
 const teamCount = Number((teamRows[0] as { n: number }).n);
 const memberCount = Number((memberRows[0] as { n: number }).n);
 
+console.log(`[characters] target ${describeTarget(info)}`);
 console.log(
   `[characters] ${teamCount} SoloQ team(s), ${memberCount} member(s) -> rating ${rating}, MMR ${mmr}, stats zeroed`,
 );
 
-if (opts.dryRun) {
+const mode = await confirmDestructive({
+  action: "reset SoloQ ratings on",
+  target: describeTarget(info),
+  yes: opts.yes,
+  dryRun: opts.dryRun,
+  allowDryRun: true,
+});
+
+if (mode === "dry-run") {
   console.log("[characters] dry run, nothing changed");
   await sql.end();
   process.exit(0);
 }
 
-await sql.unsafe(
-  `UPDATE arena_team
-   SET rating = ?, seasonGames = 0, seasonWins = 0, weekGames = 0, weekWins = 0
-   WHERE type = ?`,
-  [rating, SOLOQ_ARENA_TYPE],
-);
+await sql.begin(async (tx) => {
+  await tx.unsafe(
+    `UPDATE arena_team
+     SET rating = ?, seasonGames = 0, seasonWins = 0, weekGames = 0, weekWins = 0
+     WHERE type = ?`,
+    [rating, SOLOQ_ARENA_TYPE],
+  );
 
-await sql.unsafe(
-  `UPDATE arena_team_member atm
-   JOIN arena_team at ON at.arenaTeamId = atm.arenaTeamId
-   SET atm.personalRating = ?,
-       atm.seasonGames = 0, atm.seasonWins = 0,
-       atm.weekGames = 0, atm.weekWins = 0
-   WHERE at.type = ?`,
-  [rating, SOLOQ_ARENA_TYPE],
-);
+  await tx.unsafe(
+    `UPDATE arena_team_member atm
+     JOIN arena_team at ON at.arenaTeamId = atm.arenaTeamId
+     SET atm.personalRating = ?,
+         atm.seasonGames = 0, atm.seasonWins = 0,
+         atm.weekGames = 0, atm.weekWins = 0
+     WHERE at.type = ?`,
+    [rating, SOLOQ_ARENA_TYPE],
+  );
 
-await sql.unsafe(
-  `INSERT INTO character_arena_stats (guid, slot, matchMakerRating, maxMMR)
-   SELECT atm.guid, ?, ?, ?
-   FROM arena_team_member atm
-   JOIN arena_team at ON at.arenaTeamId = atm.arenaTeamId
-   WHERE at.type = ?
-   ON DUPLICATE KEY UPDATE matchMakerRating = ?, maxMMR = ?`,
-  [SOLOQ_ARENA_SLOT, mmr, mmr, SOLOQ_ARENA_TYPE, mmr, mmr],
-);
+  await tx.unsafe(
+    `INSERT INTO character_arena_stats (guid, slot, matchMakerRating, maxMMR)
+     SELECT atm.guid, ?, ?, ?
+     FROM arena_team_member atm
+     JOIN arena_team at ON at.arenaTeamId = atm.arenaTeamId
+     WHERE at.type = ?
+     ON DUPLICATE KEY UPDATE matchMakerRating = ?, maxMMR = ?`,
+    [SOLOQ_ARENA_SLOT, mmr, mmr, SOLOQ_ARENA_TYPE, mmr, mmr],
+  );
+});
 
 console.log(
   `[characters] reset ${teamCount} SoloQ team(s) and ${memberCount} member(s) to rating ${rating}, MMR ${mmr}, stats zeroed`,

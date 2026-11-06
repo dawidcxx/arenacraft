@@ -3,9 +3,9 @@
  * dbc_dump - inspect a WoW 3.3.5 client database (WDBC) file.
  *
  * Examples:
- *   bun scripts/src/dbc_dump.ts Faction --name-field 23 --search cenarion
- *   bun scripts/src/dbc_dump.ts data/dbc/Faction.dbc -n 23 -f 1,18
- *   bun scripts/src/dbc_dump.ts Spell -n 136 --json --limit 5
+ *   bun scripts/dbc_dump Faction --name-field 23 --search cenarion
+ *   bun scripts/dbc_dump data/dbc/Faction.dbc -n 23 -f 1,18
+ *   bun scripts/dbc_dump Spell -n 136 --json --limit 5
  */
 import { Command } from "commander";
 import { readDbc, resolveDbcPath } from "./lib/dbc.ts";
