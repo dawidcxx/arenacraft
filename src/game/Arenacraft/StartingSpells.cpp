@@ -173,7 +173,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48941, // rank 9
          48942, // rank 10
          498,   // Divine Protection
-              // Lay on Hands
+                // Lay on Hands
          633,   // rank 1
          2800,  // rank 2
          10310, // rank 3
@@ -195,7 +195,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48782, // rank 13
          642,   // Divine Shield
          750,   // Plate Mail
-              // Hammer of Justice
+                // Hammer of Justice
          853,   // rank 1
          5588,  // rank 2
          5589,  // rank 3
@@ -217,7 +217,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          1038,  // Hand of Salvation
          1044,  // Hand of Freedom
          1152,  // Purify
-               // Holy Wrath
+                // Holy Wrath
          2812,  // rank 1
          10318, // rank 2
          27139, // rank 3
@@ -227,7 +227,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          4987,  // Cleanse
          5502,  // Sense Undead
          6940,  // Hand of Sacrifice
-               // Retribution Aura
+                // Retribution Aura
          7294,  // rank 1
          10298, // rank 2
          10299, // rank 3
@@ -324,7 +324,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48937, // rank 4
          48938, // rank 5
          25898, // Greater Blessing of Kings
-         25899, // Greater Blessing of Sanctuary
                 // Consecration
          26573, // rank 1
          20116, // rank 2
@@ -368,7 +367,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          883,   // Call Pet
          982,   // Revive Pet
          1002,  // Eyes of the Beast
-               // Hunter's Mark
+                // Hunter's Mark
          1130,  // rank 1
          14323, // rank 2
          14324, // rank 3
@@ -376,7 +375,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          53338, // rank 5
          1462,  // Beast Lore
          1494,  // Track Beasts
-               // Mongoose Bite
+                // Mongoose Bite
          1495,  // rank 1
          14269, // rank 2
          14270, // rank 3
@@ -400,7 +399,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          14327, // rank 3
          1515,  // Tame Beast
          1543,  // Flare
-               // Serpent Sting
+                // Serpent Sting
          1978,  // rank 1
          13549, // rank 2
          13550, // rank 3
@@ -414,7 +413,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          49000, // rank 11
          49001, // rank 12
          2641,  // Dismiss Pet
-               // Multi-Shot
+                // Multi-Shot
          2643,  // rank 1
          14288, // rank 2
          14289, // rank 3
@@ -438,7 +437,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          2974,  // Wing Clip
          3034,  // Viper Sting
          3043,  // Scorpid Sting
-               // Arcane Shot
+                // Arcane Shot
          3044,  // rank 1
          14281, // rank 2
          14282, // rank 3
@@ -538,10 +537,10 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48656, // rank 11
          48657, // rank 12
                 // Kidney Shot
-         408,  // rank 1
-         8643, // rank 2
-         674,  // Dual Wield
-              // Garrote
+         408,   // rank 1
+         8643,  // rank 2
+         674,   // Dual Wield
+                // Garrote
          703,   // rank 1
          8631,  // rank 2
          8632,  // rank 3
@@ -554,7 +553,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48676, // rank 10
          921,   // Pick Pocket
          1725,  // Distract
-               // Sinister Strike
+                // Sinister Strike
          1752,  // rank 1
          1757,  // rank 2
          1758,  // rank 3
@@ -573,12 +572,12 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          1804,  // Pick Lock
          1833,  // Cheap Shot
          1842,  // Disarm Trap
-               // Vanish
+                // Vanish
          1856,  // rank 1
          1857,  // rank 2
          26889, // rank 3
          1860,  // Safe Fall
-               // Rupture
+                // Rupture
          1943,  // rank 1
          8639,  // rank 2
          8640,  // rank 3
@@ -598,7 +597,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48658, // rank 7
          48659, // rank 8
          2094,  // Blind
-               // Eviscerate
+                // Eviscerate
          2098,  // rank 1
          6760,  // rank 2
          6761,  // rank 3
@@ -612,25 +611,25 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48667, // rank 11
          48668, // rank 12
          2836,  // Detect Traps
-               // Sprint
+                // Sprint
          2983,  // rank 1
          8696,  // rank 2
          11305, // rank 3
          3127,  // Parry
-               // Slice and Dice
-         5171, // rank 1
-         6774, // rank 2
-               // Evasion
+                // Slice and Dice
+         5171,  // rank 1
+         6774,  // rank 2
+                // Evasion
          5277,  // rank 1
          26669, // rank 2
          5938,  // Shiv
-               // Sap
+                // Sap
          6770,  // rank 1
          2070,  // rank 2
          11297, // rank 3
          51724, // rank 4
          8647,  // Expose Armor
-               // Ambush
+                // Ambush
          8676,  // rank 1
          8724,  // rank 2
          8725,  // rank 3
@@ -688,12 +687,12 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48067, // rank 13
          48068, // rank 14
          453,   // Mind Soothe
-              // Dispel Magic
-         527, // rank 1
-         988, // rank 2
-         528, // Cure Disease
-         552, // Abolish Disease
-              // Smite
+                // Dispel Magic
+         527,   // rank 1
+         988,   // rank 2
+         528,   // Cure Disease
+         552,   // Abolish Disease
+                // Smite
          585,   // rank 1
          591,   // rank 2
          598,   // rank 3
@@ -707,7 +706,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48122, // rank 11
          48123, // rank 12
          586,   // Fade
-              // Inner Fire
+                // Inner Fire
          588,   // rank 1
          7128,  // rank 2
          602,   // rank 3
@@ -739,7 +738,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          25308, // rank 6
          48072, // rank 7
          605,   // Mind Control
-              // Shadow Protection
+                // Shadow Protection
          976,   // rank 1
          10957, // rank 2
          10958, // rank 3
@@ -755,7 +754,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          25389, // rank 7
          48161, // rank 8
          1706,  // Levitate
-               // Resurrection
+                // Resurrection
          2006,  // rank 1
          2010,  // rank 2
          10880, // rank 3
@@ -764,15 +763,15 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          25435, // rank 6
          48171, // rank 7
                 // Lesser Heal
-         2050, // rank 1
-         2052, // rank 2
-         2053, // rank 3
-               // Heal
-         2054, // rank 1
-         2055, // rank 2
-         6063, // rank 3
-         6064, // rank 4
-               // Greater Heal
+         2050,  // rank 1
+         2052,  // rank 2
+         2053,  // rank 3
+                // Heal
+         2054,  // rank 1
+         2055,  // rank 2
+         6063,  // rank 3
+         6064,  // rank 4
+                // Greater Heal
          2060,  // rank 1
          10963, // rank 2
          10964, // rank 3
@@ -808,7 +807,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48299, // rank 8
          48300, // rank 9
          6346,  // Fear Ward
-               // Mind Blast
+                // Mind Blast
          8092,  // rank 1
          8102,  // rank 2
          8103,  // rank 3
@@ -828,7 +827,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          10888, // rank 3
          10890, // rank 4
          8129,  // Mana Burn
-               // Shackle Undead
+                // Shackle Undead
          9484,  // rank 1
          9485,  // rank 2
          10955, // rank 3
@@ -979,8 +978,8 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
      }},
     {CLASS_SHAMAN,
      {
-         131, // Water Breathing
-              // Lightning Shield
+         131,   // Water Breathing
+                // Lightning Shield
          324,   // rank 1
          325,   // rank 2
          905,   // rank 3
@@ -1008,9 +1007,9 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          49272, // rank 13
          49273, // rank 14
                 // Purge
-         370,  // rank 1
-         8012, // rank 2
-               // Lightning Bolt
+         370,   // rank 1
+         8012,  // rank 2
+                // Lightning Bolt
          403,   // rank 1
          529,   // rank 2
          548,   // rank 3
@@ -1037,7 +1036,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          526,   // Cure Toxins
          546,   // Water Walking
          556,   // Astral Recall
-              // Chain Heal
+                // Chain Heal
          1064,  // rank 1
          10622, // rank 2
          10623, // rank 3
@@ -1068,7 +1067,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          2645,  // Ghost Wolf
          2825,  // Bloodlust
          2894,  // Fire Elemental Totem
-               // Searing Totem
+                // Searing Totem
          3599,  // rank 1
          6363,  // rank 2
          6364,  // rank 3
@@ -1080,7 +1079,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          58703, // rank 9
          58704, // rank 10
          3738,  // Wrath of Air Totem
-               // Healing Stream Totem
+                // Healing Stream Totem
          5394,  // rank 1
          6375,  // rank 2
          6377,  // rank 3
@@ -1112,7 +1111,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          58582, // rank 10
          6196,  // Far Sight
          6495,  // Sentry Totem
-               // Lesser Healing Wave
+                // Lesser Healing Wave
          8004,  // rank 1
          8008,  // rank 2
          8010,  // rank 3
@@ -1200,7 +1199,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          8143,  // Tremor Totem
          8170,  // Cleansing Totem
          8177,  // Grounding Totem
-               // Frost Resistance Totem
+                // Frost Resistance Totem
          8181,  // rank 1
          10478, // rank 2
          10479, // rank 3
@@ -1242,7 +1241,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          58804, // rank 8
          8512,  // Windfury Totem
          8737,  // Mail
-               // Nature Resistance Totem
+                // Nature Resistance Totem
          10595, // rank 1
          10600, // rank 2
          10601, // rank 3
@@ -1291,7 +1290,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          42939, // rank 8
          42940, // rank 9
          66,    // Invisibility
-             // Frostbolt
+                // Frostbolt
          116,   // rank 1
          205,   // rank 2
          837,   // rank 3
@@ -1330,7 +1329,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27088, // rank 5
          42917, // rank 6
          130,   // Slow Fall
-              // Fireball
+                // Fireball
          133,   // rank 1
          143,   // rank 2
          145,   // rank 3
@@ -1348,11 +1347,11 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          42832, // rank 15
          42833, // rank 16
                 // Frost Armor
-         168,  // rank 1
-         7300, // rank 2
-         7301, // rank 3
-         475,  // Remove Curse
-              // Fire Ward
+         168,   // rank 1
+         7300,  // rank 2
+         7301,  // rank 3
+         475,   // Remove Curse
+                // Fire Ward
          543,   // rank 1
          8457,  // rank 2
          8458,  // rank 3
@@ -1422,7 +1421,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          43019, // rank 8
          43020, // rank 9
          1953,  // Blink
-               // Flamestrike
+                // Flamestrike
          2120,  // rank 1
          2121,  // rank 2
          8422,  // rank 3
@@ -1445,7 +1444,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          42872, // rank 10
          42873, // rank 11
          2139,  // Counterspell
-               // Scorch
+                // Scorch
          2948,  // rank 1
          8444,  // rank 2
          8445,  // rank 3
@@ -1536,9 +1535,9 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
      }},
     {CLASS_WARLOCK,
      {
-         126, // Eye of Kilrogg
-         132, // Detect Invisibility
-              // Corruption
+         126,   // Eye of Kilrogg
+         132,   // Detect Invisibility
+                // Corruption
          172,   // rank 1
          6222,  // rank 2
          6223,  // rank 3
@@ -1580,10 +1579,10 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          47808, // rank 12
          47809, // rank 13
                 // Demon Skin
-         687, // rank 1
-         696, // rank 2
-         688, // Summon Imp
-              // Drain Life
+         687,   // rank 1
+         696,   // rank 2
+         688,   // Summon Imp
+                // Drain Life
          689,   // rank 1
          699,   // rank 2
          709,   // rank 3
@@ -1594,7 +1593,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27220, // rank 8
          47857, // rank 9
          691,   // Summon Felhunter
-              // Create Soulstone
+                // Create Soulstone
          693,   // rank 1
          20752, // rank 2
          20755, // rank 3
@@ -1604,7 +1603,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          47884, // rank 7
          697,   // Summon Voidwalker
          698,   // Ritual of Summoning
-              // Curse of Weakness
+                // Curse of Weakness
          702,   // rank 1
          1108,  // rank 2
          6205,  // rank 3
@@ -1627,7 +1626,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          710,   // rank 1
          18647, // rank 2
          712,   // Summon Succubus
-              // Health Funnel
+                // Health Funnel
          755,   // rank 1
          3698,  // rank 2
          3699,  // rank 3
@@ -1660,7 +1659,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27217, // rank 5
          47855, // rank 6
          1122,  // Inferno
-               // Life Tap
+                // Life Tap
          1454,  // rank 1
          1455,  // rank 2
          1456,  // rank 3
@@ -1676,7 +1675,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          27228, // rank 4
          47865, // rank 5
          1710,  // Summon Felsteed
-               // Curse of Tongues
+                // Curse of Tongues
          1714,  // rank 1
          11719, // rank 2
                 // Hellfire
@@ -1693,11 +1692,11 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          47886, // rank 5
          47888, // rank 6
          5138,  // Drain Mana
-               // Howl of Terror
+                // Howl of Terror
          5484,  // rank 1
          17928, // rank 2
          5500,  // Sense Demons
-               // Searing Pain
+                // Searing Pain
          5676,  // rank 1
          17919, // rank 2
          17920, // rank 3
@@ -1709,7 +1708,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          47814, // rank 9
          47815, // rank 10
          5697,  // Unending Breath
-               // Rain of Fire
+                // Rain of Fire
          5740,  // rank 1
          6219,  // rank 2
          11677, // rank 3
@@ -1718,11 +1717,11 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          47819, // rank 6
          47820, // rank 7
                 // Fear
-         5782, // rank 1
-         6213, // rank 2
-         6215, // rank 3
-         5784, // Felsteed
-               // Create Healthstone
+         5782,  // rank 1
+         6213,  // rank 2
+         6215,  // rank 3
+         5784,  // Felsteed
+                // Create Healthstone
          6201,  // rank 1
          6202,  // rank 2
          5699,  // rank 3
@@ -1828,7 +1827,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48447, // rank 7
          768,   // Cat Form
          770,   // Faerie Fire
-              // Rejuvenation
+                // Rejuvenation
          774,   // rank 1
          1058,  // rank 2
          1430,  // rank 3
@@ -1855,7 +1854,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48562, // rank 8
          783,   // Travel Form
          1066,  // Aquatic Form
-               // Rip
+                // Rip
          1079,  // rank 1
          9492,  // rank 2
          9493,  // rank 3
@@ -1902,7 +1901,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          18658, // rank 3
          2782,  // Remove Curse
          2893,  // Abolish Poison
-               // Soothe Animal
+                // Soothe Animal
          2908,  // rank 1
          8955,  // rank 2
          9901,  // rank 3
@@ -1919,7 +1918,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48464, // rank 9
          48465, // rank 10
          3025,  // Cat Form (Passive)
-               // Wrath
+                // Wrath
          5176,  // rank 1
          5177,  // rank 2
          5178,  // rank 3
@@ -1949,12 +1948,12 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48377, // rank 14
          48378, // rank 15
          5209,  // Challenging Roar
-               // Bash
-         5211, // rank 1
-         6798, // rank 2
-         8983, // rank 3
-         5215, // Prowl
-               // Tiger's Fury
+                // Bash
+         5211,  // rank 1
+         6798,  // rank 2
+         8983,  // rank 3
+         5215,  // Prowl
+                // Tiger's Fury
          5217,  // rank 1
          6793,  // rank 2
          9845,  // rank 3
@@ -1973,10 +1972,10 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48572, // rank 9
          5225,  // Track Humanoids
          5229,  // Enrage
-               // Bear Form
-         5487, // rank 1
-         9634, // rank 2
-               // Ravage
+                // Bear Form
+         5487,  // rank 1
+         9634,  // rank 2
+                // Ravage
          6785,  // rank 1
          6787,  // rank 2
          9866,  // rank 3
@@ -1985,7 +1984,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48578, // rank 6
          48579, // rank 7
          6795,  // Growl
-               // Maul
+                // Maul
          6807,  // rank 1
          6808,  // rank 2
          6809,  // rank 3
@@ -2025,7 +2024,7 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          48442, // rank 11
          48443, // rank 12
          8946,  // Cure Poison
-               // Cower
+                // Cower
          8998,  // rank 1
          9000,  // rank 2
          9892,  // rank 3

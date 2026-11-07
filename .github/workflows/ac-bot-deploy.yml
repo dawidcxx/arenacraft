@@ -47,4 +47,3 @@ jobs:
         run: |
           echo "Deployment hook for $IMAGE:${{ inputs.tag }}"
           echo "commit=${{ github.sha }}"
-          echo "TODO: call the downstream webhook here"
