@@ -224,19 +224,29 @@ Arena::Arena()
   StartMessageIds[BG_STARTING_EVENT_FOURTH] = ARENA_TEXT_START_BATTLE_HAS_BEGUN;
 }
 
+void Arena::UpdatePerTick(uint32 diff)
+{
+  // Arenacraft: a replay stage dispatches its recorded packets on the world
+  // tick, not the throttled battleground update, so movement arrives at ~100 Hz
+  // instead of in BATTLEGROUND_UPDATE_INTERVAL bursts.
+  if (!m_ReplayPlayback)
+    return;
+
+  // Once that is over, drop the invite that kept the empty arena alive so it
+  // gets deleted.
+  if (!m_ReplayPlayback->update(this, diff))
+  {
+    m_ReplayPlayback.reset();
+    DecreaseInvitedCount(TEAM_ALLIANCE);
+  }
+}
+
 bool Arena::PreUpdateImpl(uint32 diff)
 {
-  // Arenacraft: a replay stage only drives its playback. Once that is over,
-  // drop the invite that kept the empty arena alive so it gets deleted.
+  // Arenacraft: a replay stage only drives its playback (UpdatePerTick); the
+  // live arena logic below must not run for it.
   if (m_ReplayPlayback)
-  {
-    if (!m_ReplayPlayback->update(this, diff))
-    {
-      m_ReplayPlayback.reset();
-      DecreaseInvitedCount(TEAM_ALLIANCE);
-    }
     return true;
-  }
 
   if (!m_TeamsMarked)
   {

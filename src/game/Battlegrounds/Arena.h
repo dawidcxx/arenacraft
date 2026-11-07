@@ -87,6 +87,10 @@ private:
   // overrides this, so Arena's implementation reaches every arena map.
   bool PreUpdateImpl(uint32 diff) override;
 
+  // Arenacraft: drives a replay stage's playback every world tick (see
+  // Arena.cpp), independently of the battleground update interval.
+  void UpdatePerTick(uint32 diff) override;
+
   // Arenacraft: starting-box supplies (mage Refreshment Table / warlock
   // Soulwell), tracked per team and per kind (0 = table, 1 = soulwell) so we
   // only ever drop one of each.
