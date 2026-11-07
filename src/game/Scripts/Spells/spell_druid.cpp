@@ -18,6 +18,7 @@
 #include "Containers.h"
 #include "CreatureScript.h"
 #include "GridNotifiers.h"
+#include "OmenOfClarity.hpp"
 #include "Player.h"
 #include "SpellAuraEffects.h"
 #include "SpellMgr.h"
@@ -234,6 +235,13 @@ class spell_dru_omen_of_clarity : public AuraScript
 
     if (eventInfo.GetTypeMask() & PROC_FLAG_DONE_SPELL_MELEE_DMG_CLASS)
     {
+      // arenacraft: Shred and Mangle also proc it (at the weapon-speed PPM, like auto attacks)
+      SpellInfo const* firstRank = spellInfo->GetFirstRankSpell();
+      if (firstRank && arenacraft::ooc::isExtraMeleeProcSpell(firstRank->Id))
+      {
+        return true;
+      }
+
       return spellInfo->HasAttribute(SPELL_ATTR0_ON_NEXT_SWING) ||
              spellInfo->HasAttribute(SPELL_ATTR0_ON_NEXT_SWING_NO_DAMAGE);
     }
