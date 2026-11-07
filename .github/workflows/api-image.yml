@@ -1,5 +1,5 @@
 # Build and publish the public SoloQ ladder API image (apps/api) to GHCR.
-# The core runtime image lives in image.yml; PR compile checks live in check.yml.
+# The core runtime image lives in image.yml.
 name: api-image
 
 on:

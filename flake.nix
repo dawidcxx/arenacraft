@@ -74,20 +74,6 @@
             # header-only unit testing framework
             shellHook = buildShellHook [ pkgs.doctest ];
           };
-
-          # Minimal build-only environment for CI. Keep this in sync with the
-          # libraries required by zig-build/Deps.zig, but omit the developer
-          # tooling so the Nix closure and GitHub Actions cache stay small.
-          ci = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
-            nativeBuildInputs = [
-              pkgs.zig_0_16
-              pkgs.pkg-config
-            ]
-            ++ buildLibraries
-            ++ [ pkgs.mysql84 ];
-
-            shellHook = buildShellHook [ ];
-          };
         };
       }
     );

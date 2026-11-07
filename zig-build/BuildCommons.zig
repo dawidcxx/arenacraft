@@ -194,18 +194,6 @@ pub const AcGraph = struct {
 
         const run_step = bl.step("run-ac", "Build and run the ac master executable");
         run_step.dependOn(&run.step);
-
-        // `zig build check-ac` - compile everything without emitting a binary.
-        // The compile step has no install/run artifact, so Zig passes
-        // -fno-emit-bin; this is the PR compile check.
-        const check = bl.addExecutable(.{
-            .name = "ac-check",
-            .root_module = try self.createAcModule(b),
-        });
-        check.rdynamic = true;
-
-        const check_step = bl.step("check-ac", "Compile ac without emitting a binary");
-        check_step.dependOn(&check.step);
     }
 };
 

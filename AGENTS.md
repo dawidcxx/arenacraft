@@ -34,12 +34,10 @@ patch the code path instead when the rule is ours.
   (or `GIT_COMMIT`/`GIT_BRANCH`/`GIT_DATE`, used by the Docker build). It is
   exposed via `GitRevision`, `--version`, the startup banner and `.server info`.
 - `zig build run-ac [-- <args>]` — build + run `ac`, forwarding args.
-- `zig build check-ac` — compile everything without emitting an executable;
-  PR CI runs this through `nix develop .#ci`.
 - `zig build test-build` — dep/link smoke test.
-- CI: `.github/workflows/check.yml` is the PR compile check (Nix, no Docker);
-  `.github/workflows/image.yml` publishes `ghcr.io/dawidcxx/arenacraft:local`
-  on pushes to `local` and prunes older GHCR versions;
+- CI: `.github/workflows/image.yml` builds the image on pull requests (cache
+  warm-up, no push) and publishes `ghcr.io/dawidcxx/arenacraft:local` on pushes
+  to `local`, pruning older GHCR versions;
   `.github/workflows/api-image.yml` publishes `ghcr.io/dawidcxx/arenacraft-api:latest`;
   `.github/workflows/ac-bot-image.yml` publishes `ghcr.io/dawidcxx/arenacraft-bot:latest`;
   `.github/workflows/ac-bot-deploy.yml` is the manual (local-only) deployment hook for it.

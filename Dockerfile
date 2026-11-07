@@ -27,9 +27,6 @@ ARG GIT_BRANCH=unknown
 ARG GIT_DATE=unknown
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GIT_COMMIT=${GIT_COMMIT}
-ENV GIT_BRANCH=${GIT_BRANCH}
-ENV GIT_DATE=${GIT_DATE}
 
 # gcc is only here so zig can introspect the host libc: when link_libc is set
 # and a native C compiler is present, zig uses the system libc (/usr/include
@@ -66,6 +63,10 @@ COPY build.zig build.zig.zon ./
 COPY zig-build zig-build
 COPY src src
 COPY deps deps
+
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+ENV GIT_DATE=${GIT_DATE}
 
 # The three caches are owned by buildah/podman, not by the host checkout: the
 # explicit ids give them a stable, project-scoped key so a nix host's

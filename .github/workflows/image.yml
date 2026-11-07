@@ -1,12 +1,24 @@
 # Build and publish the linux/amd64 runtime image on pushes to `local` that
-# touch its build inputs. Only rebuild when something the Dockerfile actually
-# consumes changes - API/docs/compose-only commits must not pay for a fat image
-# build. PR compile checks live in check.yml and do not build Docker images.
+# touch its build inputs, and build it on pull requests to warm the cache (the
+# runtime image is never pushed from a PR). Only rebuild when something the
+# Dockerfile actually consumes changes - API/docs/compose-only commits must not
+# pay for a fat image build.
 name: image
 
 on:
   push:
     branches: [local]
+    paths:
+      - 'src/**'
+      - 'deps/**'
+      - 'zig-build/**'
+      - 'build.zig'
+      - 'build.zig.zon'
+      - 'data/sql/updates/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/image.yml'
+  pull_request:
     paths:
       - 'src/**'
       - 'deps/**'
@@ -45,7 +57,6 @@ jobs:
         id: buildx
 
       - name: Log in to GHCR
-        if: github.ref == 'refs/heads/local'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -72,8 +83,7 @@ jobs:
       # export through --cache-to/--cache-from. Keep it in a small GHCR image
       # instead of the shared 10 GB Actions cache: pull it into the builder's
       # cache mounts before the build and snapshot the mounts back afterwards.
-      # This keeps a fresh commit to "recompile changed files + link", without
-      # competing with check.yml (which is the workflow that fills the quota).
+      # This keeps a fresh commit to "recompile changed files + link".
       - name: Resolve Zig cache image
         id: zigcache
         run: |
@@ -105,7 +115,7 @@ jobs:
           RUN --mount=type=cache,id=arenacraft-zig-global,target=/dst --mount=type=bind,from=cache,source=/zig-global,target=/src cp -a /src/. /dst/
           EOF
 
-      - name: Build and push
+      - name: Build
         id: build
         uses: docker/build-push-action@v7
         with:
@@ -121,7 +131,7 @@ jobs:
             GIT_BRANCH=${{ github.ref_name }}
             GIT_DATE=${{ steps.revision.outputs.date }}
           cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=min
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max,ignore-error=true
           provenance: false
 
       # Push a single manifest: provenance/SBOM attestations turn the tag into
@@ -131,7 +141,7 @@ jobs:
       # Also after a failed build (e.g. a compile error): everything compiled until then is still worth keeping. Only
       # when the build step actually ran - otherwise the mounts are empty and would overwrite a good cache.
       - name: Save Zig cache
-        if: ${{ !cancelled() && github.ref == 'refs/heads/local' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
         env:
           BUILDER: ${{ steps.buildx.outputs.name }}
         run: |
