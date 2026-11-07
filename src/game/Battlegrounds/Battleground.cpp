@@ -246,6 +246,10 @@ Battleground::~Battleground()
 
 void Battleground::Update(uint32 diff)
 {
+  // Arenacraft: replay packet dispatch runs at the world loop rate; the rest of
+  // the battleground logic stays throttled by BATTLEGROUND_UPDATE_INTERVAL.
+  UpdatePerTick(diff);
+
   // pussywizard:
   m_UpdateTimer += diff;
   if (m_UpdateTimer < BATTLEGROUND_UPDATE_INTERVAL)

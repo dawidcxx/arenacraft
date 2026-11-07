@@ -442,3 +442,88 @@ half for players.
   was already working. Relogin was only ever needed because root/position state
   could not self-heal, which the above changes address by not splitting the
   state.
+
+---
+
+# Addendum 3: replay dispatch + observer smoothness plan (2026-11-07)
+
+Status: replay dispatch **implemented**; the live movement items below are a
+**plan only** (nothing else changed).
+
+## Applied: replay packet dispatch is no longer quantized to the BG tick
+
+The replay used to advance only inside `Arena::PreUpdateImpl`, reached through
+`Battleground::Update`'s `BATTLEGROUND_UPDATE_INTERVAL` gate, so recorded packets
+were flushed in 100 ms (previously 1 s) bursts. 10 Hz was "less bad" but still
+snapped visibly, because each event is delivered up to 100 ms after its
+timestamp.
+
+Fix:
+- `Battleground` gained `UpdatePerTick`, called from the top of
+  `Battleground::Update` before the interval gate; `Arena` overrides it to drive
+  the playback with the real world diff (`Battleground.cpp`, `Arena.cpp`
+  `UpdatePerTick`).
+- `BATTLEGROUND_UPDATE_INTERVAL` is back to `1000`; only replay dispatch runs at
+  the world/map rate (~100 Hz; `MapUpdateInterval` default 10 ms,
+  `World.cpp:691`; sessions are updated from `Map.cpp:756`).
+- `Arena::PreUpdateImpl` now only keeps live arena logic off while a replay stage
+  is active.
+
+Why this is the right shape: the client already dead-reckons recorded players;
+the replay only has to deliver the original `MSG_MOVE_*` on their real timeline.
+No server-side spline synthesis / position interpolation is needed and none
+should be added — it would duplicate the client's prediction.
+
+## Observations that drive the live plan
+
+- Movement updates are inherently sparse: state-change opcodes plus a heartbeat
+  only every ~0.5 s (`TargetedMovementGenerator.cpp:439`); the client
+  interpolates. So "10 Hz" was never a rendering rate — it was a worst-case
+  delay between a packet's timestamp and its delivery.
+- If a replay still micro-teleports after the fix, the artifact is in the
+  recorded live stream, i.e. the live movement issues below.
+- Observer sharpness for high-latency players has three concrete suspects:
+  1. `SynchronizeMovement` rewrites relayed timestamps using
+     `_timeSyncClockDelta` (`MovementHandler.cpp:412-424`), re-estimated every
+     10 s in >=25 ms steps (`ComputeNewClockDelta`, `:928-959`). Introduced by
+     `5f328c8bd` ("backport: movement improvements"), not upstream AC. Each jump
+     re-bases the stream -> one-frame correction for every observer; noisier for
+     high RTT.
+  2. Spline lock (`VerifyMovementInfo` drops while `!movespline->Finalized()`,
+     `:474-482`) has no player spline-done handshake; `CMSG_MOVE_SPLINE_DONE` is
+     taxi-only (`TaxiHandler.cpp:207`). Charge/leap/knockback then snap.
+  3. `ReadMovementInfo` flag stripping (`WorldSession.cpp:997+`) can relay a
+     different movement state than the client is in.
+
+## Plan (not applied)
+
+**Phase 0 — instrument first.**
+Per-player debug telemetry (env/config gated): movement opcode + client time +
+server receive time + current clock delta; delta changes (old->new, RTT);
+spline-lock drops (opcode, spline age); flag-strip hits. One arena session
+decides whether 150 ms players suffer delta jumps or spline/charge drops.
+
+**Phase 1 — stabilize the timestamp base (low risk).**
+- Prefer the **lowest-RTT** sample's delta over the filtered mean.
+- **Freeze `_timeSyncClockDelta` after convergence**, or clamp each change to a
+  few ms, instead of >=25 ms steps every 10 s.
+- Rate-limit/demote the per-packet fallback `LOG_INFO` (`MovementHandler.cpp:417`).
+- If still not smooth: experiment with relaying the raw client timestamp (keep
+  `m_movementInfo` server-based if any server logic needs it) and compare. Note
+  `BuildMovementPacket` emits `GameTime::GetGameTimeMS()` (`Unit.cpp:20428`), so
+  the create-block base is server time - validate the first-move edge case
+  before shipping passthrough.
+
+**Phase 2 — close the spline loop (biggest arena win).**
+Port the vmangos pattern (§9.3): handle `CMSG_MOVE_SPLINE_DONE` for player
+splines, validate the reported end against the spline destination, clear the
+lock there and adopt the validated position; add a "launched" state (§9.4) so
+charge/leap/knockback landings skip fall/teleport heuristics.
+
+**Phase 3 — trim remaining divergence.**
+Flag-stripping audit (§3.D; keep only strips that prevent observer freezes) and
+the under-map sustained-trigger guard (§3.A, Phase 1.3).
+
+Verification for each phase: `zig build ac`, `zig build test`, then manual arena
+testing (charge/leap/knockback + a high-latency client) and replay playback of
+the same match.
