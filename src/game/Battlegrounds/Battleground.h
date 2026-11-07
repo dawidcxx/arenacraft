@@ -194,7 +194,7 @@ enum BattlegroundStartTimeIntervals
   BG_START_DELAY_NONE = 0,      // ms
 };
 
-#define BATTLEGROUND_UPDATE_INTERVAL 100
+#define BATTLEGROUND_UPDATE_INTERVAL 1000
 
 enum BattlegroundBuffObjects
 {
@@ -873,6 +873,20 @@ private:
   std::string m_Name{};
 
   /* Pre- and post-update hooks */
+
+  /**
+   * @brief Per-world-tick hook.
+   *
+   * Will be called on every worldserver update loop, before the
+   * BATTLEGROUND_UPDATE_INTERVAL throttling. Use it for time-critical work
+   * that must not be quantized to the battleground update interval.
+   *
+   * @param diff a time difference between two worldserver update loops in
+   * milliseconds.
+   *
+   * @see Update(), PreUpdateImpl().
+   */
+  virtual void UpdatePerTick(uint32 /* diff */) {}
 
   /**
    * @brief Pre-update hook.

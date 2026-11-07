@@ -54,9 +54,12 @@ Playback (`Playback`):
 - creates a private, unrated, never-started copy of the arena (not in the free
   slot queue, kept alive by a fake invite), and teleports the viewer in as a
   spectator (same path as `.spect`).
-- `Arena::PreUpdateImpl` drives it: recorded packets are resent on their
-  original timeline; `MSG_MOVE_*` timestamps are shifted to the current server
-  clock. The recorded players exist only on the viewer's client.
+- `Arena::UpdatePerTick` drives it on every world tick (not the throttled
+  battleground update), so recorded packets are dispatched at the world loop
+  rate (~100 Hz) instead of in `BATTLEGROUND_UPDATE_INTERVAL` bursts: they are
+  resent on their original timeline and `MSG_MOVE_*` timestamps are shifted to
+  the current server clock. The recorded players exist only on the viewer's
+  client.
 - after the last packet the viewer is sent back after 10 s.
 
 ## Seeking and pause
