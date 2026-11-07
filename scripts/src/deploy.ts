@@ -11,17 +11,28 @@
  * Works with podman or docker (auto-detected). Native amd64 builds directly; a
  * cross-arch build on Linux falls back to binfmt/qemu emulation, slow but cached.
  *
- *   ./scripts/deploy
+ *   ./scripts/deploy          # arenacraft:prod (world + auth)
+ *   ./scripts/deploy --ptr    # arenacraft:ptr (PTR world)
  *
  * ARENACRAFT_HOST overrides the ssh target (default arenacraft@netcupbox).
  */
 import { $ } from "bun";
+import { Command } from "commander";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "./lib/repo.ts";
 
+const program = new Command();
+program
+  .name("deploy")
+  .description("Build the core image and load it on the target.")
+  .option("--ptr", "build and ship the PTR image (arenacraft:ptr) instead of prod")
+  .parse(process.argv);
+
+const { ptr } = program.opts<{ ptr: boolean }>();
+
 const target = process.env.ARENACRAFT_HOST ?? "arenacraft@netcupbox";
-const image = "arenacraft:local";
+const image = ptr ? "arenacraft:ptr" : "arenacraft:prod";
 const platform = "linux/amd64";
 const remoteEngine = "podman";
 const fmt = "{{.Architecture}}";
@@ -152,4 +163,4 @@ const remoteArch = await capture("remote inspect", () =>
 if (remoteArch !== targetArch) fail(`target has the wrong arch: ${remoteArch}, want ${targetArch}`);
 console.log(`loaded on ${target} (${remoteArch})`);
 
-console.log(`\nnext: ./scripts/restart_world`);
+console.log(`\nnext: ./scripts/restart_world${ptr ? " --ptr" : ""}`);
