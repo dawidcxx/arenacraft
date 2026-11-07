@@ -12150,6 +12150,10 @@ uint32 Unit::SpellDamageBonusTaken(Unit* caster, SpellInfo const* spellProto, ui
           AddPct(TakenTotalMod, (*i)->GetAmount());
   }
 
+  // arenacraft: Deep Wounds (12721) carries SPELL_ATTR6_IGNORE_CASTER_DAMAGE_MODIFIERS, which otherwise filters out
+  // bleed-damage bonuses (Trauma, Mangle) as well. Keep applying positive mechanic-taken modifiers for it.
+  bool const isDeepWounds = spellProto->Id == 12721;
+
   if (uint32 mechanicMask = spellProto->GetAllEffectsMechanicMask())
   {
     int32                 modifierMax    = 0;
@@ -12157,7 +12161,8 @@ uint32 Unit::SpellDamageBonusTaken(Unit* caster, SpellInfo const* spellProto, ui
     AuraEffectList const& auraEffectList = GetAuraEffectsByType(SPELL_AURA_MOD_MECHANIC_DAMAGE_TAKEN_PERCENT);
     for (AuraEffectList::const_iterator i = auraEffectList.begin(); i != auraEffectList.end(); ++i)
     {
-      if (!spellProto->ValidateAttribute6SpellDamageMods(caster, *i, damagetype == DOT))
+      if (!spellProto->ValidateAttribute6SpellDamageMods(caster, *i, damagetype == DOT) &&
+          !(isDeepWounds && (*i)->GetAmount() > 0))
         continue;
 
       // Only death knight spell with this aura
