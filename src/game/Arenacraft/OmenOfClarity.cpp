@@ -29,13 +29,15 @@ float spellProcChance(uint32_t castTimeMs, SpellKind kind)
   return ppmChance * keep;
 }
 
-bool isExtraMeleeProcSpell(uint32_t firstRankSpellId)
+bool procsAtWeaponSpeed(uint32_t firstRankSpellId)
 {
   switch (firstRankSpellId)
   {
   case 5221:  // Shred
   case 33876: // Mangle (Cat)
   case 33878: // Mangle (Bear)
+  case 16979: // Feral Charge (Bear)
+  case 49376: // Feral Charge (Cat)
     return true;
   default:
     return false;

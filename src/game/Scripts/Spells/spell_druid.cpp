@@ -237,7 +237,7 @@ class spell_dru_omen_of_clarity : public AuraScript
     {
       // arenacraft: Shred and Mangle also proc it (at the weapon-speed PPM, like auto attacks)
       SpellInfo const* firstRank = spellInfo->GetFirstRankSpell();
-      if (firstRank && arenacraft::ooc::isExtraMeleeProcSpell(firstRank->Id))
+      if (firstRank && arenacraft::ooc::procsAtWeaponSpeed(firstRank->Id))
       {
         return true;
       }

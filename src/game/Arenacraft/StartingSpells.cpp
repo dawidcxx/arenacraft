@@ -2037,12 +2037,6 @@ std::unordered_map<uint8, std::vector<uint32>> const ClassSpells = {
          9827,  // rank 3
          27006, // rank 4
          49803, // rank 5
-                // Pounce Bleed
-         9007,  // rank 1
-         9824,  // rank 2
-         9826,  // rank 3
-         27007, // rank 4
-         49804, // rank 5
                 // Nature's Grasp
          16689, // rank 1
          16810, // rank 2

@@ -24,7 +24,8 @@ inline constexpr uint32_t MinCastTimeMs  = 1500;
 // Chance in percent (0..100) for one proc roll.
 float spellProcChance(uint32_t castTimeMs, SpellKind kind);
 
-// Melee abilities that also proc Omen of Clarity on top of auto attacks and on-next-swing attacks (Maul). They keep the
-// DB weapon-speed PPM: 5% per Shred/Mangle in cat form (1.0s attack time), 14% per bear Mangle (2.5s, 6s cooldown).
-bool isExtraMeleeProcSpell(uint32_t firstRankSpellId);
+// Abilities that also proc Omen of Clarity on top of auto attacks and on-next-swing attacks (Maul). They keep the DB
+// weapon-speed PPM instead of the spell chance: 5% per Shred/Mangle/Feral Charge in cat form (1.0s attack time), 14%
+// per bear Mangle/Feral Charge (2.5s).
+bool procsAtWeaponSpeed(uint32_t firstRankSpellId);
 } // namespace arenacraft::ooc
