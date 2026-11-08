@@ -18,7 +18,9 @@ namespace arenacraft::replay
 // client renders the match as if it were live. The server never instantiates
 // the recorded players - they exist only on the viewer's client.
 //
-// Driven from Arena::PreUpdateImpl of that private arena (world thread).
+// Driven from Arena::UpdatePerTick of that private arena (world thread, every
+// world tick), so recorded packets are dispatched at the world loop rate rather
+// than the throttled battleground update interval.
 class Playback
 {
 public:
