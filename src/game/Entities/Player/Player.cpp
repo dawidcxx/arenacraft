@@ -12003,8 +12003,9 @@ void Player::ApplyEquipCooldown(Item* pItem)
     // xinef: apply hidden cooldown for procs
     if (spellData.SpellTrigger == ITEM_SPELLTRIGGER_ON_EQUIP)
     {
-      // xinef: uint32(-1) special marker for proc cooldowns
-      AddSpellCooldown(spellData.SpellId, uint32(-1), 30 * IN_MILLISECONDS);
+      // arenacraft: shorter 8s window so passive/proc equip effects come up quickly after swapping
+      // uint32(-1) is the special marker for proc cooldowns (checked in Unit::ProcDamageAndSpellFor)
+      AddSpellCooldown(spellData.SpellId, uint32(-1), 8 * IN_MILLISECONDS);
       continue;
     }
 
