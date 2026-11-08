@@ -8,7 +8,8 @@ float spellProcChance(uint32_t castTimeMs, SpellKind kind)
 {
   // instants and channels are measured like a 1.5s cast
   uint32_t const measuredMs = kind == SpellKind::CastTime ? std::max(castTimeMs, MinCastTimeMs) : MinCastTimeMs;
-  float const    ppmChance  = measuredMs / 1000.0f * ProcsPerMinute / 60.0f * 100.0f;
+  float const    ppm        = kind == SpellKind::Instant ? InstantProcsPerMinute : ProcsPerMinute;
+  float const    ppmChance  = measuredMs / 1000.0f * ppm / 60.0f * 100.0f;
 
   float keep = 1.0f;
   switch (kind)
@@ -17,7 +18,7 @@ float spellProcChance(uint32_t castTimeMs, SpellKind kind)
     keep = 2.0f / 3.0f;
     break;
   case SpellKind::Instant:
-    keep = 1.0f - 0.924f;
+    keep = 1.0f - 0.33f; // arenacraft: 8.75% * 0.67 = 5.86% (Blizzard: 92.4% fail)
     break;
   case SpellKind::MultiTarget:
     keep = 0.25f;
