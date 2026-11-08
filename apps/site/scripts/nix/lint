@@ -1,0 +1,6 @@
+if [ ! -d .git ]; then
+  echo "This script must be run from the repository root"
+  exit 1
+fi
+
+oxlint -c ./config/.oxlintrc.json

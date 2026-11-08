@@ -1,0 +1,24 @@
+if [ ! -d .git ]; then
+  echo "This script must be run from the repository root"
+  exit 1
+fi
+
+clean_path() {
+  echo "Removing $1"
+  rm -rf "$1"
+}
+
+echo "Cleaning up build artifacts and node_modules..."
+
+clean_path ./node_modules
+clean_path ./packages/backend/node_modules
+clean_path ./packages/backend/dist
+clean_path ./packages/common/node_modules
+clean_path ./packages/common/dist
+clean_path ./packages/web/node_modules
+clean_path ./packages/web/dist
+
+clean_path ./packages/web/tsconfig.app.tsbuildinfo
+clean_path ./packages/web/tsconfig.node.tsbuildinfo
+
+echo "Clean complete."

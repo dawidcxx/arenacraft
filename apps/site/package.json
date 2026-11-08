@@ -1,0 +1,19 @@
+{
+  "name": "arenacraft",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run build:common && bun run dev:backend & bun run dev:web & bun run dev:common",
+    "typecheck": "bun --filter '*' typecheck",
+    "dev:backend": "bun --filter @arenacraft/backend dev",
+    "dev:web": "bun --filter @arenacraft/web dev",
+    "dev:common": "bun --filter @arenacraft/common dev",
+    "build:backend": "bun --filter @arenacraft/backend build",
+    "build:web": "bun --filter @arenacraft/web build",
+    "build:common": "bun --filter @arenacraft/common build",
+    "test": "bun --filter '*' test"
+  }
+}

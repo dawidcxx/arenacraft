@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "server": {
+    "port": 4096
+  },
+  "lsp": true,
+  "mcp": {
+    "@upstash/context7-mcp@latest": {
+      "type": "local",
+      "command": ["bunx", "-y", "@upstash/context7-mcp@latest"]
+    }
+  }
+}

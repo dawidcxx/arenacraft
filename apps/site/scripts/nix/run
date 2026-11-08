@@ -1,0 +1,7 @@
+if [ ! -d .git ]; then
+  echo "This script must be run from the repository root"
+  exit 1
+fi
+
+export NODE_ENV=production
+bun ./packages/backend/dist/main.js

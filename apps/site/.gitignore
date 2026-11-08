@@ -1,0 +1,31 @@
+# Logs
+logs
+*.log
+
+node_modules
+dist
+dist-ssr
+*.local
+!.env.local
+.objects
+.objects/
+.storage
+.storage/
+.storage-test
+.storage-test/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.direnv
+backup/
+*.tsbuildinfo
+
+.playwright-mcp

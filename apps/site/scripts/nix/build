@@ -1,0 +1,8 @@
+if [ ! -d .git ]; then
+  echo "This script must be run from the repository root"
+  exit 1
+fi
+
+bun run build:common
+bun run build:web
+bun run build:backend

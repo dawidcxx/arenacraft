@@ -1,0 +1,13 @@
+name: arenacraft
+
+services:
+  app:
+    image: arenacraft:local
+    profiles:
+      - full
+    environment:
+      DATA_SOURCE: dummy
+      PORT: 8080
+      HOST: 0.0.0.0
+    ports:
+      - "6663:8080"
