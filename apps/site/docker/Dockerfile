@@ -21,6 +21,8 @@ COPY ./packages/web ./packages/web
 COPY ./packages/common ./packages/common
 
 # Build shared package, frontend and backend
+# The site is mounted under /site on the host reverse proxy.
+ENV VITE_BASE=/site/
 RUN bun run build:common
 RUN bun run build:web
 RUN bun run build:backend

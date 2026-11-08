@@ -5,6 +5,8 @@ import { defineConfig } from "vite";
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Defaults to root for `bun run dev`; the production image sets VITE_BASE=/site/.
+  base: process.env.VITE_BASE ?? "/",
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
