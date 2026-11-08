@@ -17990,12 +17990,18 @@ bool Unit::IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackTyp
   }
 
   // arenacraft: Omen of Clarity on spells is measured on the spell's cast time, not on the druid's weapon speed (a
-  // staff made it ~20% per spell). Auto attacks and melee abilities keep the weapon-speed rate.
+  // staff made it ~20% per spell). Auto attacks and melee abilities keep the weapon-speed rate, as do Shred, Mangle
+  // and Feral Charge (which are not all melee damage class).
   if (spellProto->Id == 16864 && !isVictim && procSpell && procSpell->DmgClass != SPELL_DAMAGE_CLASS_MELEE)
   {
-    chance = OmenOfClaritySpellChance(this, procSpell, eventInfo.GetProcSpell());
-    if (chance <= 0.0f)
-      return false;
+    SpellInfo const* firstRank    = procSpell->GetFirstRankSpell();
+    bool const       weaponSpeed = firstRank && arenacraft::ooc::procsAtWeaponSpeed(firstRank->Id);
+    if (!weaponSpeed)
+    {
+      chance = OmenOfClaritySpellChance(this, procSpell, eventInfo.GetProcSpell());
+      if (chance <= 0.0f)
+        return false;
+    }
   }
 
   // Custom chances

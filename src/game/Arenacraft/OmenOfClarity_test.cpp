@@ -2,7 +2,7 @@
 
 #include "OmenOfClarity.hpp"
 
-using arenacraft::ooc::isExtraMeleeProcSpell;
+using arenacraft::ooc::procsAtWeaponSpeed;
 using arenacraft::ooc::SpellKind;
 using arenacraft::ooc::spellProcChance;
 
@@ -29,11 +29,13 @@ TEST_CASE("omen of clarity: no spell reaches the old ~20% weapon-speed chance of
   CHECK(spellProcChance(3500, SpellKind::CastTime) < 20.0f);
 }
 
-TEST_CASE("omen of clarity: shred and mangle are extra melee proc abilities")
+TEST_CASE("omen of clarity: shred, mangle and feral charge proc at the weapon-speed rate")
 {
-  CHECK(isExtraMeleeProcSpell(5221));  // Shred
-  CHECK(isExtraMeleeProcSpell(33876)); // Mangle (Cat)
-  CHECK(isExtraMeleeProcSpell(33878)); // Mangle (Bear)
-  CHECK_FALSE(isExtraMeleeProcSpell(6807));  // Maul goes through the on-next-swing path
-  CHECK_FALSE(isExtraMeleeProcSpell(22568)); // Ferocious Bite
+  CHECK(procsAtWeaponSpeed(5221));  // Shred
+  CHECK(procsAtWeaponSpeed(33876)); // Mangle (Cat)
+  CHECK(procsAtWeaponSpeed(33878)); // Mangle (Bear)
+  CHECK(procsAtWeaponSpeed(16979)); // Feral Charge (Bear)
+  CHECK(procsAtWeaponSpeed(49376)); // Feral Charge (Cat)
+  CHECK_FALSE(procsAtWeaponSpeed(6807));  // Maul goes through the on-next-swing path
+  CHECK_FALSE(procsAtWeaponSpeed(22568)); // Ferocious Bite
 }
