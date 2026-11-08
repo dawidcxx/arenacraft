@@ -447,8 +447,9 @@ half for players.
 
 # Addendum 3: replay dispatch + observer smoothness plan (2026-11-07)
 
-Status: replay dispatch **implemented**; the live movement items below are a
-**plan only** (nothing else changed).
+Status: replay dispatch **implemented**; clock-delta stabilization (partial
+Phase 1) **implemented 2026-11-08**; the remaining live movement items below
+are still a **plan only**.
 
 ## Applied: replay packet dispatch is no longer quantized to the BG tick
 
@@ -494,6 +495,24 @@ should be added — it would duplicate the client's prediction.
      taxi-only (`TaxiHandler.cpp:207`). Charge/leap/knockback then snap.
   3. `ReadMovementInfo` flag stripping (`WorldSession.cpp:997+`) can relay a
      different movement state than the client is in.
+
+## Applied 2026-11-08: clock-delta stabilization (partial Phase 1)
+
+`ComputeNewClockDelta` (`MovementHandler.cpp:924`) now:
+
+- selects the filtered sample with the **lowest RTT** instead of the mean of
+  all filtered samples (tightest RTT/2 error bound, no latency-proportional
+  averaging noise);
+- keeps the first estimate, then moves `_timeSyncClockDelta` toward later
+  estimates by at most **5 ms per time-sync response** (every 10 s), replacing
+  the old `>25 ms` one-shot re-base.
+
+Rationale: the true server/client clock offset is constant over a match; only
+*changes* to the timestamp base are visible to observers (the client
+interpolates packet-to-packet deltas, so a constant bias is invisible). The old
+deadband made corrections rare but large, so every 10 s wall-clock reset
+re-based the stream and snapped every observer - worse for high RTT. Phase 1's
+log rate-limit and the raw-timestamp passthrough experiment remain open.
 
 ## Plan (not applied)
 

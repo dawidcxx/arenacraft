@@ -929,6 +929,7 @@ void WorldSession::ComputeNewClockDelta()
 
   std::vector<uint32> latencies;
   std::vector<int64>  clockDeltasAfterFiltering;
+  std::vector<uint32> latenciesAfterFiltering;
 
   for (auto& pair : _timeSyncClockDeltaQueue.content())
     latencies.push_back(pair.second);
@@ -936,21 +937,39 @@ void WorldSession::ComputeNewClockDelta()
   uint32 latencyMedian            = median(latencies);
   uint32 latencyStandardDeviation = standard_deviation(latencies);
 
-  uint32 sampleSizeAfterFiltering = 0;
   for (auto& pair : _timeSyncClockDeltaQueue.content())
   {
     if (pair.second <= latencyMedian + latencyStandardDeviation)
     {
       clockDeltasAfterFiltering.push_back(pair.first);
-      sampleSizeAfterFiltering++;
+      latenciesAfterFiltering.push_back(pair.second);
     }
   }
 
-  if (sampleSizeAfterFiltering != 0)
+  if (!clockDeltasAfterFiltering.empty())
   {
-    int64 meanClockDelta = static_cast<int64>(mean(clockDeltasAfterFiltering));
-    if (std::abs(meanClockDelta - _timeSyncClockDelta) > 25)
-      _timeSyncClockDelta = meanClockDelta;
+    // Prefer the lowest-RTT sample: its RTT/2 rounding error has the smallest worst-case bound.
+    // Averaging pulls in latency-dependent noise, which is precisely what hurts high-latency clients.
+    size_t bestIndex = 0;
+    for (size_t i = 1; i < latenciesAfterFiltering.size(); ++i)
+      if (latenciesAfterFiltering[i] < latenciesAfterFiltering[bestIndex])
+        bestIndex = i;
+
+    int64 bestClockDelta = clockDeltasAfterFiltering[bestIndex];
+
+    if (_timeSyncClockDelta == 0)
+    {
+      _timeSyncClockDelta = bestClockDelta;
+    }
+    else
+    {
+      // The physical clock delta is constant; apparent changes are estimator noise. A one-shot
+      // re-base shifts the timestamp of every relayed packet, so every observer snaps. A constant
+      // offset is harmless for interpolation - only changes to the base are visible. Track the
+      // target in small steps instead of jumping.
+      constexpr int64 maxStep = 5;
+      _timeSyncClockDelta += std::clamp<int64>(bestClockDelta - _timeSyncClockDelta, -maxStep, maxStep);
+    }
   }
   else if (_timeSyncClockDelta == 0)
   {
