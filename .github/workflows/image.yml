@@ -1,8 +1,9 @@
 # Build and publish the linux/amd64 runtime image on pushes to `local` that
-# touch its build inputs, and build it on pull requests to warm the cache (the
-# runtime image is never pushed from a PR). Only rebuild when something the
-# Dockerfile actually consumes changes - API/docs/compose-only commits must not
-# pay for a fat image build.
+# touch its build inputs, and build it on pull requests to validate against the
+# mainline cache (the runtime image is never pushed from a PR, and only `local`
+# writes the cache). Only rebuild when something the Dockerfile actually
+# consumes changes - API/docs/compose-only commits must not pay for a fat image
+# build.
 name: image
 
 on:
@@ -45,6 +46,7 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/dawidcxx/arenacraft
+  CACHE_IMAGE: ghcr.io/dawidcxx/arenacraft-cache
 
 jobs:
   image:
@@ -80,24 +82,24 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
       # Zig's cache lives in RUN --mount=type=cache, which BuildKit cannot
-      # export through --cache-to/--cache-from. Keep it in a small GHCR image
-      # instead of the shared 10 GB Actions cache: pull it into the builder's
-      # cache mounts before the build and snapshot the mounts back afterwards.
-      # This keeps a fresh commit to "recompile changed files + link".
+      # export through --cache-to/--cache-from. Keep it in a dedicated GHCR
+      # package (separate from the published image, so the cleanup job can keep
+      # exactly the latest tagged snapshot without touching anything else):
+      # pull it into the builder's cache mounts before the build and snapshot
+      # the mounts back afterwards. This keeps a fresh commit to "recompile
+      # changed files + link".
       - name: Resolve Zig cache image
         id: zigcache
         run: |
-          ref="$IMAGE:zigcache"
-          # Only reuse a plain image manifest. An OCI index (e.g. one carrying
-          # provenance attestations) has untagged child manifests that the
-          # cleanup job deletes, which leaves the tag unresolvable at pull time.
-          media="$(docker buildx imagetools inspect "$ref" --raw 2>/dev/null | jq -r '.mediaType // empty' 2>/dev/null || true)"
-          case "$media" in
-            application/vnd.oci.image.manifest.v1+json|application/vnd.docker.distribution.manifest.v2+json)
-              echo "image=$ref" >> "$GITHUB_OUTPUT" ;;
-            *)
-              echo "image=docker.io/library/busybox:latest" >> "$GITHUB_OUTPUT" ;;
-          esac
+          ref="$CACHE_IMAGE:zigcache"
+          # The Save step always pushes a plain manifest (provenance/sbom
+          # disabled), so the only case to handle is the very first run, before
+          # the tag exists.
+          if docker buildx imagetools inspect "$ref" >/dev/null 2>&1; then
+            echo "image=$ref" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=docker.io/library/busybox:latest" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Inject Zig cache
         env:
@@ -130,24 +132,24 @@ jobs:
             GIT_COMMIT=${{ github.sha }}
             GIT_BRANCH=${{ github.ref_name }}
             GIT_DATE=${{ steps.revision.outputs.date }}
-          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max,ignore-error=true
+          # No cross-run layer cache: the builder-stage layers are trivial next
+          # to the Zig cache, and a registry cache export is an OCI index, which
+          # cannot coexist with untagged-version pruning. Re-add via type=gha if
+          # the apt/zig-download layers ever matter.
           provenance: false
 
-      # Push a single manifest: provenance/SBOM attestations turn the tag into
-      # an OCI index whose untagged child manifests the cleanup job removes,
-      # leaving the tag broken on the next pull. Keep in sync with the resolve
-      # check above (which refuses to reuse an index).
+      # Push a single manifest (provenance/sbom off) to the dedicated cache
+      # package; cleanup keeps only the latest tagged snapshot there.
       # Also after a failed build (e.g. a compile error): everything compiled until then is still worth keeping. Only
       # when the build step actually ran - otherwise the mounts are empty and would overwrite a good cache.
       - name: Save Zig cache
-        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
+        if: ${{ !cancelled() && github.ref == 'refs/heads/local' && (steps.build.outcome == 'success' || steps.build.outcome == 'failure') }}
         env:
           BUILDER: ${{ steps.buildx.outputs.name }}
         run: |
           ctx="$(mktemp -d)"
           docker buildx build --builder "$BUILDER" -f - "$ctx" --platform linux/amd64 \
-            --tag "$IMAGE:zigcache" --provenance=false --sbom=false --push <<'EOF'
+            --tag "$CACHE_IMAGE:zigcache" --provenance=false --sbom=false --push <<'EOF'
           # syntax=docker/dockerfile:1
           FROM docker.io/library/busybox:latest
           RUN --mount=type=cache,id=arenacraft-zig-cache,target=/c1 --mount=type=cache,id=arenacraft-zig-pkg,target=/c2 --mount=type=cache,id=arenacraft-zig-global,target=/c3 mkdir -p /zig-cache /zig-pkg /zig-global && cp -a /c1/. /zig-cache/ && cp -a /c2/. /zig-pkg/ && cp -a /c3/. /zig-global/
@@ -164,6 +166,16 @@ jobs:
       - uses: actions/delete-package-versions@v5
         with:
           package-name: arenacraft
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0
+      # The Zig cache image is a plain manifest (no child manifests), so
+      # untagged-version pruning keeps the current tagged snapshot and drops
+      # older ones. Never point this rule at a registry *cache* export: that is
+      # an OCI index whose untagged children are required by the current tag.
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: arenacraft-cache
           package-type: container
           delete-only-untagged-versions: true
           min-versions-to-keep: 0
