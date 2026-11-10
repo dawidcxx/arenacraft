@@ -23,7 +23,7 @@ public:
 
   // Flex mode relaxes the melee/caster/healer composition rule: a team may field
   // any two DPS (melee or caster) plus one healer instead of exactly one of each
-  // role. Class stacking within a team is still rejected. Off by default.
+  // role. Class stacking within a team is still rejected. On by default.
   void               setFlexMode(bool value) { _flex = value; }
   [[nodiscard]] bool flexMode() const { return _flex; }
 
@@ -84,7 +84,7 @@ private:
 
   std::vector<Entry> _entries;
   uint64_t           _nextSequence = 0;
-  bool               _flex         = false;
+  bool               _flex         = true;
   AvoidCheck         _avoids;
 };
 } // namespace arenacraft::soloq

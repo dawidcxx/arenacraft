@@ -114,6 +114,7 @@ TEST_CASE("SoloqQueue needs two players of every role before matching")
 TEST_CASE("a match is two teams of one melee, one caster and one healer")
 {
   SoloqQueue queue;
+  queue.setFlexMode(false);
   addSet(queue, 100, 1500, 1500, 1500);
 
   std::vector<Match> const matches = queue.update(0ms);
@@ -262,6 +263,7 @@ TEST_CASE("SoloqQueue builds teams without regard to faction")
 {
   // Faction is not a matchmaking input, so a team can freely mix races.
   SoloqQueue mixed;
+  mixed.setFlexMode(false);
   mixed.playerAddToQueue(melee(1, InitialMmr, TEAM_ALLIANCE));
   mixed.playerAddToQueue(melee(2, InitialMmr, TEAM_ALLIANCE));
   mixed.playerAddToQueue(caster(3, InitialMmr, TEAM_HORDE));
@@ -280,6 +282,7 @@ TEST_CASE("SoloqQueue builds teams without regard to faction")
   }
 
   SoloqQueue sixHorde;
+  sixHorde.setFlexMode(false);
   sixHorde.playerAddToQueue(melee(1, InitialMmr, TEAM_HORDE));
   sixHorde.playerAddToQueue(melee(2, InitialMmr, TEAM_HORDE));
   sixHorde.playerAddToQueue(caster(3, InitialMmr, TEAM_HORDE));
@@ -293,6 +296,8 @@ TEST_CASE("SoloqQueue builds teams without regard to faction")
 TEST_CASE("flex mode forms double-DPS teams without casters")
 {
   SoloqQueue queue;
+  CHECK(queue.flexMode());
+  queue.setFlexMode(false);
   CHECK_FALSE(queue.flexMode());
   queue.setFlexMode(true);
   CHECK(queue.flexMode());
@@ -449,7 +454,8 @@ TEST_CASE("flex mode forms multiple matches in a single update")
 
 TEST_CASE("standard mode ignores flex-only pools")
 {
-  SoloqQueue queue; // flex off
+  SoloqQueue queue;
+  queue.setFlexMode(false);
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
   queue.playerAddToQueue(player(2, CLASS_ROGUE, 0));
   queue.playerAddToQueue(player(3, CLASS_DEATH_KNIGHT, 0));
