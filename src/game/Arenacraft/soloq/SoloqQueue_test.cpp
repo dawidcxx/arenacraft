@@ -159,18 +159,18 @@ TEST_CASE("update forms multiple matches in a single call")
 TEST_CASE("matching tolerance starts at the initial window")
 {
   SoloqQueue queue;
-  addSet(queue, 100, 1500, 1500, 1650); // 150 gap == InitialWindow
+  addSet(queue, 100, 1500, 1500, 1600); // 100 gap == InitialWindow
 
   CHECK(queue.update(0ms).size() == 1);
   CHECK(queue.empty());
 }
 
-TEST_CASE("matching tolerance grows by 50 every 30 seconds up to the cap")
+TEST_CASE("matching tolerance grows by 50 every 15 seconds up to the cap")
 {
   SoloqQueue queue;
-  addSet(queue, 100, 1500, 1500, 1700); // 200 gap: 150 base + one step
+  addSet(queue, 100, 1500, 1500, 1650); // 150 gap: 100 base + one step
 
-  CHECK(queue.update(29s).empty());
+  CHECK(queue.update(14s).empty());
   CHECK(queue.size() == 6);
   CHECK(queue.update(1s).size() == 1);
   CHECK(queue.empty());
@@ -426,11 +426,11 @@ TEST_CASE("flex mode respects the MMR window")
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0, 1500));
   queue.playerAddToQueue(player(2, CLASS_ROGUE, 0, 1500));
   queue.playerAddToQueue(player(3, CLASS_MAGE, 0, 1500));
-  queue.playerAddToQueue(player(4, CLASS_WARLOCK, 0, 1700)); // 200 gap: 150 base + one step
+  queue.playerAddToQueue(player(4, CLASS_WARLOCK, 0, 1650)); // 150 gap: 100 base + one step
   queue.playerAddToQueue(player(5, CLASS_PRIEST, 1, 1500));
   queue.playerAddToQueue(player(6, CLASS_PALADIN, 0, 1500));
 
-  CHECK(queue.update(29s).empty());
+  CHECK(queue.update(14s).empty());
   CHECK(queue.size() == 6);
   CHECK(queue.update(1s).size() == 1);
   CHECK(queue.empty());

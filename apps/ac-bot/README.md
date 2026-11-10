@@ -18,6 +18,9 @@ databases and to Valkey/Redis.
 | `/alias set/reset` | VIP | Solo queue display alias; resolved in game by `.alias get`. |
 | `/permaban <discord_id> <reason>` | VIP | Permanently bans the Discord user and their linked core account. |
 | `/baninfo <discord_acc>` | VIP | Current core ban and Discord server ban status for a user. |
+| `/myseat` | everyone | Your tournament seating tier (`None`, `Gold` or `Diamond`), 60s cache. |
+| `/setseat <discord_id> <tier>` | VIP | Set a linked player's seating tier (clears the list cache). |
+| `/getseatlist <tier>` | everyone | Padded list of `Gold` or `Diamond` seats, newest first, 60s cache. |
 
 Replies to info commands are ephemeral. On startup the bot replaces the guild command list,
 so removed commands do not linger as unreachable "ghosts".
@@ -37,7 +40,7 @@ VALUES (<account id>, '<discord id>');
 ```bash
 bun install
 cp .env.example .env   # fill in the values
-ac db-update           # applies data/sql/updates/db_auth (account_discord/account_alias)
+ac db-update           # applies data/sql/updates/db_auth (account_discord/account_alias/account_seat)
 bun run start
 ```
 
@@ -60,17 +63,21 @@ The bot needs the **Server Members** privileged intent enabled in the Discord De
 | `GAME_CHANNEL_PATTERN` | `^game-(\d+)-(\d+)$` | Paired voice room names. |
 | `INFO_CHANNEL_NAME` | `bot` | Channel for "no free room" notices. |
 | `AUDIT_LOG_CHANNEL_NAME` | `audit-log` | Match audit messages; empty disables them. |
-| `VIP_ROLE_NAME` | `vip` | Role allowed to use `/alias`, `/charlist`, `/permaban` and `/baninfo`. |
+| `VIP_ROLE_NAME` | `vip` | Role allowed to use `/alias`, `/charlist`, `/permaban`, `/baninfo` and `/setseat`. |
 | `STALE_ROOM_MINUTES` | `60` | Reclaim a room whose ended event never arrived. |
 
 \* optional when `AC_LOGIN_DATABASE_INFO` is set.
 
-`/alias`, `/charlist`, `/permaban` and `/baninfo` are registered with
+`/alias`, `/charlist`, `/permaban`, `/baninfo` and `/setseat` are registered with
 `default_member_permissions: 0`, so they are hidden from regular members. Allow the VIP role
 once in **Server Settings -> Integrations -> arenacraft -> Manage -> /alias** (and `/charlist`,
-`/permaban` and `/baninfo`); Discord only accepts an OAuth2 bearer token for those overwrites,
-so the bot cannot set them itself. Registration is an upsert by command name, so the overwrites
-survive restarts.
+`/permaban`, `/baninfo` and `/setseat`); Discord only accepts an OAuth2 bearer token for those
+overwrites, so the bot cannot set them itself. Registration is an upsert by command name, so the
+overwrites survive restarts.
+
+Tournament seats (`/myseat`, `/setseat`, `/getseatlist`) live in the auth DB's
+`account_seat` table keyed by linked account id; a missing row means `None`. `reset_soloq`
+reads them to seed Gold/Diamond players at a higher starting MMR for the next season.
 
 `/permaban` opens a confirmation modal showing the target and reason; type `BAN` to apply it.
 It writes a permanent row to `acore_auth.account_banned` (a ban is permanent when
