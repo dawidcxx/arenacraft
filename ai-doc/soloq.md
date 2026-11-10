@@ -101,7 +101,8 @@ Unknown class / spec outside 0..2 returns `nullopt` and is rejected by the queue
 ## Matchmaking (`SoloqQueue`)
 
 In standard mode a team is `{melee, healer, caster}`; a match is two teams (2 of
-each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
+each role). Needs at least 2 of every role. Flex mode (the default) relaxes this
+(see below).
 
 - Time is injected via `update(std::chrono::milliseconds elapsed)` - never read
   from the wall clock - so tests are deterministic.
@@ -126,7 +127,7 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
   player is always included when any valid set contains them, so fairness can
   never skip a long-waiting player in favour of a fairer set of newer arrivals.
   Emit the best match, remove those six, repeat until nothing valid remains.
-- **Flex mode** (`setFlexMode`, off by default, toggled by `.soloq flex`): the
+- **Flex mode** (`setFlexMode`, on by default, toggled by `.soloq flex`): the
   melee/caster/healer split is relaxed. The queue pools all DPS (melee + caster)
   and requires at least 4 of them plus 2 healers; each team fields any two DPS
   plus one healer. Class stacking within a team is still rejected, with one
@@ -491,7 +492,7 @@ Admin commands:
 - `.soloq status` - total queued, per-role counts, pending arenas, and a verdict
   on whether a match can form.
 - `.soloq list` - every queued player: id, class, spec, role, rating, MMR, wait
-  time. Use this to confirm you have 2/2/2.
+  time. Use this to confirm the DPS/healer split.
 - `.soloq pending` - arenas waiting for a result (instance id + both teams).
 - `.soloq clear` - dequeue everyone and clear their badges.
 - `.soloq debug on|off` - runtime bypass of the character readiness gate
@@ -500,9 +501,9 @@ Admin commands:
   Does not clear the per-character pass cache.
 - `.soloq flex [on|off]` - toggle relaxed composition
   (`SoloqService::setFlexMode` -> `SoloqQueue::setFlexMode`). With no argument
-  it flips the current setting. On: teams may field any two DPS (melee/caster)
-  plus a healer; class stacking within a team is still blocked. Off (default):
-  the strict one melee + one caster + one healer composition.
+  it flips the current setting. On (default): teams may field any two DPS
+  (melee/caster) plus a healer; class stacking within a team is still blocked.
+  Off: the strict one melee + one caster + one healer composition.
 
 ## Wiring
 
