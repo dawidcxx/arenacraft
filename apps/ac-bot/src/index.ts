@@ -21,6 +21,14 @@ import {
 import { PING_COMMAND, handlePing } from "./pingCommand";
 import { startEventSubscriber } from "./redisEvents";
 import { handleRegister, REGISTER_COMMAND } from "./registerCommand";
+import {
+  GET_SEAT_LIST_COMMAND,
+  handleGetSeatList,
+  handleMySeat,
+  handleSetSeat,
+  MY_SEAT_COMMAND,
+  SET_SEAT_COMMAND,
+} from "./seatCommand";
 import { handleSetPassword, SET_PASSWORD_COMMAND } from "./setPasswordCommand";
 import { handleTopRankers, loadTopRankers, TOP_RANKERS_COMMAND } from "./topRankersCommand";
 import { TtlCache } from "./ttlCache";
@@ -47,6 +55,10 @@ const rankersCache = new TtlCache(RANKERS_CACHE_TTL_MS, () => loadTopRankers({ a
 const ONLINE_LIST_CACHE_TTL_MS = 30_000;
 const onlineListCache = new TtlCache(ONLINE_LIST_CACHE_TTL_MS, () => loadOnlineList(characterDb));
 
+// Seats change only through /setseat, which clears this cache immediately.
+const SEAT_CACHE_TTL_MS = 60_000;
+const seatCache = new TtlCache(SEAT_CACHE_TTL_MS, () => authDb.listSeats());
+
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMembers],
 });
@@ -70,6 +82,9 @@ client.once(Events.ClientReady, async (readyClient) => {
       ALIAS_COMMAND,
       PERMABAN_COMMAND,
       BANINFO_COMMAND,
+      MY_SEAT_COMMAND,
+      SET_SEAT_COMMAND,
+      GET_SEAT_LIST_COMMAND,
     ]);
     try {
       await guild.members.fetch();
@@ -122,6 +137,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
       else if (interaction.commandName === "permaban") await handlePermaBan(interaction, config.VIP_ROLE_NAME);
       else if (interaction.commandName === "baninfo")
         await handleBanInfo(interaction, authDb, config.VIP_ROLE_NAME);
+      else if (interaction.commandName === "myseat")
+        await handleMySeat(interaction, authDb, () => seatCache.get());
+      else if (interaction.commandName === "setseat")
+        await handleSetSeat(interaction, authDb, config.VIP_ROLE_NAME, () => seatCache.clear());
+      else if (interaction.commandName === "getseatlist")
+        await handleGetSeatList(interaction, () => seatCache.get());
       return;
     }
 

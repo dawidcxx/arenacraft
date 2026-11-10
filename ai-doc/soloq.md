@@ -59,6 +59,27 @@ time (`Player::GetMostPointsTalentTree()`). `rating` starts at 1400 and `mmr` at
 carried only as informational metadata for the Redis event; it is not a
 matchmaking input.
 
+## Tournament seating
+
+Season resets can pre-seed players by a tournament seat tier. The auth DB table
+`account_seat (account_id, tier, updated_at)` stores only the elevated tiers
+`Gold` and `Diamond`; a missing row is the default `None`. The Discord bot owns
+the writes (`/myseat`, `/setseat`, `/getseatlist`, VIP-only set).
+
+`scripts/reset_soloq` reads the seats and raises the linked account's SoloQ
+characters' starting MMR (it does not change team/personal rating):
+
+| Seat | Starting MMR |
+| --- | --- |
+| None | `--mmr` (default 1500) |
+| Gold | base + 110 (1610 by default) |
+| Diamond | base + 150 (1650 by default) |
+
+Seats only apply to characters that already have a SoloQ team when the reset
+runs; a seated player who creates their team afterwards starts at the normal
+MMR and misses that season's provision. `scripts/bracket reset --bracket soloq`
+also resets MMR but ignores seats.
+
 ## Role table (`roleFor`)
 
 | Class | spec 0 | spec 1 | spec 2 |
@@ -86,9 +107,9 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
   from the wall clock - so tests are deterministic.
 - Each queued player accumulates wait time. Their acceptable MMR window is
   `min(MaxWindow, InitialWindow + MmrStep * floor(waited / StepInterval))`,
-  symmetric around their MMR (`InitialWindow = 150`, `MmrStep = 50`,
-  `StepInterval = 30s`, `MaxWindow = 500`). The nonzero base means a fresh
-  player already searches ±150 instead of requiring an exact MMR match, so a
+  symmetric around their MMR (`InitialWindow = 100`, `MmrStep = 50`,
+  `StepInterval = 15s`, `MaxWindow = 500`). The nonzero base means a fresh
+  player already searches ±100 instead of requiring an exact MMR match, so a
   slightly diverged pool still pops instead of stalling.
 - A candidate six-set is **valid** only if every pair satisfies
   `gap <= max(window_i, window_j)` (the more-patient player's window governs).

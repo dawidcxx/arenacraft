@@ -25,6 +25,17 @@ export interface AccountBan {
   active: boolean;
 }
 
+export type SeatTier = "None" | "Gold" | "Diamond";
+export type StoredSeatTier = Exclude<SeatTier, "None">;
+
+export interface SeatRow {
+  accountId: number;
+  username: string;
+  discordId: string | null;
+  tier: StoredSeatTier;
+  updatedAt: Date;
+}
+
 export class AuthDb {
   private readonly pool: Pool;
 
@@ -37,13 +48,15 @@ export class AuthDb {
   }
 
   async assertSchema(): Promise<void> {
-    try {
-      await this.pool.query("SELECT 1 FROM account_discord LIMIT 1");
-    } catch (error) {
-      if ((error as { code?: string }).code === "ER_NO_SUCH_TABLE") {
-        throw new Error("account_discord table is missing; run `ac db-update` to apply data/sql updates");
+    for (const table of ["account_discord", "account_seat"]) {
+      try {
+        await this.pool.query(`SELECT 1 FROM ${table} LIMIT 1`);
+      } catch (error) {
+        if ((error as { code?: string }).code === "ER_NO_SUCH_TABLE") {
+          throw new Error(`${table} table is missing; run \`ac db-update\` to apply data/sql updates`);
+        }
+        throw error;
       }
-      throw error;
     }
   }
 
@@ -216,6 +229,39 @@ export class AuthDb {
       discordId: row.discordId === null ? null : String(row.discordId),
       gmLevel: Number(row.gmLevel),
     }));
+  }
+
+  /** Every stored tournament seat, newest assignment first. */
+  async listSeats(): Promise<SeatRow[]> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT s.account_id AS accountId, a.username, d.discord_id AS discordId,
+              s.tier, s.updated_at AS updatedAt
+       FROM account_seat s
+       JOIN account a ON a.id = s.account_id
+       LEFT JOIN account_discord d ON d.account_id = s.account_id
+       ORDER BY s.updated_at DESC, a.username ASC`,
+    );
+    return rows.map((row) => ({
+      accountId: Number(row.accountId),
+      username: String(row.username),
+      discordId: row.discordId === null ? null : String(row.discordId),
+      tier: String(row.tier) as StoredSeatTier,
+      updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(String(row.updatedAt)),
+    }));
+  }
+
+  /** Sets an elevated seat, or removes the row when the tier is None. */
+  async setSeat(accountId: number, tier: SeatTier): Promise<void> {
+    if (tier === "None") {
+      await this.pool.execute("DELETE FROM account_seat WHERE account_id = ?", [accountId]);
+      return;
+    }
+
+    await this.pool.execute(
+      `INSERT INTO account_seat (account_id, tier, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE tier = VALUES(tier), updated_at = CURRENT_TIMESTAMP`,
+      [accountId, tier],
+    );
   }
 
   /** Inserts or replaces the account's display alias. */
