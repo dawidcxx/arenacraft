@@ -206,6 +206,24 @@ Fetching Knife, which has no 277 version), ICC Offparts (264
 necks/cloaks/boots/belts/wrists/rings plus the 272 ToGC tribute-chest cloaks) and
 ICC Offset (264 non-tier main pieces).
 
+### Speciality items NPC (hijack of 20066)
+
+Entry 20066 ("Gahruj") is a separate, standalone gossip NPC hijacked by
+`SpecialityItemsVendor`/`SpecialityItemsVendorStock`
+(`SpecialityItemsVendor.hpp/.cpp`). `OnCreatureAddWorld` replaces its flags
+with `GOSSIP | VENDOR | REPAIR` (the repair flag is what shows the anvil badge
+on hover) and `OnStartup` sets its subname to "The Professor" and stocks the
+speciality lists.
+
+The main gossip menu has one category, **Tier 9**, which opens a second menu
+with **Plate**, **Mail**, **Leather** and **Cloth** vendor lists. Each list
+holds the 25-player heroic (ilvl 258) "Triumphant" sets for both Alliance and
+Horde, with the five pieces per set ordered head, shoulders, chest, hands,
+legs. `SpecialityItemsVendorItems.cpp` holds the stock (`Tier9Groups()`); every
+id comes from the Wowhead
+[Tier 9 sets overview](https://www.wowhead.com/wotlk/guide/raids/tier-9-sets-overview)
+and its linked set pages. Add future speciality categories to `ShowMainMenu`.
+
 Arena-point items ship with `BuyPrice = 0` (would be free), so `ItemVendorStock`
 sets a small fallback gold price on any 0-price stock. `extendedCost = 0` on the
 vendor entry is what removes the rating/arena-point requirement.

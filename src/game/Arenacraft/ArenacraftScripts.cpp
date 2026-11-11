@@ -5,6 +5,7 @@
 #include "ItemVendor.hpp"
 #include "PetAutocast.hpp"
 #include "PreBuffs.hpp"
+#include "SpecialityItemsVendor.hpp"
 #include "fingerprint/FingerprintScripts.hpp"
 #include "replay/ReplayScripts.hpp"
 #include "soloq/SoloqNpc.hpp"
@@ -19,6 +20,8 @@ void AddArenacraftScripts()
   new arenacraft::GeneralGoodsVendorStock();
   new arenacraft::CosmeticVendor();
   new arenacraft::CosmeticVendorStock();
+  new arenacraft::SpecialityItemsVendor();
+  new arenacraft::SpecialityItemsVendorStock();
   new arenacraft::Doomclaw();
   new arenacraft::DoomclawSetup();
   new arenacraft::DoomclawSpellTweaks();
