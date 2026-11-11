@@ -15,6 +15,31 @@ function credentialsBlock(username: string, password: string): string {
   return [`**Username**  => \`${username}\``, `**Password**  => \`${password}\``].join("\n");
 }
 
+const PASSWORD_HINT = "You can pick your own password later with `/setpassword`.";
+
+// The logon host is part of the server's public identity, so it is hardcoded
+// here rather than being another config knob.
+const REALMLIST_HINT = [
+  "Set your realmlist before you log in:",
+  "",
+  "```",
+  "set realmlist logon.arenacraft.fun",
+  "```",
+  "> Located in Data/enUS/realmlist.wtf",
+].join("\n");
+
+/** Builds the reply/DM body; only a fresh registration gets the realmlist hint. */
+export function formatRegisterReply(
+  accountName: string,
+  password: string,
+  greeting: string,
+  realmlistHint: boolean,
+): string {
+  const parts = [greeting, "", credentialsBlock(accountName, password), "", PASSWORD_HINT];
+  if (realmlistHint) parts.push("", REALMLIST_HINT);
+  return parts.join("\n");
+}
+
 export async function handleRegister(interaction: ChatInputCommandInteraction, authDb: AuthDb): Promise<void> {
   const discordId = interaction.user.id;
   const discordUsername = interaction.user.username;
@@ -27,7 +52,15 @@ export async function handleRegister(interaction: ChatInputCommandInteraction, a
   if (owned) {
     const password = generatePassword();
     await authDb.resetPasswordForAccount(owned.id, password);
-    await finish(interaction, owned.username, password, "Password reset! Your new login:", discordUsername, "Reset");
+    await finish(
+      interaction,
+      owned.username,
+      password,
+      "Password reset! Your new login:",
+      discordUsername,
+      "Reset",
+      false,
+    );
     return;
   }
 
@@ -40,7 +73,15 @@ export async function handleRegister(interaction: ChatInputCommandInteraction, a
 
   const password = generatePassword();
   await authDb.createAccount(discordId, accountName, password);
-  await finish(interaction, accountName, password, "Welcome to Arenacraft! Your login:", discordUsername, "Registered");
+  await finish(
+    interaction,
+    accountName,
+    password,
+    "Welcome to Arenacraft! Your login:",
+    discordUsername,
+    "Registered",
+    true,
+  );
 }
 
 async function finish(
@@ -50,8 +91,9 @@ async function finish(
   greeting: string,
   discordUsername: string,
   action: "Registered" | "Reset",
+  realmlistHint: boolean,
 ): Promise<void> {
-  const reply = `${greeting}\n\n${credentialsBlock(accountName.toLowerCase(), password)}`;
+  const reply = formatRegisterReply(accountName.toLowerCase(), password, greeting, realmlistHint);
   await interaction.editReply(reply);
 
   try {

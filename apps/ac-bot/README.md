@@ -8,7 +8,7 @@ databases and to Valkey/Redis.
 
 | Command | Who | What |
 | --- | --- | --- |
-| `/register` | everyone | Creates a WoW account named after the Discord handle and DMs the generated password. Running it again resets the password. |
+| `/register` | everyone | Creates a WoW account named after the Discord handle and DMs the generated password. Running it again resets the password. The reply also points at `/setpassword` and, for fresh accounts, the hardcoded `set realmlist logon.arenacraft.fun` line. |
 | `/setpassword` | everyone | Sets a new password for the caller's account. |
 | `/ping` | everyone | Public greeting in the channel. |
 | `/toprankers` | everyone | Top 10 SoloQ players (30s cache). |
