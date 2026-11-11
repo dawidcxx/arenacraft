@@ -24,6 +24,12 @@ public:
   // Team composition is always two DPS (melee or caster) plus one healer. Class
   // stacking within a team is rejected, except Mancleave (see SoloqQueue.cpp).
 
+  // Tourney mode flag. It is driven by the weekend schedule in TourneySchedule
+  // (SoloqDriver refreshes it), not by the matchmaker itself; what it changes in
+  // matchmaking is decided separately.
+  void               setTourneyMode(bool value) { _tourneyMode = value; }
+  [[nodiscard]] bool tourneyMode() const { return _tourneyMode; }
+
   // Avoid list (#77): two players for whom this returns true are never put on the same team - partitions that would
   // do so are skipped like class stacking. Either side having avoided the other is enough. Unset = no avoiding.
   // The callback receives account ids, not character guids: avoiding is account-bound.
@@ -32,12 +38,14 @@ public:
 
   struct QueueSnapshot
   {
-    PlayerId                  id;
-    Classes                   classId;
-    uint8_t                   specIndex;
-    Role                      role;
-    uint32_t                  rating;
-    uint32_t                  mmr;
+    PlayerId id;
+    Classes  classId;
+    uint8_t  specIndex;
+    Role     role;
+    uint32_t rating;
+    uint32_t mmr;
+    // Effective MMR search window right now: the player accepts [mmr - mmrWindow, mmr + mmrWindow].
+    uint32_t                  mmrWindow;
     std::chrono::milliseconds waited;
   };
 
@@ -79,6 +87,7 @@ private:
 
   std::vector<Entry> _entries;
   uint64_t           _nextSequence = 0;
+  bool               _tourneyMode  = false;
   AvoidCheck         _avoids;
 };
 } // namespace arenacraft::soloq

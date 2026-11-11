@@ -3,12 +3,14 @@
  *
  *   .soloq join     join the queue from anywhere (players; creates a team if needed)
  *   .soloq status   role breakdown of the shared queue and whether a match can form
+ *   .soloq details  per-player class/role/MMR/effective MMR range (console/admin debug view)
  *   .soloq list     every queued player with role/class/spec/rating/MMR/wait
  *   .soloq pending  arenas waiting for a result
  *   .soloq clear    dequeue everyone (clears badges too)
  *   .soloq debug    toggle bypass of the character readiness checks
  */
 
+#include "CharacterCache.h"
 #include "Chat.h"
 #include "CommandScript.h"
 #include "DBCStores.h"
@@ -61,6 +63,7 @@ public:
     static ChatCommandTable soloqTable = {
         {"join", HandleJoinCommand, SEC_PLAYER, Console::No},
         {"status", HandleStatusCommand, SEC_ADMINISTRATOR, Console::Yes},
+        {"details", HandleDetailsCommand, SEC_CONSOLE, Console::Yes},
         {"list", HandleListCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"pending", HandlePendingCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"clear", HandleClearCommand, SEC_ADMINISTRATOR, Console::Yes},
@@ -94,12 +97,56 @@ public:
     handler->PSendSysMessage("SoloQ: {} players queued, {} pending arena(s).", queue.size(),
                              SoloqService::instance().pendingArenas().size());
     handler->PSendSysMessage("Roles: melee {} | caster {} | healer {}", roles[0], roles[1], roles[2]);
+    if (SoloqService::instance().tourneyMode())
+      handler->SendSysMessage("SoloQ: tourney mode is ON.");
 
     bool const rolesReady = roles[0] + roles[1] >= 4 && roles[2] >= 2;
     if (rolesReady)
       handler->SendSysMessage("SoloQ: requirements met, a match will form on the next world tick.");
     else
       handler->SendSysMessage("SoloQ: need at least 4 DPS (melee/caster) and 2 healers to form a match.");
+    return true;
+  }
+
+  static bool HandleDetailsCommand(ChatHandler* handler)
+  {
+    SoloqService&                                service = SoloqService::instance();
+    std::vector<SoloqQueue::QueueSnapshot> const queue   = service.snapshot();
+
+    handler->PSendSysMessage("SoloQ details: {} queued, {} pending arena(s), tourney mode {}", queue.size(),
+                             service.pendingArenas().size(), service.tourneyMode() ? "ON" : "off");
+    if (queue.empty())
+      return true;
+
+    std::array<uint32, 3> roles{};
+    for (SoloqQueue::QueueSnapshot const& entry : queue)
+      ++roles[static_cast<std::size_t>(entry.role)];
+
+    handler->PSendSysMessage("Roles: melee {} | caster {} | healer {}", roles[0], roles[1], roles[2]);
+    handler->SendSysMessage(
+        "-------------------------------------------------------------------------------------------------");
+    handler->SendSysMessage("  #  Player             Class        Spec  Role     Rating     MMR  MMR range      Wait");
+    handler->SendSysMessage(
+        "-------------------------------------------------------------------------------------------------");
+
+    uint32 index = 0;
+    for (SoloqQueue::QueueSnapshot const& entry : queue)
+    {
+      std::string name;
+      if (!sCharacterCache->GetCharacterNameByGuid(ObjectGuid{entry.id}, name))
+        name = "#" + std::to_string(entry.id);
+
+      uint32 const low   = entry.mmr > entry.mmrWindow ? entry.mmr - entry.mmrWindow : 0;
+      uint32 const high  = entry.mmr + entry.mmrWindow;
+      std::string  range = std::to_string(low) + "-" + std::to_string(high);
+
+      handler->PSendSysMessage("{:>3}  {:<18} {:<12} {:>4}  {:<7} {:>7} {:>7}  {:<13} {:>7}s", ++index, name,
+                               ClassName(entry.classId), entry.specIndex, RoleName(entry.role), entry.rating, entry.mmr,
+                               range, entry.waited.count() / 1000);
+    }
+
+    handler->SendSysMessage(
+        "-------------------------------------------------------------------------------------------------");
     return true;
   }
 

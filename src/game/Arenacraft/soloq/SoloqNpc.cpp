@@ -19,6 +19,7 @@
 #include "SoloqEvents.hpp"
 #include "SoloqService.hpp"
 #include "SoloqTeam.hpp"
+#include "TourneySchedule.hpp"
 #include "WorldSession.h"
 
 #include <chrono>
@@ -80,6 +81,19 @@ namespace
 // --- Avoid list (#77) ---------------------------------------------------------------------------------------------
 
 int64_t Now() { return GameTime::GetGameTime().count(); }
+
+// Weekend tourney window (Saturday 00:01 through Sunday 23:59, server local time). The calendar lookup happens once at
+// startup and then at most every SoloqDriver::TourneyCheckIntervalMs, never per tick.
+void RefreshTourneyMode()
+{
+  SoloqService& service = SoloqService::instance();
+  bool const    enabled = isTourneyTimeNow();
+  if (enabled == service.tourneyMode())
+    return;
+
+  service.setTourneyMode(enabled);
+  LOG_INFO("server", "soloq: tourney mode {}", enabled ? "enabled" : "disabled");
+}
 
 std::string NameOf(uint32 guid)
 {
@@ -233,6 +247,8 @@ void SoloqNpc::OnCreatureAddWorld(Creature* creature)
 
 void SoloqNpcSetup::OnStartup()
 {
+  RefreshTourneyMode();
+
   if (CreatureTemplate* proto = const_cast<CreatureTemplate*>(sObjectMgr->GetCreatureTemplate(SoloqNpc::Entry)))
     proto->SubName = "SoloQ Master";
 }
@@ -380,6 +396,13 @@ bool SoloqNpc::CanCreatureGossipSelectCode(Player* player, Creature* creature, u
 void SoloqDriver::OnUpdate(uint32 diff)
 {
   SoloqService& service = SoloqService::instance();
+
+  _tourneyCheckElapsed += diff;
+  if (_tourneyCheckElapsed >= TourneyCheckIntervalMs)
+  {
+    _tourneyCheckElapsed = 0;
+    RefreshTourneyMode();
+  }
 
   // The client can leave through the battleground queue UI and players can log
   // out; drop anyone no longer registered in the 5v5 queue so we never match a

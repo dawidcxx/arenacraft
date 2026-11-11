@@ -57,13 +57,21 @@ public:
 };
 
 // Drives SoloqService::tick from the world update loop, keeps the real 5v5
-// battleground queue in sync, and drains any matches.
+// battleground queue in sync, drains any matches and refreshes the weekend
+// tourney flag.
 class SoloqDriver : public WorldScript
 {
 public:
   SoloqDriver() : WorldScript("arenacraft::soloq::SoloqDriver", {WORLDHOOK_ON_UPDATE}) {}
 
   void OnUpdate(uint32 diff) override;
+
+private:
+  // The calendar lookup is throttled: a 10 minute granularity is plenty for a
+  // weekend window, and it keeps localtime_r out of the per-tick path.
+  static constexpr uint32 TourneyCheckIntervalMs = 10 * 60 * 1000;
+
+  uint32 _tourneyCheckElapsed = 0;
 };
 
 // Stops the core from ever matching our 5v5 rated queue entries. Soloq does its

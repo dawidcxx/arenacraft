@@ -27,6 +27,7 @@ invites the six players (see `CreateArenaForMatch`).
 | `Roles.hpp/.cpp` | `roleFor(Classes, specIndex) -> optional<Role>` |
 | `SoloqQueue.hpp/.cpp` | the queue container + exhaustive best-fit matchmaker |
 | `AvoidList.hpp/.cpp` | avoid list slots/cooldowns and the recent teammates list (pure) |
+| `TourneySchedule.hpp/.cpp` | pure weekend tourney window (Saturday 00:01 -> Sunday 23:59 server time) |
 | `Outcome.hpp/.cpp` | `resolveMatch(Match, MatchResult)` - post-match Elo adjustment |
 | `SoloqService.hpp/.cpp` | singleton: queue + pending arenas + `tick`/`registerMatch`/`takeMatch` |
 | `SoloqTeam.hpp/.cpp` | the player's real 5v5 `ArenaTeam` (visible in the PvP pane, persisted in the characters DB) |
@@ -136,6 +137,18 @@ teams, so the queue needs at least 4 DPS and 2 healers.
   `Team::melee`/`Team::caster` are just the two DPS slots, so the real role is
   derived from class/spec when reporting participants.
 - `update` returns the drained `std::vector<Match>`; matched players are removed.
+
+## Tourney mode
+
+`SoloqQueue` carries a `tourneyMode` flag (`setTourneyMode`/`tourneyMode`). What it changes in matchmaking is defined
+later; for now it is only set and observable.
+
+`SoloqDriver` refreshes it from the host's local calendar at startup and then at most once every **10 minutes**
+(`TourneyCheckIntervalMs`; it accumulates the world tick `diff` in between). The lookup itself is
+`Acore::Time::TimeBreakdown` (`localtime_r`) + the pure `isTourneyTime` in `TourneySchedule.hpp`, so it never runs per
+tick. The window is server local time, Saturday **00:01** through Sunday **23:59** (Monday 00:00 turns it off again).
+The refresh happens in `WorldScript::OnUpdate` on the world thread, not on a map-update thread. `.soloq status` prints
+the current flag.
 
 ## Public ladder role (`character_soloq_role`)
 
@@ -493,8 +506,10 @@ instead of walking back to the NPC:
 
 Admin commands:
 
-- `.soloq status` - total queued, per-role counts, pending arenas, and a verdict
-  on whether a match can form.
+- `.soloq status` - total queued, per-role counts, pending arenas, the tourney
+  flag, and a verdict on whether a match can form.
+- `.soloq details` - console-level debug table of every queued player: class,
+  spec, role, rating, MMR and the effective MMR range (`mmr ± window`).
 - `.soloq list` - every queued player: id, class, spec, role, rating, MMR, wait
   time. Use this to confirm you have at least 4 DPS and 2 healers.
 - `.soloq pending` - arenas waiting for a result (instance id + both teams).

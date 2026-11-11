@@ -83,6 +83,34 @@ TEST_CASE("SoloqQueue rejects class and spec combinations that have no role")
   CHECK(queue.empty());
 }
 
+TEST_CASE("SoloqQueue tourney mode defaults off and toggles")
+{
+  SoloqQueue queue;
+
+  CHECK_FALSE(queue.tourneyMode());
+  queue.setTourneyMode(true);
+  CHECK(queue.tourneyMode());
+  queue.setTourneyMode(false);
+  CHECK_FALSE(queue.tourneyMode());
+}
+
+TEST_CASE("queue snapshot reports the effective MMR window")
+{
+  SoloqQueue queue;
+  queue.playerAddToQueue(melee(1, 1500));
+  queue.playerAddToQueue(melee(2, 1500));
+
+  queue.update(0ms); // no match: two DPS are not enough
+  std::vector<SoloqQueue::QueueSnapshot> snapshot = queue.snapshot();
+  REQUIRE(snapshot.size() == 2);
+  CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::InitialWindow);
+
+  queue.update(20s); // one 15s step
+  snapshot = queue.snapshot();
+  REQUIRE(snapshot.size() == 2);
+  CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::InitialWindow + arenacraft::soloq::tuning::MmrStep);
+}
+
 TEST_CASE("SoloqQueue removes queued players and reports unknown ids")
 {
   SoloqQueue queue;

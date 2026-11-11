@@ -95,7 +95,7 @@ std::vector<SoloqQueue::QueueSnapshot> SoloqQueue::snapshot() const
   result.reserve(_entries.size());
   for (Entry const& entry : _entries)
     result.push_back(QueueSnapshot{entry.player.id, entry.player.classId, entry.player.specIndex, entry.role,
-                                   entry.player.rating, entry.player.mmr, entry.waited});
+                                   entry.player.rating, entry.player.mmr, windowFor(entry), entry.waited});
   return result;
 }
 

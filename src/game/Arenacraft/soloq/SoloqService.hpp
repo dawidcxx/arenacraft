@@ -74,6 +74,11 @@ public:
   void               setSkipCharacterChecks(bool value);
   [[nodiscard]] bool skipCharacterChecks() const { return _skipCharacterChecks; }
 
+  // Weekend tourney flag (see SoloqQueue). SoloqDriver refreshes it from the
+  // server calendar at startup and every 10 minutes.
+  void               setTourneyMode(bool value) { _queue.setTourneyMode(value); }
+  [[nodiscard]] bool tourneyMode() const { return _queue.tourneyMode(); }
+
   // Avoid list (#77): the matchmaker never puts two players on the same team when one avoids the other. The list is
   // keyed by account id, so every character on an avoided account is avoided too. It lives in memory only; a
   // worldserver restart clears it (see SoloqNpc.cpp).
