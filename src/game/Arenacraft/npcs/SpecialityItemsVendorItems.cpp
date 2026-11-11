@@ -299,6 +299,22 @@ std::vector<uint32> const& ClothItems()
 
 } // namespace
 
+// Low-ilvl relics that used to sit in the main vendor's ICC Set & Weapons
+// list. They are stocked here so the main vendor only carries the current
+// (264+) tier relics.
+std::vector<uint32> const& AllMinorRelics()
+{
+  static std::vector<uint32> const items = {
+      45254, // Sigil of the Vengeful Heart (ilvl 232, Onyxia)
+      47661, // Libram of Valiance (ilvl 245)
+      47673, // Sigil of Virulence (ilvl 245)
+      39757, // Idol of Worship (ilvl 213)
+      47668, // Idol of Mutilation (ilvl 245)
+      35019, // Brutal Gladiator's Idol of Resolve (ilvl 159)
+  };
+  return items;
+}
+
 std::vector<Tier9Group> const& Tier9Groups()
 {
   static std::vector<Tier9Group> const groups = {

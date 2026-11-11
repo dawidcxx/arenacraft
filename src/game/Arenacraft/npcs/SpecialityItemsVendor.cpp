@@ -26,9 +26,13 @@ void SpecialityItemsVendor::ShowMainMenu(Player* player, Creature* creature)
   GossipMenu& menu = player->PlayerTalkClass->GetGossipMenu();
   menu.SetMenuId(GossipMenuId);
 
-  // Each speciality category is a submenu; Tier 9 is the only one for now.
+  // Each speciality category is either a submenu (Tier 9) or a single vendor
+  // list (the minor relics).
   menu.AddMenuItem(0, GOSSIP_ICON_VENDOR, "Tier 9", 0, ActionTier9Menu, "", 0, false);
   menu.AddGossipMenuItemData(0, 0, 0);
+
+  menu.AddMenuItem(1, GOSSIP_ICON_VENDOR, "Minor Relic / Sigil and Idols", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(1, MinorRelicVendorEntry, 0);
 
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
 }
@@ -40,7 +44,7 @@ void SpecialityItemsVendor::ShowTier9Menu(Player* player, Creature* creature)
   menu.SetMenuId(GossipMenuId);
 
   std::vector<Tier9Group> const& groups    = Tier9Groups();
-  uint32                          menuIndex = 0;
+  uint32                         menuIndex = 0;
   for (uint32 i = 0; i < uint32(groups.size()); ++i, ++menuIndex)
   {
     menu.AddMenuItem(int32(menuIndex), GOSSIP_ICON_VENDOR, std::string(groups[i].Name), 0, GOSSIP_OPTION_VENDOR, "", 0,
@@ -92,6 +96,9 @@ void SpecialityItemsVendorStock::OnStartup()
   for (uint32 i = 0; i < uint32(groups.size()); ++i)
     for (uint32 item : groups[i].Items)
       StockVendorItem(SpecialityItemsVendor::VendorEntryBase + i, item);
+
+  for (uint32 item : AllMinorRelics())
+    StockVendorItem(SpecialityItemsVendor::MinorRelicVendorEntry, item);
 
   if (CreatureTemplate* proto =
           const_cast<CreatureTemplate*>(sObjectMgr->GetCreatureTemplate(SpecialityItemsVendor::Entry)))

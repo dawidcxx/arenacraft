@@ -199,8 +199,8 @@ Wintergrasp Titan-Forged shoulders 51572-51581), Wrathful Offparts
 (264 belts/feet/wrists/rings/necks/cloaks, plus the two Relentless Gladiator
 rings), Trinkets (264 ICC + 258/245 ToC + the five ilvl-245 Battlemaster PvP
 trinkets), ICC Set & Weapons (264 tier + 277
-weapons, plus the Onyxia relics — the ilvl-226 Sigil of the Vengeful Heart and
-the ilvl-245 Libram of Valiance; the weaker
+weapons; the lower-ilvl relics moved to the speciality vendor's "Minor Relic /
+Sigil and Idols" list; the weaker
 264/271 PvE weapon drops are not stocked, except the 264 thrown Gluth's
 Fetching Knife, which has no 277 version), ICC Offparts (264
 necks/cloaks/boots/belts/wrists/rings plus the 272 ToGC tribute-chest cloaks) and
@@ -215,14 +215,23 @@ with `GOSSIP | VENDOR | REPAIR` (the repair flag is what shows the anvil badge
 on hover) and `OnStartup` sets its subname to "The Professor" and stocks the
 speciality lists.
 
-The main gossip menu has one category, **Tier 9**, which opens a second menu
-with **Plate**, **Mail**, **Leather** and **Cloth** vendor lists. Each list
-holds the 25-player heroic (ilvl 258) "Triumphant" sets for both Alliance and
-Horde, with the five pieces per set ordered head, shoulders, chest, hands,
-legs. `SpecialityItemsVendorItems.cpp` holds the stock (`Tier9Groups()`); every
-id comes from the Wowhead
+The main gossip menu has two categories. **Tier 9** opens a second menu with
+**Plate**, **Mail**, **Leather** and **Cloth** vendor lists. Each list holds the
+25-player heroic (ilvl 258) "Triumphant" sets for both Alliance and Horde, with
+the five pieces per set ordered head, shoulders, chest, hands, legs.
+`SpecialityItemsVendorItems.cpp` holds the stock (`Tier9Groups()`); every id
+comes from the Wowhead
 [Tier 9 sets overview](https://www.wowhead.com/wotlk/guide/raids/tier-9-sets-overview)
-and its linked set pages. Add future speciality categories to `ShowMainMenu`.
+and its linked set pages.
+
+**Minor Relic / Sigil and Idols** is a single vendor list
+(`AllMinorRelics()`) holding the low-ilvl relics that used to sit in the main
+vendor's ICC Set & Weapons list: Sigil of the Vengeful Heart (45254, ilvl 232),
+Libram of Valiance (47661, ilvl 245) and Sigil of Virulence (47673, ilvl 245),
+plus the hand-picked idols Idol of Worship (39757, ilvl 213), Idol of Mutilation
+(47668, ilvl 245) and Brutal Gladiator's Idol of Resolve (35019, ilvl 159).
+The main vendor now only carries the 264+ tier relics. Add future speciality
+categories to `ShowMainMenu`.
 
 Arena-point items ship with `BuyPrice = 0` (would be free), so `ItemVendorStock`
 sets a small fallback gold price on any 0-price stock. `extendedCost = 0` on the

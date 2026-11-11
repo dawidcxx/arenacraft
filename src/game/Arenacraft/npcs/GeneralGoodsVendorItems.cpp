@@ -2,7 +2,8 @@
 
 // Flat, code-defined "General goods" vendor stock: one row per everyday
 // consumable/reagent a level-80 character needs while gearing and playing
-// (conjured mage food, rogue poisons, ammo, class reagents). It backs the
+// (conjured mage food, rogue poisons, ammo, class reagents), plus a couple of
+// everyday cosmetics (Guild Tabard, Tuxedo Shirt). It backs the
 // direct vendor `GeneralGoodsVendor` (entry 20194) via AllGeneralGoods().
 //
 // Item ids were checked on wotlk.evowow.com (and against the world DB for the
@@ -43,6 +44,7 @@ std::vector<uint32> const& AllGeneralGoods()
       21177, // Symbol of Kings
       34722, // Heavy Frostweave Bandage
       5976,  // Guild Tabard
+      10034, // Tuxedo Shirt
   };
   return items;
 }

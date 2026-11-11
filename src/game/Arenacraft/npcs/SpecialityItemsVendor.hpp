@@ -22,10 +22,14 @@ struct Tier9Group
 // SpecialityItemsVendorItems.cpp.
 std::vector<Tier9Group> const& Tier9Groups();
 
+// Flat "Minor Relic / Sigil and Idols" stock: the low-ilvl relics that used to
+// sit in the main vendor's ICC list. Defined in SpecialityItemsVendorItems.cpp.
+std::vector<uint32> const& AllMinorRelics();
+
 // Hijacks Gahruj (entry 20066) into "The Professor", the speciality-items
-// vendor. Right-clicking opens a gossip menu with "Tier 9", which opens the
-// Plate/Mail/Leather/Cloth list menu; more speciality categories can be added
-// alongside it later. The repair flag gives the anvil badge.
+// vendor. Right-clicking opens a gossip menu with "Tier 9" and "Minor Relic /
+// Sigil and Idols"; more speciality categories can be added alongside them
+// later. The repair flag gives the anvil badge.
 class SpecialityItemsVendor : public AllCreatureScript
 {
 public:
@@ -33,6 +37,8 @@ public:
   static constexpr uint32 GossipMenuId = 9300001;
   // One vendor list per armor group: VendorEntryBase + group index.
   static constexpr uint32 VendorEntryBase = 9300000;
+  // Vendor list opened by the "Minor Relic / Sigil and Idols" option.
+  static constexpr uint32 MinorRelicVendorEntry = 9300004;
 
   // Custom gossip actions (outside the built-in Gossip_Option range).
   static constexpr uint32 ActionTier9Menu = 9300010;
@@ -56,10 +62,7 @@ private:
 class SpecialityItemsVendorStock : public WorldScript
 {
 public:
-  SpecialityItemsVendorStock()
-      : WorldScript("arenacraft::SpecialityItemsVendorStock", {WORLDHOOK_ON_STARTUP})
-  {
-  }
+  SpecialityItemsVendorStock() : WorldScript("arenacraft::SpecialityItemsVendorStock", {WORLDHOOK_ON_STARTUP}) {}
 
   void OnStartup() override;
 };
