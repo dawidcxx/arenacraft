@@ -5,6 +5,7 @@ import { ALIAS_COMMAND, handleAlias } from "./aliasCommand";
 import { auditAccounts } from "./accountAudit";
 import { AuditLog } from "./auditLog";
 import { AuthDb } from "./authDb";
+import type { SeatPage, StoredSeatTier } from "./authDb";
 import { BANINFO_COMMAND, handleBanInfo } from "./baninfoCommand";
 import { CharacterDb } from "./characterDb";
 import { CHAR_LIST_COMMAND, handleCharList } from "./charlistCommand";
@@ -27,6 +28,7 @@ import {
   handleMySeat,
   handleSetSeat,
   MY_SEAT_COMMAND,
+  SEAT_LIST_LIMIT,
   SET_SEAT_COMMAND,
 } from "./seatCommand";
 import { handleSetPassword, SET_PASSWORD_COMMAND } from "./setPasswordCommand";
@@ -55,9 +57,26 @@ const rankersCache = new TtlCache(RANKERS_CACHE_TTL_MS, () => loadTopRankers({ a
 const ONLINE_LIST_CACHE_TTL_MS = 30_000;
 const onlineListCache = new TtlCache(ONLINE_LIST_CACHE_TTL_MS, () => loadOnlineList(characterDb));
 
-// Seats change only through /setseat, which clears this cache immediately.
+// Seats change only through /setseat, which clears these caches immediately.
 const SEAT_CACHE_TTL_MS = 60_000;
 const seatCache = new TtlCache(SEAT_CACHE_TTL_MS, () => authDb.listSeats());
+
+// `/getseatlist` pages each tier separately; cache one page per requested tier.
+const seatPageCaches = new Map<StoredSeatTier, TtlCache<SeatPage>>();
+
+function loadSeatPage(tier: StoredSeatTier): Promise<SeatPage> {
+  let cache = seatPageCaches.get(tier);
+  if (!cache) {
+    cache = new TtlCache(SEAT_CACHE_TTL_MS, () => authDb.listSeatPage(tier, SEAT_LIST_LIMIT));
+    seatPageCaches.set(tier, cache);
+  }
+  return cache.get();
+}
+
+function clearSeatCaches(): void {
+  seatCache.clear();
+  for (const cache of seatPageCaches.values()) cache.clear();
+}
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildMembers],
@@ -140,9 +159,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       else if (interaction.commandName === "myseat")
         await handleMySeat(interaction, authDb, () => seatCache.get());
       else if (interaction.commandName === "setseat")
-        await handleSetSeat(interaction, authDb, config.VIP_ROLE_NAME, () => seatCache.clear());
-      else if (interaction.commandName === "getseatlist")
-        await handleGetSeatList(interaction, () => seatCache.get());
+        await handleSetSeat(interaction, authDb, config.VIP_ROLE_NAME, clearSeatCaches);
+      else if (interaction.commandName === "getseatlist") await handleGetSeatList(interaction, loadSeatPage);
       return;
     }
 

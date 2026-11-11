@@ -20,7 +20,7 @@ databases and to Valkey/Redis.
 | `/baninfo <discord_acc>` | VIP | Current core ban and Discord server ban status for a user. |
 | `/myseat` | everyone | Your tournament seating tier (`None`, `Gold` or `Diamond`), 60s cache. |
 | `/setseat <discord_id> <tier>` | VIP | Set a linked player's seating tier (clears the list cache). |
-| `/getseatlist <tier>` | everyone | Padded list of `Gold` or `Diamond` seats, newest first, 60s cache. |
+| `/getseatlist <tier>` | everyone | Padded list of the 20 most recent `Gold` or `Diamond` seats, newest first, plus the tier's total count, 60s cache. |
 
 Replies to info commands are ephemeral. On startup the bot replaces the guild command list,
 so removed commands do not linger as unreachable "ghosts".

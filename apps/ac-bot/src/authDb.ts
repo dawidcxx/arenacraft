@@ -36,6 +36,22 @@ export interface SeatRow {
   updatedAt: Date;
 }
 
+/** A limited slice of one tier's seats plus that tier's full row count. */
+export interface SeatPage {
+  rows: SeatRow[];
+  total: number;
+}
+
+function mapSeatRow(row: RowDataPacket): SeatRow {
+  return {
+    accountId: Number(row.accountId),
+    username: String(row.username),
+    discordId: row.discordId === null ? null : String(row.discordId),
+    tier: String(row.tier) as StoredSeatTier,
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(String(row.updatedAt)),
+  };
+}
+
 export class AuthDb {
   private readonly pool: Pool;
 
@@ -241,13 +257,30 @@ export class AuthDb {
        LEFT JOIN account_discord d ON d.account_id = s.account_id
        ORDER BY s.updated_at DESC, a.username ASC`,
     );
-    return rows.map((row) => ({
-      accountId: Number(row.accountId),
-      username: String(row.username),
-      discordId: row.discordId === null ? null : String(row.discordId),
-      tier: String(row.tier) as StoredSeatTier,
-      updatedAt: row.updatedAt instanceof Date ? row.updatedAt : new Date(String(row.updatedAt)),
-    }));
+    return rows.map(mapSeatRow);
+  }
+
+  /**
+   * The newest `limit` seats of one tier plus the tier's total count, so callers
+   * can page the display without losing the overall size.
+   */
+  async listSeatPage(tier: StoredSeatTier, limit: number): Promise<SeatPage> {
+    const [countRows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT COUNT(*) AS total FROM account_seat WHERE tier = ?",
+      [tier],
+    );
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      `SELECT s.account_id AS accountId, a.username, d.discord_id AS discordId,
+              s.tier, s.updated_at AS updatedAt
+       FROM account_seat s
+       JOIN account a ON a.id = s.account_id
+       LEFT JOIN account_discord d ON d.account_id = s.account_id
+       WHERE s.tier = ?
+       ORDER BY s.updated_at DESC, a.username ASC
+       LIMIT ?`,
+      [tier, limit],
+    );
+    return { rows: rows.map(mapSeatRow), total: Number(countRows[0]?.total ?? 0) };
   }
 
   /** Sets an elevated seat, or removes the row when the tier is None. */

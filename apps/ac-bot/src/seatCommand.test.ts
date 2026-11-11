@@ -55,4 +55,15 @@ describe("formatSeatList", () => {
   test("handles an empty list", () => {
     expect(formatSeatList("Diamond", [])).toBe("No players have the Diamond seat.");
   });
+
+  test("says when the list is a truncated page of a larger tier", () => {
+    const lines = formatSeatList("Gold", seats.slice(0, 1), 34).split("\n");
+
+    expect(lines[0]).toBe("Gold seats (showing the 1 most recent of 34)");
+    expect(lines[3]!.trim().split(/\s+/)).toEqual(["1", "Alpha", "2026-11-01"]);
+  });
+
+  test("omits the truncation note when the whole tier fits", () => {
+    expect(formatSeatList("Gold", seats, seats.length).split("\n")[0]).toBe("Gold seats (2)");
+  });
 });

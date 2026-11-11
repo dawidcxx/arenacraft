@@ -2,7 +2,7 @@ import { GuildMember, MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { ChatInputCommandInteraction } from "discord.js";
 
 import { hasVipRole } from "./aliasCommand";
-import type { AuthDb, SeatRow, SeatTier, StoredSeatTier } from "./authDb";
+import type { AuthDb, SeatPage, SeatRow, SeatTier, StoredSeatTier } from "./authDb";
 import { normalizeDiscordId } from "./discordId";
 import { logger } from "./logger";
 
@@ -66,13 +66,16 @@ export function formatMySeat(tier: SeatTier): string {
 
 const HEADERS = ["#", "Account", "Seated"] as const;
 
+/** `/getseatlist` only shows this many of the newest seats per tier. */
+export const SEAT_LIST_LIMIT = 20;
+
 function formatSeatDate(date: Date): string {
   if (Number.isNaN(date.getTime())) return "unknown";
   return date.toISOString().slice(0, 10);
 }
 
-export function formatSeatList(tier: StoredSeatTier, rows: SeatRow[]): string {
-  if (rows.length === 0) return `No players have the ${tier} seat.`;
+export function formatSeatList(tier: StoredSeatTier, rows: SeatRow[], total: number = rows.length): string {
+  if (total === 0) return `No players have the ${tier} seat.`;
 
   const sorted = [...rows].sort(
     (left, right) =>
@@ -87,8 +90,12 @@ export function formatSeatList(tier: StoredSeatTier, rows: SeatRow[]): string {
   const widths = HEADERS.map((header) => Math.max(header.length, ...cells.map((row) => row[header].length)));
   const render = (values: string[]) => values.map((value, i) => value.padEnd(widths[i]!)).join("  ").trimEnd();
 
+  const heading =
+    total > sorted.length
+      ? `${tier} seats (showing the ${sorted.length} most recent of ${total})`
+      : `${tier} seats (${total})`;
   const lines = [render([...HEADERS]), ...cells.map((row) => render(HEADERS.map((header) => row[header])))];
-  return [`${tier} seats (${sorted.length})`, "```", ...lines, "```"].join("\n");
+  return [heading, "```", ...lines, "```"].join("\n");
 }
 
 export async function handleMySeat(
@@ -156,7 +163,7 @@ export async function handleSetSeat(
 
 export async function handleGetSeatList(
   interaction: ChatInputCommandInteraction,
-  loadSeats: () => Promise<SeatRow[]>,
+  loadSeatPage: (tier: StoredSeatTier) => Promise<SeatPage>,
 ): Promise<void> {
   const tier = parseSeatTier(interaction.options.getString("tier", true));
   if (tier !== "Gold" && tier !== "Diamond") {
@@ -165,6 +172,6 @@ export async function handleGetSeatList(
   }
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const rows = (await loadSeats()).filter((row) => row.tier === tier);
-  await interaction.editReply(formatSeatList(tier, rows));
+  const { rows, total } = await loadSeatPage(tier);
+  await interaction.editReply(formatSeatList(tier, rows, total));
 }
