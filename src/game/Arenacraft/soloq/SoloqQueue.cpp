@@ -99,15 +99,18 @@ std::vector<SoloqQueue::QueueSnapshot> SoloqQueue::snapshot() const
   return result;
 }
 
-uint32_t SoloqQueue::windowFor(Entry const& entry)
+uint32_t SoloqQueue::windowFor(Entry const& entry) const
 {
-  uint64_t const steps =
-      static_cast<uint64_t>(entry.waited.count()) / static_cast<uint64_t>(tuning::StepIntervalMs.count());
-  uint64_t const window = static_cast<uint64_t>(tuning::InitialWindow) + steps * static_cast<uint64_t>(tuning::MmrStep);
-  return static_cast<uint32_t>(std::min<uint64_t>(window, tuning::MaxWindow));
+  uint32_t const initial = _tourneyMode ? tuning::TourneyInitialWindow : tuning::InitialWindow;
+  uint32_t const cap     = _tourneyMode ? tuning::TourneyMaxWindow : tuning::MaxWindow;
+  auto const     step    = _tourneyMode ? tuning::TourneyStepIntervalMs : tuning::StepIntervalMs;
+
+  uint64_t const steps  = static_cast<uint64_t>(entry.waited.count()) / static_cast<uint64_t>(step.count());
+  uint64_t const window = static_cast<uint64_t>(initial) + steps * static_cast<uint64_t>(tuning::MmrStep);
+  return static_cast<uint32_t>(std::min<uint64_t>(window, cap));
 }
 
-bool SoloqQueue::compatible(Entry const& left, Entry const& right)
+bool SoloqQueue::compatible(Entry const& left, Entry const& right) const
 {
   uint32_t const gap =
       left.player.mmr > right.player.mmr ? left.player.mmr - right.player.mmr : right.player.mmr - left.player.mmr;

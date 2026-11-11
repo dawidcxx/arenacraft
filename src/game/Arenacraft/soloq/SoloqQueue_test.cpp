@@ -111,6 +111,31 @@ TEST_CASE("queue snapshot reports the effective MMR window")
   CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::InitialWindow + arenacraft::soloq::tuning::MmrStep);
 }
 
+TEST_CASE("tourney mode: a 302 MMR gap does not match at the 300 cap")
+{
+  SoloqQueue queue;
+  queue.setTourneyMode(true);
+
+  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0, 1801));
+  queue.playerAddToQueue(player(2, CLASS_ROGUE, 0, 1499));
+  queue.playerAddToQueue(player(3, CLASS_MAGE, 0, 1650));
+  queue.playerAddToQueue(player(4, CLASS_WARLOCK, 0, 1650));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1, 1650));
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0, 1650));
+
+  // Ten minutes maxes both windows out at 300. The pair gap is 302, and the
+  // compatibility rule is gap <= max(windowA, windowB), not the sum of windows.
+  CHECK(queue.update(10min).empty());
+  CHECK(queue.size() == 6);
+
+  std::vector<SoloqQueue::QueueSnapshot> const snapshot = queue.snapshot();
+  REQUIRE(snapshot.size() == 6);
+  CHECK(snapshot[0].mmr == 1801);
+  CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::TourneyMaxWindow);
+  CHECK(snapshot[1].mmr == 1499);
+  CHECK(snapshot[1].mmrWindow == arenacraft::soloq::tuning::TourneyMaxWindow);
+}
+
 TEST_CASE("SoloqQueue removes queued players and reports unknown ids")
 {
   SoloqQueue queue;
@@ -149,7 +174,7 @@ TEST_CASE("update forms multiple matches in a single call")
 TEST_CASE("matching tolerance starts at the initial window")
 {
   SoloqQueue queue;
-  addSet(queue, 100, 1500, 1500, 1600); // 100 gap == InitialWindow
+  addSet(queue, 100, 1500, 1500, 1500 + arenacraft::soloq::tuning::InitialWindow);
 
   CHECK(queue.update(0ms).size() == 1);
   CHECK(queue.empty());
@@ -158,7 +183,7 @@ TEST_CASE("matching tolerance starts at the initial window")
 TEST_CASE("matching tolerance grows by 50 every 15 seconds up to the cap")
 {
   SoloqQueue queue;
-  addSet(queue, 100, 1500, 1500, 1650); // 150 gap: 100 base + one step
+  addSet(queue, 100, 1500, 1500, 1500 + arenacraft::soloq::tuning::InitialWindow + arenacraft::soloq::tuning::MmrStep);
 
   CHECK(queue.update(14s).empty());
   CHECK(queue.size() == 6);
@@ -169,10 +194,35 @@ TEST_CASE("matching tolerance grows by 50 every 15 seconds up to the cap")
 TEST_CASE("matching tolerance never exceeds the cap")
 {
   SoloqQueue queue;
-  addSet(queue, 100, 1500, 1500, 2200); // 700 gap > MaxWindow
+  addSet(queue, 100, 1500, 1500, 1500 + arenacraft::soloq::tuning::MaxWindow + arenacraft::soloq::tuning::MmrStep);
 
   CHECK(queue.update(1h).empty());
   CHECK(queue.size() == 6);
+}
+
+TEST_CASE("tourney mode narrows the initial window and slows its growth")
+{
+  SoloqQueue queue;
+  queue.setTourneyMode(true);
+  queue.playerAddToQueue(melee(1, 1500));
+  queue.playerAddToQueue(melee(2, 1500));
+
+  queue.update(0ms); // no match: two DPS are not enough
+  std::vector<SoloqQueue::QueueSnapshot> snapshot = queue.snapshot();
+  REQUIRE(snapshot.size() == 2);
+  CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::TourneyInitialWindow);
+
+  queue.update(29s); // the tourney step is 30s
+  snapshot = queue.snapshot();
+  CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::TourneyInitialWindow);
+
+  queue.update(1s);
+  snapshot = queue.snapshot();
+  CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::TourneyInitialWindow + arenacraft::soloq::tuning::MmrStep);
+
+  queue.update(1h);
+  snapshot = queue.snapshot();
+  CHECK(snapshot[0].mmrWindow == arenacraft::soloq::tuning::TourneyMaxWindow);
 }
 
 TEST_CASE("update prefers the tightest available match")
@@ -408,7 +458,8 @@ TEST_CASE("respects the MMR window")
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0, 1500));
   queue.playerAddToQueue(player(2, CLASS_ROGUE, 0, 1500));
   queue.playerAddToQueue(player(3, CLASS_MAGE, 0, 1500));
-  queue.playerAddToQueue(player(4, CLASS_WARLOCK, 0, 1650)); // 150 gap: 100 base + one step
+  queue.playerAddToQueue(player(4, CLASS_WARLOCK, 0,
+                                1500 + arenacraft::soloq::tuning::InitialWindow + arenacraft::soloq::tuning::MmrStep));
   queue.playerAddToQueue(player(5, CLASS_PRIEST, 1, 1500));
   queue.playerAddToQueue(player(6, CLASS_PALADIN, 0, 1500));
 

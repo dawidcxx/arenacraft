@@ -108,13 +108,22 @@ teams, so the queue needs at least 4 DPS and 2 healers.
 - Time is injected via `update(std::chrono::milliseconds elapsed)` - never read
   from the wall clock - so tests are deterministic.
 - Each queued player accumulates wait time. Their acceptable MMR window is
-  `min(MaxWindow, InitialWindow + MmrStep * floor(waited / StepInterval))`,
-  symmetric around their MMR (`InitialWindow = 100`, `MmrStep = 50`,
-  `StepInterval = 15s`, `MaxWindow = 500`). The nonzero base means a fresh
-  player already searches ±100 instead of requiring an exact MMR match, so a
-  slightly diverged pool still pops instead of stalling.
+  `min(cap, initial + MmrStep * floor(waited / step))`, symmetric around their
+  MMR (`MmrStep = 50`). The mode selects the other values:
+
+  | Setting | Tourney off | Tourney on |
+  | --- | --- | --- |
+  | `initial` | 200 | 100 |
+  | `cap` (`MaxWindow`) | 600 | 300 |
+  | growth `step` | 15s | 30s |
+
+  The nonzero base means a fresh player already searches ±`initial` instead of
+  requiring an exact MMR match, so a slightly diverged pool still pops instead
+  of stalling.
 - A candidate six-set is **valid** only if every pair satisfies
-  `gap <= max(window_i, window_j)` (the more-patient player's window governs).
+  `gap <= max(window_i, window_j)` (the more-patient player's window governs;
+  windows are **not** summed). So two capped tourney players 302 MMR apart do
+  not match, even though their individual ±300 ranges overlap.
 - **No faction input**: the queue is a single shared pool. Teams are formed from
   role, class-distinctness and MMR only; a team may mix races freely.
 - **No class stacking per team**: a partition where team A or team B would field
@@ -140,8 +149,8 @@ teams, so the queue needs at least 4 DPS and 2 healers.
 
 ## Tourney mode
 
-`SoloqQueue` carries a `tourneyMode` flag (`setTourneyMode`/`tourneyMode`). What it changes in matchmaking is defined
-later; for now it is only set and observable.
+`SoloqQueue` carries a `tourneyMode` flag (`setTourneyMode`/`tourneyMode`). It selects the tighter MMR search
+tuning (200/600/15s off vs 100/300/30s on, see the Matchmaking table above).
 
 `SoloqDriver` refreshes it from the host's local calendar at startup and then at most once every **10 minutes**
 (`TourneyCheckIntervalMs`; it accumulates the world tick `diff` in between). The lookup itself is

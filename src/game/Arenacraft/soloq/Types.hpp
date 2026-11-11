@@ -55,17 +55,23 @@ inline constexpr uint32_t InitialMmr    = 1500;
 
 // Fresh players already search a sane MMR spread instead of requiring an exact
 // match, so a slightly diverged pool still pops quickly instead of stalling.
-inline constexpr uint32_t InitialWindow = 100;
-inline constexpr uint32_t MmrStep       = 50;
-inline constexpr uint32_t MaxWindow     = 500;
-inline constexpr uint32_t EloScale      = 400;
-inline constexpr uint32_t KFactor       = 32;
+// Tournament mode tightens the search: smaller start, smaller cap, slower growth.
+inline constexpr uint32_t InitialWindow        = 200;
+inline constexpr uint32_t TourneyInitialWindow = 100;
+inline constexpr uint32_t MmrStep              = 50;
+inline constexpr uint32_t MaxWindow            = 600;
+inline constexpr uint32_t TourneyMaxWindow     = 300;
+inline constexpr uint32_t EloScale             = 400;
+inline constexpr uint32_t KFactor              = 32;
 
 // Fraction of the rating/MMR gap closed per match (bidirectional).
 inline constexpr double RatingCatchupRate = 0.05;
 
 inline constexpr std::chrono::seconds      StepInterval{15};
+inline constexpr std::chrono::seconds      TourneyStepInterval{30};
 inline constexpr std::chrono::milliseconds StepIntervalMs =
     std::chrono::duration_cast<std::chrono::milliseconds>(StepInterval);
+inline constexpr std::chrono::milliseconds TourneyStepIntervalMs =
+    std::chrono::duration_cast<std::chrono::milliseconds>(TourneyStepInterval);
 } // namespace tuning
 } // namespace arenacraft::soloq

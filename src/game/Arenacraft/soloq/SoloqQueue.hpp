@@ -25,8 +25,8 @@ public:
   // stacking within a team is rejected, except Mancleave (see SoloqQueue.cpp).
 
   // Tourney mode flag. It is driven by the weekend schedule in TourneySchedule
-  // (SoloqDriver refreshes it), not by the matchmaker itself; what it changes in
-  // matchmaking is decided separately.
+  // (SoloqDriver refreshes it) and selects the tighter MMR search tuning in
+  // windowFor: 100 initial / 300 cap / 30s growth instead of 200 / 600 / 15s.
   void               setTourneyMode(bool value) { _tourneyMode = value; }
   [[nodiscard]] bool tourneyMode() const { return _tourneyMode; }
 
@@ -76,8 +76,8 @@ private:
   [[nodiscard]] std::optional<Candidate> findBestMatch() const;
   [[nodiscard]] bool                     allCompatible(std::array<Entry const*, 6> const& six) const;
   [[nodiscard]] std::optional<Candidate> makeCandidate(std::array<Entry const*, 6> const& six) const;
-  [[nodiscard]] static uint32_t          windowFor(Entry const& entry);
-  [[nodiscard]] static bool              compatible(Entry const& left, Entry const& right);
+  [[nodiscard]] uint32_t                 windowFor(Entry const& entry) const;
+  [[nodiscard]] bool                     compatible(Entry const& left, Entry const& right) const;
   [[nodiscard]] bool teamAvoids(QueuedPlayer const& x, QueuedPlayer const& y, QueuedPlayer const& z) const;
 
   static void fillStats(Candidate& candidate, std::array<Entry const*, 6> const& six);
