@@ -266,8 +266,8 @@ class spell_warr_deep_wounds : public SpellScript
       // doubled. TrinityCore 3.3.5 does not apply them here either.
       // 16% of the average weapon damage per rank over 6 ticks
       ApplyPct(damage, 16.0f * GetSpellInfo()->GetRank() / 6.0f);
-      target->CastDelayedSpellWithPeriodicAmount(caster, SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC,
-                                                 SPELL_AURA_PERIODIC_DAMAGE, damage, EFFECT_0);
+      target->CastRolledPeriodicSpell(caster, SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC, SPELL_AURA_PERIODIC_DAMAGE,
+                                      damage, EFFECT_0);
 
       // caster->CastCustomSpell(target, SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC, &damage, nullptr, nullptr, true);
     }

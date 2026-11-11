@@ -1843,8 +1843,7 @@ public:
   float CalculateLevelPenalty(SpellInfo const* spellProto) const;
 
   uint32 GetCastingTimeForBonus(SpellInfo const* spellProto, DamageEffectType damagetype, uint32 CastingTime) const;
-  void   CastDelayedSpellWithPeriodicAmount(Unit* caster, uint32 spellId, AuraType auraType, int32 addAmount,
-                                            uint8 effectIndex = 0);
+  void CastRolledPeriodicSpell(Unit* caster, uint32 spellId, AuraType auraType, int32 addAmount, uint8 effectIndex = 0);
 
   // SpellCastResult methods
   SpellCastResult CastSpell(SpellCastTargets const& targets, SpellInfo const* spellInfo, CustomSpellValues const* value,

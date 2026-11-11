@@ -624,7 +624,7 @@ int32 AuraEffect::CalculateAmount(Unit* caster)
     break;
   }
 
-  // xinef: save base amount, before calculating sp etc. Used for Unit::CastDelayedSpellWithPeriodicAmount
+  // xinef: save base amount, before calculating sp etc. Used for Unit::CastRolledPeriodicSpell
   SetOldAmount(amount * GetBase()->GetStackAmount());
   GetBase()->CallScriptEffectCalcAmountHandlers(this, amount, m_canBeRecalculated);
 

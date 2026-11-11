@@ -706,8 +706,8 @@ class spell_mage_ignite : public AuraScript
     int32 amount = int32(CalculatePct(eventInfo.GetDamageInfo()->GetDamage(), pct) / igniteDot->GetMaxTicks());
 
     // Xinef: implement ignite bug
-    eventInfo.GetProcTarget()->CastDelayedSpellWithPeriodicAmount(eventInfo.GetActor(), SPELL_MAGE_IGNITE,
-                                                                  SPELL_AURA_PERIODIC_DAMAGE, amount);
+    eventInfo.GetProcTarget()->CastRolledPeriodicSpell(eventInfo.GetActor(), SPELL_MAGE_IGNITE,
+                                                       SPELL_AURA_PERIODIC_DAMAGE, amount);
     // GetTarget()->CastCustomSpell(SPELL_MAGE_IGNITE, SPELLVALUE_BASE_POINT0, amount, eventInfo.GetProcTarget(), true,
     // nullptr, aurEff);
   }

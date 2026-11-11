@@ -125,8 +125,8 @@ class spell_sha_t10_restoration_4p_bonus : public AuraScript
     }
 
     int32 amount = CalculatePct(healInfo->GetHeal(), aurEff->GetAmount()) / triggeredSpell->GetMaxTicks();
-    eventInfo.GetProcTarget()->CastDelayedSpellWithPeriodicAmount(GetTarget(), triggered_spell_id,
-                                                                  SPELL_AURA_PERIODIC_HEAL, amount, EFFECT_0);
+    eventInfo.GetProcTarget()->CastRolledPeriodicSpell(GetTarget(), triggered_spell_id, SPELL_AURA_PERIODIC_HEAL,
+                                                       amount, EFFECT_0);
   }
 
   void Register() override
@@ -1146,8 +1146,8 @@ class spell_sha_t8_electrified : public AuraScript
     int32            amount         = int32(CalculatePct(eventInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount()) /
                                             electrifiedDot->GetMaxTicks());
 
-    eventInfo.GetProcTarget()->CastDelayedSpellWithPeriodicAmount(eventInfo.GetActor(), SPELL_SHAMAN_ELECTRIFIED,
-                                                                  SPELL_AURA_PERIODIC_DAMAGE, amount);
+    eventInfo.GetProcTarget()->CastRolledPeriodicSpell(eventInfo.GetActor(), SPELL_SHAMAN_ELECTRIFIED,
+                                                       SPELL_AURA_PERIODIC_DAMAGE, amount);
   }
 
   void Register() override

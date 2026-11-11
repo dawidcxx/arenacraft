@@ -7565,7 +7565,7 @@ bool Unit::HandleDummyAuraProc(Unit* victim, uint32 damage, AuraEffect* triggere
           return false;
         basepoints0 = int32(CalculatePct(damage, triggerAmount) /
                             (blessHealing->GetMaxDuration() / blessHealing->Effects[0].Amplitude));
-        victim->CastDelayedSpellWithPeriodicAmount(this, triggered_spell_id, SPELL_AURA_PERIODIC_HEAL, basepoints0);
+        victim->CastRolledPeriodicSpell(this, triggered_spell_id, SPELL_AURA_PERIODIC_HEAL, basepoints0);
         return true;
       }
       break;
@@ -7962,7 +7962,7 @@ bool Unit::HandleDummyAuraProc(Unit* victim, uint32 damage, AuraEffect* triggere
       basepoints0        = triggerAmount * damage / 400;
       triggered_spell_id = 61840;
       // Add remaining ticks to damage done
-      victim->CastDelayedSpellWithPeriodicAmount(this, triggered_spell_id, SPELL_AURA_PERIODIC_DAMAGE, basepoints0);
+      victim->CastRolledPeriodicSpell(this, triggered_spell_id, SPELL_AURA_PERIODIC_DAMAGE, basepoints0);
       return true;
     }
     // Sheath of Light
@@ -8660,7 +8660,7 @@ bool Unit::HandleDummyAuraProc(Unit* victim, uint32 damage, AuraEffect* triggere
         AddPct(basepoints0, glyph->GetAmount());
 
       basepoints0 = basepoints0 / (unholyBlight->GetMaxDuration() / unholyBlight->Effects[0].Amplitude);
-      victim->CastDelayedSpellWithPeriodicAmount(this, triggered_spell_id, SPELL_AURA_PERIODIC_DAMAGE, basepoints0);
+      victim->CastRolledPeriodicSpell(this, triggered_spell_id, SPELL_AURA_PERIODIC_DAMAGE, basepoints0);
       return true;
     }
     // Vendetta
@@ -9365,7 +9365,7 @@ bool Unit::HandleProcTriggerSpell(Unit* victim, uint32 damage, AuraEffect* trigg
         basepoints0 = CalculatePct(int32(damage), triggerAmount) / 3;
         target      = this;
         // Add remaining ticks to healing done
-        CastDelayedSpellWithPeriodicAmount(this, trigger_spell_id, SPELL_AURA_PERIODIC_HEAL, basepoints0);
+        CastRolledPeriodicSpell(this, trigger_spell_id, SPELL_AURA_PERIODIC_HEAL, basepoints0);
         return true;
       }
       break;
@@ -9447,7 +9447,7 @@ bool Unit::HandleProcTriggerSpell(Unit* victim, uint32 damage, AuraEffect* trigg
 
         basepoints0 = CalculatePct(int32(damage), triggerAmount) /
                       (TriggerPS->GetMaxDuration() / TriggerPS->Effects[0].Amplitude);
-        victim->CastDelayedSpellWithPeriodicAmount(this, trigger_spell_id, SPELL_AURA_PERIODIC_DAMAGE, basepoints0);
+        victim->CastRolledPeriodicSpell(this, trigger_spell_id, SPELL_AURA_PERIODIC_DAMAGE, basepoints0);
         return true;
       }
       // Item - Hunter T9 4P Bonus (Steady Shot)
@@ -20808,72 +20808,29 @@ void Unit::OutDebugInfo() const
     LOG_INFO("entities.unit", "On vehicle {}.", GetVehicleBase()->GetEntry());
 }
 
-class AuraMunchingQueue : public BasicEvent
+void Unit::CastRolledPeriodicSpell(Unit* caster, uint32 spellId, AuraType auraType, int32 addAmount, uint8 effectIndex)
 {
-public:
-  AuraMunchingQueue(Unit& owner, ObjectGuid targetGUID, int32 basePoints, uint32 spellId, AuraEffect* aurEff,
-                    AuraType auraType)
-      : _owner(owner), _targetGUID(targetGUID), _basePoints(basePoints), _spellId(spellId), _aurEff(aurEff),
-        _auraType(auraType)
-  {
-  }
-
-  bool Execute(uint64 /*eventTime*/, uint32 /*updateTime*/) override
-  {
-    if (_owner.IsInWorld() && _owner.FindMap())
-      if (Unit* target = ObjectAccessor::GetUnit(_owner, _targetGUID))
-      {
-        bool auraFound = false; // Used to ensure _aurEff exists to avoid wild pointer access/crash
-        Unit::AuraEffectList const& auraEffects = target->GetAuraEffectsByType(_auraType);
-        for (Unit::AuraEffectList::const_iterator j = auraEffects.begin(); j != auraEffects.end(); ++j)
-          if ((*j) == _aurEff)
-            auraFound = true;
-
-        if (!auraFound)
-          _aurEff = nullptr;
-
-        _owner.CastCustomSpell(_spellId, SPELLVALUE_BASE_POINT0, _basePoints, target,
-                               TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_NO_PERIODIC_RESET), nullptr, _aurEff,
-                               _owner.GetGUID());
-      }
-
-    return true;
-  }
-
-private:
-  Unit&       _owner;
-  ObjectGuid  _targetGUID;
-  int32       _basePoints;
-  uint32      _spellId;
-  AuraEffect* _aurEff;
-  AuraType    _auraType;
-};
-
-void Unit::CastDelayedSpellWithPeriodicAmount(Unit* caster, uint32 spellId, AuraType auraType, int32 addAmount,
-                                              uint8 effectIndex)
-{
+  // Arenacraft: no DoT munching. The remaining damage of the existing aura is rolled into the new
+  // application and cast right away, so every application accumulates (Deep Wounds, Ignite, ...).
+  // The old 400 ms batching window silently dropped every application but the last one per batch.
   AuraEffect* aurEff = nullptr;
   for (AuraEffectList::iterator i = m_modAuras[auraType].begin(); i != m_modAuras[auraType].end(); ++i)
   {
-    aurEff = *i;
-    if (aurEff->GetCasterGUID() != caster->GetGUID() || aurEff->GetId() != spellId ||
-        aurEff->GetEffIndex() != effectIndex || !aurEff->GetTotalTicks())
+    AuraEffect* current = *i;
+    if (current->GetCasterGUID() != caster->GetGUID() || current->GetId() != spellId ||
+        current->GetEffIndex() != effectIndex || !current->GetTotalTicks())
       continue;
 
+    aurEff = current;
     addAmount +=
-        ((aurEff->GetOldAmount() * std::max<int32>(aurEff->GetTotalTicks() - int32(aurEff->GetTickNumber()), 0)) /
-         aurEff->GetTotalTicks());
+        ((current->GetOldAmount() * std::max<int32>(current->GetTotalTicks() - int32(current->GetTickNumber()), 0)) /
+         current->GetTotalTicks());
     break;
   }
 
-  // xinef: delay only for casting on different unit
-  if (this == caster || !sWorld->getBoolConfig(CONFIG_MUNCHING_BLIZZLIKE))
-    caster->CastCustomSpell(spellId, SPELLVALUE_BASE_POINT0, addAmount, this,
-                            TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_NO_PERIODIC_RESET), nullptr, aurEff,
-                            caster->GetGUID());
-  else
-    caster->m_Events.AddEvent(new AuraMunchingQueue(*caster, GetGUID(), addAmount, spellId, aurEff, auraType),
-                              caster->m_Events.CalculateQueueTime(400));
+  caster->CastCustomSpell(spellId, SPELLVALUE_BASE_POINT0, addAmount, this,
+                          TriggerCastFlags(TRIGGERED_FULL_MASK & ~TRIGGERED_NO_PERIODIC_RESET), nullptr, aurEff,
+                          caster->GetGUID());
 }
 
 void Unit::SendClearTarget()
