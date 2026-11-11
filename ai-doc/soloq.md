@@ -48,7 +48,8 @@ tests fast and isolated. The core-facing pieces (`SoloqService` NPC glue,
 using PlayerId = uint64_t;                 // raw ObjectGuid
 enum class Role : uint8_t { Melee, Caster, Healer };
 
-struct QueuedPlayer { PlayerId id; Classes classId; uint8_t specIndex; uint32_t rating; uint32_t mmr; TeamId teamId; };
+struct QueuedPlayer { PlayerId id; Classes classId; uint8_t specIndex; uint32_t rating; uint32_t mmr; TeamId teamId;
+                      uint32_t accountId; };
 struct Team  { QueuedPlayer melee, caster, healer; };   // named slots encode composition
 struct Match { Team a, b; };
 ```
@@ -100,8 +101,8 @@ Unknown class / spec outside 0..2 returns `nullopt` and is rejected by the queue
 
 ## Matchmaking (`SoloqQueue`)
 
-In standard mode a team is `{melee, healer, caster}`; a match is two teams (2 of
-each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
+A team is always two DPS (melee or caster) plus one healer; a match is two
+teams, so the queue needs at least 4 DPS and 2 healers.
 
 - Time is injected via `update(std::chrono::milliseconds elapsed)` - never read
   from the wall clock - so tests are deterministic.
@@ -119,23 +120,21 @@ each role). Needs at least 2 of every role. Flex mode relaxes this (see below).
   the same class twice is rejected (e.g. Shadow Priest caster + Discipline
   Priest healer). If no partition of the six avoids it, the candidate is skipped
   entirely. `makeCandidate` returns `nullopt` in that case.
-- Exhaustive best-fit: enumerate all `(2 melee, 2 caster, 2 healer)` valid sets,
-  try the 4 ways to split them into two teams (keeping only class-distinct
-  teams), and score by `oldest queued player -> longest total wait ->
+- Exhaustive best-fit: enumerate every `(4 DPS, 2 healers)` valid set, try each
+  way to split them into two teams (2 healer assignments x 6 DPS pairs; keeping
+  only class-distinct teams), and score by `oldest queued player -> longest total wait ->
   team imbalance -> MMR spread`. Queue order dominates: the earliest-queued
   player is always included when any valid set contains them, so fairness can
   never skip a long-waiting player in favour of a fairer set of newer arrivals.
   Emit the best match, remove those six, repeat until nothing valid remains.
-- **Flex mode** (`setFlexMode`, off by default, toggled by `.soloq flex`): the
-  melee/caster/healer split is relaxed. The queue pools all DPS (melee + caster)
-  and requires at least 4 of them plus 2 healers; each team fields any two DPS
-  plus one healer. Class stacking within a team is still rejected, with one
-  exception: **Mancleave** - an Arms warrior (spec 0) and a Protection warrior
-  (spec 2) may share a team (`isMancleavePair`, a constant-time check, so the
-  enumeration cost is unchanged). Other warrior pairs still count as stacking.
-  The queue's
-  `Team::melee`/`Team::caster` fields are just the two DPS slots in this mode,
-  so the real role is derived from class/spec when reporting participants.
+- **Composition**: the queue pools all DPS (melee + caster) and requires at least
+  4 of them plus 2 healers; each team fields any two DPS plus one healer. Class
+  stacking within a team is rejected, with one exception: **Mancleave** - an Arms
+  warrior (spec 0) and a Protection warrior (spec 2) may share a team
+  (`isMancleavePair`, a constant-time check, so the enumeration cost is
+  unchanged). Other warrior pairs still count as stacking.
+  `Team::melee`/`Team::caster` are just the two DPS slots, so the real role is
+  derived from class/spec when reporting participants.
 - `update` returns the drained `std::vector<Match>`; matched players are removed.
 
 ## Public ladder role (`character_soloq_role`)
@@ -148,20 +147,26 @@ ladder as Melee / Caster / Healer.
 
 ## Avoid list (#77)
 
-A player can name up to **2** characters they never want as teammates (`AvoidList`, pure, tested in
+A player can name up to **2** accounts they never want as teammates (`AvoidList`, pure, tested in
 `AvoidList_test.cpp`). The matchmaker skips every team partition that puts an avoiding pair on the same team, the
 same way it skips class stacking (`SoloqQueue::setAvoidCheck`, a constant-time lookup per partition, so the
 enumeration cost is unchanged). Only one side needs to avoid the other. Avoided players can still be opponents.
 If no partition of a six-set avoids every pair, that set is skipped and the players stay queued.
 
+- **Account-bound**: avoiding a character avoids every character on that account, and the owner's list follows their
+  account too. Relogging to an alt no longer escapes an avoid. The menu still shows character names: a slot stores
+  the avoided account id (the matching key) and the character that was named (display only). `AvoidList` only sees
+  account ids; the queue carries `QueuedPlayer::accountId`, snapshotted from `Player::GetAccountId()` at queue time
+  (the account id is cached in the `Player` constructor because it never changes).
 - **Slots and cooldown**: filling a slot starts a **6 hour** cooldown on it (`SlotCooldownSeconds`). Removing a player
   empties the slot but keeps the cooldown, so the list can't be churned (e.g. to dodge players for rating). A filled
   slot stays filled after its cooldown; to swap, remove the player and add another once the cooldown is over.
 - **Menu** (SoloQ NPC -> "Avoid list"): a page with both slots and their cooldowns, "Avoid a player by name..." (gossip
   text box, `CanCreatureGossipSelectCode`), one option per recent teammate (last 10, in memory only:
-  `RecentTeammates`, recorded when a match pops) and "Stop avoiding <name>" per filled slot (with a confirmation).
-- **Storage**: characters DB `soloq_avoid (guid, slot, avoided_guid, used_at)`
-  (`data/sql/updates/db_characters/2026_11_05_00.sql`), loaded at startup (`SoloqNpcSetup`), one `REPLACE` per change.
+  `RecentTeammates`, recorded when a match pops; the recent list stays per character) and "Stop avoiding <name>" per
+  filled slot (with a confirmation).
+- **Storage**: in memory only (`SoloqService::_avoid`). Nothing is written to the DB and a worldserver restart clears
+  every list; that is accepted, so no migration/table is needed.
 - No bias towards either side yet: when an avoid pair blocks a set, both players simply wait for another set.
 
 ## Post-match adjustment (`resolveMatch`)
@@ -491,18 +496,13 @@ Admin commands:
 - `.soloq status` - total queued, per-role counts, pending arenas, and a verdict
   on whether a match can form.
 - `.soloq list` - every queued player: id, class, spec, role, rating, MMR, wait
-  time. Use this to confirm you have 2/2/2.
+  time. Use this to confirm you have at least 4 DPS and 2 healers.
 - `.soloq pending` - arenas waiting for a result (instance id + both teams).
 - `.soloq clear` - dequeue everyone and clear their badges.
 - `.soloq debug on|off` - runtime bypass of the character readiness gate
   (`SoloqService::setSkipCharacterChecks`): while on, `Join SoloQ` skips the
   gear/enchant/gem/talent/glyph checks entirely. `off` (default) enforces them.
   Does not clear the per-character pass cache.
-- `.soloq flex [on|off]` - toggle relaxed composition
-  (`SoloqService::setFlexMode` -> `SoloqQueue::setFlexMode`). With no argument
-  it flips the current setting. On: teams may field any two DPS (melee/caster)
-  plus a healer; class stacking within a team is still blocked. Off (default):
-  the strict one melee + one caster + one healer composition.
 
 ## Wiring
 

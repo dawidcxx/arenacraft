@@ -22,9 +22,10 @@ using namespace std::chrono_literals;
 namespace
 {
 QueuedPlayer player(PlayerId id, Classes classId, uint8_t specIndex, uint32_t mmr = InitialMmr,
-                    TeamId teamId = TEAM_ALLIANCE)
+                    TeamId teamId = TEAM_ALLIANCE, uint32_t accountId = 0)
 {
-  return QueuedPlayer{id, classId, specIndex, InitialRating, mmr, teamId};
+  return QueuedPlayer{
+      id, classId, specIndex, InitialRating, mmr, teamId, accountId ? accountId : static_cast<uint32_t>(id)};
 }
 
 QueuedPlayer melee(PlayerId id, uint32_t mmr = InitialMmr, TeamId teamId = TEAM_ALLIANCE)
@@ -91,45 +92,6 @@ TEST_CASE("SoloqQueue removes queued players and reports unknown ids")
   CHECK_FALSE(queue.playerRemoveFromQueue(1));
   CHECK_FALSE(queue.playerRemoveFromQueue(42));
   CHECK(queue.empty());
-}
-
-TEST_CASE("SoloqQueue needs two players of every role before matching")
-{
-  SoloqQueue queue;
-  queue.playerAddToQueue(melee(1));
-  queue.playerAddToQueue(melee(2));
-  queue.playerAddToQueue(caster(3));
-  queue.playerAddToQueue(caster(4));
-  queue.playerAddToQueue(healer(5));
-
-  CHECK(queue.update(0ms).empty());
-  CHECK(queue.size() == 5);
-
-  queue.playerAddToQueue(healer(6));
-
-  CHECK(queue.update(0ms).size() == 1);
-  CHECK(queue.empty());
-}
-
-TEST_CASE("a match is two teams of one melee, one caster and one healer")
-{
-  SoloqQueue queue;
-  addSet(queue, 100, 1500, 1500, 1500);
-
-  std::vector<Match> const matches = queue.update(0ms);
-  REQUIRE(matches.size() == 1);
-
-  for (SoloqTeam const* team : {&matches[0].a, &matches[0].b})
-  {
-    CHECK(roleFor(team->melee.classId, team->melee.specIndex) == Role::Melee);
-    CHECK(roleFor(team->caster.classId, team->caster.specIndex) == Role::Caster);
-    CHECK(roleFor(team->healer.classId, team->healer.specIndex) == Role::Healer);
-  }
-
-  std::multiset<PlayerId> const ids = idsOf(matches[0]);
-  CHECK(ids.size() == 6);
-  CHECK(ids.contains(100));
-  CHECK(ids.contains(105));
 }
 
 TEST_CASE("update drains matched players and leaves the rest queued")
@@ -252,8 +214,9 @@ TEST_CASE("SoloqQueue does not stack a class within a team")
   queue.playerAddToQueue(player(5, CLASS_PRIEST, 1)); // Holy (Healer)
   queue.playerAddToQueue(player(6, CLASS_PRIEST, 1)); // Holy (Healer)
 
-  // Team A gets one warrior + one priest caster + one priest healer, so priests
-  // stack in every possible partition; no match is valid.
+  // The two healers are priests, so a team with a shadow priest DPS stacks
+  // priests; with only two warriors for four DPS slots, one team must take a
+  // shadow priest, so no split is valid.
   CHECK(queue.update(0ms).empty());
   CHECK(queue.size() == 6);
 }
@@ -290,12 +253,9 @@ TEST_CASE("SoloqQueue builds teams without regard to faction")
   CHECK(sixHorde.update(0ms).size() == 1);
 }
 
-TEST_CASE("flex mode forms double-DPS teams without casters")
+TEST_CASE("forms double-DPS teams without casters")
 {
   SoloqQueue queue;
-  CHECK_FALSE(queue.flexMode());
-  queue.setFlexMode(true);
-  CHECK(queue.flexMode());
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
   queue.playerAddToQueue(player(2, CLASS_ROGUE, 0));
   queue.playerAddToQueue(player(3, CLASS_DEATH_KNIGHT, 0));
@@ -317,10 +277,9 @@ TEST_CASE("flex mode forms double-DPS teams without casters")
   }
 }
 
-TEST_CASE("flex mode still refuses to stack a class within a team")
+TEST_CASE("still refuses to stack a class within a team")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
   queue.playerAddToQueue(player(2, CLASS_WARRIOR, 0));
   queue.playerAddToQueue(player(3, CLASS_WARRIOR, 0));
@@ -333,10 +292,9 @@ TEST_CASE("flex mode still refuses to stack a class within a team")
   CHECK(queue.size() == 6);
 }
 
-TEST_CASE("flex mode allows Mancleave (Arms + Protection warrior) on one team")
+TEST_CASE("allows Mancleave (Arms + Protection warrior) on one team")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0)); // arms
   queue.playerAddToQueue(player(2, CLASS_WARRIOR, 2)); // protection
   queue.playerAddToQueue(player(3, CLASS_WARRIOR, 0)); // arms
@@ -362,10 +320,9 @@ TEST_CASE("flex mode allows Mancleave (Arms + Protection warrior) on one team")
   CHECK(foundMancleave);
 }
 
-TEST_CASE("flex mode still refuses warrior stacks that are not Mancleave")
+TEST_CASE("still refuses warrior stacks that are not Mancleave")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 1)); // fury
   queue.playerAddToQueue(player(2, CLASS_WARRIOR, 2)); // protection
   queue.playerAddToQueue(player(3, CLASS_WARRIOR, 1)); // fury
@@ -377,10 +334,9 @@ TEST_CASE("flex mode still refuses warrior stacks that are not Mancleave")
   CHECK(queue.size() == 6);
 }
 
-TEST_CASE("flex mode needs four DPS and two healers")
+TEST_CASE("needs four DPS and two healers")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
   queue.playerAddToQueue(melee(1));
   queue.playerAddToQueue(melee(2));
   queue.playerAddToQueue(caster(3));
@@ -395,10 +351,9 @@ TEST_CASE("flex mode needs four DPS and two healers")
   CHECK(queue.empty());
 }
 
-TEST_CASE("flex mode forms double-caster teams and splits healer/DPS class collisions")
+TEST_CASE("forms double-caster teams and splits healer/DPS class collisions")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
   queue.playerAddToQueue(player(1, CLASS_MAGE, 0));
   queue.playerAddToQueue(player(2, CLASS_WARLOCK, 0));
   queue.playerAddToQueue(player(3, CLASS_PRIEST, 2));  // Shadow (caster) - collides with the priest healer
@@ -419,10 +374,9 @@ TEST_CASE("flex mode forms double-caster teams and splits healer/DPS class colli
   }
 }
 
-TEST_CASE("flex mode respects the MMR window")
+TEST_CASE("respects the MMR window")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0, 1500));
   queue.playerAddToQueue(player(2, CLASS_ROGUE, 0, 1500));
   queue.playerAddToQueue(player(3, CLASS_MAGE, 0, 1500));
@@ -436,29 +390,14 @@ TEST_CASE("flex mode respects the MMR window")
   CHECK(queue.empty());
 }
 
-TEST_CASE("flex mode forms multiple matches in a single update")
+TEST_CASE("forms multiple matches in a single update")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
   addSet(queue, 100, 1500, 1500, 1500);
   addSet(queue, 200, 1500, 1500, 1500);
 
   CHECK(queue.update(0ms).size() == 2);
   CHECK(queue.empty());
-}
-
-TEST_CASE("standard mode ignores flex-only pools")
-{
-  SoloqQueue queue; // flex off
-  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
-  queue.playerAddToQueue(player(2, CLASS_ROGUE, 0));
-  queue.playerAddToQueue(player(3, CLASS_DEATH_KNIGHT, 0));
-  queue.playerAddToQueue(player(4, CLASS_HUNTER, 0));
-  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));
-  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0));
-
-  CHECK(queue.update(0ms).empty());
-  CHECK(queue.size() == 6);
 }
 
 namespace
@@ -474,9 +413,9 @@ bool sameTeam(Match const& match, PlayerId x, PlayerId y)
   return false;
 }
 
-SoloqQueue::AvoidCheck avoiding(std::set<std::pair<PlayerId, PlayerId>> pairs)
+SoloqQueue::AvoidCheck avoiding(std::set<std::pair<uint32_t, uint32_t>> pairs)
 {
-  return [pairs](PlayerId x, PlayerId y) { return pairs.contains({x, y}) || pairs.contains({y, x}); };
+  return [pairs](uint32_t x, uint32_t y) { return pairs.contains({x, y}) || pairs.contains({y, x}); };
 }
 } // namespace
 
@@ -503,10 +442,27 @@ TEST_CASE("avoid list: a six-set with no avoid-free split does not pop")
   CHECK(queue.size() == 6);
 }
 
-TEST_CASE("avoid list: flex teams respect it too")
+TEST_CASE("avoid list: every character of an avoided account is avoided")
 {
   SoloqQueue queue;
-  queue.setFlexMode(true);
+  // Account 100 avoids account 900, which has two characters queued (101 and 102).
+  queue.setAvoidCheck(avoiding({{100, 900}}));
+  queue.playerAddToQueue(player(100, CLASS_WARRIOR, 0, 1500, TEAM_ALLIANCE, 100));
+  queue.playerAddToQueue(player(101, CLASS_WARRIOR, 0, 1500, TEAM_ALLIANCE, 900));
+  queue.playerAddToQueue(player(102, CLASS_MAGE, 0, 1500, TEAM_ALLIANCE, 900));
+  queue.playerAddToQueue(player(103, CLASS_MAGE, 0));
+  queue.playerAddToQueue(player(104, CLASS_PRIEST, 1));
+  queue.playerAddToQueue(player(105, CLASS_PRIEST, 1));
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(matches.size() == 1);
+  CHECK_FALSE(sameTeam(matches[0], 100, 101));
+  CHECK_FALSE(sameTeam(matches[0], 100, 102));
+}
+
+TEST_CASE("avoid list: teams respect it too")
+{
+  SoloqQueue queue;
   queue.setAvoidCheck(avoiding({{1, 2}, {1, 5}}));
   queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
   queue.playerAddToQueue(player(2, CLASS_ROGUE, 0));

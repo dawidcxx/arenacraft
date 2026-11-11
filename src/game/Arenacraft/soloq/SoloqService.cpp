@@ -17,9 +17,10 @@ SoloqService& SoloqService::instance()
   return service;
 }
 
-bool SoloqService::join(PlayerId id, Classes classId, uint8_t specIndex, TeamId teamId, uint32_t rating, uint32_t mmr)
+bool SoloqService::join(PlayerId id, uint32_t accountId, Classes classId, uint8_t specIndex, TeamId teamId,
+                        uint32_t rating, uint32_t mmr)
 {
-  bool const added = _queue.playerAddToQueue(QueuedPlayer{id, classId, specIndex, rating, mmr, teamId});
+  bool const added = _queue.playerAddToQueue(QueuedPlayer{id, classId, specIndex, rating, mmr, teamId, accountId});
   if (added)
     refreshRoleCounts();
   return added;

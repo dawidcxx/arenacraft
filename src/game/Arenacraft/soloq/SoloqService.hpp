@@ -33,7 +33,8 @@ class SoloqService
 public:
   static SoloqService& instance();
 
-  bool join(PlayerId id, Classes classId, uint8_t specIndex, TeamId teamId, uint32_t rating, uint32_t mmr);
+  bool join(PlayerId id, uint32_t accountId, Classes classId, uint8_t specIndex, TeamId teamId, uint32_t rating,
+            uint32_t mmr);
   bool leave(PlayerId id);
 
   // Runs the character readiness check at most once per character per process:
@@ -73,20 +74,16 @@ public:
   void               setSkipCharacterChecks(bool value);
   [[nodiscard]] bool skipCharacterChecks() const { return _skipCharacterChecks; }
 
-  // Relaxes team composition to any two DPS + one healer (see SoloqQueue).
-  void               setFlexMode(bool value) { _queue.setFlexMode(value); }
-  [[nodiscard]] bool flexMode() const { return _queue.flexMode(); }
-
-  // Avoid list (#77): the matchmaker never puts two players on the same team when one avoids the other. Characters
-  // are low guids; stored in the characters DB (soloq_avoid), see SoloqNpc.cpp.
+  // Avoid list (#77): the matchmaker never puts two players on the same team when one avoids the other. The list is
+  // keyed by account id, so every character on an avoided account is avoided too. It lives in memory only; a
+  // worldserver restart clears it (see SoloqNpc.cpp).
   [[nodiscard]] AvoidList&       avoidList() { return _avoid; }
   [[nodiscard]] RecentTeammates& recentTeammates() { return _recent; }
 
 private:
   SoloqService()
   {
-    _queue.setAvoidCheck([this](PlayerId x, PlayerId y)
-                         { return _avoid.avoids(static_cast<uint32_t>(x), static_cast<uint32_t>(y)); });
+    _queue.setAvoidCheck([this](uint32_t x, uint32_t y) { return _avoid.avoids(x, y); });
   }
 
   void refreshRoleCounts();

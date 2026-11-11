@@ -214,8 +214,8 @@ ParticipantInfo ResolveParticipant(QueuedPlayer const& queued, Role fallbackRole
   info.id        = queued.id;
   info.classId   = queued.classId;
   info.specIndex = queued.specIndex;
-  // Derive the role from the character rather than its team slot: under flex
-  // matching a team's two DPS slots may both be the same role.
+  // Derive the role from the character rather than its team slot: a team's two
+  // DPS slots can hold either melee or caster characters.
   info.role   = roleFor(queued.classId, queued.specIndex).value_or(fallbackRole);
   info.teamId = queued.teamId;
   info.rating = queued.rating;

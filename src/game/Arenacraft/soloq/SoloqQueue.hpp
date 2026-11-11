@@ -21,15 +21,13 @@ public:
 
   std::vector<Match> update(std::chrono::milliseconds elapsed);
 
-  // Flex mode relaxes the melee/caster/healer composition rule: a team may field
-  // any two DPS (melee or caster) plus one healer instead of exactly one of each
-  // role. Class stacking within a team is still rejected. Off by default.
-  void               setFlexMode(bool value) { _flex = value; }
-  [[nodiscard]] bool flexMode() const { return _flex; }
+  // Team composition is always two DPS (melee or caster) plus one healer. Class
+  // stacking within a team is rejected, except Mancleave (see SoloqQueue.cpp).
 
   // Avoid list (#77): two players for whom this returns true are never put on the same team - partitions that would
   // do so are skipped like class stacking. Either side having avoided the other is enough. Unset = no avoiding.
-  using AvoidCheck = std::function<bool(PlayerId, PlayerId)>;
+  // The callback receives account ids, not character guids: avoiding is account-bound.
+  using AvoidCheck = std::function<bool(uint32_t, uint32_t)>;
   void setAvoidCheck(AvoidCheck check) { _avoids = std::move(check); }
 
   struct QueueSnapshot
@@ -68,11 +66,8 @@ private:
   };
 
   [[nodiscard]] std::optional<Candidate> findBestMatch() const;
-  [[nodiscard]] std::optional<Candidate> findStandardMatch() const;
-  [[nodiscard]] std::optional<Candidate> findFlexMatch() const;
   [[nodiscard]] bool                     allCompatible(std::array<Entry const*, 6> const& six) const;
-  [[nodiscard]] std::optional<Candidate> makeStandardCandidate(std::array<Entry const*, 6> const& six) const;
-  [[nodiscard]] std::optional<Candidate> makeFlexCandidate(std::array<Entry const*, 6> const& six) const;
+  [[nodiscard]] std::optional<Candidate> makeCandidate(std::array<Entry const*, 6> const& six) const;
   [[nodiscard]] static uint32_t          windowFor(Entry const& entry);
   [[nodiscard]] static bool              compatible(Entry const& left, Entry const& right);
   [[nodiscard]] bool teamAvoids(QueuedPlayer const& x, QueuedPlayer const& y, QueuedPlayer const& z) const;
@@ -84,7 +79,6 @@ private:
 
   std::vector<Entry> _entries;
   uint64_t           _nextSequence = 0;
-  bool               _flex         = false;
   AvoidCheck         _avoids;
 };
 } // namespace arenacraft::soloq

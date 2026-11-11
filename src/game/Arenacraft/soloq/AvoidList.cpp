@@ -9,7 +9,8 @@ bool AvoidList::free(AvoidSlot const& slot, int64_t now)
   return slot.avoided == 0 && (slot.usedAt == 0 || now - slot.usedAt >= SlotCooldownSeconds);
 }
 
-AvoidList::AddResult AvoidList::add(uint32_t owner, uint32_t avoided, int64_t now, std::size_t* slot)
+AvoidList::AddResult AvoidList::add(uint32_t owner, uint32_t avoided, uint32_t avoidedGuid, int64_t now,
+                                    std::size_t* slot)
 {
   if (owner == avoided)
     return AddResult::Self;
@@ -21,7 +22,7 @@ AvoidList::AddResult AvoidList::add(uint32_t owner, uint32_t avoided, int64_t no
   {
     if (!free(own[i], now))
       continue;
-    own[i] = AvoidSlot{avoided, now};
+    own[i] = AvoidSlot{avoided, now, avoidedGuid};
     if (slot)
       *slot = i;
     return AddResult::Added;
@@ -38,7 +39,8 @@ bool AvoidList::remove(uint32_t owner, uint32_t avoided, std::size_t* slot)
   {
     if (it->second[i].avoided != avoided)
       continue;
-    it->second[i].avoided = 0; // usedAt stays: removing does not give the cooldown back
+    it->second[i].avoided     = 0; // usedAt stays: removing does not give the cooldown back
+    it->second[i].avoidedGuid = 0;
     if (slot)
       *slot = i;
     return true;
@@ -71,12 +73,6 @@ int64_t AvoidList::cooldownLeft(uint32_t owner, std::size_t index, int64_t now) 
   if (slot.usedAt == 0)
     return 0;
   return std::max<int64_t>(slot.usedAt + SlotCooldownSeconds - now, 0);
-}
-
-void AvoidList::load(uint32_t owner, std::size_t index, AvoidSlot slot)
-{
-  if (index < Slots)
-    _slots[owner][index] = slot;
 }
 
 void RecentTeammates::record(std::array<Mate, 3> const& team)

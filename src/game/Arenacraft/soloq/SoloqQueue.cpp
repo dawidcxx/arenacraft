@@ -9,8 +9,8 @@ namespace
 constexpr uint8_t WarriorSpecArms = 0;
 constexpr uint8_t WarriorSpecProt = 2;
 
-// Mancleave (Arms warrior + Protection warrior + healer) is the one class stack flex mode allows. Constant time, so
-// the matchmaker's enumeration cost is unchanged.
+// Mancleave (Arms warrior + Protection warrior + healer) is the one class stack the matchmaker allows. Constant time,
+// so the enumeration cost is unchanged.
 bool isMancleavePair(QueuedPlayer const& x, QueuedPlayer const& y)
 {
   if (x.classId != CLASS_WARRIOR || y.classId != CLASS_WARRIOR)
@@ -24,8 +24,8 @@ bool stacksClass(QueuedPlayer const& x, QueuedPlayer const& y)
   return x.classId == y.classId && !isMancleavePair(x, y);
 }
 
-// a flex team is two DPS and one healer; healers are never warriors, so only the DPS pair can be mancleave
-bool flexTeamStacksClass(QueuedPlayer const& dps0, QueuedPlayer const& dps1, QueuedPlayer const& healer)
+// a team is two DPS and one healer; healers are never warriors, so only the DPS pair can be mancleave
+bool teamStacksClass(QueuedPlayer const& dps0, QueuedPlayer const& dps1, QueuedPlayer const& healer)
 {
   return stacksClass(dps0, dps1) || dps0.classId == healer.classId || dps1.classId == healer.classId;
 }
@@ -159,72 +159,13 @@ bool SoloqQueue::betterThan(Candidate const& left, Candidate const& right)
 
 bool SoloqQueue::teamAvoids(QueuedPlayer const& x, QueuedPlayer const& y, QueuedPlayer const& z) const
 {
-  return _avoids && (_avoids(x.id, y.id) || _avoids(x.id, z.id) || _avoids(y.id, z.id));
+  return _avoids &&
+         (_avoids(x.accountId, y.accountId) || _avoids(x.accountId, z.accountId) || _avoids(y.accountId, z.accountId));
 }
 
-std::optional<SoloqQueue::Candidate> SoloqQueue::makeStandardCandidate(std::array<Entry const*, 6> const& six) const
+std::optional<SoloqQueue::Candidate> SoloqQueue::makeCandidate(std::array<Entry const*, 6> const& six) const
 {
-  QueuedPlayer const& m0 = six[0]->player;
-  QueuedPlayer const& m1 = six[1]->player;
-  QueuedPlayer const& c0 = six[2]->player;
-  QueuedPlayer const& c1 = six[3]->player;
-  QueuedPlayer const& h0 = six[4]->player;
-  QueuedPlayer const& h1 = six[5]->player;
-
-  uint64_t const total = static_cast<uint64_t>(m0.mmr) + m1.mmr + c0.mmr + c1.mmr + h0.mmr + h1.mmr;
-
-  // partition p: team A = {m0, caster[p], healer[p]}, team B takes the rest.
-  // Only partitions where neither team stacks a class are eligible.
-  bool        found         = false;
-  uint64_t    bestImbalance = 0;
-  std::size_t bestPartition = 0;
-  for (std::size_t p = 0; p < 4; ++p)
-  {
-    QueuedPlayer const& casterA = (p == 0 || p == 1) ? c0 : c1;
-    QueuedPlayer const& healerA = (p == 0 || p == 2) ? h0 : h1;
-    QueuedPlayer const& casterB = (p == 0 || p == 1) ? c1 : c0;
-    QueuedPlayer const& healerB = (p == 0 || p == 2) ? h1 : h0;
-
-    if (m0.classId == casterA.classId || m0.classId == healerA.classId || casterA.classId == healerA.classId)
-      continue;
-    if (m1.classId == casterB.classId || m1.classId == healerB.classId || casterB.classId == healerB.classId)
-      continue;
-    if (teamAvoids(m0, casterA, healerA) || teamAvoids(m1, casterB, healerB))
-      continue;
-
-    uint64_t const sumA      = static_cast<uint64_t>(m0.mmr) + casterA.mmr + healerA.mmr;
-    uint64_t const doubled   = 2 * sumA;
-    uint64_t const imbalance = doubled > total ? doubled - total : total - doubled;
-
-    if (!found || imbalance < bestImbalance)
-    {
-      found         = true;
-      bestImbalance = imbalance;
-      bestPartition = p;
-    }
-  }
-
-  if (!found)
-    return std::nullopt;
-
-  bool const casterFirstInA = bestPartition == 0 || bestPartition == 1;
-  bool const healerFirstInA = bestPartition == 0 || bestPartition == 2;
-
-  Candidate candidate{};
-  candidate.match.a.melee  = m0;
-  candidate.match.a.caster = casterFirstInA ? c0 : c1;
-  candidate.match.a.healer = healerFirstInA ? h0 : h1;
-  candidate.match.b.melee  = m1;
-  candidate.match.b.caster = casterFirstInA ? c1 : c0;
-  candidate.match.b.healer = healerFirstInA ? h1 : h0;
-  candidate.imbalance      = bestImbalance;
-  fillStats(candidate, six);
-  return candidate;
-}
-
-std::optional<SoloqQueue::Candidate> SoloqQueue::makeFlexCandidate(std::array<Entry const*, 6> const& six) const
-{
-  // Flex composition: six[0..3] are DPS (melee or caster), six[4..5] are healers.
+  // Composition: six[0..3] are DPS (melee or caster), six[4..5] are healers.
   // Each team takes two DPS and one healer. Teams that stack a class are skipped, except Mancleave (Arms + Prot).
   uint64_t total = 0;
   for (Entry const* entry : six)
@@ -257,7 +198,7 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeFlexCandidate(std::array<En
         QueuedPlayer const& dpsB0 = six[complement[0]]->player;
         QueuedPlayer const& dpsB1 = six[complement[1]]->player;
 
-        if (flexTeamStacksClass(dpsA0, dpsA1, healerA) || flexTeamStacksClass(dpsB0, dpsB1, healerB))
+        if (teamStacksClass(dpsA0, dpsA1, healerA) || teamStacksClass(dpsB0, dpsB1, healerB))
           continue;
         if (teamAvoids(dpsA0, dpsA1, healerA) || teamAvoids(dpsB0, dpsB1, healerB))
           continue;
@@ -296,56 +237,6 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::makeFlexCandidate(std::array<En
 
 std::optional<SoloqQueue::Candidate> SoloqQueue::findBestMatch() const
 {
-  return _flex ? findFlexMatch() : findStandardMatch();
-}
-
-std::optional<SoloqQueue::Candidate> SoloqQueue::findStandardMatch() const
-{
-  std::vector<Entry const*> melee;
-  std::vector<Entry const*> caster;
-  std::vector<Entry const*> healer;
-  for (Entry const& entry : _entries)
-  {
-    switch (entry.role)
-    {
-    case Role::Melee:
-      melee.push_back(&entry);
-      break;
-    case Role::Caster:
-      caster.push_back(&entry);
-      break;
-    case Role::Healer:
-      healer.push_back(&entry);
-      break;
-    }
-  }
-
-  if (melee.size() < 2 || caster.size() < 2 || healer.size() < 2)
-    return std::nullopt;
-
-  std::optional<Candidate> best;
-  for (std::size_t mi = 0; mi < melee.size(); ++mi)
-    for (std::size_t mj = mi + 1; mj < melee.size(); ++mj)
-      for (std::size_t ci = 0; ci < caster.size(); ++ci)
-        for (std::size_t cj = ci + 1; cj < caster.size(); ++cj)
-          for (std::size_t hi = 0; hi < healer.size(); ++hi)
-            for (std::size_t hj = hi + 1; hj < healer.size(); ++hj)
-            {
-              std::array<Entry const*, 6> const six = {melee[mi],  melee[mj],  caster[ci],
-                                                       caster[cj], healer[hi], healer[hj]};
-              if (!allCompatible(six))
-                continue;
-
-              std::optional<Candidate> const candidate = makeStandardCandidate(six);
-              if (candidate && (!best || betterThan(*candidate, *best)))
-                best = candidate;
-            }
-
-  return best;
-}
-
-std::optional<SoloqQueue::Candidate> SoloqQueue::findFlexMatch() const
-{
   std::vector<Entry const*> dps;
   std::vector<Entry const*> healer;
   for (Entry const& entry : _entries)
@@ -371,7 +262,7 @@ std::optional<SoloqQueue::Candidate> SoloqQueue::findFlexMatch() const
               if (!allCompatible(six))
                 continue;
 
-              std::optional<Candidate> const candidate = makeFlexCandidate(six);
+              std::optional<Candidate> const candidate = makeCandidate(six);
               if (candidate && (!best || betterThan(*candidate, *best)))
                 best = candidate;
             }

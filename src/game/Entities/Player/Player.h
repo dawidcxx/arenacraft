@@ -2102,6 +2102,11 @@ public:
   [[nodiscard]] WorldSession* GetSession() const { return m_session; }
   void                        SetSession(WorldSession* sess) { m_session = sess; }
 
+  // Account id of the logged-in account. A character permanently belongs to one account, so this is cached once in
+  // the constructor: callers that only need the account (avoid lists, moderation, ...) don't have to go through the
+  // session.
+  [[nodiscard]] uint32 GetAccountId() const { return m_accountId; }
+
   void BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) override;
   void DestroyForPlayer(Player* target, bool onDeath = false) const override;
   void SendLogXPGain(uint32 GivenXP, Unit* victim, uint32 BonusXP, bool recruitAFriend = false,
@@ -3022,6 +3027,7 @@ protected:
   uint32     m_resurrectHealth, m_resurrectMana;
 
   WorldSession* m_session;
+  uint32        m_accountId;
 
   typedef std::list<Channel*> JoinedChannelsList;
   JoinedChannelsList          m_channels;

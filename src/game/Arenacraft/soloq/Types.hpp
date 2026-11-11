@@ -25,6 +25,9 @@ struct QueuedPlayer
   uint32_t rating;
   uint32_t mmr;
   TeamId   teamId;
+  // The character's account, snapshotted at queue time. The avoid list is account-bound, so it keys off this (see
+  // SoloqQueue::setAvoidCheck).
+  uint32_t accountId = 0;
 };
 
 struct Team

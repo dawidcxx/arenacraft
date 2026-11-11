@@ -9,8 +9,12 @@
 #include <unordered_map>
 #include <vector>
 
-// SoloQ avoid list (#77): a player names up to two characters the matchmaker must never put on their team. Pure
-// logic - characters are low guids, time is unix seconds passed in - so it is unit-tested without a world.
+// SoloQ avoid list (#77): a player names up to two accounts the matchmaker must never put on their team. Pure logic -
+// accounts are auth account ids, time is unix seconds passed in - so it is unit-tested without a world.
+//
+// The list is account-bound on purpose: avoiding a character avoids every character on that account (and the owner's
+// list follows the owner's account too), so relogging to an alt does not escape an avoid. The character originally
+// named is kept alongside the account id, but only for display in the menu.
 //
 // Each of the two slots has a 6 hour cooldown that starts when the slot is filled. Removing a player empties the slot
 // but keeps its cooldown, so the list can't be churned to dodge players one after another (and to farm rating).
@@ -19,8 +23,9 @@ namespace arenacraft::soloq
 {
 struct AvoidSlot
 {
-  uint32_t avoided = 0; // low guid of the avoided character, 0 = empty
-  int64_t  usedAt  = 0; // unix seconds the slot was last filled, 0 = never
+  uint32_t avoided     = 0; // account id of the avoided player, 0 = empty
+  int64_t  usedAt      = 0; // unix seconds the slot was last filled, 0 = never
+  uint32_t avoidedGuid = 0; // character originally named, display only (0 = unknown)
 };
 
 class AvoidList
@@ -39,21 +44,19 @@ public:
     NoFreeSlot,     // both slots taken or still cooling down
   };
 
-  // Fills the first free slot (empty and off cooldown). `slot` receives the slot used.
-  AddResult add(uint32_t owner, uint32_t avoided, int64_t now, std::size_t* slot = nullptr);
-  // Empties the slot holding `avoided`; its cooldown keeps running. `slot` receives the slot emptied.
+  // Fills the first free slot (empty and off cooldown). `avoidedGuid` is the character named by the owner and is only
+  // stored for display. `slot` receives the slot used.
+  AddResult add(uint32_t owner, uint32_t avoided, uint32_t avoidedGuid, int64_t now, std::size_t* slot = nullptr);
+  // Empties the slot holding the avoided account; its cooldown keeps running. `slot` receives the slot emptied.
   bool remove(uint32_t owner, uint32_t avoided, std::size_t* slot = nullptr);
 
-  // True if either character avoids the other.
+  // True if either account avoids the other.
   [[nodiscard]] bool avoids(uint32_t a, uint32_t b) const;
   [[nodiscard]] bool listed(uint32_t owner, uint32_t avoided) const;
 
   [[nodiscard]] OwnerSlots slots(uint32_t owner) const;
   // Seconds until slot `index` of `owner` can be filled again (0 = now); the slot may still hold a player.
   [[nodiscard]] int64_t cooldownLeft(uint32_t owner, std::size_t index, int64_t now) const;
-
-  // Restores a slot as stored (database load).
-  void load(uint32_t owner, std::size_t index, AvoidSlot slot);
 
 private:
   [[nodiscard]] static bool free(AvoidSlot const& slot, int64_t now);

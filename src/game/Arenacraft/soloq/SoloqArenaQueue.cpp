@@ -122,8 +122,8 @@ bool JoinSoloqQueue(Player* player)
     return false;
   }
 
-  if (!service.join(id, static_cast<Classes>(player->getClass()), player->GetMostPointsTalentTree(),
-                    player->GetTeamId(), team->rating, team->mmr))
+  if (!service.join(id, player->GetAccountId(), static_cast<Classes>(player->getClass()),
+                    player->GetMostPointsTalentTree(), player->GetTeamId(), team->rating, team->mmr))
   {
     Notify(player, "SoloQ: could not join the queue.");
     return false;

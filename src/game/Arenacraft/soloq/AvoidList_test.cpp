@@ -15,9 +15,9 @@ constexpr int64_t T0   = 1'800'000'000;
 TEST_CASE("avoid list: two slots, then none until a cooldown ends")
 {
   AvoidList list;
-  CHECK(list.add(1, 2, T0) == AvoidList::AddResult::Added);
-  CHECK(list.add(1, 3, T0) == AvoidList::AddResult::Added);
-  CHECK(list.add(1, 4, T0) == AvoidList::AddResult::NoFreeSlot);
+  CHECK(list.add(1, 2, 1002, T0) == AvoidList::AddResult::Added);
+  CHECK(list.add(1, 3, 1003, T0) == AvoidList::AddResult::Added);
+  CHECK(list.add(1, 4, 1004, T0) == AvoidList::AddResult::NoFreeSlot);
   CHECK(list.avoids(1, 2));
   CHECK(list.avoids(3, 1)); // one side is enough
   CHECK_FALSE(list.avoids(1, 4));
@@ -26,13 +26,13 @@ TEST_CASE("avoid list: two slots, then none until a cooldown ends")
 TEST_CASE("avoid list: removing keeps the slot's cooldown")
 {
   AvoidList list;
-  REQUIRE(list.add(1, 2, T0) == AvoidList::AddResult::Added);
-  REQUIRE(list.add(1, 3, T0) == AvoidList::AddResult::Added);
+  REQUIRE(list.add(1, 2, 1002, T0) == AvoidList::AddResult::Added);
+  REQUIRE(list.add(1, 3, 1003, T0) == AvoidList::AddResult::Added);
   CHECK(list.remove(1, 2));
   CHECK_FALSE(list.avoids(1, 2));
-  CHECK(list.add(1, 4, T0 + Hour) == AvoidList::AddResult::NoFreeSlot); // emptied, but still cooling down
+  CHECK(list.add(1, 4, 1004, T0 + Hour) == AvoidList::AddResult::NoFreeSlot); // emptied, but still cooling down
   CHECK(list.cooldownLeft(1, 0, T0 + Hour) == 5 * Hour);
-  CHECK(list.add(1, 4, T0 + 6 * Hour) == AvoidList::AddResult::Added); // cooldown over
+  CHECK(list.add(1, 4, 1004, T0 + 6 * Hour) == AvoidList::AddResult::Added); // cooldown over
   CHECK(list.avoids(1, 4));
   CHECK(list.avoids(1, 3)); // the other slot still holds its player
 }
@@ -40,32 +40,30 @@ TEST_CASE("avoid list: removing keeps the slot's cooldown")
 TEST_CASE("avoid list: a filled slot stays filled after its cooldown")
 {
   AvoidList list;
-  REQUIRE(list.add(1, 2, T0) == AvoidList::AddResult::Added);
-  REQUIRE(list.add(1, 3, T0) == AvoidList::AddResult::Added);
-  CHECK(list.add(1, 4, T0 + 7 * Hour) == AvoidList::AddResult::NoFreeSlot);
+  REQUIRE(list.add(1, 2, 1002, T0) == AvoidList::AddResult::Added);
+  REQUIRE(list.add(1, 3, 1003, T0) == AvoidList::AddResult::Added);
+  CHECK(list.add(1, 4, 1004, T0 + 7 * Hour) == AvoidList::AddResult::NoFreeSlot);
   CHECK(list.cooldownLeft(1, 0, T0 + 7 * Hour) == 0);
 }
 
 TEST_CASE("avoid list: no self, no duplicates, remove of an unknown player fails")
 {
   AvoidList list;
-  CHECK(list.add(1, 1, T0) == AvoidList::AddResult::Self);
-  REQUIRE(list.add(1, 2, T0) == AvoidList::AddResult::Added);
-  CHECK(list.add(1, 2, T0) == AvoidList::AddResult::AlreadyAvoided);
+  CHECK(list.add(1, 1, 1001, T0) == AvoidList::AddResult::Self);
+  REQUIRE(list.add(1, 2, 1002, T0) == AvoidList::AddResult::Added);
+  CHECK(list.add(1, 2, 1002, T0) == AvoidList::AddResult::AlreadyAvoided);
   CHECK_FALSE(list.remove(1, 9));
   CHECK_FALSE(list.remove(7, 2));
 }
 
-TEST_CASE("avoid list: loaded slots behave like added ones")
+TEST_CASE("avoid list: slots match accounts, the named character is display-only")
 {
   AvoidList list;
-  list.load(1, 1, AvoidSlot{5, T0});
-  CHECK(list.avoids(5, 1));
-  std::size_t slot = 9;
-  CHECK(list.add(1, 6, T0) == AvoidList::AddResult::Added);
-  CHECK(list.add(1, 7, T0) == AvoidList::AddResult::NoFreeSlot);
-  CHECK(list.remove(1, 5, &slot));
-  CHECK(slot == 1);
+  REQUIRE(list.add(7, 42, 1234, T0) == AvoidList::AddResult::Added);
+
+  CHECK(list.avoids(7, 42));
+  CHECK(list.slots(7)[0].avoidedGuid == 1234);
+  CHECK_FALSE(list.avoids(7, 1234)); // the character guid is not the matching key
 }
 
 TEST_CASE("recent teammates: newest first, at most ten, no duplicates")

@@ -157,7 +157,8 @@ Player::Player(WorldSession* session) : Unit(true), m_mover(this)
 
   m_valuesCount = PLAYER_END;
 
-  m_session = session;
+  m_session   = session;
+  m_accountId = session->GetAccountId();
 
   m_ingametime = 0;
 
