@@ -832,7 +832,13 @@ bool SpellMgr::IsSpellProcEventCanTriggeredBy(SpellInfo const* spellProto, Spell
       // spellFamilyName is Ok need check for spellFamilyMask if present
       if (spellProcEvent->spellFamilyMask)
       {
-        if (!(spellProcEvent->spellFamilyMask & procSpellInfo->SpellFamilyFlags))
+        // arenacraft: Holy Concentration (talent 34753 chain) also procs from a critical Prayer of Mending heal
+        // (33110). The heal helper spell is not part of the talent's DBC family mask; the crit requirement still
+        // comes from the talent's procEx.
+        bool const prayerOfMendingHolyConcentration =
+            procSpellInfo->Id == 33110 && GetFirstSpellInChain(spellProto->Id) == 34753;
+        if (!(spellProcEvent->spellFamilyMask & procSpellInfo->SpellFamilyFlags) &&
+            !prayerOfMendingHolyConcentration)
           return false;
         hasFamilyMask = true;
         // Some spells are not considered as active even with have spellfamilyflags
