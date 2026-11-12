@@ -1,1 +1,61 @@
 @import "tailwindcss";
+
+/* Archivo SemiBold is shipped as a single subset, mirroring the original site:
+   the same file backs the 400/600/800 declarations, so headings keep the same
+   weight as the design. */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/archivo-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/archivo-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("./assets/fonts/archivo-latin.woff2") format("woff2");
+}
+
+@theme {
+  --font-sans: "Archivo", system-ui, sans-serif;
+
+  --text-xs--line-height: 1.55;
+  --text-sm--line-height: 1.55;
+  --text-base--line-height: 1.55;
+  --text-lg--line-height: 1.55;
+
+  --color-surface: #0c0b0b;
+  --color-surface-raised: #181616;
+  --color-ink: #efeded;
+  --color-divider: rgb(239 237 237 / 0.28);
+  --color-accent: #ec3013;
+  --color-accent-soft: #fff2ef;
+  --color-accent-deep: #7c1405;
+  --color-label: #ffc4b8;
+  --color-discord: #5865f2;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-surface font-sans text-ink antialiased;
+  }
+
+  ::selection {
+    @apply bg-accent text-white;
+  }
+}

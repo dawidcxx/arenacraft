@@ -1,7 +1,7 @@
 # ArenaCraft Site
 
-Read-only SoloQ ladder for the ArenaCraft website. Bun + Hono backend, Vite + React
-frontend, and a MySQL ladder repository.
+Read-only SoloQ ladder and landing site for the ArenaCraft website. Bun + Hono backend, Vite +
+React frontend, and a MySQL ladder repository.
 
 ```
 GET /api/ladder/soloq -> [{ "name", "class", "role", "rating", "wins", "losses" }, ...]
@@ -10,6 +10,18 @@ GET /api/health       -> { "ok": true }
 
 The backend is a read-only proxy: it exposes the ladder as a plain array and rejects writes.
 The frontend sorts nothing — the server returns the best rating first.
+
+## Pages
+
+| Route          | Content                                                                            |
+| -------------- | ---------------------------------------------------------------------------------- |
+| `/`            | Hero, next tourney, stats, community/Discord info, how to play, features, commands |
+| `/tournaments` | Tourney schedule, prizes and rules                                                 |
+| `/ladder`      | Live SoloQ ladder, filterable by role; refreshes every 60 seconds                  |
+| `/streamers`   | Streamer zone and Twitch link                                                      |
+
+Routing is client-side (React Router). The backend serves `index.html` for unknown non-asset
+paths, so deep links and refreshes work in production.
 
 ## Development
 

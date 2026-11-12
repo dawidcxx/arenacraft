@@ -34,8 +34,11 @@ Follow `docs/domain-modeling-playbook.md` first, then `docs/backend-feature-play
 
 ## Routing
 
-There is one SPA: `/` → `index.html`, declared in `packages/common/src/consts/pages.ts`.
-Production static serving lives in `packages/backend/src/lib/serveStaticAssets.ts`.
+The frontend is one SPA served from `index.html`; client-side routes are `/`, `/tournaments`,
+`/ladder` and `/streamers` (React Router in `packages/web/src/App.tsx`). Unknown non-asset paths
+fall back to `index.html` in `packages/backend/src/lib/serveStaticAssets.ts`, so deep links work.
+Pages live in `packages/web/src/pages/`, shared UI in `packages/web/src/components/`, and design
+tokens (Archivo font, colors) in `packages/web/src/global.css`.
 
 ## Frontend config
 
