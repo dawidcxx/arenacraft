@@ -1,7 +1,7 @@
 export const DISCORD_URL = "https://discord.gg/tj2DVNQmj2";
 export const DISCORD_LABEL = "discord.gg/tj2DVNQmj2";
 
-export const REALM_HOST = "157.90.144.252";
+export const REALM_HOST = "logon.arenacraft.fun";
 export const REALMLIST_COMMAND = `set realmlist ${REALM_HOST}`;
 
 export const NEXT_TOURNAMENT = {
