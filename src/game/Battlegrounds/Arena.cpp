@@ -18,6 +18,7 @@
 #include "Arena.h"
 #include "ArenaTeamMgr.h"
 #include "Chat.h"
+#include "Composition.hpp"
 #include "Group.h"
 #include "GroupMgr.h"
 #include "Log.h"
@@ -253,6 +254,17 @@ bool Arena::PreUpdateImpl(uint32 diff)
     uint32 const teamSize = GetArenaType();
     bool const   fullRoster =
         GetPlayersCountByTeam(TEAM_ALLIANCE) >= teamSize && GetPlayersCountByTeam(TEAM_HORDE) >= teamSize;
+
+    // Arenacraft: tell each team what it is facing as soon as the whole roster
+    // is in the starting rooms. This runs before _ProcessJoin() decrements the
+    // start delay, so the notice always lands before the gates open (including
+    // the 15 second early start from ready crystals).
+    if (IsSoloq() && !m_SoloqCompositionAnnounced && GetStatus() == STATUS_WAIT_JOIN && fullRoster)
+    {
+      m_SoloqCompositionAnnounced = true;
+      arenacraft::soloq::announceEnemyComposition(this);
+    }
+
     if ((GetStatus() == STATUS_WAIT_JOIN && fullRoster) || GetStatus() == STATUS_IN_PROGRESS)
       MarkTeams();
   }

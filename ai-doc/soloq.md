@@ -34,6 +34,7 @@ invites the six players (see `CreateArenaForMatch`).
 | `SoloqArenaQueue.hpp/.cpp` | registers/removes players in the real 5v5 battleground queue (client badge) and creates/invites a 3v3 arena for a match |
 | `SoloqNpc.hpp/.cpp` | `SoloqNpc` (gossip menu on entry 20810), `SoloqDriver` (world tick) and `SoloqBattlegroundScript` (suppresses core 5v5 matchmaking) |
 | `SoloqEvents.hpp/.cpp` | builds and publishes the `soloq-matchup` Redis event when a match pops |
+| `Composition.hpp/.cpp` | match-start enemy composition notice (short spec/class names + per-team sys message) |
 | `CharacterCheck.hpp/.cpp` | pure character readiness check (talents, gear, enchants, gems, glyphs) + `Player` snapshot |
 | `TalentRanks.hpp` | generated, curated `TalentRankRules` (rank 1 -> max rank) enforced by the readiness check |
 | `*_test.cpp` | doctest unit tests (co-located, auto-discovered by the game test target) |
@@ -501,6 +502,31 @@ When the arena ends (or is destroyed without finishing) the core publishes
 Both events are emitted exactly once per popped matchup: `OnBattlegroundEnd`
 takes the pending match (normal path) and `OnBattlegroundDestroy` takes it only
 if it is still pending (abort path).
+
+## Match-start composition notice
+
+As soon as the whole roster is in the starting rooms, each side is told what it
+is facing:
+
+```
+Facing Enemy Team: Holy Pala (Healer), Arms War (Melee), Ele Sham (Caster)
+```
+
+`Arena::PreUpdateImpl` raises this once per arena (`m_SoloqCompositionAnnounced`)
+when `IsSoloq()`, the status is still `STATUS_WAIT_JOIN` and both teams have
+`GetArenaType()` players. That runs before `_ProcessJoin()` decrements the start
+delay, so the notice always lands during preparation - including the shortened
+15 second start from ready crystals - and never after the gates open. If the
+arena opens short-handed it is cancelled, so no notice is missed.
+
+`announceEnemyComposition` (`Composition.hpp/.cpp`) reads the opposing `Team`
+from the pending `SoloqService` match by battleground instance id and sends a
+system message to every player on that side (`TEAM_ALLIANCE` sees team B,
+`TEAM_HORDE` sees team A). The text uses fixed, reviewable short names in code:
+`classAbbreviation` (`Paladin -> Pala`, `Shaman -> Sham`, ...) and `specName`
+(`Arms`, `Ele`, `Resto`, ...), with the role derived from `roleFor` (the same
+table used by matchmaking), so either DPS slot labels correctly. Team order is
+healer, then the two DPS. `Composition_test.cpp` covers the pure formatter.
 
 ## Commands
 

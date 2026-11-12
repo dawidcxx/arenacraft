@@ -95,6 +95,15 @@ std::optional<SoloqService::PendingArena> SoloqService::takeMatch(uint32 bgInsta
   return pending;
 }
 
+std::optional<SoloqService::PendingArena> SoloqService::pendingArena(uint32 bgInstanceId) const
+{
+  auto const it = _pendingMatches.find(bgInstanceId);
+  if (it == _pendingMatches.end())
+    return std::nullopt;
+
+  return it->second;
+}
+
 std::size_t SoloqService::queueSize() const { return _queue.size(); }
 
 bool SoloqService::inQueue(PlayerId id) const { return _queue.contains(id); }

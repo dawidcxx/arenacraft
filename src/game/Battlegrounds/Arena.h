@@ -107,6 +107,10 @@ private:
   // open. Each team only sees the marks of its own group.
   void MarkTeams();
   bool m_TeamsMarked{false};
+
+  // Arenacraft: SoloQ match-start notice - announced once, when the whole
+  // roster is loaded into the starting rooms (see PreUpdateImpl).
+  bool m_SoloqCompositionAnnounced{false};
 };
 
 #endif // ACORE_ARENA_H

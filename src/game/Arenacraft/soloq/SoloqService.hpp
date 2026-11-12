@@ -59,6 +59,10 @@ public:
   void                        registerMatch(uint32 bgInstanceId, Match const& match, uint64_t startedAtMs);
   std::optional<PendingArena> takeMatch(uint32 bgInstanceId);
 
+  // Read-only lookup for match-start notices: unlike takeMatch, this keeps the
+  // pending entry so the result can still be applied at battleground end.
+  [[nodiscard]] std::optional<PendingArena> pendingArena(uint32 bgInstanceId) const;
+
   [[nodiscard]] std::size_t                            queueSize() const;
   [[nodiscard]] bool                                   inQueue(PlayerId id) const;
   [[nodiscard]] std::vector<PlayerId>                  waitingPlayers() const;
