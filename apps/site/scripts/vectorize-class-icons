@@ -1,0 +1,79 @@
+#!/usr/bin/env nix-shell
+#! nix-shell -i bash -p imagemagick vtracer svgo python3Packages.pillow
+#
+# vectorize-class-icons - turns raster class icons into path-only SVGs.
+#
+# Usage: scripts/vectorize-class-icons <icon.webp|icon.png> [...]
+#
+# Every input is upscaled, flattened onto black, traced with VTracer and
+# optimized with SVGO. The output is written next to the input with an .svg
+# extension and uses the shared class-icon frame: a 128x128 viewBox with the
+# artwork clipped to a circle whose radius is derived from the source alpha
+# channel. Best effort only - the point is a crisp icon, not a faithful trace,
+# so bump SPECKLE for smaller files or lower it for more detail.
+set -euo pipefail
+
+TRANSPARENT_ALPHA=${TRANSPARENT_ALPHA:-32}
+TRACE_SIZE=${TRACE_SIZE:-192}
+SPECKLE=${SPECKLE:-4}
+
+if [ "$#" -eq 0 ]; then
+  echo "usage: $0 <icon.webp|icon.png> [...]" >&2
+  exit 1
+fi
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+for raster in "$@"; do
+  name=$(basename "${raster%.*}")
+  out=$(dirname "$raster")/$name.svg
+
+  magick "$raster" -filter Lanczos -resize "${TRACE_SIZE}x${TRACE_SIZE}" \
+    -background black -flatten "$work/$name.png"
+
+  vtracer -i "$work/$name.png" -o "$work/$name.raw.svg" \
+    --colormode color --hierarchical stacked --mode spline \
+    --filter_speckle "$SPECKLE" --color_precision 6 --gradient_step 8 \
+    --corner_threshold 60 --segment_length 4.0 --splice_threshold 45 \
+    --path_precision 1 >/dev/null
+
+  svgo --multipass -i "$work/$name.raw.svg" -o "$work/$name.svg" >/dev/null
+
+  # Trace space is TRACE_SIZE square; the clip circle lives in 128x128 space.
+  python3 - "$work/$name.svg" "$out" "$name" "$raster" "$TRANSPARENT_ALPHA" "$TRACE_SIZE" <<'PY'
+import math
+import re
+import sys
+
+from PIL import Image
+
+src, dst, name, raster, transparent_alpha, trace_size = sys.argv[1:]
+
+alpha = Image.open(raster).convert("RGBA").getchannel("A")
+width, height = alpha.size
+# Farthest opaque pixel from the centre; icons that run past the canvas edge
+# (a stray highlight, an asymmetric ring) are clamped rather than over-clipped.
+radius = max(
+    math.hypot(x + 0.5 - width / 2, y + 0.5 - height / 2)
+    for y in range(height)
+    for x in range(width)
+    if alpha.getpixel((x, y)) >= int(transparent_alpha)
+)
+radius = round(min(radius, width / 2 - 0.4) * 128 / width, 2)
+
+svg = open(src).read()
+body = svg[svg.index(">", svg.index("<svg")) + 1 : svg.rindex("</svg>")]
+paths = "".join(re.findall(r"<path[^>]*/>", body))
+scale = 128 / float(trace_size)
+
+open(dst, "w").write(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">'
+    f'<defs><clipPath id="{name}-disc"><circle cx="64" cy="64" r="{radius}"/></clipPath></defs>'
+    f'<g clip-path="url(#{name}-disc)"><g transform="scale({scale:.6f})">{paths}</g></g>'
+    "</svg>"
+)
+PY
+
+  echo "$out ($(stat -c%s "$out") bytes)"
+done
