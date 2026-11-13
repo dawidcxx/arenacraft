@@ -1,5 +1,5 @@
 import { ChannelType } from "discord.js";
-import type { Guild, GuildMember, TextChannel, VoiceChannel } from "discord.js";
+import type { Guild, GuildMember, TextChannel, VoiceBasedChannel, VoiceChannel } from "discord.js";
 
 import type { Config } from "./config";
 import { logger } from "./logger";
@@ -64,6 +64,7 @@ export class RoomManager {
   private infoChannel: TextChannel | null = null;
   private memberRefresh: Promise<void> | null = null;
   private lastMemberRefresh = 0;
+  private originChannels = new Map<string, VoiceBasedChannel>();
 
   constructor(
     private readonly guild: Guild,
@@ -189,7 +190,13 @@ export class RoomManager {
 
   private async freeRoom(room: Room): Promise<void> {
     const members = [...room.first.members.values(), ...room.second.members.values()];
-    const moves = await Promise.all(members.map((member) => this.moveMember(member, this.waitingRoom)));
+    const moves = await Promise.all(
+      members.map((member) => {
+        const target = this.originChannels.get(member.id) ?? this.waitingRoom;
+        this.originChannels.delete(member.id);
+        return this.moveMember(member, target);
+      }),
+    );
     const moved = moves.filter(Boolean).length;
     room.instanceId = null;
     room.bookedAt = null;
@@ -205,6 +212,9 @@ export class RoomManager {
         if (!member) {
           logger.debug(`No Discord member for id ${discordId}`);
           return false;
+        }
+        if (member.voice.channel) {
+          this.originChannels.set(member.id, member.voice.channel);
         }
         return this.moveMember(member, channel);
       }),
@@ -242,7 +252,7 @@ export class RoomManager {
     return this.memberRefresh;
   }
 
-  private async moveMember(member: GuildMember, channel: VoiceChannel | null): Promise<boolean> {
+  private async moveMember(member: GuildMember, channel: VoiceBasedChannel | null): Promise<boolean> {
     if (!channel) return false;
     // Players without voice simply stay out of the rooms.
     if (!member.voice.channel) return false;
