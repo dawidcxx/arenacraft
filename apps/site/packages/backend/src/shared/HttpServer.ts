@@ -1,12 +1,14 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { HttpStatusCodes, invariant } from "@arenacraft/common";
-import { serve } from "@hono/node-server";
+import { serve, type WebSocketServerLike } from "@hono/node-server";
 import { inject, injectable } from "@needle-di/core";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { WebSocketServer } from "ws";
 import { LadderApi } from "@/features/ladder/LadderApi";
+import { LadderTopSocket } from "@/features/liveLadder/LadderTopSocket";
 import { honoJsErrorHandler } from "@/lib/honoJsApiErrorHandler";
 import { Logger } from "@/lib/Logger";
 import { requestObservability } from "@/lib/requestObservability";
@@ -20,20 +22,27 @@ const ALLOWED_API_METHODS = ["GET", "HEAD", "OPTIONS"] as const;
 @injectable()
 export class HttpServer implements OnDeinit, OnInit {
   private serverRef: ReturnType<typeof serve> | null = null;
+  private webSocketServer: WebSocketServer | null = null;
 
   constructor(
     private readonly config: Config = inject(CONFIG),
     private readonly ladderApi: LadderApi = inject(LadderApi),
+    private readonly ladderTopSocket: LadderTopSocket = inject(LadderTopSocket),
   ) {}
 
   async init() {
     invariant(this.serverRef === null, "Must not call .init() twice");
     const app = this.buildRoutes();
 
+    // `upgradeWebSocket` hands the upgraded socket to this ws server.
+    const webSocketServer = new WebSocketServer({ noServer: true });
+    this.webSocketServer = webSocketServer;
+
     this.serverRef = serve({
       fetch: app.fetch,
       port: this.config.port,
       hostname: this.config.host,
+      websocket: { server: webSocketServer as unknown as WebSocketServerLike },
     });
 
     logger.info(`Server running at http://${this.config.host}:${this.config.port}`, {
@@ -44,10 +53,18 @@ export class HttpServer implements OnDeinit, OnInit {
 
   async deinit() {
     logger.info("Closing HTTP service");
-    if (this.serverRef) {
-      await new Promise<void>((res) => this.serverRef!.close(() => res()));
-      this.serverRef = null;
-    }
+    const server = this.serverRef;
+    if (server === null) return;
+    this.serverRef = null;
+
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      // `close()` waits for open keep-alive and upgraded connections. An OBS widget would otherwise
+      // keep the process alive on SIGTERM, so drop them as soon as shutdown starts.
+      (server as { closeAllConnections?: () => void }).closeAllConnections?.();
+      this.webSocketServer?.clients.forEach((client) => client.terminate());
+      this.webSocketServer = null;
+    });
   }
 
   private buildRoutes() {
@@ -74,6 +91,7 @@ export class HttpServer implements OnDeinit, OnInit {
 
     api.on(["GET", "HEAD"], "/health", (c) => c.json({ ok: true }));
     api.route("/", this.ladderApi.build());
+    api.route("/live-ladder", this.ladderTopSocket.build());
     app.route("/api", api);
     app.get("*", serveStaticAssets(frontendDistPath));
 

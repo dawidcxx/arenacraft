@@ -9,6 +9,8 @@ type BaseConfig = {
   cacheTtlSeconds: number;
   dbTimeoutMs: number;
   corsOrigins: string[];
+  /** Auth database (account_alias). Optional even for mysql; aliases are skipped without it. */
+  authDbUrl: string | null;
 };
 
 export type Config = BaseConfig &
@@ -27,6 +29,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     cacheTtlSeconds: intFromEnv(env, "CACHE_TTL_SECONDS", 30, 1, 3600),
     dbTimeoutMs: intFromEnv(env, "DB_TIMEOUT_MS", 3000, 100, 30000),
     corsOrigins: listFromEnv(env.CORS_ORIGINS),
+    authDbUrl: env.AUTH_DB_URL?.trim() || null,
   };
 
   const dataSource = parseDataSource(env.DATA_SOURCE);

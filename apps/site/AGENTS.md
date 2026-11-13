@@ -40,6 +40,10 @@ fall back to `index.html` in `packages/backend/src/lib/serveStaticAssets.ts`, so
 Pages live in `packages/web/src/pages/`, shared UI in `packages/web/src/components/`, and design
 tokens (Archivo font, colors) in `packages/web/src/global.css`.
 
+`/live-ladder` is an unlisted OBS widget rendered outside `SiteLayout`. It talks to
+`/api/live-ladder/ws` (`packages/backend/src/features/liveLadder/`), is not linked from the site,
+and must stay that way.
+
 ## Frontend config
 
 The frontend has no runtime config. Configuration is backend-only (`DATA_SOURCE`,

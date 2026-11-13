@@ -45,10 +45,14 @@ export function roleOf(classId: number, storedRole: number | null): LadderRole {
   return SINGLE_ROLE_CLASSES[classId] ?? "";
 }
 
+export function classNameOf(classId: number): string {
+  return CLASS_NAMES[classId] ?? "Unknown";
+}
+
 export function toLadderEntry(row: LadderRow): LadderEntry {
   return {
     name: row.charName,
-    class: CLASS_NAMES[row.classId] ?? "Unknown",
+    class: classNameOf(row.classId),
     role: roleOf(row.classId, row.storedRole),
     rating: row.rating,
     wins: row.seasonWins,

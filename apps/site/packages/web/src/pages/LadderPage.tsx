@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ClassIcon } from "@/components/ClassIcon";
 import { PageHero } from "@/components/PageHero";
 import { useLadder } from "@/hooks/useLadder";
 import { cn } from "@/lib/cn";
@@ -47,14 +48,18 @@ export function LadderPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm leading-[1.55]">
+          <table className="w-full min-w-[760px] border-collapse text-left text-sm leading-[1.55]">
             <thead>
               <tr>
-                {["#", "Player", "Class", "Role", "Rating", "W", "L", "Win %"].map((header) => (
+                {["#", "", "Player", "Class", "Role", "Rating", "W", "L", "Win %"].map((header) => (
                   <th
-                    key={header}
+                    key={header || "class-icon"}
                     scope="col"
-                    className="border-b-2 border-divider p-2 text-[11px] font-bold tracking-[0.08em] text-ink/60 uppercase"
+                    aria-hidden={header === "" || undefined}
+                    className={cn(
+                      "border-b-2 border-divider p-2 text-[11px] font-bold tracking-[0.08em] text-ink/60 uppercase",
+                      header === "" && "w-9",
+                    )}
                   >
                     {header}
                   </th>
@@ -64,7 +69,7 @@ export function LadderPage() {
             <tbody>
               {visibleEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-ink/60">
+                  <td colSpan={9} className="p-6 text-center text-ink/60">
                     {state.status === "loading"
                       ? "Loading ladder…"
                       : state.status === "error"
@@ -77,6 +82,9 @@ export function LadderPage() {
                   <tr key={`${entry.name}-${index}`}>
                     <td className="border-b border-divider p-2 font-extrabold text-accent">
                       {index + 1}
+                    </td>
+                    <td className="w-9 border-b border-divider py-2 pr-0 pl-2">
+                      <ClassIcon wowClass={entry.class} />
                     </td>
                     <td className="border-b border-divider p-2 font-bold">{entry.name}</td>
                     <td

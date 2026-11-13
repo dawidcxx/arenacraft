@@ -5,6 +5,7 @@ import { int, mysqlTable, primaryKey, smallint, tinyint, varchar } from "drizzle
 
 export const characters = mysqlTable("characters", {
   guid: int("guid", { unsigned: true }).primaryKey(),
+  account: int("account", { unsigned: true }).notNull(),
   name: varchar("name", { length: 12 }).notNull(),
   class: tinyint("class", { unsigned: true }).notNull(),
 });

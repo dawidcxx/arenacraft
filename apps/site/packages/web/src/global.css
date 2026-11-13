@@ -55,6 +55,11 @@
     @apply bg-surface font-sans text-ink antialiased;
   }
 
+  /* OBS browser source: let the stream show through around the widget. */
+  body.live-ladder-obs {
+    background: transparent;
+  }
+
   ::selection {
     @apply bg-accent text-white;
   }
