@@ -64,7 +64,7 @@ export class AuthDb {
   }
 
   async assertSchema(): Promise<void> {
-    for (const table of ["account_discord", "account_seat"]) {
+    for (const table of ["account_discord", "account_seat", "account_overlay"]) {
       try {
         await this.pool.query(`SELECT 1 FROM ${table} LIMIT 1`);
       } catch (error) {
@@ -294,6 +294,25 @@ export class AuthDb {
       `INSERT INTO account_seat (account_id, tier, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
        ON DUPLICATE KEY UPDATE tier = VALUES(tier), updated_at = CURRENT_TIMESTAMP`,
       [accountId, tier],
+    );
+  }
+
+  /** The account's overlay token, or null when `/overlay` was never used. */
+  async overlayToken(accountId: number): Promise<string | null> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT token FROM account_overlay WHERE account_id = ? LIMIT 1",
+      [accountId],
+    );
+    const row = rows[0];
+    return row ? String(row.token) : null;
+  }
+
+  /** Points the account's overlay at a character, storing `token` as its link. */
+  async setOverlay(accountId: number, guid: number, token: string): Promise<void> {
+    await this.pool.execute(
+      `INSERT INTO account_overlay (account_id, token, guid) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE token = VALUES(token), guid = VALUES(guid)`,
+      [accountId, token, guid],
     );
   }
 

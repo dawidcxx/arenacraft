@@ -55,8 +55,9 @@
     @apply bg-surface font-sans text-ink antialiased;
   }
 
-  /* OBS browser source: let the stream show through around the widget. */
-  body.live-ladder-obs {
+  /* OBS browser sources: let the stream show through around the widget. */
+  body.live-ladder-obs,
+  body.player-overlay-obs {
     background: transparent;
   }
 

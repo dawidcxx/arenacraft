@@ -19,6 +19,12 @@ export interface OnlineCharacter {
   classId: number;
 }
 
+export interface CharacterRef {
+  guid: number;
+  accountId: number;
+  charName: string;
+}
+
 export interface CharacterSummary {
   charName: string;
   classId: number;
@@ -87,6 +93,16 @@ export class CharacterDb {
     ]);
     const row = rows[0];
     return row ? Number(row.account) : null;
+  }
+
+  /** Looks a character up by name (case-insensitive, as the column collation is). */
+  async characterByName(charName: string): Promise<CharacterRef | null> {
+    const [rows] = await this.pool.execute<RowDataPacket[]>(
+      "SELECT guid, account, name FROM characters WHERE name = ? LIMIT 1",
+      [charName],
+    );
+    const row = rows[0];
+    return row ? { guid: Number(row.guid), accountId: Number(row.account), charName: String(row.name) } : null;
   }
 
   /** Characters the core currently flags as online (`characters.online > 0`). */
