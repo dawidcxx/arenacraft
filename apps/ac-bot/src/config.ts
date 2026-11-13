@@ -14,6 +14,8 @@ const ConfigSchema = z.object({
   // Role allowed to use the VIP commands (and required by their runtime checks).
   VIP_ROLE_NAME: z.string().min(1).default("vip"),
   STALE_ROOM_MINUTES: z.coerce.number().int().positive().default(60),
+  // Website route that renders personal OBS overlays; `/overlay` appends the token.
+  OVERLAY_BASE_URL: z.url().default("http://arenacraft.fun/overlay"),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

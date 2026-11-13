@@ -13,6 +13,7 @@ import { getConfig } from "./config";
 import { logger } from "./logger";
 import { handleLookup, LOOKUP_COMMAND } from "./lookupCommand";
 import { handleOnlineList, loadOnlineList, ONLINE_LIST_COMMAND } from "./onlineListCommand";
+import { handleOverlay, OVERLAY_COMMAND } from "./overlayCommand";
 import {
   handlePermaBan,
   handlePermaBanConfirmation,
@@ -104,6 +105,7 @@ client.once(Events.ClientReady, async (readyClient) => {
       MY_SEAT_COMMAND,
       SET_SEAT_COMMAND,
       GET_SEAT_LIST_COMMAND,
+      OVERLAY_COMMAND,
     ]);
     try {
       await guild.members.fetch();
@@ -161,6 +163,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       else if (interaction.commandName === "setseat")
         await handleSetSeat(interaction, authDb, config.VIP_ROLE_NAME, clearSeatCaches);
       else if (interaction.commandName === "getseatlist") await handleGetSeatList(interaction, loadSeatPage);
+      else if (interaction.commandName === "overlay")
+        await handleOverlay(interaction, { authDb, characterDb, overlayBaseUrl: config.OVERLAY_BASE_URL });
       return;
     }
 

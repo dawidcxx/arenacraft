@@ -21,6 +21,7 @@ databases and to Valkey/Redis.
 | `/myseat` | everyone | Your tournament seating tier (`None`, `Gold` or `Diamond`), 60s cache. |
 | `/setseat <discord_id> <tier>` | VIP | Set a linked player's seating tier (clears the list cache). |
 | `/getseatlist <tier>` | everyone | Padded list of the 20 most recent `Gold` or `Diamond` seats, newest first, plus the tier's total count, 60s cache. |
+| `/overlay <character> [new_link]` | everyone | Personal OBS overlay link (`OVERLAY_BASE_URL/<token>`) showing the character's SoloQ rating, season and today's W:L and last 5 matches. One link per account: picking another character keeps the link, `new_link` disables the old one. |
 
 Replies to info commands are ephemeral. On startup the bot replaces the guild command list,
 so removed commands do not linger as unreachable "ghosts".
@@ -40,7 +41,7 @@ VALUES (<account id>, '<discord id>');
 ```bash
 bun install
 cp .env.example .env   # fill in the values
-ac db-update           # applies data/sql/updates/db_auth (account_discord/account_alias/account_seat)
+ac db-update           # applies data/sql/updates/db_auth (account_discord/account_alias/account_seat/account_overlay)
 bun run start
 ```
 
@@ -65,6 +66,7 @@ The bot needs the **Server Members** privileged intent enabled in the Discord De
 | `AUDIT_LOG_CHANNEL_NAME` | `audit-log` | Match audit messages; empty disables them. |
 | `VIP_ROLE_NAME` | `vip` | Role allowed to use `/alias`, `/charlist`, `/permaban`, `/baninfo` and `/setseat`. |
 | `STALE_ROOM_MINUTES` | `60` | Reclaim a room whose ended event never arrived. |
+| `OVERLAY_BASE_URL` | `http://arenacraft.fun/overlay` | Website route `/overlay` links point at. |
 
 \* optional when `AC_LOGIN_DATABASE_INFO` is set.
 
@@ -74,6 +76,10 @@ once in **Server Settings -> Integrations -> arenacraft -> Manage -> /alias** (a
 `/permaban`, `/baninfo` and `/setseat`); Discord only accepts an OAuth2 bearer token for those
 overwrites, so the bot cannot set them itself. Registration is an upsert by command name, so the
 overwrites survive restarts.
+
+Overlay links (`/overlay`) live in the auth DB's `account_overlay` table: one random 32-character
+token per account plus the character it shows. The website resolves the token and reads the
+character's SoloQ history from the arena replays (`arena_replay`), so replays must stay enabled.
 
 Tournament seats (`/myseat`, `/setseat`, `/getseatlist`) live in the auth DB's
 `account_seat` table keyed by linked account id; a missing row means `None`. `reset_soloq`
