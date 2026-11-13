@@ -1,7 +1,7 @@
 import { injectable } from "@needle-di/core";
 
 /** Hard cap on concurrent live ladder WebSockets; excess upgrades are rejected with 503. */
-export const LIVE_LADDER_MAX_CONNECTIONS = 100;
+export const LIVE_LADDER_MAX_CONNECTIONS = 500;
 
 @injectable()
 export class WebSocketConnectionLimiter {
