@@ -1,7 +1,7 @@
 import { HttpStatusCodes } from "@arenacraft/common";
 import { upgradeWebSocket, type HttpBindings } from "@hono/node-server";
 import { inject, injectable } from "@needle-di/core";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { Logger } from "@/lib/Logger";
 import { LADDER_TOP_SERVICE, type ILadderTopService } from "./ILadderTopService";
 import {
@@ -15,6 +15,8 @@ const logger = Logger.for("LadderTopSocket");
 export class LadderTopSocket {
   private lastRejectLogAt = 0;
   private suppressedRejections = 0;
+  private lastMissingUpgradeLogAt = 0;
+  private suppressedMissingUpgrades = 0;
 
   constructor(
     private readonly service: ILadderTopService = inject(LADDER_TOP_SERVICE),
@@ -27,8 +29,13 @@ export class LadderTopSocket {
 
     router.get("/ws", async (c): Promise<Response> => {
       if (c.req.header("upgrade")?.toLowerCase() !== "websocket") {
+        this.logMissingUpgrade(c);
         return c.json(
-          { code: "UpgradeRequired", message: "This endpoint only speaks WebSocket" },
+          {
+            code: "UpgradeRequired",
+            message:
+              "This endpoint only speaks WebSocket. Behind a reverse proxy, forward the Upgrade and Connection headers.",
+          },
           HttpStatusCodes.UPGRADE_REQUIRED,
         );
       }
@@ -48,6 +55,9 @@ export class LadderTopSocket {
 
       const upgrade = upgradeWebSocket(() => ({
         onOpen: (_event, ws) => {
+          logger.info("Live ladder WebSocket connected", {
+            active: this.limiter.count,
+          });
           unsubscribers.set(
             ws,
             this.service.subscribe((event) => {
@@ -60,13 +70,19 @@ export class LadderTopSocket {
             }),
           );
         },
-        onClose: (_event, ws) => {
+        onClose: (event, ws) => {
           this.unsubscribe(unsubscribers, ws);
           release();
+          logger.debug("Live ladder WebSocket closed", {
+            code: event.code,
+            reason: event.reason,
+            active: this.limiter.count,
+          });
         },
         onError: (_event, ws) => {
           this.unsubscribe(unsubscribers, ws);
           release();
+          logger.debug("Live ladder WebSocket error", { active: this.limiter.count });
         },
       }));
 
@@ -81,6 +97,25 @@ export class LadderTopSocket {
     if (unsubscribe === undefined) return;
     unsubscribers.delete(ws);
     unsubscribe();
+  }
+
+  // A misconfigured proxy turns every reconnect (2s apart) into a plain GET. The request log is
+  // debug-only in production, so shout once in a while instead of staying silent.
+  private logMissingUpgrade(c: Context) {
+    this.suppressedMissingUpgrades++;
+    const now = Date.now();
+    if (now - this.lastMissingUpgradeLogAt < 10_000) return;
+
+    logger.warn("Live ladder WebSocket request is missing the Upgrade header", {
+      upgrade: c.req.header("upgrade") ?? null,
+      connection: c.req.header("connection") ?? null,
+      forwardedFor: c.req.header("x-forwarded-for") ?? null,
+      host: c.req.header("host") ?? null,
+      suppressed: this.suppressedMissingUpgrades,
+      hint: "Forward the Upgrade and Connection headers through the reverse proxy.",
+    });
+    this.lastMissingUpgradeLogAt = now;
+    this.suppressedMissingUpgrades = 0;
   }
 
   // An attacker hammering the endpoint should not be able to flood the log.

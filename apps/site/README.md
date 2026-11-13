@@ -40,6 +40,25 @@ not linked from the site and uses its own layout (transparent page background, ~
 - `DATA_SOURCE=dummy` serves a drifting fixture ladder (`MockLadderTopService`) that simulates a
   rated game every 5-20 seconds, rotating forced rank swaps, top-5 knockouts and regular games.
 
+### Reverse proxy
+
+The widget needs a real WebSocket upgrade. nginx (and nginx-based edges) strip hop-by-hop headers by
+default, so the location that reaches the backend must forward them:
+
+```nginx
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection $connection_upgrade;
+```
+
+A global `proxy_set_header Connection "";` (part of NixOS `recommendedProxySettings`) has to be
+overridden per location; NixOS does that with `proxyWebsockets = true;`. Without these headers the
+backend receives a plain GET and answers `426 Upgrade Required`, and the widget retries every 2
+seconds. In the backend log that shows up as a warning mentioning the missing `Upgrade` header.
+
+`AUTH_DB_URL` also has to reach the container (for example `podman --env=AUTH_DB_URL`); without it
+the live ladder works but shows character names instead of aliases.
+
 ## Assets
 
 - Hero art, the Archivo subset and class icons live in `packages/web/src/assets/`.

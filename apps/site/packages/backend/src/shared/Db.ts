@@ -5,7 +5,7 @@ export function createDb(url: string, timeoutMs: number) {
   // Tiny pool: the snapshot cache in front of it means at most one query per TTL.
   const pool = mysql.createPool({
     uri: url,
-    connectionLimit: 2,
+    connectionLimit: 8,
     connectTimeout: timeoutMs,
     enableKeepAlive: true,
   });
