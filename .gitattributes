@@ -1,6 +1,19 @@
 # Auto detect text files and perform LF normalization
 * text eol=lf
 
+# Binary assets must never go through eol normalization: the `* text` rule above
+# would silently drop bytes from them (it did, to hero.webp and the woff2 font).
+*.webp   binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+
 # Whitespace rules
 # strict (no trailing, no tabs)
 *.cpp    whitespace=trailing-space,space-before-tab,tab-in-indent,cr-at-eol
