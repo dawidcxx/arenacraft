@@ -11,6 +11,11 @@ import { LadderTopSocket } from "./features/liveLadder/LadderTopSocket";
 import { MockLadderTopService } from "./features/liveLadder/MockLadderTopService";
 import { MySqlLadderTopRepository } from "./features/liveLadder/MySqlLadderTopRepository";
 import { WebSocketConnectionLimiter } from "./features/liveLadder/WebSocketConnectionLimiter";
+import { DummyPlayerOverlayRepository } from "./features/playerOverlay/DummyPlayerOverlayRepository";
+import { MySqlPlayerOverlayRepository } from "./features/playerOverlay/MySqlPlayerOverlayRepository";
+import { PlayerOverlayApi } from "./features/playerOverlay/PlayerOverlayApi";
+import { PLAYER_OVERLAY_REPOSITORY } from "./features/playerOverlay/PlayerOverlayRepository";
+import { PlayerOverlayService } from "./features/playerOverlay/PlayerOverlayService";
 import { CONFIG, loadConfig } from "./shared/Config";
 import { createDb, type DrizzleDb } from "./shared/Db";
 import { HttpServer } from "./shared/HttpServer";
@@ -26,6 +31,8 @@ export function createContainer(env: NodeJS.ProcessEnv = process.env): Container
   container.bind(LadderApi);
   container.bind(WebSocketConnectionLimiter);
   container.bind(LadderTopSocket);
+  container.bind(PlayerOverlayService);
+  container.bind(PlayerOverlayApi);
   container.bind(HttpServer);
 
   // The ladder data source is chosen once at startup. Local development uses fixtures by default
@@ -38,8 +45,8 @@ export function createContainer(env: NodeJS.ProcessEnv = process.env): Container
     });
     container.bind({ multi: true, provide: OnDeinit, useValue: { deinit: close } });
 
-    // Aliases live in the auth database. They are optional: without AUTH_DB_URL the widget simply
-    // shows character names.
+    // Aliases and overlay tokens live in the auth database. It is optional: without AUTH_DB_URL the
+    // live ladder simply shows character names and personal overlay links do not resolve.
     let authDb: DrizzleDb | null = null;
     if (config.authDbUrl !== null) {
       const auth = createDb(config.authDbUrl, config.dbTimeoutMs);
@@ -52,9 +59,17 @@ export function createContainer(env: NodeJS.ProcessEnv = process.env): Container
       useValue: new MySqlLadderTopRepository(db, authDb, config.dbTimeoutMs),
     });
     container.bind({ provide: LADDER_TOP_SERVICE, useClass: LadderTopService });
+    container.bind({
+      provide: PLAYER_OVERLAY_REPOSITORY,
+      useValue: new MySqlPlayerOverlayRepository(db, authDb, config.dbTimeoutMs),
+    });
   } else {
     container.bind({ provide: LADDER_REPOSITORY, useValue: new DummyLadderRepository() });
     container.bind({ provide: LADDER_TOP_SERVICE, useClass: MockLadderTopService });
+    container.bind({
+      provide: PLAYER_OVERLAY_REPOSITORY,
+      useValue: new DummyPlayerOverlayRepository(),
+    });
   }
 
   container.bind({ multi: true, provide: OnInit, useExisting: HttpServer });

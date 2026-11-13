@@ -44,6 +44,12 @@ tokens (Archivo font, colors) in `packages/web/src/global.css`.
 `/api/live-ladder/ws` (`packages/backend/src/features/liveLadder/`), is not linked from the site,
 and must stay that way.
 
+`/overlay/:token` is the personal OBS overlay of one streamer, also outside `SiteLayout` and
+unlinked. The token comes from the Discord bot's `/overlay` command (auth DB `account_overlay`);
+the page polls `/api/overlay/:token` (`packages/backend/src/features/playerOverlay/`), which reads
+the character's SoloQ history from the core's arena replays (`arena_replay`). With
+`DATA_SOURCE=dummy`, open `/overlay/dummyoverlaytoken000000000000000`.
+
 ## Frontend config
 
 The frontend has no runtime config. Configuration is backend-only (`DATA_SOURCE`,
