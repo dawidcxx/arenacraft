@@ -24,4 +24,5 @@ export const STREAMER_WHITELIST: readonly WhitelistedStreamer[] = [
   { login: "homerjay_tv", name: "Homerjay" },
   { login: "kerosineyo", name: "Kerosine" },
   { login: "shyxy", name: "Shyxy" },
+  { login: "badbullsz", name:"Badbull" },
 ];
