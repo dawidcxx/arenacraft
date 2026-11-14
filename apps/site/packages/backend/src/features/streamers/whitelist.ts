@@ -12,10 +12,17 @@ export interface WhitelistedStreamer {
 }
 
 export const STREAMER_WHITELIST: readonly WhitelistedStreamer[] = [
+  { login: "meeeow1ng", "name": "Meowing" },
+  { login: "fnobz", "name": "Fnobz" },
+  { login: "lordofdiscx", "name": "LordOfDisc" },
   { login: "sajkelolx", name: "Sajke" },
   { login: "hvckfy", name: "Heckfy" },
   { login: "dawidpl95", name: "Diel" },
   { login: "filip_pl_", name: "FilipPL" },
   { login: "brooxz", name: "Brooxz" },
-  { login: "nitroshield_", name: "Nitroshield" }
+  { login: "nitroshield_", name: "Nitroshield" },
+  { login: "homerjay_tv", name: "Homerjay" },
+  { login: "kerosineyo", name: "Kerosine" },
+  { login: "kerosineyo", name: "Kerosine" },
+  { login: "shyxy", name: "Shyxy" },
 ];
