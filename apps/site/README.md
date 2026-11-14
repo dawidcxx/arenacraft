@@ -5,6 +5,7 @@ React frontend, and a MySQL ladder repository.
 
 ```
 GET /api/ladder/soloq -> [{ "name", "class", "role", "rating", "wins", "losses" }, ...]
+GET /api/streamers    -> [{ "login", "name", "avatarUrl", "live": { ... } | null }, ...]
 GET /api/health       -> { "ok": true }
 ```
 
@@ -18,7 +19,7 @@ The frontend sorts nothing — the server returns the best rating first.
 | `/`            | Hero, next tourney, stats, community/Discord info, how to play, features, commands |
 | `/tournaments` | Tourney schedule, prizes and rules                                                 |
 | `/ladder`      | Live SoloQ ladder, filterable by role; refreshes every 60 seconds                  |
-| `/streamers`   | Streamer zone and Twitch link                                                      |
+| `/streamers`   | Twitch streamer zone: live channels first, affiliated offline channels below      |
 | `/live-ladder` | Unlisted OBS widget: live top 5 over WebSocket                                     |
 
 Routing is client-side (React Router). The backend serves `index.html` for unknown non-asset
@@ -58,6 +59,29 @@ seconds. In the backend log that shows up as a warning mentioning the missing `U
 
 `AUTH_DB_URL` also has to reach the container (for example `podman --env=AUTH_DB_URL`); without it
 the live ladder works but shows character names instead of aliases.
+
+## Streamer zone
+
+`/streamers` lists the affiliated Twitch channels from
+`packages/backend/src/features/streamers/whitelist.ts`. The whitelist is static code, not a database
+table. Live channels come first — promoted further when their stream title mentions "arenacraft"
+(case-insensitive) — and offline channels follow at the bottom.
+
+Status comes through one `StreamerStatusSource` interface with two implementations:
+
+| Source                      | Selected by                | Behaviour                                                         |
+| --------------------------- | -------------------------- | ----------------------------------------------------------------- |
+| `DummyStreamerStatusSource` | `DATA_SOURCE=dummy`        | Fixtures covering featured, live and offline channels             |
+| `TwitchStreamerStatusSource`| `DATA_SOURCE=mysql`        | Helix `GET /streams` + `GET /users`, app access token             |
+
+`GET /api/streamers` keeps a one-minute snapshot; a page load reads through it, and the browser may
+reuse the response for half a minute. There is no polling. Only the backend talks to Twitch, so the
+client secret never reaches the browser.
+
+For real status, register an app at <https://dev.twitch.tv/console/apps> and pass its credentials as
+`TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET`. They are free and only need the client-credentials
+grant. Without them production still renders the whitelist, but reports every channel offline
+rather than inventing liveness.
 
 ## Assets
 
@@ -111,6 +135,8 @@ Use a SELECT-only database account. The query reads `characters`, `arena_team`,
 | `CACHE_TTL_SECONDS` | `30`               | snapshot cache TTL                             |
 | `DB_TIMEOUT_MS`     | `3000`             | per-query timeout                              |
 | `CORS_ORIGINS`      | unset              | comma-separated allowed origins                |
+| `TWITCH_CLIENT_ID`  | unset              | Twitch app client ID (see "Streamer zone")     |
+| `TWITCH_CLIENT_SECRET` | unset           | Twitch app client secret, set together with the ID |
 
 The production image sets `DATA_SOURCE=mysql`; supply `CHARACTER_DB_URL` at deploy time.
 

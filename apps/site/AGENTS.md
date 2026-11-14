@@ -22,6 +22,12 @@ repository and requires `CHARACTER_DB_URL`.
 Repository selection happens in `packages/backend/src/container.ts`. Both implementations satisfy
 `LadderRepository` in `packages/backend/src/features/ladder/LadderRepository.ts`.
 
+The streamer zone (`/streamers`) follows the same split through `StreamerStatusSource`:
+`DATA_SOURCE=dummy` serves fixtures (`DummyStreamerStatusSource`), while `mysql` uses Twitch Helix
+(`TwitchStreamerStatusSource`) and lists the static whitelist as offline when
+`TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET` are absent. The whitelist lives in code
+(`features/streamers/whitelist.ts`), not in the database.
+
 ## Adding a feature
 
 Follow `docs/domain-modeling-playbook.md` first, then `docs/backend-feature-playbook.md`.

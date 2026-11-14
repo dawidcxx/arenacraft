@@ -16,7 +16,15 @@ import { MySqlPlayerOverlayRepository } from "./features/playerOverlay/MySqlPlay
 import { PlayerOverlayApi } from "./features/playerOverlay/PlayerOverlayApi";
 import { PLAYER_OVERLAY_REPOSITORY } from "./features/playerOverlay/PlayerOverlayRepository";
 import { PlayerOverlayService } from "./features/playerOverlay/PlayerOverlayService";
-import { CONFIG, loadConfig } from "./shared/Config";
+import { DummyStreamerStatusSource } from "./features/streamers/DummyStreamerStatusSource";
+import { STREAMER_STATUS_SOURCE } from "./features/streamers/StreamerStatusSource";
+import { StreamersApi } from "./features/streamers/StreamersApi";
+import { StreamersService } from "./features/streamers/StreamersService";
+import {
+  TwitchStreamerStatusSource,
+  type TwitchCredentials,
+} from "./features/streamers/TwitchStreamerStatusSource";
+import { CONFIG, loadConfig, type Config } from "./shared/Config";
 import { createDb, type DrizzleDb } from "./shared/Db";
 import { HttpServer } from "./shared/HttpServer";
 import { OnDeinit } from "./shared/OnDeinit";
@@ -33,7 +41,20 @@ export function createContainer(env: NodeJS.ProcessEnv = process.env): Container
   container.bind(LadderTopSocket);
   container.bind(PlayerOverlayService);
   container.bind(PlayerOverlayApi);
+  container.bind(StreamersService);
+  container.bind(StreamersApi);
   container.bind(HttpServer);
+
+  // The streamer zone talks to Twitch in production and serves fixtures with DATA_SOURCE=dummy,
+  // so the listing can be built without Twitch credentials. The interface has exactly these two
+  // implementations; production without credentials lists every channel as offline.
+  container.bind({
+    provide: STREAMER_STATUS_SOURCE,
+    useValue:
+      config.dataSource === "dummy"
+        ? new DummyStreamerStatusSource()
+        : new TwitchStreamerStatusSource(twitchCredentials(config)),
+  });
 
   // The ladder data source is chosen once at startup. Local development uses fixtures by default
   // (DATA_SOURCE=dummy), so frontend work needs no database.
@@ -76,4 +97,9 @@ export function createContainer(env: NodeJS.ProcessEnv = process.env): Container
   container.bind({ multi: true, provide: OnDeinit, useExisting: HttpServer });
 
   return container;
+}
+
+function twitchCredentials(config: Config): TwitchCredentials | null {
+  if (config.twitchClientId === null || config.twitchClientSecret === null) return null;
+  return { clientId: config.twitchClientId, clientSecret: config.twitchClientSecret };
 }

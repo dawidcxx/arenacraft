@@ -11,6 +11,9 @@ type BaseConfig = {
   corsOrigins: string[];
   /** Auth database (account_alias). Optional even for mysql; aliases are skipped without it. */
   authDbUrl: string | null;
+  /** Twitch Helix app credentials. Without them the streamer zone lists channels as offline. */
+  twitchClientId: string | null;
+  twitchClientSecret: string | null;
 };
 
 export type Config = BaseConfig &
@@ -22,6 +25,12 @@ export type Config = BaseConfig &
 export const CONFIG = new InjectionToken<Config>("Config");
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const twitchClientId = env.TWITCH_CLIENT_ID?.trim() || null;
+  const twitchClientSecret = env.TWITCH_CLIENT_SECRET?.trim() || null;
+  if ((twitchClientId === null) !== (twitchClientSecret === null)) {
+    throw new Error("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET must be set together");
+  }
+
   const base: BaseConfig = {
     host: env.HOST?.trim() || "0.0.0.0",
     port: intFromEnv(env, "PORT", 8080, 1, 65535),
@@ -30,6 +39,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     dbTimeoutMs: intFromEnv(env, "DB_TIMEOUT_MS", 3000, 100, 30000),
     corsOrigins: listFromEnv(env.CORS_ORIGINS),
     authDbUrl: env.AUTH_DB_URL?.trim() || null,
+    twitchClientId,
+    twitchClientSecret,
   };
 
   const dataSource = parseDataSource(env.DATA_SOURCE);

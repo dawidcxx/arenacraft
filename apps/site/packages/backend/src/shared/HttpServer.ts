@@ -10,6 +10,7 @@ import { WebSocketServer } from "ws";
 import { LadderApi } from "@/features/ladder/LadderApi";
 import { LadderTopSocket } from "@/features/liveLadder/LadderTopSocket";
 import { PlayerOverlayApi } from "@/features/playerOverlay/PlayerOverlayApi";
+import { StreamersApi } from "@/features/streamers/StreamersApi";
 import { honoJsErrorHandler } from "@/lib/honoJsApiErrorHandler";
 import { Logger } from "@/lib/Logger";
 import { requestObservability } from "@/lib/requestObservability";
@@ -30,6 +31,7 @@ export class HttpServer implements OnDeinit, OnInit {
     private readonly ladderApi: LadderApi = inject(LadderApi),
     private readonly ladderTopSocket: LadderTopSocket = inject(LadderTopSocket),
     private readonly playerOverlayApi: PlayerOverlayApi = inject(PlayerOverlayApi),
+    private readonly streamersApi: StreamersApi = inject(StreamersApi),
   ) {}
 
   async init() {
@@ -95,6 +97,7 @@ export class HttpServer implements OnDeinit, OnInit {
     api.route("/", this.ladderApi.build());
     api.route("/live-ladder", this.ladderTopSocket.build());
     api.route("/", this.playerOverlayApi.build());
+    api.route("/", this.streamersApi.build());
     app.route("/api", api);
     app.get("*", serveStaticAssets(frontendDistPath));
 
