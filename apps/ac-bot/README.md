@@ -60,7 +60,7 @@ The bot needs the **Server Members** privileged intent enabled in the Discord De
 | `AUTH_DB_URL` | required* | `mysql://user:pass@host:3306/acore_auth` |
 | `CHARACTER_DB_URL` | required | `mysql://user:pass@host:3306/acore_characters` |
 | `REDIS_URL` | `redis://127.0.0.1:6379` | Core event stream. |
-| `WAITING_ROOM_NAME` | `Waiting Room` | Lobby everyone returns to. |
+| `WAITING_ROOM_NAME` | `Waiting Room` | Lobby the queue waits in; the default return channel. |
 | `GAME_CHANNEL_PATTERN` | `^game-(\d+)-(\d+)$` | Paired voice room names. |
 | `INFO_CHANNEL_NAME` | `bot` | Channel for "no free room" notices. |
 | `AUDIT_LOG_CHANNEL_NAME` | `audit-log` | Match audit messages; empty disables them. |
@@ -98,14 +98,19 @@ and checks the guild's Discord ban list for the same user.
 
 The bot subscribes to the core's `soloq-matchup` / `soloq-matchup-ended` Redis events:
 
-- `Waiting Room` - lobby everyone returns to. The bot denies `Speak` there so the queue stays
+- `Waiting Room` - lobby the solo queue waits in. The bot denies `Speak` there so the queue stays
   quiet; the denial is channel-scoped, so it cannot server-mute anyone outside the lobby.
+- `Chill Room` / `Secret Room` - also valid places to wait. Players picked up from one of these
+  (or from the waiting room) are returned to it after the match; anyone picked up anywhere else
+  is sent to the waiting room, so a desync can never drop a player into another match's room.
+  The extra rooms are a static list in `voiceRooms.ts`, resolved at startup.
 - `game-<n>-1` / `game-<n>-2` - one room per `<n>`. Team A goes to `-1`, team B to `-2`.
   Rooms are discovered dynamically and reused once released.
 
 Players without voice are skipped, so a room may hold fewer than six. If the bot restarts,
 rooms that still contain members are treated as taken; a room held longer than
-`STALE_ROOM_MINUTES` is reclaimed.
+`STALE_ROOM_MINUTES` is reclaimed. Origins are in-memory, so after a restart players from a match
+still in progress come back to the waiting room, not to the channel they waited in.
 
 The in-game GM command `.alias get [character]` resolves character -> account -> alias and
 prints one machine-readable line: `ALIAS:<character>=<alias-or-account>`.

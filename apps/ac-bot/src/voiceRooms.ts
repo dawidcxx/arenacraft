@@ -6,6 +6,11 @@ import { logger } from "./logger";
 
 const MEMBER_REFRESH_COOLDOWN_MS = 5 * 60_000;
 
+// Lounge channels players may be returned to after a match, besides the waiting
+// room. Anything else (a game room, a private channel, ...) releases to the
+// waiting room instead.
+const EXTRA_RETURN_ROOMS = ["Chill Room", "Secret Room"];
+
 export interface ChannelLike {
   id: string;
   name: string;
@@ -50,13 +55,41 @@ interface Room {
   second: VoiceChannel;
   instanceId: number | null;
   bookedAt: number | null;
+  /** Member id -> return channel id, captured when the match was booked. */
+  origins: Map<string, string>;
+  /** True while a release is moving members out, so a sweep cannot double-free. */
+  releasing: boolean;
+}
+
+/** Case-insensitive match against a list of channel names. */
+export function matchesChannelName(channelName: string, names: readonly string[]): boolean {
+  return names.some((name) => sameName(channelName, name));
+}
+
+/**
+ * Picks where a released player lands: their recorded origin when it is still a
+ * configured return channel, the waiting room otherwise.
+ */
+export function selectReturnChannel<T extends ChannelLike>(
+  originId: string | undefined,
+  returnChannels: ReadonlyMap<string, T>,
+  waitingRoom: T | null,
+): T | null {
+  if (originId) {
+    const origin = returnChannels.get(originId);
+    if (origin) return origin;
+  }
+  return waitingRoom;
 }
 
 /**
  * Allocates players into paired voice channels per matchup and releases them
- * back to the waiting room. Occupancy is best-effort: rooms holding players are
- * treated as taken even when the bot has no instance mapping (after a crash),
- * and rooms held longer than STALE_ROOM_MINUTES are reclaimed by sweepStale().
+ * back to the channel they waited in. Only the waiting room and EXTRA_RETURN_ROOMS
+ * are restored; anything else (another game room, a private channel, ...) falls
+ * back to the waiting room so a desync cannot drop players into a room a later
+ * match owns. Occupancy is best-effort: rooms holding players are treated as
+ * taken even when the bot has no instance mapping (after a crash), and rooms
+ * held longer than STALE_ROOM_MINUTES are reclaimed by sweepStale().
  */
 export class RoomManager {
   private rooms: Room[] = [];
@@ -64,7 +97,7 @@ export class RoomManager {
   private infoChannel: TextChannel | null = null;
   private memberRefresh: Promise<void> | null = null;
   private lastMemberRefresh = 0;
-  private originChannels = new Map<string, VoiceBasedChannel>();
+  private returnChannels = new Map<string, VoiceChannel>();
 
   constructor(
     private readonly guild: Guild,
@@ -81,6 +114,18 @@ export class RoomManager {
     if (!this.waitingRoom)
       logger.warn(`Waiting room voice channel "${this.config.WAITING_ROOM_NAME}" not found`);
     else await this.muteWaitingRoom();
+
+    // Only the waiting room and the lounge rooms above are worth restoring
+    // after a match. Anything else is treated as incidental (e.g. someone
+    // waiting in a game room) and releases to the waiting room instead.
+    // Resolved once at startup like the rest of the voice layout.
+    this.returnChannels = new Map(
+      voiceChannels
+        .filter(
+          (channel) => channel.id === this.waitingRoom?.id || matchesChannelName(channel.name, EXTRA_RETURN_ROOMS),
+        )
+        .map((channel) => [channel.id, channel]),
+    );
 
     this.infoChannel =
       [...channels.values()].find(
@@ -99,6 +144,8 @@ export class RoomManager {
       second: byId.get(group.second.id)!,
       instanceId: null,
       bookedAt: null,
+      origins: new Map(),
+      releasing: false,
     }));
 
     const now = Date.now();
@@ -130,8 +177,8 @@ export class RoomManager {
     room.bookedAt = Date.now();
 
     const [movedA, movedB] = await Promise.all([
-      this.moveDiscordIds(teamADiscordIds, room.first),
-      this.moveDiscordIds(teamBDiscordIds, room.second),
+      this.moveDiscordIds(teamADiscordIds, room.first, room),
+      this.moveDiscordIds(teamBDiscordIds, room.second, room),
     ]);
     logger.info(`Booked ${roomName(room)} for instance ${instanceId} (moved ${movedA + movedB} players)`);
   }
@@ -189,23 +236,51 @@ export class RoomManager {
   }
 
   private async freeRoom(room: Room): Promise<void> {
-    const members = [...room.first.members.values(), ...room.second.members.values()];
-    const moves = await Promise.all(
-      members.map((member) => {
-        const target = this.originChannels.get(member.id) ?? this.waitingRoom;
-        this.originChannels.delete(member.id);
-        return this.moveMember(member, target);
-      }),
-    );
-    const moved = moves.filter(Boolean).length;
-    room.instanceId = null;
-    room.bookedAt = null;
-    logger.info(`Released ${roomName(room)} (moved ${moved} players back)`);
+    // release() and sweepStale() can both reach the same room (a late ended
+    // event, a stale reclaim). A second pass would find the origins already
+    // consumed and drag everyone to the waiting room, so let the first finish.
+    if (room.releasing) {
+      logger.debug(`Room ${roomName(room)} is already being released`);
+      return;
+    }
+    room.releasing = true;
+    try {
+      const members = [...room.first.members.values(), ...room.second.members.values()];
+      let moved = 0;
+      await Promise.all(
+        members.map(async (member) => {
+          if (await this.returnMember(room, member)) moved++;
+        }),
+      );
+      room.instanceId = null;
+      // If a move failed (deleted origin, missing Move Members, ...) the player
+      // is still in the room: keep it marked as held so sweepStale retries
+      // instead of leaving it outside the free pool forever.
+      room.bookedAt = memberCount(room) > 0 ? Date.now() : null;
+      logger.info(
+        `Released ${roomName(room)} (moved ${moved} players back` +
+          (room.bookedAt ? ", some members still inside; will retry)" : ")"),
+      );
+    } finally {
+      // Covers players who left voice mid-match too; a per-room map emptied on
+      // release cannot grow over the bot's uptime.
+      room.origins.clear();
+      room.releasing = false;
+    }
+  }
+
+  private async returnMember(room: Room, member: GuildMember): Promise<boolean> {
+    const target = selectReturnChannel(room.origins.get(member.id), this.returnChannels, this.waitingRoom);
+    if (!target) return false;
+    if (await this.moveMember(member, target)) return true;
+    // Never leave a player stuck in a game room because their origin vanished.
+    if (target.id === this.waitingRoom?.id) return false;
+    return this.moveMember(member, this.waitingRoom);
   }
 
   // Discord has no bulk voice-move endpoint; each move is its own request, so we
   // issue them all concurrently (a match is at most 6) instead of one at a time.
-  private async moveDiscordIds(discordIds: string[], channel: VoiceChannel): Promise<number> {
+  private async moveDiscordIds(discordIds: string[], channel: VoiceChannel, room: Room): Promise<number> {
     const moves = await Promise.all(
       discordIds.map(async (discordId) => {
         const member = await this.resolveMember(discordId);
@@ -213,13 +288,26 @@ export class RoomManager {
           logger.debug(`No Discord member for id ${discordId}`);
           return false;
         }
-        if (member.voice.channel) {
-          this.originChannels.set(member.id, member.voice.channel);
-        }
+        this.recordOrigin(room, member);
         return this.moveMember(member, channel);
       }),
     );
     return moves.filter(Boolean).length;
+  }
+
+  /**
+   * Remembers where to put a player back. Only lobby-ish channels qualify; a
+   * player picked up from a game room or some other channel is sent to the
+   * waiting room instead (recording it could return them into a room a later
+   * match has since booked).
+   */
+  private recordOrigin(room: Room, member: GuildMember): void {
+    const current = member.voice.channel;
+    if (current && this.returnChannels.has(current.id)) {
+      room.origins.set(member.id, current.id);
+    } else {
+      room.origins.delete(member.id);
+    }
   }
 
   private async resolveMember(discordId: string): Promise<GuildMember | undefined> {
