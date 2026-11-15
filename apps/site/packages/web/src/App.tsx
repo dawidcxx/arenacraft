@@ -10,6 +10,7 @@ import { LiveLadderPage } from "@/pages/LiveLadderPage";
 import { LiveLadderTourneyPage } from "@/pages/LiveLadderTourneyPage";
 import { PlayerOverlayPage } from "@/pages/PlayerOverlayPage";
 import { StreamerZonePage } from "@/pages/StreamerZonePage";
+import { TourneyBannerPage } from "@/pages/TourneyBannerPage";
 import { TournamentsPage } from "@/pages/TournamentsPage";
 
 export function App() {
@@ -19,6 +20,8 @@ export function App() {
       <Route path="live-ladder" element={<LiveLadderPage />} />
       {/* Unlinked OBS variant: live top 5 plus the tourney clock. */}
       <Route path="live-ladder-tourney" element={<LiveLadderTourneyPage />} />
+      {/* Unlinked full-frame OBS cover for the tourney stream. */}
+      <Route path="tourney-banner" element={<TourneyBannerPage />} />
       {/* Personal OBS overlay; the token comes from the Discord bot's /overlay command. */}
       <Route path="overlay/:token" element={<PlayerOverlayPage />} />
 

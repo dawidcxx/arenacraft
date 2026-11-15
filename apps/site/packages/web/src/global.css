@@ -61,6 +61,11 @@
     background: transparent;
   }
 
+  /* Full-frame OBS cover (`/tourney-banner`): solid backdrop, never transparent. */
+  body.tourney-banner-obs {
+    background: #0c0b0b;
+  }
+
   ::selection {
     @apply bg-accent text-white;
   }

@@ -28,6 +28,7 @@ The frontend sorts nothing — the server returns the best rating first.
 | `/hall-of-fame`| Past tournament champions                                                         |
 | `/live-ladder` | Unlisted OBS widget: live top 5 over WebSocket                                     |
 | `/live-ladder-tourney` | Same OBS widget plus a clock-bound tourney reminder                        |
+| `/tourney-banner` | Unlisted 16:9 OBS cover: event clock, agenda, previous winners              |
 
 The header shows Home and Ladder; every other page sits in its "More" dropdown
 (`NAV_LINKS` / `NAV_MORE_LINKS` in `packages/web/src/lib/site.ts`).
@@ -86,6 +87,21 @@ seconds. In the backend log that shows up as a warning mentioning the missing `U
 
 `AUTH_DB_URL` also has to reach the container (for example `podman --env=AUTH_DB_URL`); without it
 the live ladder works but shows character names instead of aliases.
+
+## Tourney banner OBS cover
+
+`/tourney-banner` is an unlisted, full-frame 16:9 cover for the stream start, breaks and after-show:
+event clock (CET), the tourney-day agenda with the running segment highlighted, and the previous
+champions. It never shows the tourney name — only its number, day, window and format.
+
+- Agenda and phase logic live in `lib/tourneyAgenda.ts`: 17:45 stream start, 17:59 bracket reset,
+  18:00 tourney start, 18:00–20:15 gameplay stream, 20:15–21:00 spectator commentary, then a
+  post-show state.
+- Previous winners come from `lib/hallOfFame.ts`; the current tourney from `lib/tournaments.ts`
+  (`status === "upcoming"`). Everything is static code — no API calls, no database.
+- The stage is a fixed 1920×1080 composition scaled to the browser source size and letterboxed by
+  the solid `#0c0b0b` page background (no alpha, same trap as the live ladder widget).
+- `?at=19:30` previews another phase of the day; the clock keeps ticking from there.
 
 ## Streamer zone
 
