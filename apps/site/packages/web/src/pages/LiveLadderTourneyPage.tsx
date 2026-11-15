@@ -48,13 +48,8 @@ export function LiveLadderTourneyPage() {
         <footer className="flex items-center gap-2 border-t-2 border-divider bg-accent px-3 py-1.5 text-white">
           <span className="size-2 shrink-0 bg-white" aria-hidden="true" />
           <span className="shrink-0 text-[10px] font-extrabold tracking-[0.14em] uppercase">
-            {clock.phase === "finished" ? "Tourney finished" : "Tourney today"}
+            {NEXT_TOURNAMENT.windowLabel}
           </span>
-          {clock.phase !== "finished" && (
-            <span className="truncate text-[9px] font-bold tracking-[0.1em] text-white/75 uppercase">
-              {NEXT_TOURNAMENT.windowLabel}
-            </span>
-          )}
           <span
             className="ml-auto text-[11px] font-extrabold whitespace-nowrap tabular-nums"
             aria-label="Tourney clock"
