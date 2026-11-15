@@ -27,6 +27,7 @@ The frontend sorts nothing — the server returns the best rating first.
 | `/addons`      | Downloadable Arenacraft addons, their commands and install steps                  |
 | `/hall-of-fame`| Past tournament champions                                                         |
 | `/live-ladder` | Unlisted OBS widget: live top 5 over WebSocket                                     |
+| `/live-ladder-tourney` | Same OBS widget plus a clock-bound tourney reminder                        |
 
 The header shows Home and Ladder; every other page sits in its "More" dropdown
 (`NAV_LINKS` / `NAV_MORE_LINKS` in `packages/web/src/lib/site.ts`).
@@ -47,7 +48,9 @@ paths, so deep links and refreshes work in production.
 ## Live ladder OBS widget
 
 `/live-ladder` is an unlisted, chrome-less page meant to be added as an OBS browser source. It is
-not linked from the site and uses its own layout (transparent page background, ~380px wide).
+not linked from the site and uses its own layout (~380px wide): the page background stays
+transparent so only the widget shows, but the panel itself is a solid, alpha-free `bg-surface` —
+a translucent background (`/95` etc.) reads as see-through on stream in OBS.
 
 - Data arrives over `ws(s)://<host>/api/live-ladder/ws`.
 - The server polls the top 5 once per second; every connected widget shares that one poller and
@@ -59,6 +62,11 @@ not linked from the site and uses its own layout (transparent page background, ~
 - At most 100 concurrent WebSockets; excess upgrades are rejected with `503` before the upgrade.
 - `DATA_SOURCE=dummy` serves a drifting fixture ladder (`MockLadderTopService`) that simulates a
   rated game every 5-20 seconds, rotating forced rank swaps, top-5 knockouts and regular games.
+
+`/live-ladder-tourney` is the same unlisted widget with a compact accent strip along the bottom
+bound to the tourney window in `lib/site.ts` (`NEXT_TOURNAMENT.startsAt`/`endsAt`, `windowLabel`):
+it counts down to the start, shows the remaining time while live, and reads "finished" afterwards.
+Both pages share `components/LiveLadderTable.tsx`.
 
 ### Reverse proxy
 

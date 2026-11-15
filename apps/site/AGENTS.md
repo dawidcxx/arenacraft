@@ -48,7 +48,9 @@ tokens (Archivo font, colors) in `packages/web/src/global.css`.
 
 `/live-ladder` is an unlisted OBS widget rendered outside `SiteLayout`. It talks to
 `/api/live-ladder/ws` (`packages/backend/src/features/liveLadder/`), is not linked from the site,
-and must stay that way.
+and must stay that way. `/live-ladder-tourney` is its unlisted sibling: same table
+(`components/LiveLadderTable.tsx`) plus a compact tourney reminder strip at the bottom, clocked by
+`NEXT_TOURNAMENT` in `lib/site.ts`.
 
 `/overlay/:token` is the personal OBS overlay of one streamer, also outside `SiteLayout` and
 unlinked. The token comes from the Discord bot's `/overlay` command (auth DB `account_overlay`);
