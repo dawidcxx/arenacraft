@@ -19,12 +19,27 @@ The frontend sorts nothing — the server returns the best rating first.
 | Route          | Content                                                                            |
 | -------------- | ---------------------------------------------------------------------------------- |
 | `/`            | Hero, next tourney, stats, community/Discord info, how to play, features, commands |
-| `/tournaments` | Tourney schedule, prizes and rules                                                 |
+| `/tournaments` | Upcoming tourneys with prizes, rules, and the hall of fame at the bottom           |
 | `/ladder`      | Live SoloQ ladder, filterable by role; refreshes every 60 seconds                  |
 | `/streamers`   | Twitch streamer zone: live channels first, affiliated offline channels below      |
 | `/armory`      | Every character, searchable and filterable by class; SoloQ players first          |
 | `/armory/:name`| One character: gear, talents and glyphs, SoloQ standing, recent matches           |
+| `/addons`      | Downloadable Arenacraft addons, their commands and install steps                  |
+| `/hall-of-fame`| Past tournament champions                                                         |
 | `/live-ladder` | Unlisted OBS widget: live top 5 over WebSocket                                     |
+
+The header shows Home and Ladder; every other page sits in its "More" dropdown
+(`NAV_LINKS` / `NAV_MORE_LINKS` in `packages/web/src/lib/site.ts`).
+
+Tournaments (`lib/tournaments.ts`), champions (`lib/hallOfFame.ts`) and addons (`lib/addons.ts`) are
+static data in the frontend. A finished tourney leaves the "Upcoming" list once its `status` is
+`finished`; add its winner to `HALL_OF_FAME`.
+
+Addon zips are served from `packages/web/public/addons/`. To add or update one, drop the zip as
+received into `apps/site/addons/` (git-ignored), run `scripts/pack-addons` from `apps/site`, commit
+the result and list it in `lib/addons.ts`. The script strips `.git` and OS junk (which would publish
+the author's local history) and moves addon folders nested inside another addon to the top level,
+where WoW can load them.
 
 Routing is client-side (React Router). The backend serves `index.html` for unknown non-asset
 paths, so deep links and refreshes work in production.

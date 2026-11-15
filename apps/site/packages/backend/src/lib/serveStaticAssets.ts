@@ -195,6 +195,7 @@ const mimeTypes: Record<string, string> = {
   ".woff2": "font/woff2",
   ".woff": "font/woff",
   ".map": "application/json",
+  ".zip": "application/zip",
 };
 
 function getContentType(filePath: string): string {

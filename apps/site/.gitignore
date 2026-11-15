@@ -29,3 +29,5 @@ backup/
 *.tsbuildinfo
 
 .playwright-mcp
+# Uploaded addon zips as received; scripts/pack-addons writes the served copies.
+/addons/

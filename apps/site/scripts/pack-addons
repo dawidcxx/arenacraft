@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""pack-addons - turn uploaded addon zips into the clean downloads the site serves.
+
+Usage: scripts/pack-addons [addon.zip ...]   (default: addons/*.zip)
+
+Drop the zips as you got them into apps/site/addons/ (git-ignored), run this from
+apps/site, and commit what lands in packages/web/public/addons/. For every zip:
+
+- version control and OS junk is dropped (.git, .svn, __MACOSX, .DS_Store, Thumbs.db);
+  a .git folder would publish the author's local history
+- an addon folder nested inside another addon (e.g. SnowfallKeyPress/SnowfallKeyPressSettings/
+  with its own SnowfallKeyPressSettings.toc) is moved to the top level: WoW only loads folders
+  directly under Interface/AddOns. Embedded libraries (libs/, Libs/) are left alone.
+
+The output keeps the input's file name. Entries are sorted, so packing the same input twice gives
+the same zip.
+"""
+import sys
+import zipfile
+from pathlib import Path, PurePosixPath
+
+SITE = Path(__file__).resolve().parent.parent
+OUT_DIR = SITE / "packages" / "web" / "public" / "addons"
+JUNK_DIRS = {".git", ".svn", "__MACOSX"}
+JUNK_FILES = {".DS_Store", "Thumbs.db", ".gitignore", ".gitattributes"}
+LIB_DIRS = {"libs", "lib"}
+
+
+def nested_addons(names: list[str]) -> set[tuple[str, str]]:
+    """(top, sub) pairs where top/sub/sub.toc exists: an addon shipped inside another one."""
+    found = set()
+    for name in names:
+        parts = PurePosixPath(name).parts
+        if len(parts) == 3 and parts[2].lower() == f"{parts[1].lower()}.toc":
+            if parts[1].lower() not in LIB_DIRS:
+                found.add((parts[0], parts[1]))
+    return found
+
+
+def pack(source: Path) -> None:
+    with zipfile.ZipFile(source) as zin:
+        infos = [i for i in zin.infolist() if not i.is_dir()]
+        kept = [
+            i
+            for i in infos
+            if not JUNK_DIRS.intersection(PurePosixPath(i.filename).parts)
+            and PurePosixPath(i.filename).name not in JUNK_FILES
+        ]
+        hoist = nested_addons([i.filename for i in kept])
+
+        def target(name: str) -> str:
+            parts = PurePosixPath(name).parts
+            if len(parts) > 2 and (parts[0], parts[1]) in hoist:
+                return str(PurePosixPath(*parts[1:]))
+            return name
+
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        out = OUT_DIR / source.name
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zout:
+            for info in sorted(kept, key=lambda i: target(i.filename)):
+                entry = zipfile.ZipInfo(target(info.filename), date_time=info.date_time)
+                entry.compress_type = zipfile.ZIP_DEFLATED
+                entry.external_attr = 0o644 << 16
+                zout.writestr(entry, zin.read(info))
+
+    dropped = len(infos) - len(kept)
+    folders = sorted({PurePosixPath(target(i.filename)).parts[0] for i in kept})
+    notes = []
+    if dropped:
+        notes.append(f"dropped {dropped} junk files")
+    if hoist:
+        notes.append("moved to top level: " + ", ".join(sub for _, sub in sorted(hoist)))
+    print(f"{source.name}: {', '.join(folders)}" + (f" ({'; '.join(notes)})" if notes else ""))
+
+
+def main() -> None:
+    sources = [Path(a) for a in sys.argv[1:]] or sorted((SITE / "addons").glob("*.zip"))
+    if not sources:
+        sys.exit("no zips given and none found in addons/")
+    for source in sources:
+        pack(source)
+
+
+if __name__ == "__main__":
+    main()

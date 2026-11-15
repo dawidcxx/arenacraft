@@ -1,7 +1,9 @@
 import { Route, Routes } from "react-router-dom";
 import { SiteLayout } from "@/components/SiteLayout";
 import { ArmoryCharacterPage } from "@/pages/ArmoryCharacterPage";
+import { AddonsPage } from "@/pages/AddonsPage";
 import { ArmoryPage } from "@/pages/ArmoryPage";
+import { HallOfFamePage } from "@/pages/HallOfFamePage";
 import { HomePage } from "@/pages/HomePage";
 import { LadderPage } from "@/pages/LadderPage";
 import { LiveLadderPage } from "@/pages/LiveLadderPage";
@@ -24,6 +26,8 @@ export function App() {
         <Route path="streamers" element={<StreamerZonePage />} />
         <Route path="armory" element={<ArmoryPage />} />
         <Route path="armory/:name" element={<ArmoryCharacterPage />} />
+        <Route path="addons" element={<AddonsPage />} />
+        <Route path="hall-of-fame" element={<HallOfFamePage />} />
         <Route path="*" element={<HomePage />} />
       </Route>
     </Routes>

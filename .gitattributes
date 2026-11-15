@@ -13,6 +13,7 @@
 *.woff2  binary
 *.ttf    binary
 *.otf    binary
+*.zip    binary
 
 # Whitespace rules
 # strict (no trailing, no tabs)

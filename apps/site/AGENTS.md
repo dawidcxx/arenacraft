@@ -41,7 +41,7 @@ Follow `docs/domain-modeling-playbook.md` first, then `docs/backend-feature-play
 ## Routing
 
 The frontend is one SPA served from `index.html`; client-side routes are `/`, `/tournaments`,
-`/ladder`, `/streamers`, `/armory` and `/armory/:name` (React Router in `packages/web/src/App.tsx`). Unknown non-asset paths
+`/ladder`, `/streamers`, `/armory`, `/armory/:name`, `/addons` and `/hall-of-fame` (React Router in `packages/web/src/App.tsx`). Unknown non-asset paths
 fall back to `index.html` in `packages/backend/src/lib/serveStaticAssets.ts`, so deep links work.
 Pages live in `packages/web/src/pages/`, shared UI in `packages/web/src/components/`, and design
 tokens (Archivo font, colors) in `packages/web/src/global.css`.

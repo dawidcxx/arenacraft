@@ -10,10 +10,19 @@ export const NEXT_TOURNAMENT = {
   startsAt: new Date("2026-11-15T18:00:00+01:00"),
 } as const;
 
-export const NAV_LINKS = [
+export type NavLinkItem = { label: string; to: string };
+
+/** Always visible in the header. */
+export const NAV_LINKS: readonly NavLinkItem[] = [
   { label: "Home", to: "/" },
-  { label: "Tournaments", to: "/tournaments" },
   { label: "Ladder", to: "/ladder" },
+];
+
+/** Under the header's "More" dropdown. */
+export const NAV_MORE_LINKS: readonly NavLinkItem[] = [
+  { label: "Tournaments", to: "/tournaments" },
   { label: "Armory", to: "/armory" },
   { label: "Streamer zone", to: "/streamers" },
-] as const;
+  { label: "Addons", to: "/addons" },
+  { label: "Hall of fame", to: "/hall-of-fame" },
+];
