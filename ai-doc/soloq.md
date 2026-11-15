@@ -75,13 +75,14 @@ characters' starting MMR (it does not change team/personal rating):
 | Seat | Starting MMR |
 | --- | --- |
 | None | `--mmr` (default 1500) |
-| Gold | base + 110 (1610 by default) |
-| Diamond | base + 150 (1650 by default) |
+| Gold | base + 150 (1650 by default) |
+| Diamond | base + 250 (1750 by default) |
 
 Seats only apply to characters that already have a SoloQ team when the reset
 runs; a seated player who creates their team afterwards starts at the normal
 MMR and misses that season's provision. `scripts/bracket reset --bracket soloq`
-also resets MMR but ignores seats.
+also resets MMR (to 1500) but ignores seats, so run it before `reset_soloq`,
+never after.
 
 ## Role table (`roleFor`)
 

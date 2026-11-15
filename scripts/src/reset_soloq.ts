@@ -8,8 +8,8 @@
  * (season and week) zeroed out.
  *
  * Tournament seats from the auth database's account_seat table raise the
- * starting MMR for the linked account's SoloQ characters: Gold gets base + 110
- * (1610 by default) and Diamond base + 150 (1650 by default). A missing row is
+ * starting MMR for the linked account's SoloQ characters: Gold gets base + 150
+ * (1650 by default) and Diamond base + 250 (1750 by default). A missing row is
  * the default None seat.
  *
  *   ./scripts/reset_soloq --dry-run
@@ -39,8 +39,8 @@ const DEFAULT_RATING = 1400;
 const DEFAULT_MMR = 1500;
 
 // Starting MMR advantage over the None seat. At the default base (1500) this is
-// the Gold 1610 / Diamond 1650 seeding agreed for tournament resets.
-const SEAT_MMR_OFFSET = { Gold: 110, Diamond: 150 } as const;
+// the Gold 1650 / Diamond 1750 seeding agreed for tournament resets.
+const SEAT_MMR_OFFSET = { Gold: 150, Diamond: 250 } as const;
 type SeatTier = keyof typeof SEAT_MMR_OFFSET;
 const SEAT_TIERS = Object.keys(SEAT_MMR_OFFSET) as SeatTier[];
 
@@ -81,11 +81,14 @@ program
 const opts = program.opts<Options>();
 const rating = Number(opts.rating);
 const mmr = Number(opts.mmr);
-if (!Number.isInteger(rating) || rating < 0 || rating > 65535) {
+// character_arena_stats.maxMMR and arena_team_member.personalRating are signed
+// smallints, so those columns cannot hold anything above 32767.
+const MAX_RATING = 32767;
+if (!Number.isInteger(rating) || rating < 0 || rating > MAX_RATING) {
   console.error(`invalid --rating '${opts.rating}'`);
   process.exit(1);
 }
-if (!Number.isInteger(mmr) || mmr < 0 || mmr > 65535) {
+if (!Number.isInteger(mmr) || mmr < 0 || mmr > MAX_RATING) {
   console.error(`invalid --mmr '${opts.mmr}'`);
   process.exit(1);
 }
@@ -93,8 +96,8 @@ const seatMmr = {
   Gold: mmr + SEAT_MMR_OFFSET.Gold,
   Diamond: mmr + SEAT_MMR_OFFSET.Diamond,
 };
-if (seatMmr.Diamond > 65535) {
-  console.error(`--mmr '${opts.mmr}' leaves no room for the Diamond seat (${seatMmr.Diamond} > 65535)`);
+if (seatMmr.Diamond > MAX_RATING) {
+  console.error(`--mmr '${opts.mmr}' leaves no room for the Diamond seat (${seatMmr.Diamond} > ${MAX_RATING})`);
   process.exit(1);
 }
 
@@ -178,7 +181,7 @@ if (mode === "dry-run") {
 await sql.begin(async (tx) => {
   await tx.unsafe(
     `UPDATE arena_team
-     SET rating = ?, seasonGames = 0, seasonWins = 0, weekGames = 0, weekWins = 0
+     SET rating = ?, seasonGames = 0, seasonWins = 0, weekGames = 0, weekWins = 0, \`rank\` = 0
      WHERE type = ?`,
     [rating, SOLOQ_ARENA_TYPE],
   );
