@@ -115,7 +115,7 @@ WorldSession::WorldSession(uint32 id, std::string&& name, std::shared_ptr<WorldS
       m_playerSave(false), m_sessionDbcLocale(sWorld->GetDefaultDbcLocale()), m_sessionDbLocaleIndex(locale),
       m_latency(0), m_TutorialsChanged(false), recruiterId(recruiter), isRecruiter(isARecruiter),
       m_currentVendorEntry(0), _calendarEventCreationCooldown(0), _addonMessageReceiveCount(0),
-      _timeSyncClockDeltaQueue(6), _timeSyncClockDelta(0), _orderCounter(0), _pendingTimeSyncRequests()
+      _timeSyncClockDeltaQueue(6), _orderCounter(0), _pendingTimeSyncRequests()
 {
   memset(m_Tutorials, 0, sizeof(m_Tutorials));
 
@@ -1645,9 +1645,9 @@ void WorldSession::SendTimeSync()
 {
   WorldPacket data(SMSG_TIME_SYNC_REQ, 4);
   data << uint32(_timeSyncNextCounter);
-  SendPacket(&data);
 
-  _pendingTimeSyncRequests[_timeSyncNextCounter] = getMSTime();
+  _pendingTimeSyncRequests[_timeSyncNextCounter] = std::chrono::steady_clock::now();
+  SendPacket(&data);
 
   // Schedule next sync in 10 sec (except for the 2 first packets, which are spaced by only 5s)
   _timeSyncTimer = _timeSyncNextCounter == 0 ? 5000 : 10000;

@@ -470,7 +470,7 @@ WorldSocket::ReadDataHandlerResult WorldSocket::ReadDataHandler()
               GetRemoteIpAddress().to_string());
     return ReadDataHandlerResult::Error;
   case CMSG_TIME_SYNC_RESP:
-    packetToQueue = new WorldPacket(std::move(packet), GameTime::Now());
+    packetToQueue = new WorldPacket(std::move(packet), std::chrono::steady_clock::now());
     break;
   default:
     packetToQueue = new WorldPacket(std::move(packet));

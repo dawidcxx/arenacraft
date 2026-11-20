@@ -411,16 +411,7 @@ void WorldSession::HandleMovementOpcodes(WorldPacket& recvData)
 
 void WorldSession::SynchronizeMovement(MovementInfo& movementInfo)
 {
-  int64 movementTime = (int64)movementInfo.time + _timeSyncClockDelta;
-  if (_timeSyncClockDelta == 0 || movementTime < 0 || movementTime > 0xFFFFFFFF)
-  {
-    LOG_INFO("misc", "The computed movement time using clockDelta is erronous. Using fallback instead");
-    movementInfo.time = getMSTime();
-  }
-  else
-  {
-    movementInfo.time = (uint32)movementTime;
-  }
+  movementInfo.time = _movementClock.Synchronize(movementInfo.time, getMSTime());
 }
 
 void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo, Unit* mover)
@@ -897,14 +888,23 @@ void WorldSession::HandleTimeSyncResp(WorldPacket& recvData)
   if (_pendingTimeSyncRequests.count(counter) == 0)
     return;
 
-  uint32 serverTimeAtSent = _pendingTimeSyncRequests.at(counter);
+  TimePoint sentTime = _pendingTimeSyncRequests.at(counter);
   _pendingTimeSyncRequests.erase(counter);
+
+  auto roundTrip = std::chrono::duration_cast<Milliseconds>(recvData.GetReceivedTime() - sentTime);
+  if (recvData.GetReceivedTime() < sentTime || roundTrip > 10s)
+  {
+    LOG_DEBUG("network", "Ignoring invalid or stale time-sync sample: {} ms", roundTrip.count());
+    return;
+  }
 
   // time it took for the request to travel to the client, for the client to process it and reply and for response to
   // travel back to the server. we are going to make 2 assumptions: 1) we assume that the request processing time equals
   // 0. 2) we assume that the packet took as much time to travel from server to client than it took to travel from
   // client to server.
-  uint32 roundTripDuration = getMSTimeDiff(serverTimeAtSent, recvData.GetReceivedTime());
+  uint32 serverTimeAtSent =
+      uint32(std::chrono::duration_cast<Milliseconds>(sentTime - GetApplicationStartTime()).count());
+  uint32 roundTripDuration = uint32(roundTrip.count());
   uint32 lagDelay          = roundTripDuration / 2;
 
   // clockDelta = serverTime - clientTime
@@ -916,66 +916,20 @@ void WorldSession::HandleTimeSyncResp(WorldPacket& recvData)
   // Once clockDelta has been computed, we can compute the time of an event on server clock when we know the time of
   // that same event on the client clock, using the following relation: serverTime = clockDelta + clientTime
 
-  int64 clockDelta = (int64)serverTimeAtSent + (int64)lagDelay - (int64)clientTimestamp;
-  _timeSyncClockDeltaQueue.put(std::pair<int64, uint32>(clockDelta, roundTripDuration));
+  uint32 clockDelta = serverTimeAtSent + lagDelay - clientTimestamp;
+  _timeSyncClockDeltaQueue.put(std::pair<uint32, uint32>(clockDelta, roundTripDuration));
   ComputeNewClockDelta();
 }
 
 void WorldSession::ComputeNewClockDelta()
 {
-  // implementation of the technique described here:
-  // https://web.archive.org/web/20180430214420/http://www.mine-control.com/zack/timesync/timesync.html to reduce the
-  // skew induced by dropped TCP packets that get resent.
-
-  std::vector<uint32> latencies;
-  std::vector<int64>  clockDeltasAfterFiltering;
-  std::vector<uint32> latenciesAfterFiltering;
-
-  for (auto& pair : _timeSyncClockDeltaQueue.content())
-    latencies.push_back(pair.second);
-
-  uint32 latencyMedian            = median(latencies);
-  uint32 latencyStandardDeviation = standard_deviation(latencies);
-
-  for (auto& pair : _timeSyncClockDeltaQueue.content())
-  {
-    if (pair.second <= latencyMedian + latencyStandardDeviation)
-    {
-      clockDeltasAfterFiltering.push_back(pair.first);
-      latenciesAfterFiltering.push_back(pair.second);
-    }
-  }
-
-  if (!clockDeltasAfterFiltering.empty())
-  {
-    // Prefer the lowest-RTT sample: its RTT/2 rounding error has the smallest worst-case bound.
-    // Averaging pulls in latency-dependent noise, which is precisely what hurts high-latency clients.
-    size_t bestIndex = 0;
-    for (size_t i = 1; i < latenciesAfterFiltering.size(); ++i)
-      if (latenciesAfterFiltering[i] < latenciesAfterFiltering[bestIndex])
-        bestIndex = i;
-
-    int64 bestClockDelta = clockDeltasAfterFiltering[bestIndex];
-
-    if (_timeSyncClockDelta == 0)
-    {
-      _timeSyncClockDelta = bestClockDelta;
-    }
-    else
-    {
-      // The physical clock delta is constant; apparent changes are estimator noise. A one-shot
-      // re-base shifts the timestamp of every relayed packet, so every observer snaps. A constant
-      // offset is harmless for interpolation - only changes to the base are visible. Track the
-      // target in small steps instead of jumping.
-      constexpr int64 maxStep = 5;
-      _timeSyncClockDelta += std::clamp<int64>(bestClockDelta - _timeSyncClockDelta, -maxStep, maxStep);
-    }
-  }
-  else if (_timeSyncClockDelta == 0)
-  {
-    std::pair<int64, uint32> back = _timeSyncClockDeltaQueue.peak_back();
-    _timeSyncClockDelta           = back.first;
-  }
+  // The minimum RTT always survives the old median/deviation filter. Keep the same
+  // sample choice, but let movement timestamps approach its offset gradually.
+  auto samples = _timeSyncClockDeltaQueue.content();
+  auto best    = std::min_element(samples.begin(), samples.end(),
+                                  [](auto const& left, auto const& right) { return left.second < right.second; });
+  if (best != samples.end())
+    _movementClock.SetOffset(best->first);
 }
 
 void WorldSession::HandleMoveRootAck(WorldPacket& recvData)

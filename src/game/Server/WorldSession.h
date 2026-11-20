@@ -30,6 +30,7 @@
 #include "Common.h"
 #include "DatabaseEnv.h"
 #include "GossipDef.h"
+#include "MovementClock.h"
 #include "Packet.h"
 #include "SharedDefines.h"
 #include "World.h"
@@ -1199,15 +1200,15 @@ private:
   // Addon Message count for Metric
   std::atomic<uint32> _addonMessageReceiveCount;
 
-  CircularBuffer<std::pair<int64, uint32>> _timeSyncClockDeltaQueue; // first member: clockDelta. Second member:
-                                                                     // latency of the packet exchange that was used
-                                                                     // to compute that clockDelta.
-  int64  _timeSyncClockDelta;
-  uint32 _orderCounter;
-  void   ComputeNewClockDelta();
+  CircularBuffer<std::pair<uint32, uint32>> _timeSyncClockDeltaQueue; // first member: clockDelta. Second member:
+                                                                      // latency of the packet exchange that was used
+                                                                      // to compute that clockDelta.
+  MovementClock _movementClock;
+  uint32        _orderCounter;
+  void          ComputeNewClockDelta();
 
-  std::map<uint32, uint32> _pendingTimeSyncRequests; // key: counter. value: server time when packet
-                                                     // with that counter was sent.
+  std::map<uint32, TimePoint> _pendingTimeSyncRequests; // key: counter. value: server time when packet
+                                                        // with that counter was sent.
   uint32 _timeSyncNextCounter;
   uint32 _timeSyncTimer;
 
