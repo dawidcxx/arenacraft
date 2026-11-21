@@ -300,7 +300,8 @@ bool AuthSession::HandleLogonChallenge()
     return false;
 
   std::string login((char const*)challenge->I, challenge->I_len);
-  LOG_DEBUG("server.authserver", "[AuthChallenge] '{}'", login);
+  LOG_INFO("server.authserver", "'{}:{}' [AuthChallenge] login attempt for account '{}'",
+           GetRemoteIpAddress().to_string(), GetRemotePort(), login);
 
   _build      = challenge->build;
   _expversion = uint8(AuthHelper::IsPostBCAcceptedClientBuild(_build)
@@ -655,7 +656,8 @@ bool AuthSession::HandleReconnectChallenge()
     return false;
 
   std::string login((char const*)challenge->I, challenge->I_len);
-  LOG_DEBUG("server.authserver", "[ReconnectChallenge] '{}'", login);
+  LOG_INFO("server.authserver", "'{}:{}' [ReconnectChallenge] login attempt for account '{}'",
+           GetRemoteIpAddress().to_string(), GetRemotePort(), login);
 
   _build      = challenge->build;
   _expversion = uint8(AuthHelper::IsPostBCAcceptedClientBuild(_build)
