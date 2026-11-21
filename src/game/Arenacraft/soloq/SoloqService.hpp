@@ -9,22 +9,15 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 namespace arenacraft::soloq
 {
-// Queued players per role. The queue is a single shared pool.
-struct RoleCounts
-{
-  uint16_t melee  = 0;
-  uint16_t caster = 0;
-  uint16_t healer = 0;
-};
-
-// Pure: renders the shared queue line shown in the NPC gossip page.
-std::string formatQueueStats(RoleCounts const& counts);
+// Pure: renders the shared queue block shown in the NPC gossip page.
+std::string formatQueueStats(RoleCounts const& counts, std::string_view mode);
 
 // Owns the queue and the arenas waiting for a result. Player rating/MMR lives in
 // the player's 5v5 ArenaTeam (see SoloqTeam.hpp), not here.
@@ -82,6 +75,17 @@ public:
   // server calendar at startup and every 10 minutes.
   void               setTourneyMode(bool value) { _queue.setTourneyMode(value); }
   [[nodiscard]] bool tourneyMode() const { return _queue.tourneyMode(); }
+
+  // Runtime matchmaker selection (see SoloqMatchmaker.hpp). Switching modes
+  // drains the waiting queue - players queued under the old composition rules
+  // have not accepted the new ones - and returns the ids that were waiting so
+  // the caller can clear their client badges. Arenas already running are left
+  // alone: they stay in _pendingMatches and settle normally.
+  std::vector<PlayerId>   setMode(SoloqMode mode);
+  [[nodiscard]] SoloqMode mode() const { return _queue.mode(); }
+  [[nodiscard]] bool      requirementsMet(RoleCounts const& counts) const { return _queue.requirementsMet(counts); }
+  // Dry-runs the current matchmaker against the live queue; see SoloqQueue::canFormMatch.
+  [[nodiscard]] bool canFormMatch() const { return _queue.canFormMatch(); }
 
   // Avoid list (#77): the matchmaker never puts two players on the same team when one avoids the other. The list is
   // keyed by account id, so every character on an avoided account is avoided too. It lives in memory only; a

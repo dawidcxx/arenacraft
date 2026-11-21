@@ -4,9 +4,11 @@ Living notes for the arena solo-queue subsystem. Code lives in
 `src/game/Arenacraft/soloq/` under `arenacraft::soloq`.
 
 Status: the isolated queue/matchmaker, the post-match rating adjustment and the
-arena pop are implemented. A temporary NPC front-end exists for end-to-end
-testing; players get the client "in queue" badge and, when a match forms, the
-rated 5v5 arena invite ("Enter Battle") dialog. The queue/badge track is 5v5
+arena pop are implemented. The matchmaker has two runtime-selectable modes
+(`flex` by default and `mch`; see Matchmaker modes below). A temporary NPC
+front-end exists for end-to-end testing; players get the client "in queue"
+badge and, when a match forms, the rated 5v5 arena invite ("Enter Battle")
+dialog. The queue/badge track is 5v5
 (an otherwise unused core track, so real 3v3 arena teams keep working), but the
 arena instance spawned for the match is created as **3v3**, so inside the game
 the match is played, scored and ready-checked as 3v3 (6/6). The player's
@@ -23,9 +25,10 @@ invites the six players (see `CreateArenaForMatch`).
 
 | File | Purpose |
 | --- | --- |
-| `Types.hpp` | `Role`, `QueuedPlayer`, `Team`, `Match`, `playersOf`, tuning constants |
+| `Types.hpp` | `Role`, `QueuedPlayer`, `QueueEntry`, `Team`, `Match`, `RoleCounts`, tuning constants |
 | `Roles.hpp/.cpp` | `roleFor(Classes, specIndex) -> optional<Role>` |
-| `SoloqQueue.hpp/.cpp` | the queue container + exhaustive best-fit matchmaker |
+| `SoloqMatchmaker.hpp/.cpp` | `SoloqMode` (flex / mch), `parseMode`, the `SoloqMatchmaker` interface, the flex and mch strategies and the mode factory |
+| `SoloqQueue.hpp/.cpp` | the queue container; delegating the actual match search to the selected `SoloqMatchmaker` |
 | `AvoidList.hpp/.cpp` | avoid list slots/cooldowns and the recent teammates list (pure) |
 | `TourneySchedule.hpp/.cpp` | pure weekend tourney window (Saturday 00:01 -> Sunday 23:59 server time) |
 | `Outcome.hpp/.cpp` | `resolveMatch(Match, MatchResult)` - post-match Elo adjustment |
@@ -102,16 +105,41 @@ never after.
 All hunter specs count as Melee. Tank specs are allowed and treated as Melee.
 Unknown class / spec outside 0..2 returns `nullopt` and is rejected by the queue.
 
+## Matchmaker modes (`SoloqMatchmaker`)
+
+The composition rule is a runtime-selectable strategy. There are two today:
+
+| Mode | Team composition | Pool requirement |
+| --- | --- | --- |
+| `flex` (default) | any two DPS (melee or caster) plus one healer | at least 4 DPS and 2 healers |
+| `mch` | exactly one melee, one caster and one healer | at least 2 of each role |
+
+`flex` is the default at startup. An admin switches at runtime with
+`.soloq mode flex` or `.soloq mode mch`; `.soloq mode` alone prints the current
+one. The switch deliberately drains the waiting queue (every queued player is
+removed, has their badge cleared and is told to requeue) because they queued
+under the old composition rules. Arenas already running are left alone: they
+live in `SoloqService::_pendingMatches` and settle normally.
+
+The interface is `SoloqMatchmaker` (`SoloqMatchmaker.hpp`). A mode implements
+`mode()`, `requirementsMet(RoleCounts)` and `findBestMatch(entries, tourneyMode,
+avoids)`. The base class owns all shared behavior: per-player MMR windows, pair
+compatibility, the avoid list, team imbalance and the fairness ordering.
+`FlexMatchmaker` and `MchMatchmaker` are the current implementations, built by
+`makeMatchmaker`. Adding a mode means implementing the interface, adding an
+enum value, a factory case and cases in `parseMode`, `modeName` and
+`modeRequirement`. The mode is runtime state only: a restart returns to `flex`.
+
 ## Matchmaking (`SoloqQueue`)
 
-A team is always two DPS (melee or caster) plus one healer; a match is two
-teams, so the queue needs at least 4 DPS and 2 healers.
+A match is two three-player teams, so the pool requirements above apply per
+mode. Everything below is shared by both modes:
 
 - Time is injected via `update(std::chrono::milliseconds elapsed)` - never read
   from the wall clock - so tests are deterministic.
 - Each queued player accumulates wait time. Their acceptable MMR window is
   `min(cap, initial + MmrStep * floor(waited / step))`, symmetric around their
-  MMR (`MmrStep = 50`). The mode selects the other values:
+  MMR (`MmrStep = 50`). Tourney mode selects the other values:
 
   | Setting | Tourney off | Tourney on |
   | --- | --- | --- |
@@ -131,22 +159,24 @@ teams, so the queue needs at least 4 DPS and 2 healers.
 - **No class stacking per team**: a partition where team A or team B would field
   the same class twice is rejected (e.g. Shadow Priest caster + Discipline
   Priest healer). If no partition of the six avoids it, the candidate is skipped
-  entirely. `makeCandidate` returns `nullopt` in that case.
-- Exhaustive best-fit: enumerate every `(4 DPS, 2 healers)` valid set, try each
-  way to split them into two teams (2 healer assignments x 6 DPS pairs; keeping
-  only class-distinct teams), and score by `oldest queued player -> longest total wait ->
-  team imbalance -> MMR spread`. Queue order dominates: the earliest-queued
-  player is always included when any valid set contains them, so fairness can
-  never skip a long-waiting player in favour of a fairer set of newer arrivals.
-  Emit the best match, remove those six, repeat until nothing valid remains.
-- **Composition**: the queue pools all DPS (melee + caster) and requires at least
-  4 of them plus 2 healers; each team fields any two DPS plus one healer. Class
-  stacking within a team is rejected, with one exception: **Mancleave** - an Arms
-  warrior (spec 0) and a Protection warrior (spec 2) may share a team
-  (`isMancleavePair`, a constant-time check, so the enumeration cost is
-  unchanged). Other warrior pairs still count as stacking.
-  `Team::melee`/`Team::caster` are just the two DPS slots, so the real role is
-  derived from class/spec when reporting participants.
+  entirely. The one exception is **Mancleave** (flex only, see below).
+- Exhaustive best-fit. `FlexMatchmaker` enumerates every `(4 DPS, 2 healers)`
+  set and every split (2 healer assignments x 6 DPS pairs). `MchMatchmaker`
+  enumerates every `(2 melee, 2 caster, 2 healer)` set and every split (2 caster
+  assignments x 2 healer assignments). Both score candidates by `oldest queued
+  player -> longest total wait -> team imbalance -> MMR spread`. Queue order
+  dominates: the earliest-queued player is always included when any valid set
+  contains them, so fairness can never skip a long-waiting player in favour of
+  a fairer set of newer arrivals. Emit the best match, remove those six, repeat
+  until nothing valid remains.
+- **Flex composition**: the queue pools all DPS (melee + caster); each team
+  fields any two of them plus one healer. Class stacking within a team is
+  rejected, with one exception: **Mancleave** - an Arms warrior (spec 0) and a
+  Protection warrior (spec 2) may share a team (`isMancleavePair`, a
+  constant-time check, so the enumeration cost is unchanged). Other warrior
+  pairs still count as stacking. `Team::melee`/`Team::caster` are just the two
+  DPS slots, so the real role is derived from class/spec when reporting
+  participants. In `mch` these fields line up with the real roles.
 - `update` returns the drained `std::vector<Match>`; matched players are removed.
 
 ## Tourney mode
@@ -349,19 +379,21 @@ fields, since `ArenaTeam::AddMember` only sets the team id/type.
 - **Reset SoloQ Team** - resets rating/record to the starting values, keeping MMR.
 
 Opening the menu also replaces the NPC's default gossip page text with the live
-queue counts:
+queue counts and the active mode:
 
 ```
 SoloQ Queue
 -----------------------
 
 Players in queue: 6
+Mode: flex
 
 Melee (1) Caster (5) Healer (0)
 ```
 
-There is a single queue for everyone. The text is built from
-`SoloqService::roleCounts()` and registered in memory via
+There is a single shared queue; the active matchmaker mode applies to everyone
+in it. The text is built from `SoloqService::roleCounts()` and
+`SoloqService::mode()` and registered in memory via
 `ObjectMgr::AddOrUpdateGossipText` under the custom id `StatsTextId` (9100002;
 no DB row). Because the client caches npc text by id, `WorldSession::SendNpcTextUpdate`
 is called first to push the fresh text (`SMSG_NPC_TEXT_UPDATE`) before the
@@ -544,18 +576,25 @@ instead of walking back to the NPC:
 
 Admin commands:
 
-- `.soloq status` - total queued, per-role counts, pending arenas, the tourney
-  flag, and a verdict on whether a match can form.
+- `.soloq status` - total queued, per-role counts, pending arenas, the active
+  matchmaker mode, the tourney flag, and a verdict on whether a match can form.
+  The verdict dry-runs the active matchmaker, so it accounts for class stacking
+  and the avoid list (role counts alone may say yes while every partition is
+  blocked).
 - `.soloq details` - console-level debug table of every queued player: class,
   spec, role, rating, MMR and the effective MMR range (`mmr ± window`).
 - `.soloq list` - every queued player: id, class, spec, role, rating, MMR, wait
-  time. Use this to confirm you have at least 4 DPS and 2 healers.
+  time. Use this to confirm the current mode's role requirement is met.
 - `.soloq pending` - arenas waiting for a result (instance id + both teams).
 - `.soloq clear` - dequeue everyone and clear their badges.
 - `.soloq debug on|off` - runtime bypass of the character readiness gate
   (`SoloqService::setSkipCharacterChecks`): while on, `Join SoloQ` skips the
   gear/enchant/gem/talent/glyph checks entirely. `off` (default) enforces them.
   Does not clear the per-character pass cache.
+- `.soloq mode [flex|mch]` - print or switch the runtime matchmaker
+  (`SoloqService::setMode`). Changing it drains the waiting queue (badges
+  cleared, players told to requeue); running arenas continue and settle
+  normally. A restart returns to `flex`.
 
 ## Wiring
 

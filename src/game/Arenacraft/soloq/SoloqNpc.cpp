@@ -281,7 +281,7 @@ bool SoloqNpc::CanCreatureGossipHello(Player* player, Creature* creature)
   // explicitly because the client caches npc text by id and would otherwise show
   // stale counts.
   RoleCounts const& counts = SoloqService::instance().roleCounts();
-  sObjectMgr->AddOrUpdateGossipText(StatsTextId, formatQueueStats(counts));
+  sObjectMgr->AddOrUpdateGossipText(StatsTextId, formatQueueStats(counts, modeName(SoloqService::instance().mode())));
   player->GetSession()->SendNpcTextUpdate(StatsTextId);
 
   SendGossipMenuFor(player, StatsTextId, creature);

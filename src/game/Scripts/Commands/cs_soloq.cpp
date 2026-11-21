@@ -8,6 +8,7 @@
  *   .soloq pending  arenas waiting for a result
  *   .soloq clear    dequeue everyone (clears badges too)
  *   .soloq debug    toggle bypass of the character readiness checks
+ *   .soloq mode     show or switch the runtime matchmaker (flex | mch)
  */
 
 #include "CharacterCache.h"
@@ -24,7 +25,9 @@
 #include "World.h"
 
 #include <array>
+#include <optional>
 #include <string>
+#include <vector>
 
 using namespace Acore::ChatCommands;
 using namespace arenacraft::soloq;
@@ -68,6 +71,7 @@ public:
         {"pending", HandlePendingCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"clear", HandleClearCommand, SEC_ADMINISTRATOR, Console::Yes},
         {"debug", HandleDebugCommand, SEC_ADMINISTRATOR, Console::Yes},
+        {"mode", HandleModeCommand, SEC_ADMINISTRATOR, Console::Yes},
     };
     static ChatCommandTable commandTable = {{"soloq", soloqTable}};
     return commandTable;
@@ -88,23 +92,30 @@ public:
 
   static bool HandleStatusCommand(ChatHandler* handler)
   {
-    std::vector<SoloqQueue::QueueSnapshot> const queue = SoloqService::instance().snapshot();
+    SoloqService&                                service = SoloqService::instance();
+    std::vector<SoloqQueue::QueueSnapshot> const queue   = service.snapshot();
 
     std::array<uint32, 3> roles{};
     for (SoloqQueue::QueueSnapshot const& entry : queue)
       ++roles[static_cast<std::size_t>(entry.role)];
 
     handler->PSendSysMessage("SoloQ: {} players queued, {} pending arena(s).", queue.size(),
-                             SoloqService::instance().pendingArenas().size());
+                             service.pendingArenas().size());
+    handler->PSendSysMessage("Mode: {} - {}.", modeName(service.mode()), modeRequirement(service.mode()));
     handler->PSendSysMessage("Roles: melee {} | caster {} | healer {}", roles[0], roles[1], roles[2]);
-    if (SoloqService::instance().tourneyMode())
+    if (service.tourneyMode())
       handler->SendSysMessage("SoloQ: tourney mode is ON.");
 
-    bool const rolesReady = roles[0] + roles[1] >= 4 && roles[2] >= 2;
-    if (rolesReady)
+    RoleCounts const counts{static_cast<uint16_t>(roles[0]), static_cast<uint16_t>(roles[1]),
+                            static_cast<uint16_t>(roles[2])};
+    if (service.canFormMatch())
       handler->SendSysMessage("SoloQ: requirements met, a match will form on the next world tick.");
+    else if (service.requirementsMet(counts))
+      handler->SendSysMessage(
+          "SoloQ: enough players by role, but MMR spread, class stacking or the avoid list currently blocks every "
+          "match.");
     else
-      handler->SendSysMessage("SoloQ: need at least 4 DPS (melee/caster) and 2 healers to form a match.");
+      handler->PSendSysMessage("SoloQ: {}.", modeRequirement(service.mode()));
     return true;
   }
 
@@ -113,8 +124,9 @@ public:
     SoloqService&                                service = SoloqService::instance();
     std::vector<SoloqQueue::QueueSnapshot> const queue   = service.snapshot();
 
-    handler->PSendSysMessage("SoloQ details: {} queued, {} pending arena(s), tourney mode {}", queue.size(),
-                             service.pendingArenas().size(), service.tourneyMode() ? "ON" : "off");
+    handler->PSendSysMessage("SoloQ details: {} queued, {} pending arena(s), mode {}, tourney mode {}", queue.size(),
+                             service.pendingArenas().size(), modeName(service.mode()),
+                             service.tourneyMode() ? "ON" : "off");
     if (queue.empty())
       return true;
 
@@ -209,6 +221,51 @@ public:
           "SoloQ: debug enabled - readiness checks (gear/enchants/gems/talents/glyphs) are skipped when queueing.");
     else
       handler->SendSysMessage("SoloQ: debug disabled - readiness checks are enforced again.");
+    return true;
+  }
+
+  static bool HandleModeCommand(ChatHandler* handler, Optional<std::string> modeArg)
+  {
+    SoloqService& service = SoloqService::instance();
+
+    if (!modeArg)
+    {
+      handler->PSendSysMessage("SoloQ: matchmaker mode is {}, {}. Available modes: flex, mch.",
+                               modeName(service.mode()), modeRequirement(service.mode()));
+      return true;
+    }
+
+    std::optional<SoloqMode> const mode = parseMode(*modeArg);
+    if (!mode)
+    {
+      handler->PSendSysMessage("SoloQ: unknown mode '{}' - use 'flex' or 'mch'.", *modeArg);
+      return false;
+    }
+
+    if (service.mode() == *mode)
+    {
+      handler->PSendSysMessage("SoloQ: matchmaker is already {}.", modeName(*mode));
+      return true;
+    }
+
+    // The queue is drained because players queued under the old composition
+    // rules. Running arenas are untouched and settle normally.
+    std::vector<PlayerId> const dequeued = service.setMode(*mode);
+    for (PlayerId const id : dequeued)
+    {
+      Player* player = ObjectAccessor::FindPlayer(ObjectGuid{id});
+      if (!player)
+        continue;
+
+      LeaveArenaQueue(player);
+      if (player->GetSession())
+        ChatHandler(player->GetSession())
+            .SendSysMessage(std::string("SoloQ: the matchmaker switched to ") + std::string(modeName(*mode)) +
+                            ". You were removed from the queue - queue again.");
+    }
+
+    handler->PSendSysMessage("SoloQ: matchmaker is now {}, {}. {} queued player(s) dequeued; running matches continue.",
+                             modeName(*mode), modeRequirement(*mode), dequeued.size());
     return true;
   }
 };

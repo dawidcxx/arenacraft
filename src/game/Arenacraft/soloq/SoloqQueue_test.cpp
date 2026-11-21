@@ -12,7 +12,9 @@ using arenacraft::soloq::Match;
 using arenacraft::soloq::PlayerId;
 using arenacraft::soloq::QueuedPlayer;
 using arenacraft::soloq::Role;
+using arenacraft::soloq::RoleCounts;
 using arenacraft::soloq::roleFor;
+using arenacraft::soloq::SoloqMode;
 using arenacraft::soloq::SoloqQueue;
 using arenacraft::soloq::tuning::InitialMmr;
 using SoloqTeam = arenacraft::soloq::Team;
@@ -92,6 +94,149 @@ TEST_CASE("SoloqQueue tourney mode defaults off and toggles")
   CHECK(queue.tourneyMode());
   queue.setTourneyMode(false);
   CHECK_FALSE(queue.tourneyMode());
+}
+
+TEST_CASE("the matchmaker defaults to flex")
+{
+  SoloqQueue queue;
+
+  CHECK(queue.mode() == SoloqMode::Flex);
+}
+
+TEST_CASE("switching the matchmaker keeps the waiting pool")
+{
+  SoloqQueue queue;
+  addSet(queue, 100, 1500, 1500, 1500);
+
+  queue.setMode(SoloqMode::Mch);
+  CHECK(queue.mode() == SoloqMode::Mch);
+  CHECK(queue.size() == 6);
+
+  // Selecting the mode that is already active is a no-op too.
+  queue.setMode(SoloqMode::Mch);
+  CHECK(queue.size() == 6);
+
+  // Clearing is the caller's job (SoloqService::setMode drains before switching).
+  queue.clear();
+  CHECK(queue.empty());
+}
+
+TEST_CASE("mch mode: every team is one melee, one caster and one healer")
+{
+  SoloqQueue queue;
+  queue.setMode(SoloqMode::Mch);
+  addSet(queue, 100, 1500, 1500, 1500);
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(matches.size() == 1);
+  CHECK(queue.empty());
+
+  for (SoloqTeam const* team : {&matches[0].a, &matches[0].b})
+  {
+    CHECK(roleFor(team->melee.classId, team->melee.specIndex) == Role::Melee);
+    CHECK(roleFor(team->caster.classId, team->caster.specIndex) == Role::Caster);
+    CHECK(roleFor(team->healer.classId, team->healer.specIndex) == Role::Healer);
+  }
+}
+
+TEST_CASE("mch mode: needs two of every role")
+{
+  SoloqQueue queue;
+  queue.setMode(SoloqMode::Mch);
+  queue.playerAddToQueue(melee(1));
+  queue.playerAddToQueue(melee(2));
+  queue.playerAddToQueue(caster(3));
+  queue.playerAddToQueue(caster(4));
+  queue.playerAddToQueue(healer(5));
+
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 5);
+
+  queue.playerAddToQueue(healer(6));
+  CHECK(queue.update(0ms).size() == 1);
+  CHECK(queue.empty());
+}
+
+TEST_CASE("mch mode ignores a flex-only pool")
+{
+  SoloqQueue queue;
+  queue.setMode(SoloqMode::Mch);
+  // Four melee DPS and two healers is a valid flex pool, but mch needs casters.
+  queue.playerAddToQueue(player(1, CLASS_WARRIOR, 0));
+  queue.playerAddToQueue(player(2, CLASS_ROGUE, 0));
+  queue.playerAddToQueue(player(3, CLASS_DEATH_KNIGHT, 0));
+  queue.playerAddToQueue(player(4, CLASS_HUNTER, 0));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0));
+
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 6);
+}
+
+TEST_CASE("mch mode rejects class stacking across roles")
+{
+  SoloqQueue queue;
+  queue.setMode(SoloqMode::Mch);
+  queue.playerAddToQueue(melee(1));
+  queue.playerAddToQueue(melee(2));
+  queue.playerAddToQueue(player(3, CLASS_PRIEST, 2)); // Shadow (caster)
+  queue.playerAddToQueue(player(4, CLASS_PRIEST, 2)); // Shadow (caster)
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1)); // Holy (healer)
+  queue.playerAddToQueue(player(6, CLASS_PRIEST, 1)); // Holy (healer)
+
+  // Every partition puts a priest caster with a priest healer.
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 6);
+
+  // Replacing one caster and one healer makes a clean partition possible.
+  queue.playerRemoveFromQueue(4);
+  queue.playerAddToQueue(caster(7));
+  queue.playerRemoveFromQueue(6);
+  queue.playerAddToQueue(player(8, CLASS_PALADIN, 0)); // Holy (healer)
+  CHECK(queue.update(0ms).size() == 1);
+}
+
+TEST_CASE("mch mode respects the MMR window")
+{
+  SoloqQueue queue;
+  queue.setMode(SoloqMode::Mch);
+  queue.playerAddToQueue(melee(1, 1500));
+  queue.playerAddToQueue(melee(2, 1500));
+  queue.playerAddToQueue(caster(3, 1500));
+  queue.playerAddToQueue(
+      caster(4, 1500 + arenacraft::soloq::tuning::InitialWindow + arenacraft::soloq::tuning::MmrStep));
+  queue.playerAddToQueue(healer(5, 1500));
+  queue.playerAddToQueue(healer(6, 1500));
+
+  CHECK(queue.update(14s).empty());
+  CHECK(queue.size() == 6);
+  CHECK(queue.update(1s).size() == 1);
+  CHECK(queue.empty());
+}
+
+TEST_CASE("canFormMatch dry-runs the matchmaker, not just the role counts")
+{
+  RoleCounts const counts{2, 2, 2};
+
+  SoloqQueue ok;
+  addSet(ok, 100, 1500, 1500, 1500);
+  CHECK(ok.requirementsMet(counts));
+  CHECK(ok.canFormMatch());
+
+  // Role-complete, but 650 MMR apart: the cap is 600, so no six-set is ever valid.
+  SoloqQueue mmrBlocked;
+  mmrBlocked.playerAddToQueue(melee(1, 1500));
+  mmrBlocked.playerAddToQueue(melee(2, 1500));
+  mmrBlocked.playerAddToQueue(caster(3, 1500));
+  mmrBlocked.playerAddToQueue(caster(4, 1500));
+  mmrBlocked.playerAddToQueue(
+      healer(5, 1500 + arenacraft::soloq::tuning::MaxWindow + arenacraft::soloq::tuning::MmrStep));
+  mmrBlocked.playerAddToQueue(
+      healer(6, 1500 + arenacraft::soloq::tuning::MaxWindow + arenacraft::soloq::tuning::MmrStep));
+
+  CHECK(mmrBlocked.requirementsMet(counts));
+  CHECK_FALSE(mmrBlocked.canFormMatch());
+  CHECK(mmrBlocked.update(1h).empty());
 }
 
 TEST_CASE("queue snapshot reports the effective MMR window")
@@ -554,4 +699,21 @@ TEST_CASE("avoid list: teams respect it too")
   REQUIRE(matches.size() == 1);
   CHECK_FALSE(sameTeam(matches[0], 1, 2));
   CHECK_FALSE(sameTeam(matches[0], 1, 5));
+}
+
+TEST_CASE("avoid list: mch mode blocks a set with no avoid-free split")
+{
+  SoloqQueue queue;
+  queue.setMode(SoloqMode::Mch);
+  // The melee 1 avoids both healers, so every partition puts it with one of them.
+  queue.setAvoidCheck(avoiding({{1, 5}, {1, 6}}));
+  queue.playerAddToQueue(melee(1));
+  queue.playerAddToQueue(melee(2));
+  queue.playerAddToQueue(caster(3));
+  queue.playerAddToQueue(caster(4));
+  queue.playerAddToQueue(healer(5));
+  queue.playerAddToQueue(healer(6));
+
+  CHECK(queue.update(0ms).empty());
+  CHECK(queue.size() == 6);
 }
