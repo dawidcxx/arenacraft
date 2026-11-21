@@ -67,7 +67,6 @@ export const HALL_OF_FAME: readonly Champion[] = [
     date: "Sunday, 1 November 2026",
     format: "SoloQ Flex",
     prize: "100 EUR",
-    twitch: "bruce_tv1",
     note: "Bruce donated the whole 100 EUR prize back to the server to fund upcoming events. Huge gratz, and thank you!",
     runnerUp: {
       winner: "Vrutel",
