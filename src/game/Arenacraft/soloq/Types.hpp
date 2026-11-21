@@ -43,6 +43,25 @@ struct Match
   Team b;
 };
 
+// Queued players per role. The queue is a single shared pool.
+struct RoleCounts
+{
+  uint16_t melee  = 0;
+  uint16_t caster = 0;
+  uint16_t healer = 0;
+};
+
+// One row of the live queue as the matchmaker sees it: the player snapshot plus
+// the queue bookkeeping used for compatibility and fairness scoring. Role is
+// derived once at queue time (roleFor), so the strategies do not re-derive it.
+struct QueueEntry
+{
+  QueuedPlayer              player;
+  Role                      role;
+  std::chrono::milliseconds waited;
+  uint64_t                  sequence;
+};
+
 inline std::array<QueuedPlayer const*, 6> playersOf(Match const& match)
 {
   return {&match.a.melee, &match.a.caster, &match.a.healer, &match.b.melee, &match.b.caster, &match.b.healer};

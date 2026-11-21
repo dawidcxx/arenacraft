@@ -2,13 +2,13 @@
 
 namespace arenacraft::soloq
 {
-std::string formatQueueStats(RoleCounts const& counts)
+std::string formatQueueStats(RoleCounts const& counts, std::string_view mode)
 {
   uint16_t const total = counts.melee + counts.caster + counts.healer;
 
   return std::string("SoloQ Queue\n-----------------------\n\nPlayers in queue: ") + std::to_string(total) +
-         "\n\nMelee (" + std::to_string(counts.melee) + ") Caster (" + std::to_string(counts.caster) + ") Healer (" +
-         std::to_string(counts.healer) + ")";
+         "\nMode: " + std::string(mode) + "\n\nMelee (" + std::to_string(counts.melee) + ") Caster (" +
+         std::to_string(counts.caster) + ") Healer (" + std::to_string(counts.healer) + ")";
 }
 
 SoloqService& SoloqService::instance()
@@ -33,6 +33,8 @@ bool SoloqService::leave(PlayerId id)
     refreshRoleCounts();
   return removed;
 }
+
+void SoloqService::setMode(SoloqMode mode) { _queue.setMode(mode); }
 
 void SoloqService::refreshRoleCounts()
 {
