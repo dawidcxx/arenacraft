@@ -73,10 +73,12 @@ ENV GIT_DATE=${GIT_DATE}
 # .zig-cache can never be reused by this ubuntu build (and vice versa). On a
 # podman builder they live under $TMPDIR/buildah-cache-$UID, so point TMPDIR at
 # a persistent disk when building on an ephemeral/small machine.
+# -Dcpu=znver5: deployment CPUs are AMD EPYC 9005 (Zen 5, EPYC 9645); without
+# it zig targets the build host and can emit instructions the server lacks.
 RUN --mount=type=cache,id=arenacraft-zig-cache,target=/app/.zig-cache \
     --mount=type=cache,id=arenacraft-zig-pkg,target=/app/zig-pkg \
     --mount=type=cache,id=arenacraft-zig-global,target=/root/.cache/zig \
-    zig build -j"$(nproc)" -Doptimize=ReleaseFast ac
+    zig build -j"$(nproc)" -Doptimize=ReleaseFast -Dcpu=znver5 ac
 
 # --- runtime ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS runtime
