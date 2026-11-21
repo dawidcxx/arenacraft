@@ -110,10 +110,9 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recvData)
       type      = ARENA_TEAM_CHARTER_3v3_TYPE;
       break;
     case 3:
-      charterid = ARENA_TEAM_CHARTER_5v5;
-      cost      = sWorld->getIntConfig(CONFIG_CHARTER_COST_ARENA_5v5);
-      type      = ARENA_TEAM_CHARTER_5v5_TYPE;
-      break;
+      // 5v5 is not a stock bracket on this server: the slot belongs to the SoloQ team (see soloq.md)
+      SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, name, "", ERR_ALREADY_IN_ARENA_TEAM);
+      return;
     default:
       LOG_DEBUG("network", "unknown selection at buy arena petition: {}", clientIndex);
       return;
@@ -707,13 +706,14 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recvData)
   else
   {
     // Standard 2v2 teams are gone: everyone owns a solo 2v2 team
-    if (type == ARENA_TEAM_CHARTER_2v2_TYPE)
+    // 5v5 is not a stock bracket: the slot belongs to the SoloQ team
+    if (type == ARENA_TEAM_CHARTER_2v2_TYPE || type == ARENA_TEAM_CHARTER_5v5_TYPE)
     {
       SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, name, "", ERR_ALREADY_IN_ARENA_TEAM);
       return;
     }
 
-    // Check for valid arena bracket (2v2, 3v3, 5v5)
+    // Check for valid arena bracket (only stock 3v3 charters get this far)
     uint8 slot = ArenaTeam::GetSlotByType(type);
     if (slot >= MAX_ARENA_SLOT)
       return;

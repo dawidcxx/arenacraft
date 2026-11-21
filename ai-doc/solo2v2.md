@@ -12,14 +12,20 @@ Code: `src/game/Arenacraft/solo2v2/` (`Solo2v2Rules.hpp` pure rules + tests, `So
   **drops all stock 2v2 teams** (MMR for slot 0 reset to 1500).
 - Rename: `CharacterCache::UpdateCharacterData` calls `solo2v2::OnCharacterRenamed` when the name changed
   (2v2 and SoloQ team are renamed; `ArenaTeam::Rename` skips charter-name validation).
-- Delete: `Player::LeaveAllArenaTeams` disbands solo teams (frees the name).
-- Standard 2v2 charters cannot be bought or turned in.
+- Delete: `Player::LeaveAllArenaTeams(guid, true)` disbands personal solo teams (captain is the only member, frees
+  the name). Leaving for any other reason (`LeaveAllArenaTeams(guid, false)`, i.e. faction change) leaves them
+  untouched - they are personal, so there is no other member to split off and nothing to reset.
+- Standard 2v2 and 5v5 charters cannot be bought or turned in. 5v5 is not a stock bracket: the 5v5 slot belongs
+  to the SoloQ team (`IsSoloTeam()` is effectively "personal or SoloQ"), and only the SoloQ NPC creates it.
 
 ## Player actions (`ArenaTeamHandler`)
 - Leave / Disband on a solo team = reset (rating 1400, games/wins 0, MMR kept). Blocked while invited to
   a match / fighting. Invite / Remove / Leader are ignored.
-- Captain checks for character delete and faction change ignore solo teams
-  (`ArenaTeamMgr::GetNonSoloArenaTeamByCaptain`).
+- Captain checks for character delete and faction change ignore personal solo teams
+  (`ArenaTeamMgr::GetNonSoloArenaTeamByCaptain`, i.e. `ArenaTeam::IsPersonalTeam()`: solo type + sole member), so a
+  SoloQ/2v2 leader can delete the character or change faction; the faction change keeps the team as-is (no rating
+  reset, no rename beyond the character rename). A legacy stock 5v5 team (charters can no longer be created) is not
+  personal once it has other members, so it keeps the stock rules.
 
 ## Queue (`HandleBattlemasterJoinArena`, rated 2v2)
 - Party of exactly two; each member's own team is used (`Group::CanJoinBattlegroundQueue` skips the

@@ -374,7 +374,9 @@ the real `BATTLEGROUND_QUEUE_5v5` queue and sends `SMSG_BATTLEFIELD_STATUS`
 badge and re-request it on login/map change. Leaving (NPC, `Reset Team`, or the
 client's own "Leave Queue") removes the entry and clears the badge.
 The player's persistent `SoloqTeam` is a **5v5** `ArenaTeam` (so it lives in the
-5v5 PvP tab); only the match instance itself is 3v3.
+5v5 PvP tab); only the match instance itself is 3v3. 5v5 is not a stock bracket
+on this server: stock 5v5 charters cannot be bought or turned in, the whole slot
+belongs to the SoloQ team and is only created by the SoloQ NPC.
 
 `SoloqDriver` (`WorldScript::OnUpdate`) ticks the service every world update and
 logs any formed match to the `server` log. Each tick it also drops anyone who
@@ -569,4 +571,4 @@ Admin commands:
 - Thread safety once there is more than one writer.
 
 ## Team handling
-The soloq 5v5 team is a solo team (`ArenaTeam::IsSoloTeam()`): Leave/Disband reset it, it never blocks character delete or faction change, and it is renamed with the character. See `solo2v2.md`.
+The soloq 5v5 team is a solo team (`ArenaTeam::IsSoloTeam()`): Leave/Disband reset it, it never blocks character delete or faction change, and it is renamed with the character. A faction change leaves it untouched (it is only disbanded when the character itself is deleted). See `solo2v2.md`.

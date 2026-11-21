@@ -39,7 +39,7 @@ public:
   ArenaTeam* GetArenaTeamByCaptain(ObjectGuid guid) const;
   ArenaTeam* GetArenaTeamByName(std::string const& arenaTeamName, const uint32 type) const;
   ArenaTeam* GetArenaTeamByCaptain(ObjectGuid guid, const uint32 type) const;
-  // Captain of any team except personal solo teams (2v2 / SoloQ 5v5).
+  // Captain of any team that has more than just its captain (i.e. not a personal solo team: 2v2 / SoloQ 5v5).
   ArenaTeam* GetNonSoloArenaTeamByCaptain(ObjectGuid guid) const;
 
   void LoadArenaTeams();

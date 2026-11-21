@@ -2392,8 +2392,8 @@ void WorldSession::HandleCharFactionOrRaceChangeCallback(std::shared_ptr<Charact
         trans->Append(stmt);
       }
 
-      // Leave Arena Teams
-      Player::LeaveAllArenaTeams(factionChangeInfo->Guid);
+      // Leave Arena Teams (solo teams are personal and survive a faction change untouched)
+      Player::LeaveAllArenaTeams(factionChangeInfo->Guid, false);
 
       // Achievement conversion
       for (auto const& [achiev_alliance, achiev_horde] : sObjectMgr->FactionChangeAchievements)

@@ -4057,7 +4057,7 @@ void Player::DeleteFromDB(ObjectGuid::LowType lowGuid, uint32 accountId, bool up
       guild->DeleteMember(playerGuid, false, false, true);
 
   // remove from arena teams
-  LeaveAllArenaTeams(playerGuid);
+  LeaveAllArenaTeams(playerGuid, true);
 
   // close player ticket if any
   GmTicket* ticket = sTicketMgr->GetTicketByPlayer(playerGuid);
@@ -10361,7 +10361,7 @@ void Player::RemovePetitionsAndSigns(ObjectGuid guid, uint32 type)
   CharacterDatabase.CommitTransaction(trans);
 }
 
-void Player::LeaveAllArenaTeams(ObjectGuid guid)
+void Player::LeaveAllArenaTeams(ObjectGuid guid, bool characterDeleted)
 {
   // xinef: sync query
   CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_PLAYER_ARENA_TEAMS);
@@ -10378,11 +10378,15 @@ void Player::LeaveAllArenaTeams(ObjectGuid guid)
     if (arenaTeamId != 0)
     {
       ArenaTeam* arenaTeam = sArenaTeamMgr->GetArenaTeamById(arenaTeamId);
-      if (arenaTeam && arenaTeam->IsSoloTeam())
+      if (arenaTeam && arenaTeam->IsPersonalTeam())
       {
-        // A solo team has no other member: it goes away with its character, freeing its name.
-        arenaTeam->Disband();
-        delete arenaTeam;
+        // A personal team belongs to exactly one character: it goes away with that character (freeing its name), but
+        // anything else (faction change, ...) leaves it untouched - there is no other member it could be split from.
+        if (characterDeleted)
+        {
+          arenaTeam->Disband();
+          delete arenaTeam;
+        }
       }
       else if (arenaTeam)
         arenaTeam->DelMember(guid, true);

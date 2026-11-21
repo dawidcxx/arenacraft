@@ -117,8 +117,10 @@ ArenaTeam* ArenaTeamMgr::GetArenaTeamByCaptain(ObjectGuid guid, const uint32 typ
 
 ArenaTeam* ArenaTeamMgr::GetNonSoloArenaTeamByCaptain(ObjectGuid guid) const
 {
+  // A captain only "leads" a team in the stock sense when the team has other members that could be split off by a
+  // character delete or end up with a leader of the opposing faction after a faction change.
   for (auto const& [id, team] : ArenaTeamStore)
-    if (team->GetCaptain() == guid && !team->IsSoloTeam())
+    if (team->GetCaptain() == guid && !team->IsPersonalTeam())
       return team;
   return nullptr;
 }

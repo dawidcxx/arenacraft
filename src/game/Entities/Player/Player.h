@@ -2012,7 +2012,9 @@ public:
   void                 SetArenaTeamInfoField(uint8 slot, ArenaTeamInfoType type, uint32 value);
   [[nodiscard]] uint32 GetArenaPersonalRating(uint8 slot) const;
   static uint32        GetArenaTeamIdFromDB(ObjectGuid guid, uint8 slot);
-  static void          LeaveAllArenaTeams(ObjectGuid guid);
+  // characterDeleted: solo (personal) teams only exist for their character, so they are disbanded when it is deleted.
+  // When leaving for another reason (faction change) they are left untouched.
+  static void          LeaveAllArenaTeams(ObjectGuid guid, bool characterDeleted);
   [[nodiscard]] uint32 GetArenaTeamId(uint8 slot) const;
   void                 SetArenaTeamIdInvited(uint32 ArenaTeamId) { m_ArenaTeamIdInvited = ArenaTeamId; }
   uint32               GetArenaTeamIdInvited() { return m_ArenaTeamIdInvited; }

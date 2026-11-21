@@ -150,7 +150,10 @@ public:
   [[nodiscard]] uint32 GetId() const { return TeamId; }
   [[nodiscard]] uint32 GetType() const { return Type; }
   // Personal single-member teams (solo 2v2 and the SoloQ 5v5 team): never left, disbanded or handed over by players.
-  [[nodiscard]] bool                  IsSoloTeam() const { return Type == ARENA_TEAM_2v2 || Type == ARENA_TEAM_5v5; }
+  [[nodiscard]] bool IsSoloTeam() const { return Type == ARENA_TEAM_2v2 || Type == ARENA_TEAM_5v5; }
+  // A solo team that really has no other member. Matters where a decision affects the whole team (character delete,
+  // faction change): a legacy stock 5v5 charter team shares the slot with the SoloQ team, and must keep its members.
+  [[nodiscard]] bool                  IsPersonalTeam() const { return IsSoloTeam() && GetMembersSize() == 1; }
   [[nodiscard]] uint8                 GetSlot() const { return GetSlotByType(GetType()); }
   static uint8                        GetSlotByType(uint32 type);
   static uint8                        GetReqPlayersForType(uint32 type);
