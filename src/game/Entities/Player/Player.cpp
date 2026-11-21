@@ -86,6 +86,7 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "WorldState.h"
+#include <atomic>
 #include <cmath>
 
 /// @todo: this import is not necessary for compilation and marked as unused by the IDE
@@ -5313,7 +5314,19 @@ float Player::OCTRegenMPPerSpirit()
   //    GtOCTRegenMPEntry     const* baseRatio = sGtOCTRegenMPStore.LookupEntry((pclass-1)*GT_MAX_LEVEL + level-1);
   GtRegenMPPerSptEntry const* moreRatio = sGtRegenMPPerSptStore.LookupEntry((pclass - 1) * GT_MAX_LEVEL + level - 1);
   if (!moreRatio)
+  {
+    // arenacraft: a missing entry silently disables *all* spirit-based mana regeneration for this player (the value
+    // above is what UpdateManaRegen() scales by sqrt(intellect)). It normally cannot happen because the .dbc cannot be
+    // parsed (1 column, "df" format) and the data is served from `gtregenmpperspt_dbc`, which an empty/missing table
+    // would make fatal at startup - but warn loudly once if a lookup still fails.
+    static std::atomic<bool> warned{false};
+    if (!warned.exchange(true))
+      LOG_WARN("entities.player",
+               "gtRegenMPPerSpt lookup failed (class {}, level {}, index {}): spirit-based mana regeneration is 0. "
+               "Check that gtRegenMPPerSpt.dbc / `gtregenmpperspt_dbc` is loaded.",
+               uint32(pclass), uint32(level), uint32((pclass - 1) * GT_MAX_LEVEL + level - 1));
     return 0.0f;
+  }
 
   // Formula get from PaperDollFrame script
   float spirit = GetStat(STAT_SPIRIT);

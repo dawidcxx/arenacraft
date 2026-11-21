@@ -195,7 +195,11 @@ class spell_pri_divine_aegis : public AuraScript
 
   bool Validate(SpellInfo const* /*spellInfo*/) override { return ValidateSpellInfo({SPELL_PRIEST_DIVINE_AEGIS}); }
 
-  bool CheckProc(ProcEventInfo& eventInfo) { return eventInfo.GetProcTarget(); }
+  bool CheckProc(ProcEventInfo& eventInfo)
+  {
+    HealInfo* healInfo = eventInfo.GetHealInfo();
+    return healInfo && healInfo->GetHeal();
+  }
 
   void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
   {

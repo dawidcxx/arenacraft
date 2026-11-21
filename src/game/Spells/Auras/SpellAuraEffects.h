@@ -377,48 +377,40 @@ public:
   AbsorbAuraOrderPred() {}
   bool operator()(AuraEffect* aurEffA, AuraEffect* aurEffB) const
   {
-    SpellInfo const* spellProtoA = aurEffA->GetSpellInfo();
-    SpellInfo const* spellProtoB = aurEffB->GetSpellInfo();
+    // Lower priority is absorbed first. Using a single priority value keeps the
+    // comparator a strict weak ordering even when both effects are the same
+    // special-cased spell (e.g. Divine Aegis from two different priests).
+    auto priority = [](SpellInfo const* spellProto) -> int
+    {
+      // Wards
+      if ((spellProto->SpellFamilyName == SPELLFAMILY_MAGE || spellProto->SpellFamilyName == SPELLFAMILY_WARLOCK) &&
+          spellProto->GetCategory() == 56)
+        return 0;
 
-    // Wards
-    if ((spellProtoA->SpellFamilyName == SPELLFAMILY_MAGE) || (spellProtoA->SpellFamilyName == SPELLFAMILY_WARLOCK))
-      if (spellProtoA->GetCategory() == 56)
-        return true;
-    if ((spellProtoB->SpellFamilyName == SPELLFAMILY_MAGE) || (spellProtoB->SpellFamilyName == SPELLFAMILY_WARLOCK))
-      if (spellProtoB->GetCategory() == 56)
-        return false;
+      // Sacred Shield
+      if (spellProto->Id == 58597)
+        return 1;
 
-    // Sacred Shield
-    if (spellProtoA->Id == 58597)
-      return true;
-    if (spellProtoB->Id == 58597)
-      return false;
+      // Fel Blossom
+      if (spellProto->Id == 28527)
+        return 2;
 
-    // Fel Blossom
-    if (spellProtoA->Id == 28527)
-      return true;
-    if (spellProtoB->Id == 28527)
-      return false;
+      // Divine Aegis
+      if (spellProto->Id == 47753)
+        return 3;
 
-    // Divine Aegis
-    if (spellProtoA->Id == 47753)
-      return true;
-    if (spellProtoB->Id == 47753)
-      return false;
+      // Ice Barrier
+      if (spellProto->GetCategory() == 471)
+        return 4;
 
-    // Ice Barrier
-    if (spellProtoA->GetCategory() == 471)
-      return true;
-    if (spellProtoB->GetCategory() == 471)
-      return false;
+      // Sacrifice
+      if (spellProto->SpellFamilyName == SPELLFAMILY_WARLOCK && spellProto->SpellIconID == 693)
+        return 5;
 
-    // Sacrifice
-    if ((spellProtoA->SpellFamilyName == SPELLFAMILY_WARLOCK) && (spellProtoA->SpellIconID == 693))
-      return true;
-    if ((spellProtoB->SpellFamilyName == SPELLFAMILY_WARLOCK) && (spellProtoB->SpellIconID == 693))
-      return false;
+      return 6;
+    };
 
-    return false;
+    return priority(aurEffA->GetSpellInfo()) < priority(aurEffB->GetSpellInfo());
   }
 };
 } // namespace Acore
