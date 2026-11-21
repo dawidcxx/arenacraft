@@ -102,7 +102,8 @@ std::optional<Bracket> bracketFromId(uint8_t id)
 void loadConfig()
 {
   Config cfg;
-  cfg.enabled = sConfigMgr->GetOption<bool>("Replay.Enabled", false, false);
+  cfg.enabled        = sConfigMgr->GetOption<bool>("Replay.Enabled", false, false);
+  cfg.smoothMovement = sConfigMgr->GetOption<bool>("Replay.SmoothMovement", true, false);
 
   std::string const raw = sConfigMgr->GetOption<std::string>("Replay.Brackets", "2v2,3v3,soloq", false);
   std::string       unknown;

@@ -39,7 +39,8 @@ struct Config
   // Replay.Enabled (AC_REPLAY_ENABLED) - master switch for the replay system:
   // recording and playback. While it is off nothing is recorded and old
   // recordings can no longer be watched.
-  bool     enabled = false;
+  bool     enabled        = false;
+  bool     smoothMovement = true;
   Brackets brackets{.rated2v2 = true, .rated3v3 = true, .soloq = true};
   // Replay.KeepDays (AC_REPLAY_KEEP_DAYS) - delete recordings older than N days.
   uint32_t keepDays = 0;

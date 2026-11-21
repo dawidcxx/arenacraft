@@ -8,6 +8,7 @@ Code: `src/game/Arenacraft/replay/`. Tables: `arena_replay`, `arena_replay_playe
 | env                        | default          | meaning                                                   |
 |----------------------------|------------------|-----------------------------------------------------------|
 | `AC_REPLAY_ENABLED`        | `0`              | master switch: record matches and allow playback          |
+| `AC_REPLAY_SMOOTH_MOVEMENT` | `1`             | reconstruct supported forward ground movement during playback; `0` uses raw packets |
 | `AC_REPLAY_BRACKETS`       | `2v2,3v3,soloq`  | `2v2`, `3v3`, `5v5`, `soloq`, `skirmish`, `all`           |
 | `AC_REPLAY_KEEP_DAYS`      | `0`              | delete recordings older than N days                       |
 | `AC_REPLAY_MAX_TOTAL`      | `0`              | keep the newest N recordings overall                      |
@@ -62,6 +63,29 @@ Playback (`Playback`):
   client.
 - after the last packet the viewer is sent back after 10 s.
 
+## Movement reconstruction
+
+`ReplayMovement` builds short linear segments when a replay is loaded; recordings and their format remain
+unchanged, including old recordings. `AC_REPLAY_SMOOTH_MOVEMENT=0` disables this for newly opened playbacks,
+allowing the same recording to be compared with raw playback.
+
+- Only straight forward ground runs/walks are reconstructed initially. Strafing, backpedaling, continuous
+  turning, jumps, knockbacks, swimming, flight and existing server splines retain their raw packets. This avoids
+  changing their facing, animation or motion semantics.
+- Each supported interval connects consecutive recorded positions on the **dispatch timeline**, keeping combat
+  packets at their existing times. It requires a 20–1500 ms interval, movement timestamp spacing within 100 ms
+  of dispatch spacing, at most 16 yd/s, at most 0.5 yd elevation change, and travel within 0.1 radians of the
+  starting facing. Gaps and unsupported movement/state changes are not bridged.
+- Visibility/create/movement object updates, compressed updates/moves and destroys are conservative barriers;
+  plain values-only updates can occur within an interval. No terrain path is invented and no curved smoothing
+  is applied; small unrecorded deviations between samples cannot be recovered.
+- The interval's initial positional packet is replaced by a current-position/facing anchor and a timed
+  `SMSG_MONSTER_MOVE` linear spline. Facing is fixed to the recorded starting facing, not the line's direction.
+  Playback arriving partway through an interval sends only its remaining portion.
+- Pause explicitly stops reconstructed movement at the timeline position. Resume and seek reconstruct the
+  position inside supported intervals and send their remaining motion (or just the position when paused).
+  Unsupported movement retains the older approximate pause/seek behavior.
+
 ## Seeking and pause
 
 `Playback` keeps a timeline position (`positionMs`) instead of a start time; pausing stops it, the recorded
@@ -77,8 +101,8 @@ packets stay in memory so the timeline can be revisited. Pure logic: `ReplayTime
   doors) are not destroyed; their re-sent create packets just refresh them.
 - Movement timestamps are rebased on every send (`now - recordStart - position`), so a jumped-to move looks as
   if it happened `position - offset` ago.
-- **Pause** is approximate: the client keeps animating a movement spline that already started until it ends,
-  and aura timers keep counting down client-side.
+- **Pause** stops reconstructed ground movement; it remains approximate for raw movement: the client keeps
+  animating a previously started raw spline until it ends. Aura timers keep counting down client-side.
 - At the end the viewer is sent back after 10 s unless paused; a seek back from the end resumes playing.
 
 ## Addon API

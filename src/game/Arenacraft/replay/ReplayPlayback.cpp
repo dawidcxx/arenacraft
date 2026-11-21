@@ -133,6 +133,8 @@ Playback::Playback(ObjectGuid viewer, uint32_t replayId, ReplayData data)
   _hasSpectatorData = std::any_of(_data.packets.begin(), _data.packets.end(),
                                   [](RecordedPacket const& packet) { return spectatorMessageOf(packet).has_value(); });
   _durationMs       = _data.packets.empty() ? 0 : _data.packets.back().offsetMs;
+  if (config().smoothMovement)
+    _groundSegments = buildGroundSegments(_data.packets);
 }
 
 Playback::~Playback()
@@ -142,10 +144,65 @@ Playback::~Playback()
     Registry().erase(it);
 }
 
-void Playback::sendPacket(Player* viewer, std::size_t index) const
+void Playback::sendGround(Player* viewer, std::size_t index)
+{
+  GroundSegment const& segment = _groundSegments.at(index);
+  WorldPacket          anchor  = groundAnchor(segment, _posMs, getMSTime());
+  viewer->GetSession()->SendPacket(&anchor);
+  if (!_paused)
+  {
+    WorldPacket spline = groundSpline(segment, _posMs, ++_splineId);
+    viewer->GetSession()->SendPacket(&spline);
+  }
+  _activeGround[segment.guid] = index;
+}
+
+void Playback::stopGround(Player* viewer)
+{
+  for (auto const& [guid, index] : _activeGround)
+  {
+    WorldPacket stop = groundStop(_groundSegments.at(index), _posMs, ++_splineId);
+    viewer->GetSession()->SendPacket(&stop);
+    WorldPacket anchor = groundAnchor(_groundSegments.at(index), _posMs, getMSTime());
+    viewer->GetSession()->SendPacket(&anchor);
+  }
+  _activeGround.clear();
+}
+
+void Playback::restoreGround(Player* viewer)
+{
+  for (auto const& [index, segment] : _groundSegments)
+    if (segment.beginMs <= _posMs && _posMs < segment.endMs)
+      sendGround(viewer, index);
+}
+
+void Playback::sendPacket(Player* viewer, std::size_t index, bool reconstruct)
 {
   RecordedPacket const& recorded = _data.packets[index];
-  WorldPacket           packet(recorded.opcode, recorded.data.size());
+  if (isMovementOpcode(recorded.opcode) || recorded.opcode == SMSG_MONSTER_MOVE ||
+      recorded.opcode == SMSG_MONSTER_MOVE_TRANSPORT)
+  {
+    std::size_t pos = 0;
+    if (auto guid = readPackedGuid(recorded.data, pos))
+    {
+      if (auto active = _activeGround.find(*guid); active != _activeGround.end())
+      {
+        WorldPacket stop = groundStop(_groundSegments.at(active->second), _posMs, ++_splineId);
+        viewer->GetSession()->SendPacket(&stop);
+        _activeGround.erase(active);
+      }
+    }
+  }
+  if (reconstruct)
+  {
+    auto segment = _groundSegments.find(index);
+    if (segment != _groundSegments.end() && _posMs < segment->second.endMs)
+    {
+      sendGround(viewer, index);
+      return;
+    }
+  }
+  WorldPacket packet(recorded.opcode, recorded.data.size());
   if (!recorded.data.empty())
   {
     if (isMovementOpcode(recorded.opcode))
@@ -163,13 +220,13 @@ void Playback::sendPacket(Player* viewer, std::size_t index) const
 }
 
 // sendPacket while jumping to `targetMs`: spectator addon data is adjusted for the skipped time.
-void Playback::sendJumpPacket(Player* viewer, std::size_t index, uint32_t targetMs) const
+void Playback::sendJumpPacket(Player* viewer, std::size_t index, uint32_t targetMs)
 {
   RecordedPacket const&                 recorded = _data.packets[index];
   std::optional<std::string_view> const message  = spectatorMessageOf(recorded);
   if (!message)
   {
-    sendPacket(viewer, index);
+    sendPacket(viewer, index, false);
     return;
   }
   std::optional<std::string> adjusted =
@@ -237,7 +294,14 @@ bool Playback::setPaused(Player* viewer, bool paused)
 {
   if (!controllable())
     return false;
+  if (_paused == paused)
+  {
+    sendState(viewer);
+    return true;
+  }
+  stopGround(viewer);
   _paused = paused;
+  restoreGround(viewer);
   sendState(viewer);
   return true;
 }
@@ -248,6 +312,7 @@ bool Playback::seek(Player* viewer, uint32_t targetMs)
     return false;
 
   targetMs = std::min(targetMs, _durationMs);
+  stopGround(viewer);
   if (targetMs < _posMs)
   {
     // the client can't go back: wipe the recorded objects and rebuild the state from the start
@@ -270,6 +335,7 @@ bool Playback::seek(Player* viewer, uint32_t targetMs)
   for (std::size_t index : planJump(_data.packets, _next, targetMs, next))
     sendJumpPacket(viewer, index, targetMs);
   _next = next;
+  restoreGround(viewer);
 
   if (_state == State::Finished && _next < _data.packets.size())
     _state = State::Playing;
