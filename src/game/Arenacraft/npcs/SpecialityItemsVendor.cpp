@@ -27,12 +27,15 @@ void SpecialityItemsVendor::ShowMainMenu(Player* player, Creature* creature)
   menu.SetMenuId(GossipMenuId);
 
   // Each speciality category is either a submenu (Tier 9) or a single vendor
-  // list (the minor relics).
+  // list (the 271 weapons and the minor relics).
   menu.AddMenuItem(0, GOSSIP_ICON_VENDOR, "Tier 9", 0, ActionTier9Menu, "", 0, false);
   menu.AddGossipMenuItemData(0, 0, 0);
 
-  menu.AddMenuItem(1, GOSSIP_ICON_VENDOR, "Minor Relic / Sigil and Idols", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
-  menu.AddGossipMenuItemData(1, MinorRelicVendorEntry, 0);
+  menu.AddMenuItem(1, GOSSIP_ICON_VENDOR, "271 Weapons", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(1, Weapons271VendorEntry, 0);
+
+  menu.AddMenuItem(2, GOSSIP_ICON_VENDOR, "Minor Relic / Sigil and Idols", 0, GOSSIP_OPTION_VENDOR, "", 0, false);
+  menu.AddGossipMenuItemData(2, MinorRelicVendorEntry, 0);
 
   SendGossipMenuFor(player, player->GetGossipTextId(creature), creature);
 }
@@ -96,6 +99,9 @@ void SpecialityItemsVendorStock::OnStartup()
   for (uint32 i = 0; i < uint32(groups.size()); ++i)
     for (uint32 item : groups[i].Items)
       StockVendorItem(SpecialityItemsVendor::VendorEntryBase + i, item);
+
+  for (uint32 item : All271Weapons())
+    StockVendorItem(SpecialityItemsVendor::Weapons271VendorEntry, item);
 
   for (uint32 item : AllMinorRelics())
     StockVendorItem(SpecialityItemsVendor::MinorRelicVendorEntry, item);

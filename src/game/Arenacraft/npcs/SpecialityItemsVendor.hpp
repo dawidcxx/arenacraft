@@ -26,10 +26,14 @@ std::vector<Tier9Group> const& Tier9Groups();
 // sit in the main vendor's ICC list. Defined in SpecialityItemsVendorItems.cpp.
 std::vector<uint32> const& AllMinorRelics();
 
+// Flat "271 Weapons" stock: the ilvl-271 weapons the Lich King drops in
+// Icecrown Citadel (25N and 10H). Defined in SpecialityItemsVendorItems.cpp.
+std::vector<uint32> const& All271Weapons();
+
 // Hijacks Gahruj (entry 20066) into "The Professor", the speciality-items
-// vendor. Right-clicking opens a gossip menu with "Tier 9" and "Minor Relic /
-// Sigil and Idols"; more speciality categories can be added alongside them
-// later. The repair flag gives the anvil badge.
+// vendor. Right-clicking opens a gossip menu with "Tier 9", "271 Weapons" and
+// "Minor Relic / Sigil and Idols"; more speciality categories can be added
+// alongside them later. The repair flag gives the anvil badge.
 class SpecialityItemsVendor : public AllCreatureScript
 {
 public:
@@ -39,6 +43,8 @@ public:
   static constexpr uint32 VendorEntryBase = 9300000;
   // Vendor list opened by the "Minor Relic / Sigil and Idols" option.
   static constexpr uint32 MinorRelicVendorEntry = 9300004;
+  // Vendor list opened by the "271 Weapons" option.
+  static constexpr uint32 Weapons271VendorEntry = 9300005;
 
   // Custom gossip actions (outside the built-in Gossip_Option range).
   static constexpr uint32 ActionTier9Menu = 9300010;

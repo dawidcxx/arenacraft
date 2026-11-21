@@ -297,6 +297,37 @@ std::vector<uint32> const& ClothItems()
   return items;
 }
 
+// Ilvl-271 weapons: the Lich King's Icecrown Citadel drops. Source:
+// https://www.wowhead.com/wotlk/items/weapons/min-level:270/max-level:273/min-req-level:0
+// (18 items: 9 from 25N, 9 from 10H). Row order is the vendor order; the 25N
+// weapons come first, then their 10H counterparts.
+std::vector<uint32> const& Weapons271()
+{
+  static std::vector<uint32> const items = {
+      // == Icecrown Citadel (25N) ==
+      49981, // Fal'inrush, Defender of Quel'thalas (crossbow)
+      49997, // Mithrios, Bronzebeard's Legacy (one-handed mace)
+      50012, // Havoc's Call, Blade of Lordaeron Kings (one-handed axe)
+      50070, // Glorenzelg, High-Blade of the Silver Hand (two-handed sword)
+      50425, // Oathbinder, Charge of the Ranger-General (polearm)
+      50426, // Heaven's Fall, Kryss of a Thousand Lies (dagger)
+      50427, // Bloodsurge, Kel'Thuzad's Blade of Agony (one-handed sword)
+      50428, // Royal Scepter of Terenas II (one-handed mace)
+      50429, // Archus, Greatstaff of Antonidas (staff)
+      // == Icecrown Citadel (10H) ==
+      51939, // Tel'thas, Dagger of the Blood King (dagger)
+      51940, // Windrunner's Heartseeker (crossbow)
+      51941, // Pugius, Fist of Defiance (fist weapon)
+      51942, // Stormfury, Black Blade of the Betrayer (one-handed sword)
+      51943, // Halion, Staff of Forgotten Love (staff)
+      51944, // Valius, Gavel of the Lightbringer (one-handed mace)
+      51945, // Tainted Twig of Nordrassil (staff)
+      51946, // Warmace of Menethil (two-handed mace)
+      51947, // Troggbane, Axe of the Frostborne King (one-handed axe)
+  };
+  return items;
+}
+
 } // namespace
 
 // Low-ilvl relics that used to sit in the main vendor's ICC Set & Weapons
@@ -314,6 +345,8 @@ std::vector<uint32> const& AllMinorRelics()
   };
   return items;
 }
+
+std::vector<uint32> const& All271Weapons() { return Weapons271(); }
 
 std::vector<Tier9Group> const& Tier9Groups()
 {

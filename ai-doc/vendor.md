@@ -215,7 +215,7 @@ with `GOSSIP | VENDOR | REPAIR` (the repair flag is what shows the anvil badge
 on hover) and `OnStartup` sets its subname to "The Professor" and stocks the
 speciality lists.
 
-The main gossip menu has two categories. **Tier 9** opens a second menu with
+The main gossip menu has three categories. **Tier 9** opens a second menu with
 **Plate**, **Mail**, **Leather** and **Cloth** vendor lists. Each list holds the
 25-player heroic (ilvl 258) "Triumphant" sets for both Alliance and Horde, with
 the five pieces per set ordered head, shoulders, chest, hands, legs.
@@ -232,6 +232,13 @@ plus the hand-picked idols Idol of Worship (39757, ilvl 213), Idol of Mutilation
 (47668, ilvl 245) and Brutal Gladiator's Idol of Resolve (35019, ilvl 159).
 The main vendor now only carries the 264+ tier relics. Add future speciality
 categories to `ShowMainMenu`.
+
+**271 Weapons** is a single vendor list (`All271Weapons()`) holding the ilvl-271
+weapons the Lich King drops in Icecrown Citadel: the nine 25N weapons
+(49981/49997/50012/50070/50425-50429) followed by their nine 10H counterparts
+(51939-51947). Sourced from the Wowhead
+[ilvl 270-273 weapons filter](https://www.wowhead.com/wotlk/items/weapons/min-level:270/max-level:273/min-req-level:0);
+those are the only WotLK weapons in that item-level band.
 
 Arena-point items ship with `BuyPrice = 0` (would be free), so `ItemVendorStock`
 sets a small fallback gold price on any 0-price stock. `extendedCost = 0` on the
