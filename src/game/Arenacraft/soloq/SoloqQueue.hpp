@@ -25,21 +25,19 @@ public:
   std::vector<Match> update(std::chrono::milliseconds elapsed);
 
   // Runtime matchmaker selection (flex by default; see SoloqMatchmaker.hpp).
-  // Swapping the strategy does not touch the waiting pool: a caller that wants a
-  // clean transition must clear() first (SoloqService::setMode does). Arenas
-  // already formed are untouched - they live in SoloqService's pending map.
+  // The waiting pool is deliberately kept: role, wait time and MMR do not depend
+  // on the composition rule, so queued players simply become eligible under the
+  // new rules. Arenas already formed are untouched - they live in
+  // SoloqService's pending map.
   void                    setMode(SoloqMode mode);
   [[nodiscard]] SoloqMode mode() const { return _matchmaker->mode(); }
-
-  // Empties the waiting pool. Doesn't touch the real battleground queue or the
-  // players' client badges; the caller must do that (see SoloqService::setMode).
-  void clear();
 
   // True when the queued roles are enough for the current mode to pop.
   [[nodiscard]] bool requirementsMet(RoleCounts const& counts) const { return _matchmaker->requirementsMet(counts); }
 
   // Dry-runs the current matchmaker. A false result with requirementsMet(true)
   // means the MMR spread, class stacking or the avoid list blocks every match.
+  // This costs a full matchmaker pass; keep it on admin/debug paths only.
   [[nodiscard]] bool canFormMatch() const;
 
   // Tourney mode flag. It is driven by the weekend schedule in TourneySchedule
@@ -51,7 +49,6 @@ public:
   // Avoid list (#77): two players for whom this returns true are never put on the same team - partitions that would
   // do so are skipped like class stacking. Either side having avoided the other is enough. Unset = no avoiding.
   // The callback receives account ids, not character guids: avoiding is account-bound.
-  using AvoidCheck = arenacraft::soloq::AvoidCheck;
   void setAvoidCheck(AvoidCheck check) { _avoids = std::move(check); }
 
   struct QueueSnapshot

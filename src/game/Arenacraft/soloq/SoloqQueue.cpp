@@ -54,8 +54,6 @@ void SoloqQueue::setMode(SoloqMode mode)
   _matchmaker = makeMatchmaker(mode);
 }
 
-void SoloqQueue::clear() { _entries.clear(); }
-
 bool SoloqQueue::canFormMatch() const
 {
   return _matchmaker->findBestMatch(_entries, _tourneyMode, _avoids).has_value();

@@ -116,10 +116,11 @@ The composition rule is a runtime-selectable strategy. There are two today:
 
 `flex` is the default at startup. An admin switches at runtime with
 `.soloq mode flex` or `.soloq mode mch`; `.soloq mode` alone prints the current
-one. The switch deliberately drains the waiting queue (every queued player is
-removed, has their badge cleared and is told to requeue) because they queued
-under the old composition rules. Arenas already running are left alone: they
-live in `SoloqService::_pendingMatches` and settle normally.
+one. The waiting queue is kept across the switch: role, wait time and MMR do not
+depend on the composition rule, so queued players simply become eligible under
+the new one (a `flex` -> `mch` switch can stall until enough casters/melee are
+queued, but nobody loses their place). Arenas already running are left alone:
+they live in `SoloqService::_pendingMatches` and settle normally.
 
 The interface is `SoloqMatchmaker` (`SoloqMatchmaker.hpp`). A mode implements
 `mode()`, `requirementsMet(RoleCounts)` and `findBestMatch(entries, tourneyMode,
@@ -592,9 +593,8 @@ Admin commands:
   gear/enchant/gem/talent/glyph checks entirely. `off` (default) enforces them.
   Does not clear the per-character pass cache.
 - `.soloq mode [flex|mch]` - print or switch the runtime matchmaker
-  (`SoloqService::setMode`). Changing it drains the waiting queue (badges
-  cleared, players told to requeue); running arenas continue and settle
-  normally. A restart returns to `flex`.
+  (`SoloqService::setMode`). Changing it keeps the waiting queue and running
+  arenas intact; no one has to requeue. A restart returns to `flex`.
 
 ## Wiring
 

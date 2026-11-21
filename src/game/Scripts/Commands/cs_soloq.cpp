@@ -106,8 +106,9 @@ public:
     if (service.tourneyMode())
       handler->SendSysMessage("SoloQ: tourney mode is ON.");
 
-    RoleCounts const counts{static_cast<uint16_t>(roles[0]), static_cast<uint16_t>(roles[1]),
-                            static_cast<uint16_t>(roles[2])};
+    RoleCounts const& counts = service.roleCounts();
+    // Admin-only: canFormMatch is a full matchmaker pass, the same cost as one
+    // world tick; don't call it from a player-facing or hot path.
     if (service.canFormMatch())
       handler->SendSysMessage("SoloQ: requirements met, a match will form on the next world tick.");
     else if (service.requirementsMet(counts))
@@ -239,6 +240,7 @@ public:
     if (!mode)
     {
       handler->PSendSysMessage("SoloQ: unknown mode '{}' - use 'flex' or 'mch'.", *modeArg);
+      handler->SetSentErrorMessage(true);
       return false;
     }
 
@@ -248,24 +250,14 @@ public:
       return true;
     }
 
-    // The queue is drained because players queued under the old composition
-    // rules. Running arenas are untouched and settle normally.
-    std::vector<PlayerId> const dequeued = service.setMode(*mode);
-    for (PlayerId const id : dequeued)
-    {
-      Player* player = ObjectAccessor::FindPlayer(ObjectGuid{id});
-      if (!player)
-        continue;
+    // The waiting pool is kept: role, wait time and MMR do not depend on the
+    // composition rule, so players simply become eligible under the new one.
+    // Running arenas are untouched and settle normally.
+    service.setMode(*mode);
 
-      LeaveArenaQueue(player);
-      if (player->GetSession())
-        ChatHandler(player->GetSession())
-            .SendSysMessage(std::string("SoloQ: the matchmaker switched to ") + std::string(modeName(*mode)) +
-                            ". You were removed from the queue - queue again.");
-    }
-
-    handler->PSendSysMessage("SoloQ: matchmaker is now {}, {}. {} queued player(s) dequeued; running matches continue.",
-                             modeName(*mode), modeRequirement(*mode), dequeued.size());
+    handler->PSendSysMessage(
+        "SoloQ: matchmaker is now {}, {}. {} player(s) are still queued; running matches continue.", modeName(*mode),
+        modeRequirement(*mode), service.queueSize());
     return true;
   }
 };

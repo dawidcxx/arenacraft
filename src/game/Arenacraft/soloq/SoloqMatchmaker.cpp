@@ -1,9 +1,7 @@
 #include "SoloqMatchmaker.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
-#include <string>
 
 namespace arenacraft::soloq
 {
@@ -31,6 +29,23 @@ bool stacksClass(QueuedPlayer const& x, QueuedPlayer const& y)
 bool teamStacksClass(QueuedPlayer const& dps0, QueuedPlayer const& dps1, QueuedPlayer const& healer)
 {
   return stacksClass(dps0, dps1) || dps0.classId == healer.classId || dps1.classId == healer.classId;
+}
+
+// ASCII-only comparison, so mode parsing does not depend on the locale.
+bool equalsIgnoreCase(std::string_view value, std::string_view expected)
+{
+  if (value.size() != expected.size())
+    return false;
+
+  for (std::size_t i = 0; i < value.size(); ++i)
+  {
+    char c = value[i];
+    if (c >= 'A' && c <= 'Z')
+      c = static_cast<char>(c - 'A' + 'a');
+    if (c != expected[i])
+      return false;
+  }
+  return true;
 }
 
 // Flex: each team takes any two DPS (melee or caster) plus one healer. six[0..3]
@@ -125,8 +140,7 @@ private:
             continue;
 
           uint64_t const sumA      = static_cast<uint64_t>(dpsA0.mmr) + dpsA1.mmr + healerA.mmr;
-          uint64_t const doubled   = 2 * sumA;
-          uint64_t const imbalance = doubled > total ? doubled - total : total - doubled;
+          uint64_t const imbalance = imbalanceOf(sumA, total);
 
           if (!found || imbalance < bestImbalance)
           {
@@ -253,8 +267,7 @@ private:
         continue;
 
       uint64_t const sumA      = static_cast<uint64_t>(m0.mmr) + casterA.mmr + healerA.mmr;
-      uint64_t const doubled   = 2 * sumA;
-      uint64_t const imbalance = doubled > total ? doubled - total : total - doubled;
+      uint64_t const imbalance = imbalanceOf(sumA, total);
 
       if (!found || imbalance < bestImbalance)
       {
@@ -298,13 +311,9 @@ std::string_view modeName(SoloqMode mode)
 
 std::optional<SoloqMode> parseMode(std::string_view name)
 {
-  std::string lower(name);
-  for (char& c : lower)
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-
-  if (lower == "flex")
+  if (equalsIgnoreCase(name, "flex"))
     return SoloqMode::Flex;
-  if (lower == "mch")
+  if (equalsIgnoreCase(name, "mch"))
     return SoloqMode::Mch;
   return std::nullopt;
 }
@@ -354,6 +363,12 @@ bool SoloqMatchmaker::teamAvoids(QueuedPlayer const& x, QueuedPlayer const& y, Q
 {
   return avoids &&
          (avoids(x.accountId, y.accountId) || avoids(x.accountId, z.accountId) || avoids(y.accountId, z.accountId));
+}
+
+uint64_t SoloqMatchmaker::imbalanceOf(uint64_t sumA, uint64_t total)
+{
+  uint64_t const doubled = 2 * sumA;
+  return doubled > total ? doubled - total : total - doubled;
 }
 
 void SoloqMatchmaker::fillStats(Candidate& candidate, std::array<QueueEntry const*, 6> const& six)

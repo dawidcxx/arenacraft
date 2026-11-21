@@ -76,12 +76,11 @@ public:
   void               setTourneyMode(bool value) { _queue.setTourneyMode(value); }
   [[nodiscard]] bool tourneyMode() const { return _queue.tourneyMode(); }
 
-  // Runtime matchmaker selection (see SoloqMatchmaker.hpp). Switching modes
-  // drains the waiting queue - players queued under the old composition rules
-  // have not accepted the new ones - and returns the ids that were waiting so
-  // the caller can clear their client badges. Arenas already running are left
-  // alone: they stay in _pendingMatches and settle normally.
-  std::vector<PlayerId>   setMode(SoloqMode mode);
+  // Runtime matchmaker selection (see SoloqMatchmaker.hpp). The waiting pool is
+  // kept across the switch: role, wait time and MMR do not depend on the mode, so
+  // nobody has to requeue. Arenas already running stay in _pendingMatches and
+  // settle normally.
+  void                    setMode(SoloqMode mode);
   [[nodiscard]] SoloqMode mode() const { return _queue.mode(); }
   [[nodiscard]] bool      requirementsMet(RoleCounts const& counts) const { return _queue.requirementsMet(counts); }
   // Dry-runs the current matchmaker against the live queue; see SoloqQueue::canFormMatch.

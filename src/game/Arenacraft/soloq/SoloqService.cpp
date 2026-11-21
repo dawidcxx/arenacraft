@@ -34,17 +34,7 @@ bool SoloqService::leave(PlayerId id)
   return removed;
 }
 
-std::vector<PlayerId> SoloqService::setMode(SoloqMode mode)
-{
-  if (_queue.mode() == mode)
-    return {};
-
-  std::vector<PlayerId> const waiting = _queue.waitingPlayers();
-  _queue.clear();
-  _queue.setMode(mode);
-  refreshRoleCounts();
-  return waiting;
-}
+void SoloqService::setMode(SoloqMode mode) { _queue.setMode(mode); }
 
 void SoloqService::refreshRoleCounts()
 {

@@ -75,6 +75,8 @@ protected:
                                        AvoidCheck const& avoids);
 
   static void fillStats(Candidate& candidate, std::array<QueueEntry const*, 6> const& six);
+  // |2 * sumA - total|: the per-team MMR imbalance used to rank a split.
+  [[nodiscard]] static uint64_t imbalanceOf(uint64_t sumA, uint64_t total);
   // Queue order dominates, then total wait, then team imbalance, then MMR spread.
   static bool betterThan(Candidate const& left, Candidate const& right);
 };

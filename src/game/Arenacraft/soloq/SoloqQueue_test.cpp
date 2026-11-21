@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+using arenacraft::soloq::AvoidCheck;
 using arenacraft::soloq::Match;
 using arenacraft::soloq::PlayerId;
 using arenacraft::soloq::QueuedPlayer;
@@ -115,10 +116,6 @@ TEST_CASE("switching the matchmaker keeps the waiting pool")
   // Selecting the mode that is already active is a no-op too.
   queue.setMode(SoloqMode::Mch);
   CHECK(queue.size() == 6);
-
-  // Clearing is the caller's job (SoloqService::setMode drains before switching).
-  queue.clear();
-  CHECK(queue.empty());
 }
 
 TEST_CASE("mch mode: every team is one melee, one caster and one healer")
@@ -637,11 +634,30 @@ bool sameTeam(Match const& match, PlayerId x, PlayerId y)
   return false;
 }
 
-SoloqQueue::AvoidCheck avoiding(std::set<std::pair<uint32_t, uint32_t>> pairs)
+AvoidCheck avoiding(std::set<std::pair<uint32_t, uint32_t>> pairs)
 {
   return [pairs](uint32_t x, uint32_t y) { return pairs.contains({x, y}) || pairs.contains({y, x}); };
 }
 } // namespace
+
+TEST_CASE("mch mode class stacking forces the priest pair onto opposite teams")
+{
+  SoloqQueue queue;
+  queue.setMode(SoloqMode::Mch);
+  queue.playerAddToQueue(melee(1));
+  queue.playerAddToQueue(melee(2));
+  queue.playerAddToQueue(player(3, CLASS_PRIEST, 2)); // Shadow (caster)
+  queue.playerAddToQueue(caster(4));
+  queue.playerAddToQueue(player(5, CLASS_PRIEST, 1));  // Holy (healer)
+  queue.playerAddToQueue(player(6, CLASS_PALADIN, 0)); // Holy (healer)
+
+  std::vector<Match> const matches = queue.update(0ms);
+  REQUIRE(matches.size() == 1);
+
+  // The only non-stacking split pairs the shadow priest with the paladin.
+  CHECK_FALSE(sameTeam(matches[0], 3, 5));
+  CHECK(sameTeam(matches[0], 3, 6));
+}
 
 TEST_CASE("avoid list: avoided players end up on opposite teams")
 {

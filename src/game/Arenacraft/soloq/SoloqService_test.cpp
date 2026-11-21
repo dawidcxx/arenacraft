@@ -41,7 +41,7 @@ TEST_CASE("mode names round-trip through parseMode")
   CHECK_FALSE(parseMode("").has_value());
 }
 
-TEST_CASE("SoloqService::setMode drains the queue but keeps pending arenas")
+TEST_CASE("SoloqService::setMode keeps the queue and pending arenas")
 {
   SoloqService& service = SoloqService::instance();
   service.setMode(SoloqMode::Flex); // start from the default mode
@@ -58,12 +58,14 @@ TEST_CASE("SoloqService::setMode drains the queue but keeps pending arenas")
   service.registerMatch(4242, pending, 0);
   REQUIRE(service.pendingArena(4242).has_value());
 
-  std::vector<PlayerId> const drained = service.setMode(SoloqMode::Mch);
-  CHECK(drained.size() == 6);
-  CHECK(service.queueSize() == 0);
+  service.setMode(SoloqMode::Mch);
   CHECK(service.mode() == SoloqMode::Mch);
+  CHECK(service.queueSize() == 6);
   CHECK(service.pendingArena(4242).has_value());
 
+  // Leave the singleton clean for the rest of the test binary.
+  for (PlayerId const id : service.waitingPlayers())
+    service.leave(id);
   service.takeMatch(4242);
-  service.setMode(SoloqMode::Flex); // leave the singleton in its default state
+  service.setMode(SoloqMode::Flex);
 }
