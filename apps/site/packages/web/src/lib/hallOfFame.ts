@@ -63,7 +63,7 @@ export const HALL_OF_FAME: readonly Champion[] = [
     winner: "Bruce",
     wowClass: "Paladin",
     spec: "Holy",
-    tournament: "Flex SoloQ tourney",
+    tournament: "Unannounced Brooxz tourney",
     date: "Sunday, 1 November 2026",
     format: "SoloQ Flex",
     prize: "100 EUR",

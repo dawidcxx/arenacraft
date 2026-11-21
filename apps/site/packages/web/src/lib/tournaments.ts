@@ -160,9 +160,6 @@ export function latestFinishedTournament(now: Date = new Date()): Tournament | u
   return latest;
 }
 
-export const TOURNAMENT_NOTE =
-  "Depending on how those 2 go I will let u know the December schedule.";
-
 export const TOURNAMENT_RULES = [
   "Players with a poor reputation are banned from participating. If you are curious if fall under this category DM me @Randomsheep 99,9% of players need not to worry about it",
   "Griefing is strictly prohibited. Expect harsh punishments",

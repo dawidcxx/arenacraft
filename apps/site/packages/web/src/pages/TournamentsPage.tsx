@@ -5,7 +5,7 @@ import { PageHero } from "@/components/PageHero";
 import { SectionIntro } from "@/components/SectionIntro";
 import { TournamentCard } from "@/components/sections/TournamentCard";
 import { cn } from "@/lib/cn";
-import { TOURNAMENT_NOTE, TOURNAMENT_RULES, upcomingTournaments } from "@/lib/tournaments";
+import { TOURNAMENT_RULES, upcomingTournaments } from "@/lib/tournaments";
 
 export function TournamentsPage() {
   const upcoming = upcomingTournaments();
@@ -26,10 +26,6 @@ export function TournamentsPage() {
           ))}
         </section>
       )}
-
-      <div className="border-b-2 border-divider px-4 py-3 text-base leading-[1.55]">
-        {TOURNAMENT_NOTE}
-      </div>
 
       <section className="grid border-b-2 border-divider md:grid-cols-2">
         <div className="border-b-2 border-divider px-4 py-6 md:border-r-2 md:border-b-0">
