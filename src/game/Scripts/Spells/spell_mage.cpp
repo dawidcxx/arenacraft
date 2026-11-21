@@ -23,7 +23,6 @@
 #include "SpellScript.h"
 #include "SpellScriptLoader.h"
 #include "TemporarySummon.h"
-#include <atomic>
 /*
  * Scripts for spells with SPELLFAMILY_MAGE and SPELLFAMILY_GENERIC spells used by mage players.
  * Ordered alphabetically using scriptname.
@@ -41,7 +40,6 @@ enum MageSpells
   SPELL_MAGE_COLD_SNAP                        = 11958,
   SPELL_MAGE_FOCUS_MAGIC_PROC                 = 54648,
   SPELL_MAGE_FROST_WARDING_R1                 = 11189,
-  SPELL_MAGE_FROST_WARDING_R2                 = 28332,
   SPELL_MAGE_FROST_WARDING_TRIGGERED          = 57776,
   SPELL_MAGE_INCANTERS_ABSORBTION_R1          = 44394,
   SPELL_MAGE_INCANTERS_ABSORBTION_TRIGGERED   = 44413,
@@ -518,36 +516,17 @@ class spell_mage_fire_frost_ward : public spell_mage_incanters_absorbtion_base_A
     Unit*       target       = GetTarget();
     AuraEffect* talentAurEff = target->GetAuraEffectOfRankedSpell(SPELL_MAGE_FROST_WARDING_R1, EFFECT_0);
     if (!talentAurEff)
-    {
-      // arenacraft: Frost Warding is a two-rank talent (11189/28332). If the rank chain is ever broken the mana
-      // restore silently never procs even though the player has the talent. Warn once (not per hit) so this cannot
-      // spam the console in production, but is still visible if it ever regresses.
-      static std::atomic<bool> warned{false};
-      if (!warned.exchange(true) &&
-          (target->HasAura(SPELL_MAGE_FROST_WARDING_R1) || target->HasAura(SPELL_MAGE_FROST_WARDING_R2)))
-        LOG_WARN("spells.aura",
-                 "Frost Warding: {} has the talent but no ranked aura for {} (Talent.dbc/spell_ranks chain is broken); "
-                 "its mana restore cannot proc",
-                 target->GetGUID().ToString(), uint32(SPELL_MAGE_FROST_WARDING_R1));
       return;
-    }
 
     int32 chance = talentAurEff->GetSpellInfo()->Effects[EFFECT_1].CalcValue(); // SPELL_EFFECT_DUMMY with NO_TARGET
     if (chance <= 0)
-    {
-      LOG_DEBUG("spells.aura", "Frost Warding: {} resolved a non-positive negate chance ({}) from talent {}",
-                target->GetGUID().ToString(), chance, talentAurEff->GetId());
       return;
-    }
 
     if (roll_chance_i(chance))
     {
-      int32           bp     = dmgInfo.GetDamage();
-      SpellCastResult result = target->CastCustomSpell(target, SPELL_MAGE_FROST_WARDING_TRIGGERED, &bp, nullptr,
-                                                       nullptr, true, nullptr, aurEff);
-      if (result != SPELL_CAST_OK)
-        LOG_DEBUG("spells.aura", "Frost Warding: energize {} failed for {} (result {})",
-                  uint32(SPELL_MAGE_FROST_WARDING_TRIGGERED), target->GetGUID().ToString(), uint32(result));
+      int32 bp = dmgInfo.GetDamage();
+      target->CastCustomSpell(target, SPELL_MAGE_FROST_WARDING_TRIGGERED, &bp, nullptr, nullptr, true, nullptr,
+                              aurEff);
 
       absorbAmount = 0;
 
