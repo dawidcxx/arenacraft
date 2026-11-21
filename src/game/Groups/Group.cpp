@@ -1987,8 +1987,8 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
     if (!sScriptMgr->CanGroupJoinBattlegroundQueue(this, member, bgTemplate, MinPlayerCount, isRated, arenaSlot))
       return ERR_BATTLEGROUND_JOIN_FAILED;
 
-    // don't let join rated matches if the arena team id doesn't match
-    if (isRated && member->GetArenaTeamId(arenaSlot) != arenaTeamId)
+    // don't let join rated matches if the arena team id doesn't match (solo 2v2 members own separate teams)
+    if (isRated && arenaSlot != ARENA_SLOT_2v2 && member->GetArenaTeamId(arenaSlot) != arenaTeamId)
       return ERR_BATTLEGROUND_JOIN_FAILED;
 
     // not in the same battleground level braket, don't let join
@@ -2046,8 +2046,8 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
   if (bgTemplate->isArena() && memberscount != MinPlayerCount)
     return ERR_ARENA_TEAM_PARTY_SIZE;
 
-  // check against other arena team members
-  if (isRated)
+  // check against other arena team members (a solo 2v2 team has none)
+  if (isRated && arenaSlot != ARENA_SLOT_2v2)
   {
     ArenaTeam* arenaTeam = sArenaTeamMgr->GetArenaTeamById(arenaTeamId);
     for (auto const& itr : arenaTeam->GetMembers())

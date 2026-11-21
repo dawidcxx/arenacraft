@@ -80,6 +80,11 @@ private:
   // the missing players get a short deserter. Returns true if it was cancelled.
   bool CancelIfIncompleteAtStart();
 
+  // Arenacraft: rated 2v2 has no shared teams. Every present player is rated on their own solo 2v2 team against the
+  // opposing party's average MMR. Fills the per-side (indexed by TeamId) average rating/MMR change for the logs and
+  // fills the scoreboard.
+  void ResolveSolo2v2(TeamId winnerTeamId, bool validArena, int32 (&ratingChange)[2], int32 (&mmrChange)[2]);
+
   bool m_StartRosterChecked{false};
   bool m_CancelledAtStart{false};
 

@@ -28,6 +28,7 @@
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
+#include "Solo2v2Team.hpp"
 #include "ScriptMgr.h"
 #include <unordered_map>
 
@@ -328,7 +329,12 @@ void BattlegroundQueue::RemovePlayer(ObjectGuid guid, bool decreaseInvitedCount)
   // if player leaves queue and he is invited to a rated arena match, then count it as he lost
   if (groupInfo->IsInvitedToBGInstanceGUID && groupInfo->IsRated && decreaseInvitedCount)
   {
-    if (ArenaTeam* at = sArenaTeamMgr->GetArenaTeamById(groupInfo->ArenaTeamId))
+    // solo 2v2: every member owns a team, ArenaTeamId is only the leader's
+    uint32 penaltyTeamId = groupInfo->ArenaTeamId;
+    if (groupInfo->ArenaType == ARENA_TYPE_2v2)
+      penaltyTeamId = arenacraft::solo2v2::FindTeam(guid) ? arenacraft::solo2v2::FindTeam(guid)->GetId() : 0;
+
+    if (ArenaTeam* at = sArenaTeamMgr->GetArenaTeamById(penaltyTeamId))
     {
       LOG_DEBUG("bg.battleground", "UPDATING memberLost's personal arena rating for {} by opponents rating: {}",
                 guid.ToString(), groupInfo->OpponentsTeamRating);
@@ -1353,9 +1359,16 @@ void BattlegroundQueue::InviteGroupToBG(GroupQueueInfo* ginfo, Battleground* bg,
 
     // pussywizard:
     if (bg->isArena() && bg->isRated())
+    {
+      uint32 arenaLogTeamId = ginfo->ArenaTeamId;
+      if (ginfo->ArenaType == ARENA_TYPE_2v2)
+        if (ArenaTeam* own = arenacraft::solo2v2::FindTeam(player->GetGUID()))
+          arenaLogTeamId = own->GetId();
+
       bg->ArenaLogEntries[player->GetGUID()].Fill(player->GetName(), player->GetGUID().GetCounter(),
-                                                  player->GetSession()->GetAccountId(), ginfo->ArenaTeamId,
+                                                  player->GetSession()->GetAccountId(), arenaLogTeamId,
                                                   player->GetSession()->GetRemoteAddress());
+    }
   }
 }
 

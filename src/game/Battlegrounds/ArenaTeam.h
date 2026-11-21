@@ -147,8 +147,10 @@ public:
 
   typedef std::list<ArenaTeamMember> MemberList;
 
-  [[nodiscard]] uint32                GetId() const { return TeamId; }
-  [[nodiscard]] uint32                GetType() const { return Type; }
+  [[nodiscard]] uint32 GetId() const { return TeamId; }
+  [[nodiscard]] uint32 GetType() const { return Type; }
+  // Personal single-member teams (solo 2v2 and the SoloQ 5v5 team): never left, disbanded or handed over by players.
+  [[nodiscard]] bool                  IsSoloTeam() const { return Type == ARENA_TEAM_2v2 || Type == ARENA_TEAM_5v5; }
   [[nodiscard]] uint8                 GetSlot() const { return GetSlotByType(GetType()); }
   static uint8                        GetSlotByType(uint32 type);
   static uint8                        GetReqPlayersForType(uint32 type);
@@ -162,6 +164,8 @@ public:
 
   void SetCaptain(ObjectGuid guid);
   bool SetName(std::string const& name);
+  // Unlike SetName, skips charter-name validation (solo 2v2 names contain an apostrophe).
+  void Rename(std::string const& name);
   bool AddMember(ObjectGuid playerGuid);
 
   // Shouldn't be ObjectGuid, because than can reference guid from members on

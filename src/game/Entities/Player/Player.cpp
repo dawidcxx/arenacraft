@@ -10378,7 +10378,13 @@ void Player::LeaveAllArenaTeams(ObjectGuid guid)
     if (arenaTeamId != 0)
     {
       ArenaTeam* arenaTeam = sArenaTeamMgr->GetArenaTeamById(arenaTeamId);
-      if (arenaTeam)
+      if (arenaTeam && arenaTeam->IsSoloTeam())
+      {
+        // A solo team has no other member: it goes away with its character, freeing its name.
+        arenaTeam->Disband();
+        delete arenaTeam;
+      }
+      else if (arenaTeam)
         arenaTeam->DelMember(guid, true);
     }
   } while (result->NextRow());

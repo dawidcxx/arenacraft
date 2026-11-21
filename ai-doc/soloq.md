@@ -567,3 +567,6 @@ Admin commands:
 - Block talent/spec changes while queued (cheat prevention).
 - Queue-count queries and richer NPC/UI feedback.
 - Thread safety once there is more than one writer.
+
+## Team handling
+The soloq 5v5 team is a solo team (`ArenaTeam::IsSoloTeam()`): Leave/Disband reset it, it never blocks character delete or faction change, and it is renamed with the character. See `solo2v2.md`.

@@ -47,6 +47,7 @@
 #include "ScriptMgr.h"
 #include "SharedDefines.h"
 #include "SocialMgr.h"
+#include "Solo2v2Team.hpp"
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
 #include "StringConvert.h"
@@ -609,6 +610,7 @@ void WorldSession::HandleCharCreateOpcode(WorldPacket& recvData)
                               sCharacterCache->AddCharacterCacheEntry(
                                   newChar->GetGUID(), GetAccountId(), newChar->GetName(), newChar->getGender(),
                                   newChar->getRace(), newChar->getClass(), newChar->GetLevel());
+                              arenacraft::solo2v2::EnsureTeam(newChar->GetGUID());
                               SendCharCreate(CHAR_CREATE_SUCCESS);
                             }
                             else
@@ -659,7 +661,7 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recvData)
   }
 
   // is arena team captain
-  if (sArenaTeamMgr->GetArenaTeamByCaptain(guid))
+  if (sArenaTeamMgr->GetNonSoloArenaTeamByCaptain(guid))
   {
     sScriptMgr->OnPlayerFailedDelete(guid, initAccountId);
     SendCharDelete(CHAR_DELETE_FAILED_ARENA_CAPTAIN);
@@ -1203,6 +1205,8 @@ void WorldSession::HandlePlayerLoginFromDB(LoginQueryHolder const& holder)
       }
     }
   }
+
+  arenacraft::solo2v2::EnsureTeam(pCurrChar->GetGUID());
 
   sScriptMgr->OnPlayerLogin(pCurrChar);
 
@@ -2103,7 +2107,7 @@ void WorldSession::HandleCharFactionOrRaceChangeCallback(std::shared_ptr<Charact
     }
 
     // is arena team captain
-    if (sArenaTeamMgr->GetArenaTeamByCaptain(factionChangeInfo->Guid))
+    if (sArenaTeamMgr->GetNonSoloArenaTeamByCaptain(factionChangeInfo->Guid))
     {
       SendCharFactionChange(CHAR_CREATE_CHARACTER_ARENA_LEADER, factionChangeInfo.get());
       return;

@@ -29,6 +29,8 @@
 #include "Opcodes.h"
 #include "Player.h"
 #include "ScriptMgr.h"
+#include "Solo2v2Rules.hpp"
+#include "Solo2v2Team.hpp"
 #include "WorldPacket.h"
 #include "WorldSession.h"
 
@@ -868,23 +870,84 @@ void WorldSession::HandleBattlemasterJoinArena(WorldPacket& recvData)
       if (!sWorld->getBoolConfig(CONFIG_ARENA_SEASON_IN_PROGRESS))
         return;
 
-      ateamId = _player->GetArenaTeamId(arenaslot);
-
-      // check team existence
-      ArenaTeam* at = sArenaTeamMgr->GetArenaTeamById(ateamId);
-      if (!at)
+      if (arenatype == ARENA_TYPE_2v2)
       {
-        SendNotInArenaTeamPacket(arenatype);
-        return;
+        // Solo 2v2: a party of two, each queueing with their own personal team
+        if (grp->GetMembersCount() != 2)
+        {
+          ChatHandler(this).SendSysMessage("Rated 2v2 requires a party of exactly two players.");
+          return;
+        }
+
+        uint32                  ratingSum = 0;
+        uint32                  mmrs[2]   = {0, 0};
+        uint32                  count     = 0;
+        ArenaTeam*              leaderTeam = nullptr;
+        bool                    missing    = false;
+        for (GroupReference* itr = grp->GetFirstMember(); itr != nullptr && count < 2; itr = itr->next())
+        {
+          Player* member = itr->GetSource();
+          if (!member)
+          {
+            missing = true;
+            break;
+          }
+
+          ArenaTeam*       team   = arenacraft::solo2v2::EnsureTeam(member->GetGUID());
+          ArenaTeamMember* tMember = team ? team->GetMember(member->GetGUID()) : nullptr;
+          if (!tMember)
+          {
+            missing = true;
+            break;
+          }
+
+          ratingSum += team->GetRating();
+          mmrs[count++] = tMember->MatchMakerRating;
+          if (member == _player)
+            leaderTeam = team;
+        }
+
+        if (missing || count != 2 || !leaderTeam)
+        {
+          SendNotInArenaTeamPacket(arenatype);
+          return;
+        }
+
+        if (!arenacraft::solo2v2::partyMmrGapAllowed(mmrs[0], mmrs[1]))
+        {
+          ChatHandler(this).PSendSysMessage(
+              "The matchmaking rating difference between party members must not exceed {}.",
+              arenacraft::solo2v2::MaxPartyMmrGap);
+          return;
+        }
+
+        ateamId           = leaderTeam->GetId();
+        arenaRating       = ratingSum / 2;
+        matchmakerRating  = arenacraft::solo2v2::partyMmr(mmrs[0], mmrs[1]);
+        previousOpponents = leaderTeam->GetPreviousOpponents();
+        if (arenaRating <= 0)
+          arenaRating = 1;
       }
+      else
+      {
+        ateamId = _player->GetArenaTeamId(arenaslot);
 
-      // get team rating for queueing
-      arenaRating      = at->GetRating();
-      matchmakerRating = at->GetAverageMMR(grp);
-      if (arenaRating <= 0)
-        arenaRating = 1;
+        // check team existence
+        ArenaTeam* at = sArenaTeamMgr->GetArenaTeamById(ateamId);
+        if (!at)
+        {
+          SendNotInArenaTeamPacket(arenatype);
+          return;
+        }
 
-      previousOpponents = at->GetPreviousOpponents();
+        // get team rating for queueing
+        arenaRating      = at->GetRating();
+        matchmakerRating = at->GetAverageMMR(grp);
+        if (arenaRating <= 0)
+          arenaRating = 1;
+
+        previousOpponents = at->GetPreviousOpponents();
+      }
     }
 
     err = grp->CanJoinBattlegroundQueue(bgt, bgQueueTypeId, arenatype, arenatype, (bool)isRated, arenaslot);

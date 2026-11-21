@@ -28,6 +28,7 @@
 #include "ReplayPlayback.hpp"
 #include "ReplayRecorder.hpp"
 #include "ScriptMgr.h"
+#include "Solo2v2Team.hpp"
 #include "World.h"
 #include "WorldSession.h"
 // #include "WorldStatePackets.h"
@@ -488,7 +489,14 @@ void Arena::RemovePlayerAtLeave(Player* player)
       ArenaTeam* loserArenaTeam  = sArenaTeamMgr->GetArenaTeamById(GetArenaTeamIdForTeam(teamId));
 
       if (winnerArenaTeam && loserArenaTeam && winnerArenaTeam != loserArenaTeam)
+      {
+        // solo 2v2: the leaver's own team takes the loss, not the leader's
+        if (GetArenaType() == ARENA_TYPE_2v2)
+          if (ArenaTeam* own = arenacraft::solo2v2::FindTeam(player->GetGUID()))
+            loserArenaTeam = own;
+
         loserArenaTeam->MemberLost(player, GetArenaMatchmakerRating(GetOtherTeamId(teamId)));
+      }
     }
   }
 
@@ -562,6 +570,89 @@ bool Arena::CancelIfIncompleteAtStart()
   return true;
 }
 
+void Arena::ResolveSolo2v2(TeamId winnerTeamId, bool validArena, int32 (&ratingChange)[2], int32 (&mmrChange)[2])
+{
+  bool const draw = winnerTeamId == TEAM_NEUTRAL;
+
+  int32       ratingSum[2] = {0, 0};
+  int32       mmrSum[2]    = {0, 0};
+  uint32      count[2]     = {0, 0};
+  std::string names[2];
+
+  std::vector<ArenaTeam*> touched;
+
+  for (auto const& [playerGuid, player] : GetPlayers())
+  {
+    ArenaTeam* own = arenacraft::solo2v2::FindTeam(playerGuid);
+    if (!own)
+      continue;
+
+    ArenaTeamMember* member = own->GetMember(playerGuid);
+    if (!member)
+      continue;
+
+    TeamId const side   = player->GetBgTeamId();
+    uint32 const oppMmr = GetArenaMatchmakerRating(GetOtherTeamId(side));
+    int32        rating = 0;
+    int32        mmr    = 0;
+
+    if (draw)
+    {
+      rating = ARENA_TIMELIMIT_POINTS_LOSS;
+      own->FinishGame(rating, GetBgMap());
+    }
+    else if (side == winnerTeamId)
+    {
+      if (validArena)
+      {
+        // update achievement BEFORE personal rating update
+        uint32 personal = member->PersonalRating;
+        player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_WIN_RATED_ARENA, personal ? personal : 1);
+        player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_WIN_ARENA, GetMapId());
+
+        mmr = own->WonAgainst(member->MatchMakerRating, oppMmr, rating, GetBgMap());
+        own->MemberWon(player, oppMmr, mmr);
+      }
+    }
+    else
+    {
+      mmr = own->LostAgainst(member->MatchMakerRating, oppMmr, rating, GetBgMap());
+      own->MemberLost(player, oppMmr, mmr);
+
+      // Arena lost => reset the win_rated_arena having the "no_lose" condition
+      player->ResetAchievementCriteria(ACHIEVEMENT_CRITERIA_CONDITION_NO_LOSE, 0);
+    }
+
+    player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_PLAY_ARENA, GetMapId());
+
+    ratingSum[side] += rating;
+    mmrSum[side] += mmr;
+    ++count[side];
+    names[side] += (names[side].empty() ? "" : " & ") + player->GetName();
+    touched.push_back(own);
+  }
+
+  for (TeamId side : {TEAM_ALLIANCE, TEAM_HORDE})
+  {
+    ratingChange[side] = count[side] ? ratingSum[side] / static_cast<int32>(count[side]) : 0;
+    mmrChange[side]    = count[side] ? mmrSum[side] / static_cast<int32>(count[side]) : 0;
+
+    uint32 const partyMmr = GetArenaMatchmakerRating(side);
+    if (!draw)
+      SetArenaMatchmakerRating(side, partyMmr + mmrChange[side]);
+
+    // bg team that the client expects is different to TeamId: alliance 1, horde 0
+    _arenaTeamScores[side == TEAM_ALLIANCE ? PVP_TEAM_ALLIANCE : PVP_TEAM_HORDE].Assign(ratingChange[side], partyMmr,
+                                                                                         names[side]);
+  }
+
+  for (ArenaTeam* team : touched)
+  {
+    team->SaveToDB();
+    team->NotifyStatsChanged();
+  }
+}
+
 void Arena::EndBattleground(TeamId winnerTeamId)
 {
   // Arenacraft: cancelled at the gates - no rating, no logs, no draw penalty.
@@ -598,6 +689,8 @@ void Arena::EndBattleground(TeamId winnerTeamId)
       Battleground::EndBattleground(winnerTeamId);
       return;
     }
+
+    bool const solo2v2 = GetArenaType() == ARENA_TYPE_2v2;
 
     auto SaveArenaLogs = [&]()
     {
@@ -651,7 +744,31 @@ void Arena::EndBattleground(TeamId winnerTeamId)
       CharacterDatabase.CommitTransaction(trans);
     };
 
-    if (winnerArenaTeam && loserArenaTeam && winnerArenaTeam != loserArenaTeam)
+    if (solo2v2)
+    {
+      // logs keep the leaders' team ids and ratings; the real rating work is done per player
+      TeamId const winnerSide = winnerTeamId == TEAM_NEUTRAL ? TEAM_HORDE : winnerTeamId;
+      TeamId const loserSide  = GetOtherTeamId(winnerSide);
+
+      winnerTeamRating       = winnerArenaTeam->GetRating();
+      winnerMatchmakerRating = GetArenaMatchmakerRating(winnerSide);
+      loserTeamRating        = loserArenaTeam->GetRating();
+      loserMatchmakerRating  = GetArenaMatchmakerRating(loserSide);
+
+      int32 ratingChanges[2] = {0, 0};
+      int32 mmrChanges[2]    = {0, 0};
+      ResolveSolo2v2(winnerTeamId, bValidArena, ratingChanges, mmrChanges);
+
+      winnerChange           = ratingChanges[winnerSide];
+      loserChange            = ratingChanges[loserSide];
+      winnerMatchmakerChange = mmrChanges[winnerSide];
+      loserMatchmakerChange  = mmrChanges[loserSide];
+
+      if (winnerTeamId != TEAM_NEUTRAL)
+        sScriptMgr->OnAfterArenaRatingCalculation(this, winnerMatchmakerChange, loserMatchmakerChange, winnerChange,
+                                                  loserChange);
+    }
+    else if (winnerArenaTeam && loserArenaTeam && winnerArenaTeam != loserArenaTeam)
     {
       loserTeamRating        = loserArenaTeam->GetRating();
       loserMatchmakerRating  = GetArenaMatchmakerRating(GetOtherTeamId(winnerTeamId));
@@ -726,7 +843,7 @@ void Arena::EndBattleground(TeamId winnerTeamId)
       auto const& bgTeamId = player->GetBgTeamId();
 
       // per player calculation
-      if (winnerArenaTeam && loserArenaTeam && winnerArenaTeam != loserArenaTeam)
+      if (!solo2v2 && winnerArenaTeam && loserArenaTeam && winnerArenaTeam != loserArenaTeam)
       {
         if (bgTeamId == winnerTeamId)
         {
@@ -762,15 +879,18 @@ void Arena::EndBattleground(TeamId winnerTeamId)
     winnerArenaTeam->SetPreviousOpponents(loserArenaTeam->GetId());
     loserArenaTeam->SetPreviousOpponents(winnerArenaTeam->GetId());
 
-    // save the stat changes
-    if (bValidArena)
+    // save the stat changes (solo 2v2 teams were saved per player)
+    if (!solo2v2 && bValidArena)
     {
       winnerArenaTeam->SaveToDB();
       winnerArenaTeam->NotifyStatsChanged();
     }
 
-    loserArenaTeam->SaveToDB();
-    loserArenaTeam->NotifyStatsChanged();
+    if (!solo2v2)
+    {
+      loserArenaTeam->SaveToDB();
+      loserArenaTeam->NotifyStatsChanged();
+    }
   }
 
   // end battleground

@@ -16,6 +16,7 @@
  */
 
 #include "CharacterCache.h"
+#include "Solo2v2Team.hpp"
 #include "ArenaTeam.h"
 #include "DatabaseEnv.h"
 #include "Log.h"
@@ -183,6 +184,9 @@ void CharacterCache::UpdateCharacterData(ObjectGuid const& guid, std::string con
   // Correct name -> pointer storage
   _characterCacheByNameStore.erase(oldName);
   _characterCacheByNameStore[name] = &itr->second;
+
+  if (oldName != name)
+    arenacraft::solo2v2::OnCharacterRenamed(guid, name);
 }
 
 void CharacterCache::UpdateCharacterLevel(ObjectGuid const& guid, uint8 level)

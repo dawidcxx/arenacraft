@@ -101,10 +101,9 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recvData)
     switch (clientIndex) // arenaSlot+1 as received from client (1 from 3 case)
     {
     case 1:
-      charterid = ARENA_TEAM_CHARTER_2v2;
-      cost      = sWorld->getIntConfig(CONFIG_CHARTER_COST_ARENA_2v2);
-      type      = ARENA_TEAM_CHARTER_2v2_TYPE;
-      break;
+      // Standard 2v2 teams are gone: everyone owns a solo 2v2 team
+      SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, name, "", ERR_ALREADY_IN_ARENA_TEAM);
+      return;
     case 2:
       charterid = ARENA_TEAM_CHARTER_3v3;
       cost      = sWorld->getIntConfig(CONFIG_CHARTER_COST_ARENA_3v3);
@@ -707,6 +706,13 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recvData)
   }
   else
   {
+    // Standard 2v2 teams are gone: everyone owns a solo 2v2 team
+    if (type == ARENA_TEAM_CHARTER_2v2_TYPE)
+    {
+      SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, name, "", ERR_ALREADY_IN_ARENA_TEAM);
+      return;
+    }
+
     // Check for valid arena bracket (2v2, 3v3, 5v5)
     uint8 slot = ArenaTeam::GetSlotByType(type);
     if (slot >= MAX_ARENA_SLOT)

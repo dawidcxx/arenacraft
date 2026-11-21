@@ -44,8 +44,9 @@ ArenaTeam::~ArenaTeam() {}
 bool ArenaTeam::Create(ObjectGuid captainGuid, uint8 type, std::string const& teamName, uint32 backgroundColor,
                        uint8 emblemStyle, uint32 emblemColor, uint8 borderStyle, uint32 borderColor)
 {
-  // Check if captain is present
-  if (!ObjectAccessor::FindConnectedPlayer(captainGuid))
+  // Check if captain is present (Arenacraft: offline captains are fine as long as the character cache knows them,
+  // solo 2v2 teams are created for characters that are not logged in)
+  if (!ObjectAccessor::FindConnectedPlayer(captainGuid) && !sCharacterCache->GetCharacterCacheByGuid(captainGuid))
     return false;
 
   // Check if arena team name is already taken
@@ -297,6 +298,15 @@ bool ArenaTeam::SetName(std::string const& name)
   stmt->SetData(1, GetId());
   CharacterDatabase.Execute(stmt);
   return true;
+}
+
+void ArenaTeam::Rename(std::string const& name)
+{
+  TeamName                                 = name;
+  CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ARENA_TEAM_NAME);
+  stmt->SetData(0, TeamName);
+  stmt->SetData(1, GetId());
+  CharacterDatabase.Execute(stmt);
 }
 
 void ArenaTeam::SetCaptain(ObjectGuid guid)

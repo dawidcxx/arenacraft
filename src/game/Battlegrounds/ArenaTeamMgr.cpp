@@ -115,6 +115,14 @@ ArenaTeam* ArenaTeamMgr::GetArenaTeamByCaptain(ObjectGuid guid, const uint32 typ
   return nullptr;
 }
 
+ArenaTeam* ArenaTeamMgr::GetNonSoloArenaTeamByCaptain(ObjectGuid guid) const
+{
+  for (auto const& [id, team] : ArenaTeamStore)
+    if (team->GetCaptain() == guid && !team->IsSoloTeam())
+      return team;
+  return nullptr;
+}
+
 void ArenaTeamMgr::AddArenaTeam(ArenaTeam* arenaTeam) { ArenaTeamStore[arenaTeam->GetId()] = arenaTeam; }
 
 void ArenaTeamMgr::RemoveArenaTeam(uint32 arenaTeamId) { ArenaTeamStore.erase(arenaTeamId); }

@@ -22,6 +22,8 @@
 #include "Opcodes.h"
 #include "Player.h"
 #include "SocialMgr.h"
+#include "Solo2v2Team.hpp"
+#include "SoloqTeam.hpp"
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
@@ -125,6 +127,13 @@ void WorldSession::HandleArenaTeamInviteOpcode(WorldPacket& recvData)
     return;
   }
 
+  // Solo teams are personal: nobody can be invited
+  if (arenaTeam->IsSoloTeam())
+  {
+    SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, "", "", ERR_ARENA_TEAM_PERMISSIONS);
+    return;
+  }
+
   // OK result but don't send invite
   if (player->GetSocial()->HasIgnore(GetPlayer()->GetGUID()))
     return;
@@ -209,6 +218,29 @@ void WorldSession::HandleArenaTeamDeclineOpcode(WorldPacket& /*recvData*/)
   _player->SetArenaTeamIdInvited(0);
 }
 
+namespace
+{
+void ResetSoloTeam(Player* player, uint32 type)
+{
+  if (type == ARENA_TEAM_2v2)
+    arenacraft::solo2v2::ResetTeam(player);
+  else
+    arenacraft::soloq::ResetSoloqTeam(player);
+}
+
+// Same rule as the stock handlers: no changes while invited to / inside an arena.
+bool IsQueuedForArena(Player* player, uint32 type)
+{
+  BattlegroundQueueTypeId bgQueue = BattlegroundMgr::BGQueueTypeId(BATTLEGROUND_AA, type);
+  if (!bgQueue)
+    return false;
+
+  GroupQueueInfo     ginfo;
+  BattlegroundQueue& queue = sBattlegroundMgr->GetBattlegroundQueue(bgQueue);
+  return queue.GetPlayerGroupInfoData(player->GetGUID(), &ginfo) && ginfo.IsInvitedToBGInstanceGUID;
+}
+} // namespace
+
 void WorldSession::HandleArenaTeamLeaveOpcode(WorldPacket& recvData)
 {
   LOG_DEBUG("network", "CMSG_ARENA_TEAM_LEAVE");
@@ -224,6 +256,16 @@ void WorldSession::HandleArenaTeamLeaveOpcode(WorldPacket& recvData)
   if (arenaTeam->IsFighting())
   {
     SendArenaTeamCommandResult(ERR_ARENA_TEAM_QUIT_S, "", "", ERR_ARENA_TEAMS_LOCKED);
+    return;
+  }
+
+  // Solo team: leaving resets the stats instead
+  if (arenaTeam->IsSoloTeam())
+  {
+    if (arenaTeam->GetCaptain() == _player->GetGUID() && !IsQueuedForArena(_player, arenaTeam->GetType()))
+      ResetSoloTeam(_player, arenaTeam->GetType());
+    else
+      SendArenaTeamCommandResult(ERR_ARENA_TEAM_QUIT_S, "", "", ERR_ARENA_TEAMS_LOCKED);
     return;
   }
 
@@ -280,6 +322,14 @@ void WorldSession::HandleArenaTeamDisbandOpcode(WorldPacket& recvData)
     if (arenaTeam->GetCaptain() != _player->GetGUID())
       return;
 
+    // Solo team: disbanding resets the stats instead
+    if (arenaTeam->IsSoloTeam())
+    {
+      if (!arenaTeam->IsFighting() && !IsQueuedForArena(_player, arenaTeam->GetType()))
+        ResetSoloTeam(_player, arenaTeam->GetType());
+      return;
+    }
+
     // Teams cannot be disbanded during queues
     if (BattlegroundQueueTypeId bgQueue = BattlegroundMgr::BGQueueTypeId(BATTLEGROUND_AA, arenaTeam->GetType()))
     {
@@ -312,6 +362,10 @@ void WorldSession::HandleArenaTeamRemoveOpcode(WorldPacket& recvData)
   // Check for valid arena team
   ArenaTeam* arenaTeam = sArenaTeamMgr->GetArenaTeamById(arenaTeamId);
   if (!arenaTeam)
+    return;
+
+  // Solo teams have a single member
+  if (arenaTeam->IsSoloTeam())
     return;
 
   // Only captain can remove members
@@ -378,6 +432,10 @@ void WorldSession::HandleArenaTeamLeaderOpcode(WorldPacket& recvData)
   // Check for valid arena team
   ArenaTeam* arenaTeam = sArenaTeamMgr->GetArenaTeamById(arenaTeamId);
   if (!arenaTeam)
+    return;
+
+  // Solo teams have a single member
+  if (arenaTeam->IsSoloTeam())
     return;
 
   // Only captain can pass leadership
