@@ -50,12 +50,12 @@ tokens (Archivo font, colors) in `packages/web/src/global.css`.
 `/api/live-ladder/ws` (`packages/backend/src/features/liveLadder/`), is not linked from the site,
 and must stay that way. `/live-ladder-tourney` is its unlisted sibling: same table
 (`components/LiveLadderTable.tsx`) plus a compact tourney reminder strip at the bottom, clocked by
-`NEXT_TOURNAMENT` in `lib/site.ts`.
+`nextTournament()` from `lib/tournaments.json` (hidden when nothing is scheduled).
 
 `/tourney-banner` is the unlisted full-frame 16:9 OBS cover (event clock, tourney-day agenda,
 previous winners) for stream start/breaks/after-show. It renders outside `SiteLayout`, is never
 linked, shows the tourney number but not the name, and is static data only (`lib/tourneyAgenda.ts`,
-`lib/hallOfFame.ts`, `lib/tournaments.ts`). `?at=HH:MM` previews a phase.
+`lib/hallOfFame.ts`, `lib/tournaments.json`). `?at=HH:MM` previews a phase.
 
 `/overlay/:token` is the personal OBS overlay of one streamer, also outside `SiteLayout` and
 unlinked. The token comes from the Discord bot's `/overlay` command (auth DB `account_overlay`);

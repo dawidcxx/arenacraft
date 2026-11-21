@@ -4,14 +4,6 @@ export const DISCORD_LABEL = "discord.gg/tj2DVNQmj2";
 export const REALM_HOST = "logon.arenacraft.fun";
 export const REALMLIST_COMMAND = `set realmlist ${REALM_HOST}`;
 
-export const NEXT_TOURNAMENT = {
-  name: "No Warmane november",
-  // Sunday 15 November 2026, 18:00-21:00 CET.
-  startsAt: new Date("2026-11-15T18:00:00+01:00"),
-  endsAt: new Date("2026-11-15T21:00:00+01:00"),
-  windowLabel: "18:00–21:00 CET",
-} as const;
-
 export type NavLinkItem = { label: string; to: string };
 
 /** Always visible in the header. */

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "arenacraft-forever",
+    "number": 1,
+    "title": "Arenacraft forever",
+    "description": "A smaller tournament to keep the pace going. Due to concurrent WoW Forever release we expect a smaller player count. A more chill tourney, we will experiment with MCH format here. The goal here is continue tech development for larger tourneys",
+    "format": "SoloQ MCH, King of the Hill",
+    "startsAt": "2026-11-08T18:00:00+01:00",
+    "endsAt": "2026-11-08T21:00:00+01:00",
+    "prizes": [
+      {
+        "amount": "50 EUR",
+        "description": "to the highest rated player",
+        "highlight": true
+      },
+      {
+        "amount": "25 EUR",
+        "description": "lottery reward to a randomly selected player. The winner is excluded from the reward.",
+        "highlight": false
+      }
+    ]
+  },
+  {
+    "id": "no-warmane-november",
+    "number": 2,
+    "title": "No Warmane november",
+    "description": "Time to get serious! Prize pool and details might change slightly depending on the player feedback. We wanna measure the impact of a slightly higher prize on the games quality. By this point we expect our tech to mature. Fewer bugs, more smooth game play experience.",
+    "format": "SoloQ Flex, King of the Hill",
+    "startsAt": "2026-11-15T18:00:00+01:00",
+    "endsAt": "2026-11-15T21:00:00+01:00",
+    "prizes": [
+      {
+        "amount": "100 EUR",
+        "description": "to the highest rated player",
+        "highlight": true
+      },
+      {
+        "amount": "50 EUR",
+        "description": "lottery reward to a randomly selected player. The winner is excluded from the reward.",
+        "highlight": false
+      }
+    ]
+  }
+]

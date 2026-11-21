@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ClassIcon } from "@/components/ClassIcon";
 import { Tag } from "@/components/Tag";
 import { TwitchIcon } from "@/components/TwitchIcon";
-import { HALL_OF_FAME, type Champion } from "@/lib/hallOfFame";
+import { HALL_OF_FAME, type Champion, type RunnerUp } from "@/lib/hallOfFame";
 import { CLASS_COLORS } from "@/lib/ladder";
 
 /** Tournament champions, newest first. */
@@ -47,6 +47,8 @@ function ChampionCard({ champion }: { champion: Champion }) {
         <Row term="Prize">{champion.prize}</Row>
       </dl>
 
+      {champion.runnerUp !== undefined && <RunnerUpCard runnerUp={champion.runnerUp} />}
+
       {champion.note !== undefined && (
         <p className="border-l-4 border-accent bg-surface-raised px-3 py-2.5 text-[15px] leading-[1.55]">
           <span className="mb-1 block text-xs font-extrabold tracking-[0.08em] text-label uppercase">
@@ -66,6 +68,27 @@ function ChampionCard({ champion }: { champion: Champion }) {
         </a>
       )}
     </article>
+  );
+}
+
+function RunnerUpCard({ runnerUp }: { runnerUp: RunnerUp }) {
+  const color = CLASS_COLORS[runnerUp.wowClass];
+
+  return (
+    <div className="flex items-center gap-3 border-t-2 border-divider pt-4">
+      <ClassIcon wowClass={runnerUp.wowClass} className="size-10" />
+      <div className="grid min-w-0">
+        <p className="text-xs tracking-[0.1em] text-label uppercase">
+          Runner-up · {runnerUp.prize ?? "no prize"}
+        </p>
+        <p className="text-[22px] leading-tight font-extrabold" style={{ color }}>
+          {runnerUp.winner}
+        </p>
+        <p className="text-sm font-bold text-ink/60">
+          {runnerUp.spec === null ? runnerUp.wowClass : `${runnerUp.spec} ${runnerUp.wowClass}`}
+        </p>
+      </div>
+    </div>
   );
 }
 

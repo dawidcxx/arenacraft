@@ -5,10 +5,10 @@ import { PageHero } from "@/components/PageHero";
 import { SectionIntro } from "@/components/SectionIntro";
 import { TournamentCard } from "@/components/sections/TournamentCard";
 import { cn } from "@/lib/cn";
-import { TOURNAMENT_NOTE, TOURNAMENT_RULES, TOURNAMENTS } from "@/lib/tournaments";
+import { TOURNAMENT_NOTE, TOURNAMENT_RULES, upcomingTournaments } from "@/lib/tournaments";
 
 export function TournamentsPage() {
-  const upcoming = TOURNAMENTS.filter((tournament) => tournament.status === "upcoming");
+  const upcoming = upcomingTournaments();
 
   return (
     <>

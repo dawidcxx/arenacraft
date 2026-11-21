@@ -4,9 +4,9 @@ import { useEventClock } from "@/hooks/useEventClock";
 import { cn } from "@/lib/cn";
 import { HALL_OF_FAME } from "@/lib/hallOfFame";
 import { CLASS_COLORS } from "@/lib/ladder";
-import { DISCORD_LABEL, NEXT_TOURNAMENT } from "@/lib/site";
+import { DISCORD_LABEL } from "@/lib/site";
 import { agendaStatus, eventDayLabel, TOURNEY_AGENDA, tourneyPhase } from "@/lib/tourneyAgenda";
-import { TOURNAMENTS } from "@/lib/tournaments";
+import { latestFinishedTournament, nextTournament } from "@/lib/tournaments";
 
 // 16:9 cover, designed at 1080p and scaled to whatever the OBS browser source is.
 const STAGE_WIDTH = 1920;
@@ -21,7 +21,9 @@ export function TourneyBannerPage() {
   const clock = useEventClock();
   const phase = tourneyPhase(clock.secondsOfDay);
   const scale = useStageScale();
-  const current = TOURNAMENTS.find((tournament) => tournament.status === "upcoming");
+  // On tourney day this is the running/next one; after it ends, keep the cover on the latest.
+  const featured = nextTournament() ?? latestFinishedTournament();
+  const eventDate = featured?.startsAt ?? new Date();
 
   const statuses = TOURNEY_AGENDA.map((row) => agendaStatus(row, clock.secondsOfDay));
   const nextIndex = statuses.indexOf("upcoming");
@@ -51,11 +53,12 @@ export function TourneyBannerPage() {
             <span className="text-[26px] font-extrabold tracking-[0.34em]">ARENACRAFT</span>
             <span className="h-[22px] w-[2px] bg-divider" aria-hidden="true" />
             <span className="text-[19px] font-bold tracking-[0.3em] text-label uppercase">
-              {current === undefined ? "Tourney" : `Tourney #${current.number}`}
+              {featured === undefined ? "Tourney" : `Tourney #${featured.number}`}
             </span>
           </div>
           <p className="text-[17px] font-bold tracking-[0.24em] text-ink/50 uppercase">
-            {eventDayLabel(NEXT_TOURNAMENT.startsAt)} · {NEXT_TOURNAMENT.windowLabel}
+            {eventDayLabel(eventDate)}
+            {featured === undefined ? "" : ` · ${featured.windowLabel}`}
           </p>
         </header>
 
@@ -149,8 +152,9 @@ export function TourneyBannerPage() {
           <p className="text-[15px] font-extrabold tracking-[0.28em] text-label uppercase">
             Previous winners
           </p>
-          <div className="mt-[18px] grid grid-cols-2 gap-[64px]">
-            {HALL_OF_FAME.map((champion) => (
+          {/* Fixed 1080p cover: one row of the latest champions, so new wins never overflow it. */}
+          <div className="mt-[18px] grid grid-cols-3 gap-[40px]">
+            {HALL_OF_FAME.slice(0, 3).map((champion) => (
               <article
                 key={champion.id}
                 className="flex items-center gap-[20px] border-l-4 border-accent pl-[20px]"
@@ -177,7 +181,7 @@ export function TourneyBannerPage() {
 
         <footer className="flex items-center justify-between pt-[30px] text-[13px] font-bold tracking-[0.22em] text-ink/35 uppercase">
           <p>arenacraft.fun · {DISCORD_LABEL}</p>
-          <p>{current?.format ?? ""}</p>
+          <p>{featured?.format ?? ""}</p>
         </footer>
       </div>
     </main>

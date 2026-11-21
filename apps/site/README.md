@@ -33,9 +33,10 @@ The frontend sorts nothing — the server returns the best rating first.
 The header shows Home and Ladder; every other page sits in its "More" dropdown
 (`NAV_LINKS` / `NAV_MORE_LINKS` in `packages/web/src/lib/site.ts`).
 
-Tournaments (`lib/tournaments.ts`), champions (`lib/hallOfFame.ts`) and addons (`lib/addons.ts`) are
-static data in the frontend. A finished tourney leaves the "Upcoming" list once its `status` is
-`finished`; add its winner to `HALL_OF_FAME`.
+Tournaments (`lib/tournaments.json`), champions (`lib/hallOfFame.ts`) and addons (`lib/addons.ts`)
+are static data in the frontend. A tourney carries its window (`startsAt`/`endsAt`); status, date
+labels and the next/latest tourney are derived on read, so an expired tourney drops out of
+"Upcoming" automatically. Add its winner (and runner-up) to `HALL_OF_FAME`.
 
 Addon zips are served from `packages/web/public/addons/`. To add or update one, drop the zip as
 received into `apps/site/addons/` (git-ignored), run `scripts/pack-addons` from `apps/site`, commit
@@ -65,8 +66,9 @@ a translucent background (`/95` etc.) reads as see-through on stream in OBS.
   rated game every 5-20 seconds, rotating forced rank swaps, top-5 knockouts and regular games.
 
 `/live-ladder-tourney` is the same unlisted widget with a compact accent strip along the bottom
-bound to the tourney window in `lib/site.ts` (`NEXT_TOURNAMENT.startsAt`/`endsAt`, `windowLabel`):
-it counts down to the start, shows the remaining time while live, and reads "finished" afterwards.
+bound to the next scheduled tourney (`nextTournament()` from `lib/tournaments.json`, with its derived
+`windowLabel`): it counts down to the start, shows the remaining time while live, and reads
+"finished" afterwards. Without a scheduled tourney the strip is hidden.
 Both pages share `components/LiveLadderTable.tsx`.
 
 ### Reverse proxy
@@ -97,8 +99,9 @@ champions. It never shows the tourney name — only its number, day, window and 
 - Agenda and phase logic live in `lib/tourneyAgenda.ts`: 17:45 stream start, 17:59 bracket reset,
   18:00 tourney start, 18:00–20:15 gameplay stream, 20:15–21:00 spectator commentary, then a
   post-show state.
-- Previous winners come from `lib/hallOfFame.ts`; the current tourney from `lib/tournaments.ts`
-  (`status === "upcoming"`). Everything is static code — no API calls, no database.
+- Previous winners come from `lib/hallOfFame.ts`; the featured tourney is the next scheduled one
+  from `lib/tournaments.json`, falling back to the latest finished one after the event. Everything
+  is static code — no API calls, no database.
 - The stage is a fixed 1920×1080 composition scaled to the browser source size and letterboxed by
   the solid `#0c0b0b` page background (no alpha, same trap as the live ladder widget).
 - `?at=19:30` previews another phase of the day; the clock keeps ticking from there.

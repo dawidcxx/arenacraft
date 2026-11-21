@@ -3,17 +3,19 @@ import { Tag } from "@/components/Tag";
 import { useCountdown } from "@/hooks/useCountdown";
 import { cn } from "@/lib/cn";
 import { formatCountdown } from "@/lib/countdown";
-import type { Tournament } from "@/lib/tournaments";
+import { type Tournament, tournamentStatus } from "@/lib/tournaments";
 
 export function TournamentCard({ tournament }: { tournament: Tournament }) {
+  const status = tournamentStatus(tournament);
+
   return (
     <article className="grid content-start gap-3 border-b-2 border-divider px-4 py-6 md:border-r-2 md:border-b-0 md:last:border-r-0">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs tracking-[0.1em] text-label uppercase">
           Tourney #{tournament.number}
         </p>
-        <Tag tone={tournament.status === "finished" ? "neutral" : "outline"}>
-          {tournament.status === "finished" ? "Finished" : "Upcoming"}
+        <Tag tone={status === "finished" ? "neutral" : "outline"}>
+          {status === "finished" ? "Finished" : "Upcoming"}
         </Tag>
       </div>
 
@@ -27,7 +29,7 @@ export function TournamentCard({ tournament }: { tournament: Tournament }) {
         <DetailRow term="Date">{tournament.date}</DetailRow>
         <DetailRow term="Format">{tournament.format}</DetailRow>
         <DetailRow term="Starts in">
-          <StartsIn startsAt={tournament.startsAt} />
+          {status === "finished" ? "Finished" : <StartsInCountdown startsAt={tournament.startsAt} />}
         </DetailRow>
       </dl>
 
@@ -59,11 +61,6 @@ function DetailRow({ term, children }: { term: string; children: ReactNode }) {
       <dd className="text-[15px] leading-[1.55] font-bold">{children}</dd>
     </div>
   );
-}
-
-function StartsIn({ startsAt }: { startsAt: Date | null }) {
-  if (startsAt === null) return <>Finished</>;
-  return <StartsInCountdown startsAt={startsAt} />;
 }
 
 function StartsInCountdown({ startsAt }: { startsAt: Date }) {

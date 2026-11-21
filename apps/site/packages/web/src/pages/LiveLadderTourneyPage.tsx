@@ -4,7 +4,7 @@ import { useLiveLadder } from "@/hooks/useLiveLadder";
 import { useTourneyClock } from "@/hooks/useTourneyClock";
 import { cn } from "@/lib/cn";
 import type { LiveLadderStatus } from "@/lib/liveLadder";
-import { NEXT_TOURNAMENT } from "@/lib/site";
+import { nextTournament } from "@/lib/tournaments";
 import { tourneyClockLabel } from "@/lib/tourneyClock";
 
 const STATUS_STYLES: Record<LiveLadderStatus, { dot: string; label: string }> = {
@@ -15,11 +15,18 @@ const STATUS_STYLES: Record<LiveLadderStatus, { dot: string; label: string }> = 
 
 /**
  * Unlisted OBS browser source: the live top 5 plus a compact tourney reminder strip whose clock
- * follows `NEXT_TOURNAMENT`'s window. Same transparent chrome-less layout as `/live-ladder`.
+ * follows the next scheduled tourney (`lib/tournaments.json`). Same transparent chrome-less layout
+ * as `/live-ladder`.
  */
 export function LiveLadderTourneyPage() {
   const { status, players } = useLiveLadder();
-  const clock = useTourneyClock(NEXT_TOURNAMENT.startsAt, NEXT_TOURNAMENT.endsAt);
+  const tournament = nextTournament();
+  // Fallback dates only keep the hook unconditional; the strip itself is hidden without a tourney.
+  const fallback = new Date();
+  const clock = useTourneyClock(
+    tournament?.startsAt ?? fallback,
+    tournament?.endsAt ?? fallback,
+  );
   const indicator = STATUS_STYLES[status];
 
   useEffect(() => {
@@ -45,18 +52,20 @@ export function LiveLadderTourneyPage() {
 
         <LiveLadderTable players={players} />
 
-        <footer className="flex items-center gap-2 border-t-2 border-divider bg-accent px-3 py-1.5 text-white">
-          <span className="size-2 shrink-0 bg-white" aria-hidden="true" />
-          <span className="shrink-0 text-[10px] font-extrabold tracking-[0.14em] uppercase">
-            {NEXT_TOURNAMENT.windowLabel}
-          </span>
-          <span
-            className="ml-auto text-[11px] font-extrabold whitespace-nowrap tabular-nums"
-            aria-label="Tourney clock"
-          >
-            {tourneyClockLabel(clock)}
-          </span>
-        </footer>
+        {tournament !== undefined && (
+          <footer className="flex items-center gap-2 border-t-2 border-divider bg-accent px-3 py-1.5 text-white">
+            <span className="size-2 shrink-0 bg-white" aria-hidden="true" />
+            <span className="shrink-0 text-[10px] font-extrabold tracking-[0.14em] uppercase">
+              {tournament.windowLabel}
+            </span>
+            <span
+              className="ml-auto text-[11px] font-extrabold whitespace-nowrap tabular-nums"
+              aria-label="Tourney clock"
+            >
+              {tourneyClockLabel(clock)}
+            </span>
+          </footer>
+        )}
       </section>
     </main>
   );
