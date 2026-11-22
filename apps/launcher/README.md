@@ -44,6 +44,14 @@ tests are pure Zig with no libc or Win32 dependency, so they build and run
 natively: `zig build clay-test` needs no wine, and `zig build test` runs both.
 `zig build lib-test` runs the lib tests on their own.
 
+## Icon
+
+`launcher.rc` embeds `AppIcon.ico` in the PE, so `launcher.exe` carries the
+application icon for Explorer, the taskbar, Alt+Tab and shortcuts; `gui` loads
+the same resource for the window class. `AppIcon.ico` is generated from
+`AppIcon.jpeg` by `scripts/make_icon.py` (needs `ffmpeg` on `PATH`); regenerate
+and commit it when the artwork changes.
+
 ## What it does
 
 The window declares a single-column layout: an **Arenacraft** title, a
@@ -78,6 +86,9 @@ launcher stays open.
   MinGW-w64 headers and CRT resolve.
 - `installer/`: WiX source for `Arenacraft.msi` and its JScript validation
   action.
+- `launcher.rc` / `AppIcon.ico`: PE resources; the icon is also used for the
+  window class. `scripts/make_icon.py` regenerates the icon from
+  `AppIcon.jpeg`.
 - `scripts/changelog.sh`: release notes for the `launcher-release` workflow.
 
 The GUI surface hides widget handles and takes layout in its own vocabulary, so

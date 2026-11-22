@@ -6,8 +6,11 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{},
     .paths = .{
+        "AppIcon.jpeg",
+        "AppIcon.ico",
         "build.zig",
         "build.zig.zon",
+        "launcher.rc",
         "README.md",
         "installer",
         "scripts",

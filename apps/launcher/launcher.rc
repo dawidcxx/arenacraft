@@ -1,0 +1,6 @@
+// Resource script compiled into launcher.exe. The lowest icon ID is the one
+// Explorer, the taskbar and shortcuts use for the executable; gui/window.zig
+// loads the same ID for the window class.
+//
+// AppIcon.ico is generated from AppIcon.jpeg by scripts/make_icon.py.
+1 ICON "AppIcon.ico"

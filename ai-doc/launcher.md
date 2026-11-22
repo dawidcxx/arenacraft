@@ -96,6 +96,17 @@ Testing note: without a window manager, resizing the X window does not reach
 Wine's Win32 window, so no `WM_SIZE` is delivered. Drive resizes with
 `SetWindowPos` from a helper process instead.
 
+## Icon
+
+`launcher.rc` embeds `AppIcon.ico` in the PE; the lowest icon ID is the
+application icon, which is why Explorer, the taskbar and shortcuts use it and
+not just the window. `gui/window.zig` loads the same ID for the window class
+(`hIcon`/`hIconSm`). `AppIcon.ico` is generated from `AppIcon.jpeg` by
+`scripts/make_icon.py` (uses `ffmpeg`); regenerate and commit it when the
+artwork changes. The `.ico` must be committed as a binary — `.gitattributes`
+already marks it so, otherwise CRLF normalization corrupts the PNG-compressed
+256 px entry (this happened to the old updater app's icon).
+
 ## Release
 
 `launcher-release` builds `Arenacraft.exe` from an existing `launcher-x.y.z` tag

@@ -32,6 +32,10 @@ const background_color: c.COLORREF = 0x00f0f0f0;
 /// `MAKEINTRESOURCE`, which `@cImport` cannot translate.
 const idc_arrow = 32512;
 
+/// Icon ID from `launcher.rc`, embedded in launcher.exe. `MAKEINTRESOURCE` is
+/// not translated, so the small integer is cast to a pointer directly.
+const icon_resource_id = 1;
+
 const font_count = 2;
 
 var class_registered = false;
@@ -449,8 +453,8 @@ fn textExtent(window: *Window, font: c.HFONT, text: []const u16) clay.Size {
 /// Create and show the window. The returned pointer is owned by the caller and
 /// must be released with `Window.deinit`.
 pub fn create(options: Options) !*Window {
-    try ensureClass();
     ensureDpiAware();
+    try ensureClass();
 
     const self = try allocator.create(Window);
     self.* = .{ .engine = clay.Layout.init(allocator, measureText, self) };
@@ -511,21 +515,40 @@ pub fn run() void {
     }
 }
 
+/// Load one icon size from the executable's resource table. The handles are
+/// owned by the window class and live for the whole process.
+fn loadIcon(metric: c_int) c.HICON {
+    const size = c.GetSystemMetrics(metric);
+    return @ptrCast(@alignCast(c.LoadImageA(
+        c.GetModuleHandleA(null),
+        @ptrFromInt(@as(usize, icon_resource_id)),
+        c.IMAGE_ICON,
+        size,
+        size,
+        c.LR_DEFAULTCOLOR,
+    )));
+}
+
 fn ensureClass() !void {
     if (class_registered) return;
 
     // The brush lives as long as the class, i.e. for the whole process.
     class_brush = c.CreateSolidBrush(background_color);
 
-    var window_class: c.WNDCLASSA = std.mem.zeroes(c.WNDCLASSA);
+    var window_class: c.WNDCLASSEXA = std.mem.zeroes(c.WNDCLASSEXA);
+    window_class.cbSize = @sizeOf(c.WNDCLASSEXA);
     window_class.style = @intCast(c.CS_HREDRAW | c.CS_VREDRAW);
     window_class.lpfnWndProc = windowProc;
     window_class.hInstance = c.GetModuleHandleA(null);
     window_class.hCursor = c.LoadCursorA(null, @ptrFromInt(@as(usize, idc_arrow)));
+    // Title bar, Alt+Tab and the taskbar take the icons from the class; both
+    // handles live for the whole process, like the class brush.
+    window_class.hIcon = loadIcon(c.SM_CXICON);
+    window_class.hIconSm = loadIcon(c.SM_CXSMICON);
     window_class.hbrBackground = class_brush;
     window_class.lpszClassName = class_name;
 
-    if (c.RegisterClassA(&window_class) == 0) return error.WindowClassRegistrationFailed;
+    if (c.RegisterClassExA(&window_class) == 0) return error.WindowClassRegistrationFailed;
     class_registered = true;
 }
 

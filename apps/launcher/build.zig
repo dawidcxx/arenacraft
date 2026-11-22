@@ -138,6 +138,10 @@ fn addLauncher(
             .{ .name = "gui", .module = gui_mod },
         },
     });
+    // The application icon lives in the PE resource table (launcher.rc), so
+    // Explorer and shortcuts show it too, not just the window.
+    mod.addWin32ResourceFile(.{ .file = b.path("launcher.rc") });
+
     const exe = b.addExecutable(.{
         .name = "launcher",
         .root_module = mod,
