@@ -117,7 +117,7 @@ pub fn main() void {
 
     const window = gui.createWindow(.{
         .title = window_title,
-        .size = .{ .width = 620, .height = 380 },
+        .size = .{ .width = 640, .height = 480 },
     }) catch |err| {
         var buffer: [256]u8 = undefined;
         const text = std.fmt.bufPrint(
