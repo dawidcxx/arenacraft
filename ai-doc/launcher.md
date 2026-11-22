@@ -41,6 +41,18 @@ to `DefWindowProcA` instead of returning `TRUE` itself. Returning early skips
 the default proc, which is what applies the title passed to `CreateWindowExA`;
 the window then has an empty caption even though the title was supplied.
 
+Labels are native `STATIC` controls. Two things keep their text intact when
+`setLabelText` changes it:
+
+- `applyPlacements` invalidates every label after a layout pass. When a static
+  grows, it repaints only the strip it gained, so the previous (slightly
+  narrower) paint survives: changing "Arenacraft" to "New realm" showed just
+  "New" until a resize repainted the whole control. `setLabelText` alone is not
+  enough; the invalidation has to happen after the control has been resized.
+- Label containers reserve one pixel of right and bottom padding. `STATIC`
+  wraps at word boundaries, and rounding the measured text width down is enough
+  to push the last word to a second line that the one-line control clips.
+
 ## Views
 
 The launcher has two views in one window: home and the realm switcher. A view

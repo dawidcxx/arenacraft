@@ -578,8 +578,14 @@ pub const Window = struct {
                     // The text sits inside a container so labels accept the same
                     // sizing options as any other widget; a fit container
                     // around a text element is exactly the text's size.
+                    //
+                    // STATIC wraps at word boundaries, and rounding the
+                    // container down by half a pixel is enough to push the last
+                    // word onto a second line that the one-line control clips,
+                    // so keep a pixel of slack on the right and bottom.
                     const node = try self.engine.open(.{ .layout = .{
                         .sizing = layout.toClaySizing(widget.sizing),
+                        .padding = .{ .right = 1, .bottom = 1 },
                     } });
                     _ = try self.engine.text(widget.text, .{
                         .wrap = layout.toClayWrap(widget.wrap),
@@ -638,6 +644,15 @@ pub const Window = struct {
         }
 
         _ = c.EndDeferWindowPos(handle);
+
+        // A STATIC that grew only repaints the strip it gained, so its old
+        // word-wrapped text can stay on screen until something else repaints
+        // it (e.g. "Arenacraft" -> "New realm" shows just "New"). Labels are
+        // cheap: repaint them in full after every layout pass.
+        for (self.placements.items) |placement| switch (placement.target) {
+            .label => |widget| _ = c.InvalidateRect(widget.hwnd, null, c.TRUE),
+            else => {},
+        };
     }
 
     fn hwndOf(_: *Window, placement: Placement) c.HWND {
