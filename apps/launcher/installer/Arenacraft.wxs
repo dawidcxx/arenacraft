@@ -33,15 +33,12 @@
     <SetProperty Id="INSTALLDIR" Value="[WOWDIR]" Before="CostFinalize"
                  Sequence="both" Condition="NOT Installed AND WOWDIR AND NOT INSTALLDIR" />
 
-    <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFiles6432Folder">
-        <Directory Id="INSTALLDIR" Name="World of Warcraft" />
-      </Directory>
-      <Directory Id="DesktopFolder" />
-      <Directory Id="ProgramMenuFolder">
-        <Directory Id="ArenacraftMenuFolder" Name="Arenacraft" />
-      </Directory>
-    </Directory>
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLDIR" Name="World of Warcraft" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ArenacraftMenuFolder" Name="Arenacraft" />
+    </StandardDirectory>
 
     <Component Id="LauncherComponent" Directory="INSTALLDIR" Guid="*">
       <File Id="ArenacraftExe" Source="$(var.SourceDir)\Arenacraft.exe" KeyPath="yes" />
@@ -62,7 +59,7 @@
                      Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
-    <Feature Id="LauncherFeature" Title="Arenacraft Launcher" Level="1" Absent="disallow">
+    <Feature Id="LauncherFeature" Title="Arenacraft Launcher" Level="1" AllowAbsent="no">
       <ComponentRef Id="LauncherComponent" />
     </Feature>
     <Feature Id="DesktopShortcutFeature" Title="Desktop shortcut" Level="1">
