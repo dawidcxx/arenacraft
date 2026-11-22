@@ -396,6 +396,14 @@ pub const Window = struct {
         return @intCast(result);
     }
 
+    /// Highlight `index` without touching the rows. Unlike `setListItems` this
+    /// is safe from inside the list's own selection notification, where
+    /// resetting the content would desynchronise the native selection.
+    pub fn setListSelection(self: *Window, target: *listbox.ListBox, index: usize) void {
+        _ = self;
+        selectListItem(target, index);
+    }
+
     /// Replace an edit's text and select it, so a typed replacement starts on
     /// the next keystroke.
     pub fn setEditText(self: *Window, target: *edit.Edit, text: []const u8) !void {

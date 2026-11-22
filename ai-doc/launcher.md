@@ -128,6 +128,12 @@ state.
   realm is worse than not starting.
 - A host is validated as `[A-Za-z0-9.-]+` (no scheme, port or path); anything
   else cannot go in that field anyway.
+- Remove forgets the highlighted realm and rewrites the file. Custom hosts just
+  disappear from the history; a built-in realm would be appended again by
+  `ensurePresets` on the next start, so removing one writes a `#hidden <host>`
+  line. That is an ordinary comment for the client, and `parse`/`Client.load`
+  merge it back so the preset stays gone. Typing the host again clears the
+  marker. The last realm cannot be removed: the client needs one.
 - The file is rewritten unconditionally (line endings become `\n`), which also
   normalizes hand-edited duplicates away.
 - The MSI is per-machine and may install into Program Files; a non-elevated
@@ -146,10 +152,12 @@ easier to reason about and to drive:
   `Window.editText` is read right before writing; Enter is caught by a window
   procedure subclass (`SetWindowLongPtrW(GWLP_WNDPROC)`) that forwards everything
   but `VK_RETURN` to `CallWindowProcW`.
-- `Window.setListItems` repopulates after a typed host joins the list.
-  `LB_SETCURSEL` does not notify the parent, so that refresh cannot re-enter the
-  selection callback; `LB_RESETCONTENT`/`LB_ADDSTRING` are safe from inside the
-  notification as well.
+- `Window.setListItems` repopulates after a typed host joins the list or a realm
+  is removed. `LB_SETCURSEL` does not notify the parent, so reselecting cannot
+  re-enter the selection callback. Do not call it from inside `LBN_SELCHANGE`:
+  resetting the rows while the control is still handling the click leaves the
+  native selection out of sync with the active realm. Inside the notification
+  use `Window.setListSelection`, which only moves the highlight.
 - Both controls copy their strings, so call sites keep ownership of the item
   list and may free it after adding rows.
 

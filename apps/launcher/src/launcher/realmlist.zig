@@ -41,6 +41,10 @@ const max_host_len = 253;
 pub const List = struct {
     allocator: std.mem.Allocator,
     hosts: std.ArrayListUnmanaged([]u8) = .empty,
+    /// Built-in realms the player removed. They are written as `#hidden` lines
+    /// (ignored by the client, like any comment) so `ensurePresets` does not
+    /// bring them back on the next start.
+    hidden: std.ArrayListUnmanaged([]u8) = .empty,
     /// Index into `hosts` of the realm written as the active line.
     active: usize = 0,
     /// Whether any file had an uncommented `set realmlist` line. A list made of
@@ -54,6 +58,8 @@ pub const List = struct {
     pub fn deinit(self: *List) void {
         for (self.hosts.items) |host| self.allocator.free(host);
         self.hosts.deinit(self.allocator);
+        for (self.hidden.items) |host| self.allocator.free(host);
+        self.hidden.deinit(self.allocator);
         self.* = undefined;
     }
 
@@ -62,6 +68,10 @@ pub const List = struct {
         for (self.hosts.items, 0..) |known, index| {
             if (std.ascii.eqlIgnoreCase(known, host)) return index;
         }
+
+        // An explicit host line wins over a stale `#hidden` marker, e.g. when
+        // the player types the address again or edits the file by hand.
+        self.forgetHidden(host);
 
         const copy = try self.allocator.dupe(u8, host);
         errdefer self.allocator.free(copy);
@@ -82,9 +92,34 @@ pub const List = struct {
         return self.hosts.items[self.active];
     }
 
-    /// Append the built-in realms that the file history does not contain yet.
+    /// Forget the realm at `index`. Removing a built-in realm also hides it, so
+    /// the next start does not re-add it. The last realm cannot be removed: the
+    /// client needs one to connect to.
+    pub fn remove(self: *List, index: usize) error{ NotFound, LastRealm, OutOfMemory }!void {
+        if (index >= self.hosts.items.len) return error.NotFound;
+        if (self.hosts.items.len == 1) return error.LastRealm;
+
+        const host = self.hosts.items[index];
+        if (isPreset(host)) try self.hide(host);
+
+        self.allocator.free(host);
+        _ = self.hosts.orderedRemove(index);
+
+        if (self.active == index) {
+            self.active = @min(index, self.hosts.items.len - 1);
+            self.has_active = true;
+        } else if (self.active > index) {
+            self.active -= 1;
+        }
+    }
+
+    /// Append the built-in realms that the file history does not contain yet,
+    /// skipping the ones the player removed.
     pub fn ensurePresets(self: *List) !void {
-        for (presets) |preset| _ = try self.add(preset.host);
+        for (presets) |preset| {
+            if (self.isHidden(preset.host)) continue;
+            _ = try self.add(preset.host);
+        }
     }
 
     /// Parse `set realmlist` lines. All hosts are remembered in file order; the
@@ -95,6 +130,11 @@ pub const List = struct {
 
         var lines = std.mem.splitScalar(u8, text, '\n');
         while (lines.next()) |line| {
+            if (parseHiddenLine(line)) |host| {
+                try list.hide(host);
+                continue;
+            }
+
             const entry = parseLine(line) orelse continue;
             const index = try list.add(entry.host);
             if (!entry.commented and !list.has_active) {
@@ -103,26 +143,65 @@ pub const List = struct {
             }
         }
 
+        list.pruneHidden();
         return list;
     }
 
     /// Render the file: one active line, every other remembered host commented
-    /// out. Allocated with `allocator`.
+    /// out, then the hidden built-in realms. Allocated with `allocator`.
     pub fn render(self: *const List, allocator: std.mem.Allocator) ![]u8 {
         var out: std.Io.Writer.Allocating = .init(allocator);
         errdefer out.deinit();
         const writer = &out.writer;
 
-        if (self.hosts.items.len == 0) {
-            return out.toOwnedSlice();
+        if (self.hosts.items.len > 0) {
+            try writer.print("set realmlist {s}\n", .{self.activeHost()});
+            for (self.hosts.items, 0..) |host, index| {
+                if (index == self.active) continue;
+                try writer.print("#set realmlist {s}\n", .{host});
+            }
         }
-
-        try writer.print("set realmlist {s}\n", .{self.activeHost()});
-        for (self.hosts.items, 0..) |host, index| {
-            if (index == self.active) continue;
-            try writer.print("#set realmlist {s}\n", .{host});
+        for (self.hidden.items) |host| {
+            try writer.print("#hidden {s}\n", .{host});
         }
         return out.toOwnedSlice();
+    }
+
+    fn hide(self: *List, host: []const u8) !void {
+        if (self.isHidden(host)) return;
+
+        const copy = try self.allocator.dupe(u8, host);
+        errdefer self.allocator.free(copy);
+        try self.hidden.append(self.allocator, copy);
+    }
+
+    fn unhide(self: *List, host: []const u8) void {
+        self.forgetHidden(host);
+    }
+
+    /// Drop hidden markers for hosts that are in the list; a `set realmlist`
+    /// line is the player's explicit wish, whatever the file order.
+    fn pruneHidden(self: *List) void {
+        for (self.hosts.items) |host| self.forgetHidden(host);
+    }
+
+    fn forgetHidden(self: *List, host: []const u8) void {
+        var index: usize = 0;
+        while (index < self.hidden.items.len) {
+            if (std.ascii.eqlIgnoreCase(self.hidden.items[index], host)) {
+                self.allocator.free(self.hidden.items[index]);
+                _ = self.hidden.orderedRemove(index);
+            } else {
+                index += 1;
+            }
+        }
+    }
+
+    fn isHidden(self: *const List, host: []const u8) bool {
+        for (self.hidden.items) |known| {
+            if (std.ascii.eqlIgnoreCase(known, host)) return true;
+        }
+        return false;
     }
 };
 
@@ -157,6 +236,22 @@ fn parseLine(line: []const u8) ?Line {
     return .{ .host = rest[0..end], .commented = commented };
 }
 
+/// Recognise the launcher's `#hidden <host>` marker, which records a built-in
+/// realm the player removed. Any other comment is ignored, by us and the client.
+fn parseHiddenLine(line: []const u8) ?[]const u8 {
+    var rest = std.mem.trim(u8, line, " \t\r");
+    if (rest.len == 0 or rest[0] != '#') return null;
+    rest = std.mem.trimStart(u8, rest[1..], " \t");
+
+    if (!std.ascii.startsWithIgnoreCase(rest, "hidden")) return null;
+    if (rest.len == "hidden".len or !std.ascii.isWhitespace(rest["hidden".len])) return null;
+    rest = std.mem.trimStart(u8, rest["hidden".len..], " \t");
+
+    const end = std.mem.findAny(u8, rest, " \t#") orelse rest.len;
+    if (end == 0) return null;
+    return rest[0..end];
+}
+
 /// Trim a user-entered realm and reject anything that is not a plain host name
 /// or IPv4 address. Returns the trimmed slice or null.
 pub fn validate(text: []const u8) ?[]const u8 {
@@ -168,6 +263,14 @@ pub fn validate(text: []const u8) ?[]const u8 {
         if (!std.ascii.isAlphanumeric(ch) and ch != '.' and ch != '-') return null;
     }
     return host;
+}
+
+/// Whether `host` is one of the built-in realms.
+pub fn isPreset(host: []const u8) bool {
+    for (presets) |preset| {
+        if (std.ascii.eqlIgnoreCase(preset.host, host)) return true;
+    }
+    return false;
 }
 
 /// Friendly name for the realm label: the preset name, or "Custom realm" for a
@@ -288,12 +391,15 @@ pub const Client = struct {
             defer parsed.deinit();
 
             for (parsed.hosts.items) |host| _ = try list.add(host);
+            for (parsed.hidden.items) |host| try list.hide(host);
             if (parsed.has_active and !list.has_active) {
                 list.active = try list.add(parsed.hosts.items[parsed.active]);
                 list.has_active = true;
             }
         }
 
+        // A host seen in any file wins over a `#hidden` marker from another.
+        list.pruneHidden();
         return list;
     }
 
@@ -445,6 +551,78 @@ test "add and setActive are case insensitive" {
     try std.testing.expectEqual(@as(usize, 1), list.hosts.items.len);
     try std.testing.expectEqual(@as(usize, 0), index);
     try std.testing.expectEqualStrings("logon.arenacraft.fun", list.activeHost());
+}
+
+test "remove drops a realm and keeps the active realm valid" {
+    var list = List.init(std.testing.allocator);
+    defer list.deinit();
+
+    _ = try list.add("logon.arenacraft.fun");
+    _ = try list.add("62.83.16.59");
+    _ = try list.add("logon.warmane.com");
+    _ = try list.setActive("62.83.16.59");
+
+    // Removing the active custom realm activates the one that takes its place
+    // and needs no hidden marker.
+    try list.remove(1);
+    try std.testing.expectEqual(@as(usize, 2), list.hosts.items.len);
+    try std.testing.expectEqual(@as(usize, 1), list.active);
+    try std.testing.expectEqualStrings("logon.warmane.com", list.activeHost());
+    try std.testing.expectEqual(@as(usize, 0), list.hidden.items.len);
+
+    // Removing a preset records it as hidden.
+    try list.remove(1);
+    try std.testing.expectEqualStrings("logon.arenacraft.fun", list.activeHost());
+    try std.testing.expectEqual(@as(usize, 1), list.hidden.items.len);
+}
+
+test "removing a preset hides it across restarts" {
+    var list = List.init(std.testing.allocator);
+    defer list.deinit();
+
+    _ = try list.add("logon.arenacraft.fun");
+    _ = try list.add("logon.warmane.com");
+    _ = try list.setActive("logon.warmane.com");
+
+    try list.remove(1);
+
+    const text = try list.render(std.testing.allocator);
+    defer std.testing.allocator.free(text);
+    try std.testing.expectEqualStrings(
+        "set realmlist logon.arenacraft.fun\n" ++
+            "#hidden logon.warmane.com\n",
+        text,
+    );
+
+    var reread = try List.parse(std.testing.allocator, text);
+    defer reread.deinit();
+    try reread.ensurePresets();
+
+    try std.testing.expectEqual(@as(usize, 1), reread.hosts.items.len);
+    try std.testing.expectEqualStrings("logon.arenacraft.fun", reread.activeHost());
+}
+
+test "typing a hidden preset again brings it back" {
+    var list = try List.parse(
+        std.testing.allocator,
+        "#hidden logon.warmane.com\nset realmlist logon.arenacraft.fun\n",
+    );
+    defer list.deinit();
+    try list.ensurePresets();
+    try std.testing.expectEqual(@as(usize, 1), list.hosts.items.len);
+
+    _ = try list.setActive("logon.warmane.com");
+    try std.testing.expectEqual(@as(usize, 0), list.hidden.items.len);
+    try std.testing.expectEqual(@as(usize, 2), list.hosts.items.len);
+}
+
+test "the last realm cannot be removed" {
+    var list = List.init(std.testing.allocator);
+    defer list.deinit();
+
+    _ = try list.setActive("127.0.0.1");
+    try std.testing.expectError(error.LastRealm, list.remove(0));
+    try std.testing.expectEqual(@as(usize, 1), list.hosts.items.len);
 }
 
 test "validate accepts hosts and IPv4, rejects file syntax" {

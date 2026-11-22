@@ -140,10 +140,10 @@ pub fn main() void {
 /// Declare the window content. `gui` re-runs this tree on resize.
 ///
 /// Layout: a padded column. The title and description size themselves to their
-/// text, the two panes share the remaining height (remembered realms on the
-/// left, address field and hints on the right), the status line names the file
-/// being written, a growing spacer absorbs the leftover, and the action row
-/// right-aligns its buttons.
+/// text, the two panes share the remaining height (remembered realms with a
+/// Remove button on the left, address field and hints on the right), the status
+/// line names the file being written, a growing spacer absorbs the leftover, and
+/// the action row right-aligns its buttons.
 fn buildUi(app: *App) !void {
     const window = app.window;
 
@@ -187,6 +187,11 @@ fn buildUi(app: *App) !void {
             .width = .{ .grow = .{} },
             .height = .{ .grow = .{} },
         },
+    });
+    _ = try window.addButton(.{
+        .text = "Remove",
+        .sizing = .{ .width = .{ .fixed = 90 }, .height = .{ .fixed = 28 } },
+        .onClick = .{ .function = onRealmRemove, .context = app },
     });
     try window.endContainer();
 
@@ -295,6 +300,8 @@ fn onQuit(context: ?*anyopaque) void {
 /// Read the realm field, remember it, write `realmlist.wtf`, and refresh the
 /// UI. Returns false (after reporting why) when the realm was not applied.
 fn applyRealm(app: *App) bool {
+    const previous_len = app.realms.hosts.items.len;
+
     const text = app.window.editText(app.edit) catch {
         gui.showMessage(.critical, window_title, "Not enough memory to read the address field.");
         return false;
@@ -312,7 +319,55 @@ fn applyRealm(app: *App) bool {
         gui.showMessage(.critical, window_title, "Not enough memory to remember the realm.");
         return false;
     };
+    const added_host = app.realms.hosts.items.len != previous_len;
 
+    if (!writeRealms(app)) return false;
+    // Only a newly typed host changes the rows; rebuilding them from inside the
+    // list's selection notification would lose the highlight.
+    refreshRealmUi(app, if (added_host) .rows else .selection);
+
+    setStatus(app, "Saved {d} realm{s} to {s}", .{
+        app.realms.hosts.items.len,
+        if (app.realms.hosts.items.len == 1) "" else "s",
+        app.client.primary(),
+    });
+    return true;
+}
+
+/// The player pressed Remove: forget the highlighted realm. If it was the
+/// active one, the next remembered realm becomes active and is written.
+fn onRealmRemove(context: ?*anyopaque) void {
+    const app: *App = @ptrCast(@alignCast(context orelse return));
+
+    const index = app.window.listSelection(app.list) orelse {
+        gui.showMessage(.warning, window_title, "Select the realm you want to remove first.");
+        return;
+    };
+
+    app.realms.remove(index) catch |err| switch (err) {
+        error.NotFound => {
+            gui.showMessage(.warning, window_title, "Select the realm you want to remove first.");
+            return;
+        },
+        error.LastRealm => {
+            gui.showMessage(.warning, window_title, "The launcher needs at least one realm.\n\n" ++
+                "Type the address of another realm before removing this one.");
+            return;
+        },
+        error.OutOfMemory => {
+            gui.showMessage(.critical, window_title, "Not enough memory to remove the realm.");
+            return;
+        },
+    };
+
+    if (!writeRealms(app)) return;
+    refreshRealmUi(app, .rows);
+    setStatus(app, "Removed the realm; now using {s}", .{app.realms.activeHost()});
+}
+
+/// Write the current realm list to every realmlist file. Reports the failure
+/// (usually a read-only game directory) and returns false when nothing changed.
+fn writeRealms(app: *App) bool {
     app.client.write(app.io, &app.realms) catch |err| {
         var buffer: [512]u8 = undefined;
         const detail = std.fmt.bufPrint(
@@ -325,24 +380,23 @@ fn applyRealm(app: *App) bool {
         gui.showMessage(.critical, window_title, detail);
         return false;
     };
-
-    // The address may have been typed or normalised; show the host as it is
-    // written and keep the list selection pointing at the same realm.
-    app.window.setEditText(app.edit, app.realms.activeHost()) catch {};
-    app.window.setListItems(app.list, app.realms.hosts.items, app.realms.active) catch {};
-    app.window.setLabelText(app.realm_name, realmlist.displayName(app.realms.activeHost())) catch {};
-
-    var status_buffer: [512]u8 = undefined;
-    const status = std.fmt.bufPrint(
-        &status_buffer,
-        "Saved {d} realm{s} to {s}",
-        .{
-            app.realms.hosts.items.len,
-            if (app.realms.hosts.items.len == 1) "" else "s",
-            app.client.primary(),
-        },
-    ) catch "Saved realmlist.wtf";
-    app.window.setLabelText(app.status, status) catch {};
-
     return true;
+}
+
+/// Show the active realm in the address field, the list and the friendly name.
+/// `.rows` rebuilds the list entries (after a host was added or removed);
+/// `.selection` only moves the highlight, which is safe during a list click.
+fn refreshRealmUi(app: *App, mode: enum { rows, selection }) void {
+    app.window.setEditText(app.edit, app.realms.activeHost()) catch {};
+    switch (mode) {
+        .rows => app.window.setListItems(app.list, app.realms.hosts.items, app.realms.active) catch {},
+        .selection => app.window.setListSelection(app.list, app.realms.active),
+    }
+    app.window.setLabelText(app.realm_name, realmlist.displayName(app.realms.activeHost())) catch {};
+}
+
+fn setStatus(app: *App, comptime format: []const u8, args: anytype) void {
+    var buffer: [512]u8 = undefined;
+    const text = std.fmt.bufPrint(&buffer, format, args) catch return;
+    app.window.setLabelText(app.status, text) catch {};
 }

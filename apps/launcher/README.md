@@ -72,6 +72,12 @@ into the address field and applies it immediately. The address field is also
 editable, so a new host name or IPv4 address can be typed and committed with
 Enter (or by pressing Launch Game); the launcher trims it and updates the file.
 
+**Remove** forgets the highlighted realm. A custom host simply disappears from
+the history; a built-in realm is recorded in `realmlist.wtf` as a
+`#hidden <host>` comment (the client ignores comments) so it is not offered
+again on the next start. Typing a hidden host brings it back. The last remaining
+realm cannot be removed, because the client needs one to connect to.
+
 A 3.3.5a client reads `Data/<locale>/realmlist.wtf`, so the launcher writes
 every `Data/*/realmlist.wtf` it finds (and a root `realmlist.wtf` for pre-1.9
 installations). With none present it creates the one for the locale in
