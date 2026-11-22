@@ -19,6 +19,7 @@
 /env/user/*
 /.env*
 !/.env.example
+!/.envrc
 /apps/joiner
 /deps/deno
 /data/sql/custom/*
