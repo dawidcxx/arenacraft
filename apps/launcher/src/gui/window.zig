@@ -19,8 +19,9 @@ const clay = @import("clay");
 const geometry = @import("geometry.zig");
 const layout = @import("layout.zig");
 const button = @import("button.zig");
+const edit = @import("edit.zig");
 const label = @import("label.zig");
-
+const listbox = @import("listbox.zig");
 const allocator = std.heap.smp_allocator;
 
 const class_name = "ArenacraftGuiWindow";
@@ -56,21 +57,27 @@ const Plan = union(enum) {
     open: layout.Container,
     close,
     button: *button.Button,
+    edit: *edit.Edit,
     label: *label.Label,
+    list_box: *listbox.ListBox,
 };
 
 const Placement = struct {
     node: clay.NodeId,
     target: union(enum) {
         button: *button.Button,
+        edit: *edit.Edit,
         label: *label.Label,
+        list_box: *listbox.ListBox,
     },
 };
 
 pub const Window = struct {
     hwnd: c.HWND = null,
     buttons: std.ArrayListUnmanaged(*button.Button) = .empty,
+    edits: std.ArrayListUnmanaged(*edit.Edit) = .empty,
     labels: std.ArrayListUnmanaged(*label.Label) = .empty,
+    list_boxes: std.ArrayListUnmanaged(*listbox.ListBox) = .empty,
     fonts: [font_count]c.HFONT = [_]c.HFONT{null} ** font_count,
     /// Screen DC used only to measure text; never drawn into.
     measure_dc: c.HDC = null,
@@ -82,6 +89,9 @@ pub const Window = struct {
     ready: bool = false,
     /// Open containers in the tree being recorded, to catch unbalanced trees.
     depth: usize = 0,
+    /// Whether a control already took the initial keyboard focus. The first
+    /// focusable control created inherits it, like a dialog's first tab stop.
+    focus_assigned: bool = false,
 
     /// Start recording a layout tree. Call `endLayout` after declaring it.
     pub fn beginLayout(self: *Window) !void {
@@ -168,11 +178,133 @@ pub const Window = struct {
             return err;
         };
 
-        // Dialog-style tab handling is not wired up yet, so give the first
-        // control focus explicitly: the button then responds to Space.
-        if (self.buttons.items.len == 1) {
-            _ = c.SetFocus(child);
+        // A window with no text field or list still needs a first tab stop, so
+        // the button takes the initial focus. When a field exists it already
+        // owns the focus (see `addEdit`).
+        if (self.edits.items.len == 0 and self.list_boxes.items.len == 0) {
+            takeFocus(self, child);
         }
+        return widget;
+    }
+
+    /// Add a single-selection list as a child of the currently open container.
+    /// `onSelect` fires when a row is picked; see `listbox.zig`.
+    pub fn addListBox(self: *Window, options: listbox.Options) !*listbox.ListBox {
+        if (self.hwnd == null) return error.WindowDestroyed;
+        if (!self.recording) return error.LayoutNotStarted;
+
+        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP |
+            c.WS_VSCROLL | c.WS_BORDER | c.LBS_NOTIFY | c.LBS_NOINTEGRALHEIGHT);
+        const child = c.CreateWindowExW(
+            0,
+            std.unicode.utf8ToUtf16LeStringLiteral("LISTBOX"),
+            null,
+            style,
+            0,
+            0,
+            0,
+            0,
+            self.hwnd,
+            null,
+            c.GetModuleHandleA(null),
+            null,
+        );
+        if (child == null) return error.ControlCreationFailed;
+
+        const font = self.fonts[@intFromEnum(label.Font.body)];
+        if (font != null) {
+            _ = c.SendMessageW(child, c.WM_SETFONT, @intFromPtr(font), c.TRUE);
+        }
+
+        const widget = allocator.create(listbox.ListBox) catch |err| {
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        widget.* = .{
+            .hwnd = child,
+            .callback = options.onSelect,
+            .sizing = options.sizing,
+        };
+
+        addListItems(widget, options.items) catch |err| {
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        if (options.selected) |index| {
+            selectListItem(widget, index);
+        }
+
+        self.list_boxes.append(allocator, widget) catch |err| {
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        self.plan.append(allocator, .{ .list_box = widget }) catch |err| {
+            self.list_boxes.items.len -= 1;
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        return widget;
+    }
+
+    /// Add a single-line text field as a child of the currently open container.
+    /// `onEnter` fires when Enter is pressed; see `edit.zig`.
+    pub fn addEdit(self: *Window, options: edit.Options) !*edit.Edit {
+        if (self.hwnd == null) return error.WindowDestroyed;
+        if (!self.recording) return error.LayoutNotStarted;
+
+        const text = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, options.text);
+        defer allocator.free(text);
+
+        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP |
+            c.WS_BORDER | c.ES_LEFT | c.ES_AUTOHSCROLL);
+        const child = c.CreateWindowExW(
+            0,
+            std.unicode.utf8ToUtf16LeStringLiteral("EDIT"),
+            text.ptr,
+            style,
+            0,
+            0,
+            0,
+            0,
+            self.hwnd,
+            null,
+            c.GetModuleHandleA(null),
+            null,
+        );
+        if (child == null) return error.ControlCreationFailed;
+
+        const font = self.fonts[@intFromEnum(label.Font.body)];
+        if (font != null) {
+            _ = c.SendMessageW(child, c.WM_SETFONT, @intFromPtr(font), c.TRUE);
+        }
+
+        const widget = allocator.create(edit.Edit) catch |err| {
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        widget.* = .{
+            .hwnd = child,
+            .callback = options.onEnter,
+            .sizing = options.sizing,
+        };
+        edit.install(widget);
+
+        self.edits.append(allocator, widget) catch |err| {
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        self.plan.append(allocator, .{ .edit = widget }) catch |err| {
+            self.edits.items.len -= 1;
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+
+        takeFocus(self, child);
         return widget;
     }
 
@@ -237,6 +369,67 @@ pub const Window = struct {
         return widget;
     }
 
+    /// Replace a list's rows and highlight `selected`. Used after a typed realm
+    /// joins the remembered list. The native control copies the strings, so the
+    /// caller keeps ownership and may free them afterwards. `LB_SETCURSEL` does
+    /// not notify the parent, so this never re-enters the selection callback.
+    pub fn setListItems(
+        self: *Window,
+        target: *listbox.ListBox,
+        items: []const []const u8,
+        selected: usize,
+    ) !void {
+        _ = self;
+        _ = c.SendMessageW(target.hwnd, c.LB_RESETCONTENT, 0, 0);
+
+        try addListItems(target, items);
+        if (items.len > 0) {
+            selectListItem(target, @min(selected, items.len - 1));
+        }
+    }
+
+    /// Index of the highlighted row, or null when nothing is selected.
+    pub fn listSelection(self: *Window, target: *listbox.ListBox) ?usize {
+        _ = self;
+        const result = c.SendMessageW(target.hwnd, c.LB_GETCURSEL, 0, 0);
+        if (result == c.LB_ERR or result < 0) return null;
+        return @intCast(result);
+    }
+
+    /// Replace an edit's text and select it, so a typed replacement starts on
+    /// the next keystroke.
+    pub fn setEditText(self: *Window, target: *edit.Edit, text: []const u8) !void {
+        _ = self;
+        const wide = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, text);
+        defer allocator.free(wide);
+
+        _ = c.SendMessageW(target.hwnd, c.WM_SETTEXT, 0, @bitCast(@intFromPtr(wide.ptr)));
+        _ = c.SendMessageW(target.hwnd, c.EM_SETSEL, 0, -1);
+    }
+
+    /// Current text of an edit field, allocated with the GUI allocator. The
+    /// caller owns the result.
+    pub fn editText(self: *Window, target: *edit.Edit) ![]u8 {
+        _ = self;
+        var wide: [1024]u16 = undefined;
+        const length = c.GetWindowTextW(target.hwnd, &wide, wide.len);
+        if (length <= 0) return allocator.alloc(u8, 0);
+        return std.unicode.wtf16LeToWtf8Alloc(allocator, wide[0..@intCast(length)]);
+    }
+
+    /// Replace a label's text and re-run the layout, so a wider status line
+    /// still fits the tree. The label keeps an owned copy of the string.
+    pub fn setLabelText(self: *Window, target: *label.Label, text: []const u8) !void {
+        const copy = try allocator.dupeZ(u8, text);
+        errdefer allocator.free(copy);
+
+        allocator.free(target.text);
+        target.text = copy;
+        _ = c.SetWindowTextA(target.hwnd, copy.ptr);
+
+        try self.relayout();
+    }
+
     /// Finish recording and apply the layout. The tree is replayed on resize.
     pub fn endLayout(self: *Window) !void {
         if (!self.recording) return error.LayoutNotStarted;
@@ -260,6 +453,10 @@ pub const Window = struct {
         self.close();
         for (self.buttons.items) |widget| allocator.destroy(widget);
         self.buttons.deinit(allocator);
+        for (self.edits.items) |widget| allocator.destroy(widget);
+        self.edits.deinit(allocator);
+        for (self.list_boxes.items) |widget| allocator.destroy(widget);
+        self.list_boxes.deinit(allocator);
         for (self.labels.items) |widget| {
             allocator.free(widget.text);
             allocator.destroy(widget);
@@ -311,6 +508,20 @@ pub const Window = struct {
                     try self.engine.close();
                     try self.placements.append(allocator, .{ .node = node, .target = .{ .button = widget } });
                 },
+                .edit => |widget| {
+                    const node = try self.engine.open(.{ .layout = .{
+                        .sizing = layout.toClaySizing(widget.sizing),
+                    } });
+                    try self.engine.close();
+                    try self.placements.append(allocator, .{ .node = node, .target = .{ .edit = widget } });
+                },
+                .list_box => |widget| {
+                    const node = try self.engine.open(.{ .layout = .{
+                        .sizing = layout.toClaySizing(widget.sizing),
+                    } });
+                    try self.engine.close();
+                    try self.placements.append(allocator, .{ .node = node, .target = .{ .list_box = widget } });
+                },
                 .label => |widget| {
                     // The text sits inside a container so labels accept the same
                     // sizing options as any other widget; a fit container
@@ -341,7 +552,14 @@ pub const Window = struct {
             for (self.placements.items) |placement| {
                 const rect = layout.toRect(self.engine.bounds(placement.node));
                 self.storeRect(placement, rect);
-                _ = c.MoveWindow(self.hwndOf(placement), rect.x, rect.y, rect.width, rect.height, c.TRUE);
+                _ = c.MoveWindow(
+                    self.hwndOf(placement),
+                    rect.x,
+                    rect.y,
+                    rect.width,
+                    rect.height,
+                    c.TRUE,
+                );
             }
             return;
         }
@@ -373,17 +591,47 @@ pub const Window = struct {
     fn hwndOf(_: *Window, placement: Placement) c.HWND {
         return switch (placement.target) {
             .button => |widget| widget.hwnd,
+            .edit => |widget| widget.hwnd,
             .label => |widget| widget.hwnd,
+            .list_box => |widget| widget.hwnd,
         };
     }
 
     fn storeRect(_: *Window, placement: Placement, rect: geometry.Rect) void {
         switch (placement.target) {
             .button => |widget| widget.setRect(rect),
+            .edit => |widget| widget.setRect(rect),
             .label => |widget| widget.setRect(rect),
+            .list_box => |widget| widget.setRect(rect),
         }
     }
 };
+
+/// Hand the initial keyboard focus to `child`, unless an earlier focusable
+/// control already took it.
+fn takeFocus(window: *Window, child: c.HWND) void {
+    if (window.focus_assigned) return;
+    _ = c.SetFocus(child);
+    window.focus_assigned = true;
+}
+
+fn addListItems(target: *listbox.ListBox, items: []const []const u8) !void {
+    for (items) |item| try addListItem(target.hwnd, item);
+}
+
+fn addListItem(hwnd: c.HWND, text: []const u8) !void {
+    const wide = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, text);
+    defer allocator.free(wide);
+
+    const result = c.SendMessageW(hwnd, c.LB_ADDSTRING, 0, @bitCast(@intFromPtr(wide.ptr)));
+    if (result == @as(c.LRESULT, c.LB_ERR) or result == @as(c.LRESULT, c.LB_ERRSPACE)) {
+        return error.ControlCreationFailed;
+    }
+}
+
+fn selectListItem(target: *listbox.ListBox, index: usize) void {
+    _ = c.SendMessageW(target.hwnd, c.LB_SETCURSEL, @intCast(index), 0);
+}
 
 /// Give `.fit` buttons a minimum size derived from their measured label, so the
 /// native control always has room for its text.
@@ -628,16 +876,27 @@ fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
         },
         c.WM_COMMAND => {
             const notification: c_int = @intCast((wparam >> 16) & 0xffff);
+            // lParam carries the child HWND that raised the notification.
+            // Compare integer values: fabricating an `HWND` from it would
+            // trip the pointer alignment check in Debug builds.
+            const child: usize = @bitCast(lparam);
+
             if (notification == c.BN_CLICKED) {
-                // lParam carries the child HWND that raised the notification.
-                // Compare integer values: fabricating an `HWND` from it would
-                // trip the pointer alignment check in Debug builds.
-                const child: usize = @bitCast(lparam);
                 for (window.buttons.items) |widget| {
-                    if (@intFromPtr(widget.hwnd) == child) {
-                        widget.callback.function(widget.callback.context);
-                        break;
-                    }
+                    if (@intFromPtr(widget.hwnd) != child) continue;
+                    widget.callback.function(widget.callback.context);
+                    break;
+                }
+            }
+
+            // Picking a row in the realm list applies it right away; the edit
+            // field is only committed by Enter or by the Launch button, so a
+            // half-typed address never triggers a validation dialog.
+            if (notification == c.LBN_SELCHANGE) {
+                for (window.list_boxes.items) |widget| {
+                    if (@intFromPtr(widget.hwnd) != child) continue;
+                    widget.callback.function(widget.callback.context);
+                    break;
                 }
             }
             return 0;

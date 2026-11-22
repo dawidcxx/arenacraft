@@ -15,6 +15,7 @@ var CLAY_MOD: ?*std.Build.Module = null;
 var GUI_MOD: ?*std.Build.Module = null;
 var LIB_TEST_STEP: *std.Build.Step = undefined;
 var CLAY_TEST_STEP: *std.Build.Step = undefined;
+var REALMLIST_TEST_STEP: *std.Build.Step = undefined;
 
 pub fn build(b: *std.Build) !void {
     const target = b.resolveTargetQuery(windows_target_query);
@@ -33,10 +34,12 @@ pub fn build(b: *std.Build) !void {
     try addClay(b, target, optimize);
     try addGui(b, target, optimize);
     try addLauncher(b, target, optimize, console_window);
+    try addRealmlistTests(b, optimize);
 
     const all_test = b.step("test", "Run all tests");
     all_test.dependOn(LIB_TEST_STEP);
     all_test.dependOn(CLAY_TEST_STEP);
+    all_test.dependOn(REALMLIST_TEST_STEP);
 }
 
 /// Declares the shared `lib` module: the raw Win32 translation.
@@ -91,6 +94,27 @@ fn addClay(
     }
     CLAY_TEST_STEP = b.step("clay-test", "Run the clay layout tests (native)");
     CLAY_TEST_STEP.dependOn(&run.step);
+}
+
+/// Realmlist parsing and file selection are plain `std`, so their tests build
+/// for the host and run natively instead of through wine.
+fn addRealmlistTests(
+    b: *std.Build,
+    optimize: std.builtin.OptimizeMode,
+) !void {
+    const mod = b.createModule(.{
+        .root_source_file = b.path("src/launcher/realmlist.zig"),
+        .target = b.resolveTargetQuery(.{}),
+        .optimize = optimize,
+    });
+
+    const tst = b.addTest(.{ .root_module = mod });
+    const run = b.addRunArtifact(tst);
+    if (b.args) |args| {
+        run.addArgs(args);
+    }
+    REALMLIST_TEST_STEP = b.step("realmlist-test", "Run the realmlist tests (native)");
+    REALMLIST_TEST_STEP.dependOn(&run.step);
 }
 
 /// Declares the `gui` module: the launcher's scoped Win32 GUI layer.

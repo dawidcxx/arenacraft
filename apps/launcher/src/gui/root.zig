@@ -26,7 +26,9 @@ const c = lib.win32.c;
 const geometry = @import("geometry.zig");
 const layout = @import("layout.zig");
 const widget = @import("button.zig");
+const edit_widget = @import("edit.zig");
 const label = @import("label.zig");
+const listbox_widget = @import("listbox.zig");
 const window = @import("window.zig");
 
 pub const Rect = geometry.Rect;
@@ -36,6 +38,12 @@ pub const Point = geometry.Point;
 pub const Button = widget.Button;
 pub const ButtonOptions = widget.Options;
 pub const Callback = widget.Callback;
+
+pub const Edit = edit_widget.Edit;
+pub const EditOptions = edit_widget.Options;
+
+pub const ListBox = listbox_widget.ListBox;
+pub const ListBoxOptions = listbox_widget.Options;
 
 pub const Label = label.Label;
 pub const LabelOptions = label.Options;

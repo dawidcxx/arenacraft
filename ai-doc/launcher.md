@@ -10,7 +10,7 @@ design decisions that are easy to break.
 src/lib      raw Win32 bindings (@cImport windows.h)
 src/clay     layout engine (Zig port of Clay's solver; no Win32)
 src/gui      scoped GUI layer (windows, widgets, layout replay, message boxes)
-src/launcher app behaviour (launch Wow.exe)
+src/launcher app behaviour (realm selection, launch Wow.exe)
 ```
 
 - `lib` is only the translation of `windows.h`. No launcher semantics.
@@ -73,7 +73,8 @@ The engine is immediate-mode but a Win32 window only hears about resizes through
 `WM_SIZE`, so `gui` records the tree and replays it:
 
 - `Window.beginLayout` starts recording. `container`/`endContainer`/`addButton`/
-  `addLabel` append to `Window.plan`; `endLayout` computes and applies.
+  `addLabel`/`addListBox`/`addEdit` append to `Window.plan`; `endLayout`
+  computes and applies.
 - Every layout pass (`WM_SIZE`, and the initial `endLayout`) resets the engine's
   per-frame arena, replays `plan`, computes, and moves all controls in a single
   `DeferWindowPos` batch. There is no per-widget `MoveWindow` in the common case.
@@ -95,6 +96,65 @@ numbers were cross-checked against upstream Clay compiled from `clay.h` v0.14.
 Testing note: without a window manager, resizing the X window does not reach
 Wine's Win32 window, so no `WM_SIZE` is delivered. Drive resizes with
 `SetWindowPos` from a helper process instead.
+
+## Realm switcher
+
+The realm lives in the client's `realmlist.wtf`, not in our own config:
+`Data/<locale>/realmlist.wtf` in 3.3.5a (a root `realmlist.wtf` for pre-1.9
+installs). The file is both the setting and its history:
+
+```
+set realmlist logon.arenacraft.fun
+#set realmlist logon.warmane.com
+#set realmlist 62.83.16.59
+```
+
+`realmlist.zig` parses every `set realmlist <host>` line (`#` comments are
+remembered too), keeps the first uncommented one active, and renders the active
+host first with the rest commented out. Non-realm lines are ignored, and a
+realmlist file is rewritten with realm lines only: the launcher owns that
+state.
+
+- Presets are hardcoded in `realmlist.zig` (Arenacraft, Warmane) and appended
+  when the file history lacks them. Do not fetch the list from the API: the
+  switcher has to work offline, before the player ever logs in.
+- `Client` resolves every realmlist file once at startup by iterating `Data/*`
+  and checking `realmlist.wtf`. With none present it picks `SET locale "xxYY"`
+  from `WTF/Config.wtf`, else the first locale-shaped `Data` directory, else
+  enUS; `write` creates the directories and the file.
+- Writes happen when a realm row is picked, when Enter is pressed in the address
+  field, and again before launching, so a host typed but not submitted still
+  reaches the client. A failed write aborts the launch: connecting to the wrong
+  realm is worse than not starting.
+- A host is validated as `[A-Za-z0-9.-]+` (no scheme, port or path); anything
+  else cannot go in that field anyway.
+- The file is rewritten unconditionally (line endings become `\n`), which also
+  normalizes hand-edited duplicates away.
+- The MSI is per-machine and may install into Program Files; a non-elevated
+  launcher then cannot write `Data/<locale>/realmlist.wtf`. The write error
+  tells the player to move the client or run as administrator instead of
+  silently launching against the old realm.
+
+The picker is deliberately *not* a combo box: a native `COMBOBOX` mixes an edit
+field, a popup list and their notifications in one control, and every piece of
+it has to be understood before the launcher behaves. Two plain controls are
+easier to reason about and to drive:
+
+- `gui/listbox.zig` wraps a `LISTBOX` (`LBS_NOTIFY`) and calls `onSelect` on
+  `LBN_SELCHANGE`; `Window.listSelection` reads the picked row.
+- `gui/edit.zig` wraps an `EDIT`. The address is authoritative for launching, so
+  `Window.editText` is read right before writing; Enter is caught by a window
+  procedure subclass (`SetWindowLongPtrW(GWLP_WNDPROC)`) that forwards everything
+  but `VK_RETURN` to `CallWindowProcW`.
+- `Window.setListItems` repopulates after a typed host joins the list.
+  `LB_SETCURSEL` does not notify the parent, so that refresh cannot re-enter the
+  selection callback; `LB_RESETCONTENT`/`LB_ADDSTRING` are safe from inside the
+  notification as well.
+- Both controls copy their strings, so call sites keep ownership of the item
+  list and may free it after adding rows.
+
+`Window.setLabelText` replaces a label and re-runs the layout, because labels
+are sized to their text and the status line changes length.
 
 ## Icon
 

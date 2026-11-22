@@ -41,8 +41,10 @@ nix-shell -p wineWow64Packages.stable \
 
 `lib` tests are Windows PE and need the wine executor above. The `clay` layout
 tests are pure Zig with no libc or Win32 dependency, so they build and run
-natively: `zig build clay-test` needs no wine, and `zig build test` runs both.
-`zig build lib-test` runs the lib tests on their own.
+natively: `zig build clay-test` needs no wine. The `realmlist` parser and file
+selection are plain `std` too, so `zig build realmlist-test` also runs natively.
+`zig build test` runs all three; `zig build lib-test`, `zig build clay-test`
+and `zig build realmlist-test` run one at a time.
 
 ## Icon
 
@@ -55,20 +57,52 @@ and commit it when the artwork changes.
 ## What it does
 
 The window declares a single-column layout: an **Arenacraft** title, a
-description that re-wraps when the window narrows, a spacer, and a bottom row
-with **Launch Game** and **Quit** buttons aligned to the right. Resize the
-window and everything adapts; there are no hardcoded widget positions.
+description that re-wraps when the window narrows, two panes (**Realms** list on
+the left, **Realm address** field and hints on the right), a status line naming
+the file being written, a spacer, and a bottom row with **Launch Game** and
+**Quit** buttons aligned to the right. Resize the window and everything adapts;
+there are no hardcoded widget positions.
 
-**Launch Game** resolves `Wow.exe` next to the launcher's own executable (not
-the current working directory) and starts it with that directory as the child's
-working directory. The launcher closes once the game has started. If `Wow.exe`
-is missing or the process cannot be created, a message box explains why and the
-launcher stays open.
+### Realm switcher
+
+The list shows the realms the launcher knows: the built-in Arenacraft and
+Warmane entries plus every logon host already present in the client's
+`realmlist.wtf`, including commented-out ones. Picking a row copies its host
+into the address field and applies it immediately. The address field is also
+editable, so a new host name or IPv4 address can be typed and committed with
+Enter (or by pressing Launch Game); the launcher trims it and updates the file.
+
+A 3.3.5a client reads `Data/<locale>/realmlist.wtf`, so the launcher writes
+every `Data/*/realmlist.wtf` it finds (and a root `realmlist.wtf` for pre-1.9
+installations). With none present it creates the one for the locale in
+`WTF/Config.wtf`, falling back to `Data/enUS/realmlist.wtf`. The active realm is
+the first `set realmlist` line; every other remembered realm stays as a
+`#set realmlist` line, which is also the format the launcher reads back at
+startup. A typed realm joins the list, so the list grows with the player's
+history. Invalid input (scheme, port, spaces, path separators) is rejected with
+a message box.
+
+The MSI installs into the World of Warcraft directory, so a game under
+`Program Files` is owned by an administrator. If `realmlist.wtf` cannot be
+written the launcher reports the path and error and leaves the game unstarted
+rather than connecting to the wrong realm; move the client somewhere the user
+can write to, or start the launcher as administrator.
+
+**Launch Game** applies the realm in the field first (a typed host may not have
+been committed), resolves `Wow.exe` next to the launcher's own executable (not
+the current working directory), and starts it with that directory as the
+child's working directory. The launcher closes once the game has started. If
+`Wow.exe` is missing or the process cannot be created, a message box explains
+why and the launcher stays open.
 
 ## Modules
 
-- `src/launcher/main.zig`: entry point, layout declaration, launch callback.
-- `src/launcher/game.zig`: resolves and spawns `Wow.exe`.
+- `src/launcher/main.zig`: entry point, layout declaration, realm and launch
+  callbacks.
+- `src/launcher/game.zig`: spawns `Wow.exe` from the installation directory.
+- `src/launcher/install.zig`: resolves the game directory (the launcher's own).
+- `src/launcher/realmlist.zig`: realm list parsing/rendering and the
+  `realmlist.wtf` files of the installation; no Win32, tested natively.
 - `src/clay/`: the layout engine: a Zig port of Clay v0.14's solver.
   - `types.zig`: element declarations (sizing, padding, alignment, floating).
   - `text.zig`: word measurement and line breaking.
@@ -79,6 +113,8 @@ launcher stays open.
   - `window.zig`: window class, message loop, layout replay, text measurement.
   - `layout.zig`: `gui`'s layout vocabulary; mirrors `clay` one to one.
   - `button.zig`: button widget; the `HWND` stays internal.
+  - `listbox.zig`: single-selection list; reports the picked row.
+  - `edit.zig`: single-line text field; reports Enter (subclassed `EDIT`).
   - `label.zig`: static text widget; the `HWND` stays internal.
   - `geometry.zig`: `Rect`/`Size`/`Point` for widget placement.
 - `src/lib/root.zig`: shared library, imported as `lib`.
@@ -126,8 +162,9 @@ and publishes them plus `SHA256SUMS`. Set `WINDOWS_SIGNING_PFX_BASE64` and
 `WINDOWS_SIGNING_PFX_PASSWORD` to Authenticode-sign the artifacts.
 
 The MSI installs the launcher into the World of Warcraft directory, so the
-wizard asks for it. The folder page is pre-filled with, in order: the directory
-this launcher was installed into last time (recorded under
+wizard asks for it; the launcher writes `realmlist.wtf` there, so the directory
+must be writable by the player. The folder page is pre-filled with, in order:
+the directory this launcher was installed into last time (recorded under
 `HKLM\SOFTWARE\Arenacraft\Launcher\InstallPath`), the client registered by
 Blizzard (`HKLM\SOFTWARE\Blizzard Entertainment\World of Warcraft\InstallPath`),
 or `%ProgramFiles%\World of Warcraft`. The install is refused unless `Wow.exe`

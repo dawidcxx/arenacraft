@@ -1,8 +1,8 @@
 //! Starting the game client that sits next to the launcher.
 //!
-//! The launcher is installed *into* a World of Warcraft 3.3.5a directory, so
-//! `Wow.exe` is resolved relative to the launcher's own executable, not to the
-//! current working directory (which is whatever Explorer or a shortcut chose).
+//! `launchWow` takes the installation directory (see `install.zig`) rather than
+//! resolving it again, so the launcher and the realmlist code always agree on
+//! which client they are talking to.
 
 const std = @import("std");
 const lib = @import("lib");
@@ -15,27 +15,17 @@ pub const Outcome = union(enum) {
     failed: []u8,
 };
 
-/// Spawn `Wow.exe` from the directory containing this executable, with that
-/// directory as the child's working directory (WoW resolves `Data`, `WTF`,
-/// `Logs` and `Cache` relatively).
-pub fn launchWow(io: std.Io, allocator: std.mem.Allocator) error{OutOfMemory}!Outcome {
-    const exe_dir = std.process.executableDirPathAlloc(io, allocator) catch |err| {
-        return .{ .failed = try std.fmt.allocPrint(
-            allocator,
-            "Could not determine where Arenacraft is installed ({s}).",
-            .{@errorName(err)},
-        ) };
-    };
-    defer allocator.free(exe_dir);
-
-    const wow_path = try std.fs.path.join(allocator, &.{ exe_dir, "Wow.exe" });
+/// Spawn `Wow.exe` from `install_dir`, with that directory as the child's
+/// working directory (WoW resolves `Data`, `WTF`, `Logs` and `Cache` relatively).
+pub fn launchWow(allocator: std.mem.Allocator, install_dir: []const u8) error{OutOfMemory}!Outcome {
+    const wow_path = try std.fs.path.join(allocator, &.{ install_dir, "Wow.exe" });
     defer allocator.free(wow_path);
 
     // Paths from the OS are WTF-8 (see std.process.executablePath), so convert
     // as WTF-8: a client in a non-ASCII directory still starts.
     const wow_path_w = try toWide(allocator, wow_path);
     defer allocator.free(wow_path_w);
-    const exe_dir_w = try toWide(allocator, exe_dir);
+    const exe_dir_w = try toWide(allocator, install_dir);
     defer allocator.free(exe_dir_w);
 
     if (c.GetFileAttributesW(wow_path_w.ptr) == std.math.maxInt(c.DWORD)) {
@@ -72,7 +62,7 @@ pub fn launchWow(io: std.Io, allocator: std.mem.Allocator) error{OutOfMemory}!Ou
         return .{ .failed = try std.fmt.allocPrint(
             allocator,
             "Wow.exe could not be started from:\n\n{s}\n\nWindows error {d}.",
-            .{ exe_dir, c.GetLastError() },
+            .{ install_dir, c.GetLastError() },
         ) };
     }
 
