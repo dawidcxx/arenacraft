@@ -161,9 +161,10 @@ jobs:
           ## Installation
 
           `Arenacraft.msi` installs into an existing World of Warcraft 3.3.5a
-          directory. It asks for the directory, verifies that `Wow.exe` and
-          `Data\common.MPQ` are there, and optionally creates desktop and Start
-          menu shortcuts.
+          directory. It asks for the directory (pre-filled from the previous
+          install, then the client Blizzard registered), verifies that `Wow.exe`
+          and `Data\common.MPQ` are there, and creates desktop and Start menu
+          shortcuts.
 
           `Arenacraft.exe` is the portable build: copy it next to `Wow.exe`.
           EOF

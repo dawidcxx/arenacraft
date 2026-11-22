@@ -114,6 +114,45 @@ ReleaseSafe panics with "incorrect alignment"). `handleToIcon` reinterprets the
 bits with `@memcpy`; a handle is never dereferenced, so its alignment is
 irrelevant.
 
+## Installer
+
+`installer/Arenacraft.wxs` is the WiX source (plus `wowcheck.js`, the embedded
+JScript directory check, and `License.rtf`); the release workflow builds it on
+the Windows runner. Don't try to validate it by running the `wix` dotnet tool
+locally on Linux: it starts (with a "only supports Windows" warning) but rejects
+every `Directory/@Name` with `WIX0389`, binds no MSI, and needs Windows'
+`msi.dll` for file versions. Use the workflow.
+
+The install directory *is* the World of Warcraft directory: `Arenacraft.exe`
+lives next to `Wow.exe` and resolves the game relative to itself. So the wizard
+has to let the user pick it.
+
+- The dialog set is `WixUI_InstallDir`, which has a folder page.
+  `WixUI_Mondo` was used before: its only directory picker is
+  Customise → Browse, so in practice users could not choose where to install.
+  The trade-off is that `InstallDir` has no feature page, so the shortcut
+  features are always installed (they stay features so `ADDLOCAL`/`REMOVE`
+  still work).
+- Pre-selected directory, in order: our own
+  `HKLM\SOFTWARE\Arenacraft\Launcher\InstallPath` (written on install) →
+  Blizzard's `HKLM\SOFTWARE\Blizzard Entertainment\World of Warcraft\InstallPath`
+  → `ProgramFiles6432Folder\World of Warcraft`. Ours comes first so an upgrade
+  lands where the user actually installed instead of wherever the Blizzard key
+  or Program Files points.
+- The two `SetProperty` defaults have mutually exclusive conditions (each
+  excludes all earlier sources) rather than relying on the order WiX emits
+  them in. `NOT INSTALLDIR` keeps a command-line `INSTALLDIR` and a reinstall of
+  the same ProductCode untouched.
+- Registry view: the package is x64, so our key is written to the 64-bit view and
+  read with `Bitness="always64"`. The 3.3.5a client is 32-bit, so Blizzard's key
+  is read with `Bitness="always32"`.
+- `ValidateWowDir` runs `After="CostFinalize"` in the *execute* sequence: after
+  the folder page has set `INSTALLDIR`, but before `RemoveExistingProducts`
+  (upgrades default to `afterInstallValidate`), so a rejected directory leaves
+  the previous install untouched. It cannot run in the UI sequence, where the
+  page has not been shown yet. A rejected directory therefore fails at install
+  time rather than on the folder page.
+
 ## Release
 
 `launcher-release` builds `Arenacraft.exe` from an existing `launcher-x.y.z` tag

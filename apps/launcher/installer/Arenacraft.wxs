@@ -16,22 +16,50 @@
                   DowngradeErrorMessage="A newer version of the Arenacraft Launcher is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
-    <ui:WixUI Id="WixUI_Mondo" InstallDirectory="INSTALLDIR" />
+    <!-- The install directory is the World of Warcraft directory, so the wizard
+         has to show it. WixUI_InstallDir is the dialog set with a folder page;
+         WixUI_Mondo (the previous choice) only exposes the folder through its
+         Customise dialog, which makes the picker easy to miss. -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLDIR" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.InstallerDir)\License.rtf" />
 
-    <!-- Default the target to the client Blizzard registered, and let the
-         directory dialog override it. ValidateWowDir checks whatever the user
-         ends up picking. -->
-    <Property Id="WOWDIR">
-      <RegistrySearch Id="WowInstallPath"
+    <!-- Directory to pre-select in the folder page, in order:
+           1. the directory this launcher was installed into (our own key, so
+              an upgrade or reinstall lands where the user put it last time),
+           2. the client Blizzard registered,
+           3. Program Files\World of Warcraft (the Directory element below).
+         Every SetProperty condition excludes the earlier steps, so the three
+         are mutually exclusive and their action order cannot matter. The
+         NOT INSTALLDIR term keeps an INSTALLDIR passed on the msiexec command
+         line, and a reinstall of the same ProductCode, untouched. -->
+    <Property Id="ARENACRAFTWOWDIR">
+      <!-- Written below by LauncherComponent; the package is x64, so its
+           registry values live in the 64-bit view. -->
+      <RegistrySearch Id="ArenacraftInstallPath"
+                      Root="HKLM"
+                      Key="SOFTWARE\Arenacraft\Launcher"
+                      Name="InstallPath"
+                      Type="directory"
+                      Bitness="always64" />
+    </Property>
+    <Property Id="BLIZZARDWOWDIR">
+      <!-- 3.3.5a is a 32-bit client, so its key is in the 32-bit view even on
+           64-bit Windows. -->
+      <RegistrySearch Id="BlizzardInstallPath"
                       Root="HKLM"
                       Key="SOFTWARE\Blizzard Entertainment\World of Warcraft"
                       Name="InstallPath"
                       Type="directory"
                       Bitness="always32" />
     </Property>
-    <SetProperty Id="INSTALLDIR" Value="[WOWDIR]" Before="CostFinalize"
-                 Sequence="both" Condition="NOT Installed AND WOWDIR AND NOT INSTALLDIR" />
+    <!-- Action= is required here: both actions set INSTALLDIR, and without a
+         distinct name each would generate the same SetINSTALLDIR action. -->
+    <SetProperty Action="SetWowDirFromArenacraft" Id="INSTALLDIR" Value="[ARENACRAFTWOWDIR]"
+                 Before="CostFinalize" Sequence="both"
+                 Condition="NOT Installed AND NOT INSTALLDIR AND ARENACRAFTWOWDIR" />
+    <SetProperty Action="SetWowDirFromBlizzard" Id="INSTALLDIR" Value="[BLIZZARDWOWDIR]"
+                 Before="CostFinalize" Sequence="both"
+                 Condition="NOT Installed AND NOT INSTALLDIR AND NOT ARENACRAFTWOWDIR AND BLIZZARDWOWDIR" />
 
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLDIR" Name="World of Warcraft" />
@@ -42,6 +70,10 @@
 
     <Component Id="LauncherComponent" Directory="INSTALLDIR" Guid="*">
       <File Id="ArenacraftExe" Source="$(var.SourceDir)\Arenacraft.exe" KeyPath="yes" />
+      <!-- The update path: the next version's MSI reads this back as
+           ARENACRAFTWOWDIR to pre-select the directory the user picked. -->
+      <RegistryValue Root="HKLM" Key="Software\Arenacraft\Launcher"
+                     Name="InstallPath" Type="string" Value="[INSTALLDIR]" />
     </Component>
 
     <Component Id="DesktopShortcutComponent" Directory="DesktopFolder" Guid="*">
@@ -79,7 +111,8 @@
     <InstallExecuteSequence>
       <!-- After CostFinalize (INSTALLDIR is resolved) but before
            RemoveExistingProducts/InstallFiles: a rejected directory must not
-           uninstall the previous launcher. -->
+           uninstall the previous launcher. Not scheduled in the UI sequence,
+           where the folder page has not run yet. -->
       <Custom Action="ValidateWowDir" After="CostFinalize" Condition="NOT Installed" />
     </InstallExecuteSequence>
 

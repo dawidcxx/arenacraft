@@ -125,7 +125,12 @@ since the previous `launcher-*` tag, attests build provenance for both files,
 and publishes them plus `SHA256SUMS`. Set `WINDOWS_SIGNING_PFX_BASE64` and
 `WINDOWS_SIGNING_PFX_PASSWORD` to Authenticode-sign the artifacts.
 
-The MSI defaults to the World of Warcraft directory registered by Blizzard,
-lets the user pick another one, and refuses to install unless `Wow.exe` and
-`Data\common.MPQ` are present. Desktop and Start menu shortcuts are optional
-features.
+The MSI installs the launcher into the World of Warcraft directory, so the
+wizard asks for it. The folder page is pre-filled with, in order: the directory
+this launcher was installed into last time (recorded under
+`HKLM\SOFTWARE\Arenacraft\Launcher\InstallPath`), the client registered by
+Blizzard (`HKLM\SOFTWARE\Blizzard Entertainment\World of Warcraft\InstallPath`),
+or `%ProgramFiles%\World of Warcraft`. The install is refused unless `Wow.exe`
+and `Data\common.MPQ` are present, and the chosen directory is recorded for the
+next upgrade. Desktop and Start menu shortcuts are always installed; the MSI
+has no feature page.
