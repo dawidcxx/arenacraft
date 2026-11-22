@@ -107,6 +107,13 @@ artwork changes. The `.ico` must be committed as a binary — `.gitattributes`
 already marks it so, otherwise CRLF normalization corrupts the PNG-compressed
 256 px entry (this happened to the old updater app's icon).
 
+`LoadImageA` returns an untyped `HANDLE`, but the translated `HICON` is a
+pointer to a dummy `int`-bearing struct, so it carries alignment 4 while handle
+values are not required to be aligned (Wine hands out odd ones, and Debug/
+ReleaseSafe panics with "incorrect alignment"). `handleToIcon` reinterprets the
+bits with `@memcpy`; a handle is never dereferenced, so its alignment is
+irrelevant.
+
 ## Release
 
 `launcher-release` builds `Arenacraft.exe` from an existing `launcher-x.y.z` tag

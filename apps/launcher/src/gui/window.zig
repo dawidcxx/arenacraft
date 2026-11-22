@@ -519,14 +519,25 @@ pub fn run() void {
 /// owned by the window class and live for the whole process.
 fn loadIcon(metric: c_int) c.HICON {
     const size = c.GetSystemMetrics(metric);
-    return @ptrCast(@alignCast(c.LoadImageA(
+    const handle = c.LoadImageA(
         c.GetModuleHandleA(null),
         @ptrFromInt(@as(usize, icon_resource_id)),
         c.IMAGE_ICON,
         size,
         size,
         c.LR_DEFAULTCOLOR,
-    )));
+    );
+    return handleToIcon(handle);
+}
+
+/// `LoadImageA` returns an untyped `HANDLE`, while `HICON` points at a dummy
+/// struct and so carries an alignment. Handle values are not required to be
+/// aligned — Wine returns odd ones — so `@alignCast` trips the safety check.
+/// Handles are never dereferenced: reinterpret the bits.
+fn handleToIcon(handle: c.HANDLE) c.HICON {
+    var icon: c.HICON = undefined;
+    @memcpy(std.mem.asBytes(&icon), std.mem.asBytes(&handle));
+    return icon;
 }
 
 fn ensureClass() !void {
