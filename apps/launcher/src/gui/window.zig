@@ -783,7 +783,6 @@ pub fn create(options: Options) !*Window {
         self,
     );
     if (hwnd == null) return error.WindowCreationFailed;
-
     self.fonts[@intFromEnum(label.Font.body)] = createFont(-18, c.FW_NORMAL);
     self.fonts[@intFromEnum(label.Font.title)] = createFont(-30, c.FW_BOLD);
     self.measure_dc = c.GetDC(null);
@@ -896,7 +895,10 @@ fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
             setUserData(hwnd, self);
             live_windows += 1;
         }
-        return c.TRUE;
+        // Let the default proc run for WM_NCCREATE. Returning TRUE directly
+        // skips it and leaves the caption passed to CreateWindowExA unapplied:
+        // the window then has no title bar text.
+        return c.DefWindowProcA(hwnd, message, wparam, lparam);
     }
 
     const window = getUserData(hwnd) orelse

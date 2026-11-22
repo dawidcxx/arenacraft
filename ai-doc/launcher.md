@@ -36,6 +36,11 @@ Never fabricate an `HWND` from an integer through `@ptrFromInt`: the translated
 handle types carry an alignment and Debug builds panic on unaligned values.
 Compare `@intFromPtr` instead.
 
+`windowProc` stores the `Window` in `WM_NCCREATE` but then forwards the message
+to `DefWindowProcA` instead of returning `TRUE` itself. Returning early skips
+the default proc, which is what applies the title passed to `CreateWindowExA`;
+the window then has an empty caption even though the title was supplied.
+
 ## Views
 
 The launcher has two views in one window: home and the realm switcher. A view
