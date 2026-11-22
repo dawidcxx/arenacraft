@@ -60,3 +60,16 @@ changing the launcher.
 `launcher-release` builds `Arenacraft.exe` from an existing `launcher-x.y.z` tag
 and packages `Arenacraft.msi` (WiX) with an embedded JScript check for `Wow.exe`
 and `Data\common.MPQ`. The MSI build only runs on the Windows runner.
+
+- Build with ReleaseSafe: the launcher has no performance-critical path, and
+  safety checks make a bad build fail loudly instead of silently.
+- Run the workflow on the tag ref
+  (`gh workflow run launcher-release.yml --ref launcher-x.y.z -f tag=launcher-x.y.z`).
+  The provenance attestation records `github.ref`; running on a branch makes
+  `--source-ref refs/tags/...` verification fail even though the tag was
+  checked out for the build.
+- Provenance is mandatory: `actions/attest-build-provenance` is not
+  `continue-on-error`, so a release cannot claim a verification path it does
+  not have.
+- Tags are not signed yet; a GitHub "Verified" badge requires a GPG/SSH-signed
+  tag from a key registered on the account, which a workflow cannot supply.

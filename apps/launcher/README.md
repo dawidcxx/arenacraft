@@ -82,11 +82,20 @@ downloads, patching) must not be awaited on the GUI thread; see
 ## Release
 
 1. Create and push a tag named `launcher-x.y.z`.
-2. Run the `launcher-release` workflow with that tag.
+2. Run the workflow on that tag, not on a branch:
 
-The workflow builds `Arenacraft.exe` and `Arenacraft.msi`, generates notes from
-the commits touching `apps/launcher` since the previous `launcher-*` tag, and
-publishes both files plus `SHA256SUMS`. Set `WINDOWS_SIGNING_PFX_BASE64` and
+   ```sh
+   gh workflow run launcher-release.yml \
+     --ref launcher-x.y.z -f tag=launcher-x.y.z
+   ```
+
+   The run ref becomes the provenance source ref, which is what `gh attestation
+   verify --source-ref refs/tags/...` (printed in the release notes) checks.
+
+The workflow builds `Arenacraft.exe` (`-Doptimize=ReleaseSafe`) and
+`Arenacraft.msi`, generates notes from the commits touching `apps/launcher`
+since the previous `launcher-*` tag, attests build provenance for both files,
+and publishes them plus `SHA256SUMS`. Set `WINDOWS_SIGNING_PFX_BASE64` and
 `WINDOWS_SIGNING_PFX_PASSWORD` to Authenticode-sign the artifacts.
 
 The MSI defaults to the World of Warcraft directory registered by Blizzard,

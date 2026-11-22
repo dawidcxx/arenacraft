@@ -45,6 +45,12 @@ jobs:
             echo "::error::MSI versions allow major<=255, minor<=255, build<=65535; got $version"
             exit 1
           fi
+          # Provenance attestations record the workflow's ref. Run the workflow
+          # on the tag itself so `--source-ref refs/tags/<tag>` is meaningful.
+          if [[ "${GITHUB_REF}" != "refs/tags/$TAG" ]]; then
+            echo "::error::run this workflow on the tag ref: gh workflow run launcher-release.yml --ref $TAG -f tag=$TAG"
+            exit 1
+          fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@v4
@@ -74,7 +80,10 @@ jobs:
         shell: bash
         run: |
           cd apps/launcher
-          zig build launcher -Doptimize=ReleaseFast
+          # ReleaseSafe keeps the safety checks and panic messages; the launcher
+          # has no throughput-critical code, and the artifacts are easier to
+          # diagnose when something goes wrong.
+          zig build launcher -Doptimize=ReleaseSafe
           mkdir -p ../../dist
           cp zig-out/bin/launcher.exe ../../dist/Arenacraft.exe
 
@@ -138,7 +147,6 @@ jobs:
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
-        continue-on-error: true
         with:
           subject-path: |
             dist/Arenacraft.exe
@@ -158,6 +166,21 @@ jobs:
           menu shortcuts.
 
           `Arenacraft.exe` is the portable build: copy it next to `Wow.exe`.
+          EOF
+          cat >> release-notes.md <<EOF
+
+          ## Verifying the build
+
+          These artifacts were built by the \`launcher-release\` workflow from
+          tag \`$TAG\` using \`ReleaseSafe\`. Verify provenance with the GitHub CLI:
+
+          \`\`\`sh
+          gh attestation verify Arenacraft.exe --repo $GITHUB_REPOSITORY \\
+            --signer-workflow $GITHUB_REPOSITORY/.github/workflows/launcher-release.yml \\
+            --source-ref refs/tags/$TAG
+          \`\`\`
+
+          \`Arenacraft.msi\` verifies with the same command.
           EOF
 
       - name: Publish release
