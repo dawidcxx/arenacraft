@@ -8,17 +8,21 @@ design decisions that are easy to break.
 
 ```
 src/lib      raw Win32 bindings (@cImport windows.h)
-src/gui      scoped GUI layer (windows, widgets, message boxes)
+src/clay     layout engine (Zig port of Clay's solver; no Win32)
+src/gui      scoped GUI layer (windows, widgets, layout replay, message boxes)
 src/launcher app behaviour (launch Wow.exe)
 ```
 
 - `lib` is only the translation of `windows.h`. No launcher semantics.
+- `clay` is a port, not a binding: the layout half of Clay v0.14 in plain Zig,
+  with no libc, no Win32 and no global state, so it builds and tests on the host.
 - `gui` is our own surface API, not a general Win32 wrapper. Widgets are two
   things on purpose:
   - an opaque handle (no public `HWND`), so the implementation can change;
   - a `button.Options`/`Window.addButton` call that only exposes what the
     launcher needs.
-- `launcher` never calls `gui`/`lib` from a worker thread.
+- `launcher` never calls `gui`/`lib` from a worker thread, and never imports
+  `clay`.
 
 ## GUI thread
 
@@ -50,10 +54,47 @@ Rules for future work (downloads, patching):
 
 ## Layout
 
-The current pass in `gui/window.zig` is a placeholder: one column, equal height
-shares, 24px margin. Widgets are positioned through `Rect` and `Button.setRect`,
-so replacing the placeholder with yoga means computing rects in `gui` and never
-changing the launcher.
+`src/clay/` is a Zig port of Clay v0.14's layout solver: the sizing pass, text
+wrapping, height propagation and positioning. Only the layout half exists;
+colors, corner radius, borders, clipping/scrolling, transitions, pointer/hover
+state and render-command generation are not ported. The deviations from upstream
+are listed at the top of `src/clay/layout.zig`; the ones that matter:
+
+- no clip/scroll containers, so a container never ignores its children's minimum
+  sizes;
+- floating elements attach only to their parent or to the layout root (attaching
+  by element id needs Clay's id hash map);
+- roots are positioned in declaration order, without z-index sorting;
+- a `percent` axis is not re-clamped after height propagation. Clay reads
+  min/max through the union's percent member there, which is undefined behaviour
+  in C.
+
+The engine is immediate-mode but a Win32 window only hears about resizes through
+`WM_SIZE`, so `gui` records the tree and replays it:
+
+- `Window.beginLayout` starts recording. `container`/`endContainer`/`addButton`/
+  `addLabel` append to `Window.plan`; `endLayout` computes and applies.
+- Every layout pass (`WM_SIZE`, and the initial `endLayout`) resets the engine's
+  per-frame arena, replays `plan`, computes, and moves all controls in a single
+  `DeferWindowPos` batch. There is no per-widget `MoveWindow` in the common case.
+- `gui/layout.zig` mirrors the engine's declarations (`Container`, `SizingAxis`,
+  `Padding`, `Alignment`, `WrapMode`) and converts with exhaustive switches.
+  Launcher code uses only these names; adding an engine option without mapping
+  it fails to compile.
+- Text is measured by `gui` with the control's font (`GetTextExtentPoint32W` on
+  a screen DC). Clay does the line breaking, so a `STATIC`'s height matches its
+  own word wrapping. Labels are wrapped in a fit container so they accept the
+  same `sizing` options as other widgets; buttons get a `.fit` minimum of the
+  measured label plus their padding.
+
+`zig build clay-test` runs the layout tests natively (they do not need wine).
+`layout_test.zig` covers fit/grow/percent/fixed, shrink with minimums,
+alignment, wrapping modes, floating and a launcher-shaped tree; the expected
+numbers were cross-checked against upstream Clay compiled from `clay.h` v0.14.
+
+Testing note: without a window manager, resizing the X window does not reach
+Wine's Win32 window, so no `WM_SIZE` is delivered. Drive resizes with
+`SetWindowPos` from a helper process instead.
 
 ## Release
 

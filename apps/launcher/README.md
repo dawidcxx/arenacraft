@@ -39,26 +39,40 @@ nix-shell -p wineWow64Packages.stable \
   --run 'nix develop ../.. --command zig build test -fwine'
 ```
 
-The test binaries are Windows PE as well, so they need the same executor.
+`lib` tests are Windows PE and need the wine executor above. The `clay` layout
+tests are pure Zig with no libc or Win32 dependency, so they build and run
+natively: `zig build clay-test` needs no wine, and `zig build test` runs both.
 `zig build lib-test` runs the lib tests on their own.
 
 ## What it does
 
-The window shows a single **Launch Game** button. It resolves `Wow.exe` next to
-the launcher's own executable (not the current working directory) and starts it
-with that directory as the child's working directory. The launcher closes once
-the game has started. If `Wow.exe` is missing or the process cannot be created,
-a message box explains why and the launcher stays open.
+The window declares a single-column layout: an **Arenacraft** title, a
+description that re-wraps when the window narrows, a spacer, and a bottom row
+with **Launch Game** and **Quit** buttons aligned to the right. Resize the
+window and everything adapts; there are no hardcoded widget positions.
+
+**Launch Game** resolves `Wow.exe` next to the launcher's own executable (not
+the current working directory) and starts it with that directory as the child's
+working directory. The launcher closes once the game has started. If `Wow.exe`
+is missing or the process cannot be created, a message box explains why and the
+launcher stays open.
 
 ## Modules
 
-- `src/launcher/main.zig`: entry point, window setup, launch callback.
+- `src/launcher/main.zig`: entry point, layout declaration, launch callback.
 - `src/launcher/game.zig`: resolves and spawns `Wow.exe`.
+- `src/clay/`: the layout engine: a Zig port of Clay v0.14's solver.
+  - `types.zig`: element declarations (sizing, padding, alignment, floating).
+  - `text.zig`: word measurement and line breaking.
+  - `layout.zig`: the sizing and positioning passes.
+  - `layout_test.zig`: unit tests with hand-computed expectations.
 - `src/gui/`: scoped Win32 GUI layer, imported as `gui`.
-  - `root.zig`: public surface (`createWindow`, `run`, `showMessage`, types).
-  - `window.zig`: window class, message loop, placeholder layout pass.
+  - `root.zig`: public surface (`createWindow`, `run`, `showMessage`, layout types).
+  - `window.zig`: window class, message loop, layout replay, text measurement.
+  - `layout.zig`: `gui`'s layout vocabulary; mirrors `clay` one to one.
   - `button.zig`: button widget; the `HWND` stays internal.
-  - `geometry.zig`: `Rect`/`Size`/`Point`, the seam for a layout engine.
+  - `label.zig`: static text widget; the `HWND` stays internal.
+  - `geometry.zig`: `Rect`/`Size`/`Point` for widget placement.
 - `src/lib/root.zig`: shared library, imported as `lib`.
 - `src/lib/win32.zig`: `windows.h` via `@cImport`; the module links libc so the
   MinGW-w64 headers and CRT resolve.
@@ -66,9 +80,11 @@ a message box explains why and the launcher stays open.
   action.
 - `scripts/changelog.sh`: release notes for the `launcher-release` workflow.
 
-The GUI surface deliberately hides widget handles and positions widgets with
-`Rect`, so a layout engine (yoga) can take over layout, and widgets can gain
-state or custom painting, without changing launcher code.
+The GUI surface hides widget handles and takes layout in its own vocabulary, so
+the engine behind it (`clay`) never appears in launcher code and can be swapped
+without touching call sites. `gui/layout.zig` mirrors every engine option and
+converts with exhaustive switches, so an engine change that is not mapped fails
+to compile instead of silently doing nothing.
 
 ## I/O
 

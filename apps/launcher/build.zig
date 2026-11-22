@@ -11,8 +11,10 @@ const windows_target_query: std.Target.Query = .{
 };
 
 var LIB_MOD: ?*std.Build.Module = null;
+var CLAY_MOD: ?*std.Build.Module = null;
 var GUI_MOD: ?*std.Build.Module = null;
 var LIB_TEST_STEP: *std.Build.Step = undefined;
+var CLAY_TEST_STEP: *std.Build.Step = undefined;
 
 pub fn build(b: *std.Build) !void {
     const target = b.resolveTargetQuery(windows_target_query);
@@ -28,11 +30,13 @@ pub fn build(b: *std.Build) !void {
     ) orelse false;
 
     try addLib(b, target, optimize);
+    try addClay(b, target, optimize);
     try addGui(b, target, optimize);
     try addLauncher(b, target, optimize, console_window);
 
     const all_test = b.step("test", "Run all tests");
     all_test.dependOn(LIB_TEST_STEP);
+    all_test.dependOn(CLAY_TEST_STEP);
 }
 
 /// Declares the shared `lib` module: the raw Win32 translation.
@@ -60,6 +64,35 @@ fn addLib(
     LIB_TEST_STEP.dependOn(&run.step);
 }
 
+/// Declares the `clay` module: the ported layout engine.
+fn addClay(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) !void {
+    const mod = b.createModule(.{
+        .root_source_file = b.path("src/clay/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    CLAY_MOD = mod;
+
+    // Layout is pure computation with no libc or Win32 dependency, so the tests
+    // build for the host and run directly instead of through wine.
+    const host_mod = b.createModule(.{
+        .root_source_file = b.path("src/clay/root.zig"),
+        .target = b.resolveTargetQuery(.{}),
+        .optimize = optimize,
+    });
+    const tst = b.addTest(.{ .root_module = host_mod });
+    const run = b.addRunArtifact(tst);
+    if (b.args) |args| {
+        run.addArgs(args);
+    }
+    CLAY_TEST_STEP = b.step("clay-test", "Run the clay layout tests (native)");
+    CLAY_TEST_STEP.dependOn(&run.step);
+}
+
 /// Declares the `gui` module: the launcher's scoped Win32 GUI layer.
 fn addGui(
     b: *std.Build,
@@ -67,6 +100,7 @@ fn addGui(
     optimize: std.builtin.OptimizeMode,
 ) !void {
     const lib_mod = LIB_MOD orelse return error.MissingModule;
+    const clay_mod = CLAY_MOD orelse return error.MissingModule;
 
     const mod = b.createModule(.{
         .root_source_file = b.path("src/gui/root.zig"),
@@ -75,6 +109,7 @@ fn addGui(
         .link_libc = true,
         .imports = &.{
             .{ .name = "lib", .module = lib_mod },
+            .{ .name = "clay", .module = clay_mod },
         },
     });
     // Fonts and brushes are GDI; Zig's windows-gnu link line does not include

@@ -1,16 +1,25 @@
-//! Top-level window, its message pump and the placeholder layout pass.
+//! Top-level window, its message pump and the clay-backed layout pass.
 //!
 //! One process-wide window class and one brush are registered lazily. The
 //! `Window` is heap allocated because Win32 stores the instance pointer in
 //! `GWLP_USERDATA` for the whole lifetime of the `HWND`; moving it afterwards
 //! would dangle. `deinit` frees it.
+//!
+//! The layout engine is immediate-mode, but a Win32 window only gets a
+//! notification (`WM_SIZE`) when its size changes. `beginLayout` therefore
+//! records the declarations in `plan`, and every re-layout replays that plan
+//! into the engine and applies the resulting rects to the controls in one
+//! `DeferWindowPos` batch.
 
 const std = @import("std");
 const lib = @import("lib");
 const c = lib.win32.c;
+const clay = @import("clay");
 
 const geometry = @import("geometry.zig");
+const layout = @import("layout.zig");
 const button = @import("button.zig");
+const label = @import("label.zig");
 
 const allocator = std.heap.smp_allocator;
 
@@ -22,6 +31,8 @@ const background_color: c.COLORREF = 0x00f0f0f0;
 /// `IDC_ARROW`, spelled out because MinGW expresses it through
 /// `MAKEINTRESOURCE`, which `@cImport` cannot translate.
 const idc_arrow = 32512;
+
+const font_count = 2;
 
 var class_registered = false;
 var class_brush: c.HBRUSH = null;
@@ -36,14 +47,67 @@ pub const Options = struct {
     size: geometry.Size = .{ .width = 640, .height = 400 },
 };
 
+/// One step of the recorded layout tree, replayed on every layout pass.
+const Plan = union(enum) {
+    open: layout.Container,
+    close,
+    button: *button.Button,
+    label: *label.Label,
+};
+
+const Placement = struct {
+    node: clay.NodeId,
+    target: union(enum) {
+        button: *button.Button,
+        label: *label.Label,
+    },
+};
+
 pub const Window = struct {
     hwnd: c.HWND = null,
     buttons: std.ArrayListUnmanaged(*button.Button) = .empty,
-    font: c.HFONT = null,
+    labels: std.ArrayListUnmanaged(*label.Label) = .empty,
+    fonts: [font_count]c.HFONT = [_]c.HFONT{null} ** font_count,
+    /// Screen DC used only to measure text; never drawn into.
+    measure_dc: c.HDC = null,
 
-    /// Add a push button as a child of this window.
+    engine: clay.Layout,
+    plan: std.ArrayListUnmanaged(Plan) = .empty,
+    placements: std.ArrayListUnmanaged(Placement) = .empty,
+    recording: bool = false,
+    ready: bool = false,
+    /// Open containers in the tree being recorded, to catch unbalanced trees.
+    depth: usize = 0,
+
+    /// Start recording a layout tree. Call `endLayout` after declaring it.
+    pub fn beginLayout(self: *Window) !void {
+        if (self.hwnd == null) return error.WindowDestroyed;
+        if (self.recording) return error.LayoutAlreadyStarted;
+        self.plan.clearRetainingCapacity();
+        self.placements.clearRetainingCapacity();
+        self.depth = 0;
+        self.recording = true;
+    }
+
+    /// Open a container. Pair with `endContainer`.
+    pub fn container(self: *Window, style: layout.Container) !void {
+        if (!self.recording) return error.LayoutNotStarted;
+        try self.plan.append(allocator, .{ .open = style });
+        self.depth += 1;
+    }
+
+    /// Close the most recent container opened with `container`.
+    pub fn endContainer(self: *Window) !void {
+        if (!self.recording) return error.LayoutNotStarted;
+        if (self.depth == 0) return error.UnbalancedLayout;
+        try self.plan.append(allocator, .close);
+        self.depth -= 1;
+    }
+
+    /// Add a push button as a child of the currently open container.
     pub fn addButton(self: *Window, options: button.Options) !*button.Button {
         if (self.hwnd == null) return error.WindowDestroyed;
+        if (!self.recording) return error.LayoutNotStarted;
 
         const text = try allocator.dupeZ(u8, options.text);
         defer allocator.free(text);
@@ -66,24 +130,118 @@ pub const Window = struct {
             null,
         );
         if (child == null) return error.ControlCreationFailed;
-        errdefer _ = c.DestroyWindow(child);
 
-        if (self.font != null) {
-            _ = c.SendMessageA(child, c.WM_SETFONT, @intFromPtr(self.font), c.TRUE);
+        if (self.fonts[@intFromEnum(label.Font.body)] != null) {
+            _ = c.SendMessageA(child, c.WM_SETFONT, @intFromPtr(self.fonts[@intFromEnum(label.Font.body)]), c.TRUE);
         }
 
-        const widget = try allocator.create(button.Button);
-        errdefer allocator.destroy(widget);
-        widget.* = .{ .hwnd = child, .callback = options.onClick };
-        try self.buttons.append(allocator, widget);
+        const measured = measureText(self, options.text, @intFromEnum(label.Font.body));
 
-        self.relayout();
+        const widget = allocator.create(button.Button) catch |err| {
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        widget.* = .{
+            .hwnd = child,
+            .callback = options.onClick,
+            .sizing = options.sizing,
+            .padding = options.padding,
+            .text_size = .{
+                .width = layout.roundToInt(measured.width),
+                .height = layout.roundToInt(measured.height),
+            },
+        };
+
+        self.buttons.append(allocator, widget) catch |err| {
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        self.plan.append(allocator, .{ .button = widget }) catch |err| {
+            self.buttons.items.len -= 1;
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+
         // Dialog-style tab handling is not wired up yet, so give the first
         // control focus explicitly: the button then responds to Space.
         if (self.buttons.items.len == 1) {
             _ = c.SetFocus(child);
         }
         return widget;
+    }
+
+    /// Add a static text label as a child of the currently open container.
+    pub fn addLabel(self: *Window, options: label.Options) !*label.Label {
+        if (self.hwnd == null) return error.WindowDestroyed;
+        if (!self.recording) return error.LayoutNotStarted;
+
+        const text = try allocator.dupeZ(u8, options.text);
+
+        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | c.SS_LEFT);
+        const child = c.CreateWindowExA(
+            0,
+            "STATIC",
+            text.ptr,
+            style,
+            0,
+            0,
+            0,
+            0,
+            self.hwnd,
+            null,
+            c.GetModuleHandleA(null),
+            null,
+        );
+        if (child == null) {
+            allocator.free(text);
+            return error.ControlCreationFailed;
+        }
+
+        const font = self.fonts[@intFromEnum(options.font)];
+        if (font != null) {
+            _ = c.SendMessageA(child, c.WM_SETFONT, @intFromPtr(font), c.TRUE);
+        }
+
+        const widget = allocator.create(label.Label) catch |err| {
+            allocator.free(text);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        widget.* = .{
+            .hwnd = child,
+            .text = text,
+            .font = options.font,
+            .wrap = options.wrap,
+            .sizing = options.sizing,
+        };
+
+        self.labels.append(allocator, widget) catch |err| {
+            allocator.free(text);
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        self.plan.append(allocator, .{ .label = widget }) catch |err| {
+            self.labels.items.len -= 1;
+            allocator.free(text);
+            allocator.destroy(widget);
+            _ = c.DestroyWindow(child);
+            return err;
+        };
+        return widget;
+    }
+
+    /// Finish recording and apply the layout. The tree is replayed on resize.
+    pub fn endLayout(self: *Window) !void {
+        if (!self.recording) return error.LayoutNotStarted;
+        const balanced = self.depth == 0;
+        self.recording = false;
+        self.depth = 0;
+        if (!balanced) return error.UnbalancedLayout;
+        self.ready = true;
+        try self.relayout();
     }
 
     /// Destroy the native window. Safe to call more than once.
@@ -98,35 +256,195 @@ pub const Window = struct {
         self.close();
         for (self.buttons.items) |widget| allocator.destroy(widget);
         self.buttons.deinit(allocator);
-        if (self.font != null) {
-            _ = c.DeleteObject(@ptrCast(self.font));
+        for (self.labels.items) |widget| {
+            allocator.free(widget.text);
+            allocator.destroy(widget);
+        }
+        self.labels.deinit(allocator);
+        self.plan.deinit(allocator);
+        self.placements.deinit(allocator);
+        self.engine.deinit();
+        for (&self.fonts) |*font| {
+            if (font.* != null) {
+                _ = c.DeleteObject(@ptrCast(font.*));
+                font.* = null;
+            }
+        }
+        if (self.measure_dc != null) {
+            _ = c.ReleaseDC(null, self.measure_dc);
+            self.measure_dc = null;
         }
         allocator.destroy(self);
     }
 
-    /// Placeholder for the layout engine. Widgets currently form a single
-    /// column and share the client height equally; once yoga is wired in, this
-    /// becomes "run layout, hand each widget its computed rect".
-    fn relayout(self: *Window) void {
-        if (self.hwnd == null) return;
+    /// Re-run the recorded tree for the current client size.
+    fn relayout(self: *Window) !void {
+        const hwnd = self.hwnd orelse return;
+        if (!self.ready) return;
+
         var client: c.RECT = undefined;
-        if (c.GetClientRect(self.hwnd, &client) == 0) return;
+        if (c.GetClientRect(hwnd, &client) == 0) return;
 
-        const count: i32 = @intCast(self.buttons.items.len);
-        if (count == 0) return;
+        try self.runPlan(.{
+            .width = @floatFromInt(@max(0, client.right - client.left)),
+            .height = @floatFromInt(@max(0, client.bottom - client.top)),
+        });
+        self.applyPlacements();
+    }
 
-        const margin: i32 = 24;
-        const gap: i32 = 12;
-        const width = @max(1, client.right - client.left - 2 * margin);
-        const share = @max(1, @divTrunc(client.bottom - client.top - 2 * margin - gap * (count - 1), count));
+    fn runPlan(self: *Window, size: clay.Size) !void {
+        self.placements.clearRetainingCapacity();
+        try self.engine.begin(size);
 
-        var y = margin;
-        for (self.buttons.items) |widget| {
-            widget.setRect(.{ .x = margin, .y = y, .width = width, .height = share });
-            y += share + gap;
+        for (self.plan.items) |item| {
+            switch (item) {
+                .open => |style| {
+                    _ = try self.engine.open(.{ .layout = layout.toClayContainer(style) });
+                },
+                .close => try self.engine.close(),
+                .button => |widget| {
+                    const node = try self.engine.open(buttonDeclaration(widget));
+                    try self.engine.close();
+                    try self.placements.append(allocator, .{ .node = node, .target = .{ .button = widget } });
+                },
+                .label => |widget| {
+                    // The text sits inside a container so labels accept the same
+                    // sizing options as any other widget; a fit container
+                    // around a text element is exactly the text's size.
+                    const node = try self.engine.open(.{ .layout = .{
+                        .sizing = layout.toClaySizing(widget.sizing),
+                    } });
+                    _ = try self.engine.text(widget.text, .{
+                        .wrap = layout.toClayWrap(widget.wrap),
+                        .measure_key = @intFromEnum(widget.font),
+                    });
+                    try self.engine.close();
+                    try self.placements.append(allocator, .{ .node = node, .target = .{ .label = widget } });
+                },
+            }
+        }
+
+        try self.engine.compute();
+    }
+
+    /// Move every control to its computed rect in one repaint.
+    fn applyPlacements(self: *Window) void {
+        if (self.placements.items.len == 0) return;
+
+        var handle = c.BeginDeferWindowPos(@intCast(self.placements.items.len));
+        if (handle == null) {
+            // Batching is an optimisation; without it, move one by one.
+            for (self.placements.items) |placement| {
+                const rect = layout.toRect(self.engine.bounds(placement.node));
+                self.storeRect(placement, rect);
+                _ = c.MoveWindow(self.hwndOf(placement), rect.x, rect.y, rect.width, rect.height, c.TRUE);
+            }
+            return;
+        }
+
+        for (self.placements.items) |placement| {
+            const rect = layout.toRect(self.engine.bounds(placement.node));
+            self.storeRect(placement, rect);
+
+            const next = c.DeferWindowPos(
+                handle,
+                self.hwndOf(placement),
+                null,
+                rect.x,
+                rect.y,
+                rect.width,
+                rect.height,
+                c.SWP_NOZORDER | c.SWP_NOACTIVATE,
+            );
+            if (next == null) {
+                _ = c.EndDeferWindowPos(handle);
+                return;
+            }
+            handle = next;
+        }
+
+        _ = c.EndDeferWindowPos(handle);
+    }
+
+    fn hwndOf(_: *Window, placement: Placement) c.HWND {
+        return switch (placement.target) {
+            .button => |widget| widget.hwnd,
+            .label => |widget| widget.hwnd,
+        };
+    }
+
+    fn storeRect(_: *Window, placement: Placement, rect: geometry.Rect) void {
+        switch (placement.target) {
+            .button => |widget| widget.setRect(rect),
+            .label => |widget| widget.setRect(rect),
         }
     }
 };
+
+/// Give `.fit` buttons a minimum size derived from their measured label, so the
+/// native control always has room for its text.
+fn buttonDeclaration(widget: *button.Button) clay.Declaration {
+    var declaration = clay.Declaration{ .layout = .{
+        .sizing = layout.toClaySizing(widget.sizing),
+        .padding = layout.toClayPadding(widget.padding),
+    } };
+
+    const minimum_width = @as(f32, @floatFromInt(widget.text_size.width)) +
+        widget.padding.left + widget.padding.right;
+    const minimum_height = @as(f32, @floatFromInt(widget.text_size.height)) +
+        widget.padding.top + widget.padding.bottom;
+
+    switch (declaration.layout.sizing.width) {
+        .fit => |bounds| declaration.layout.sizing.width = .{ .fit = .{
+            .min = @max(bounds.min, minimum_width),
+            .max = bounds.max,
+        } },
+        else => {},
+    }
+    switch (declaration.layout.sizing.height) {
+        .fit => |bounds| declaration.layout.sizing.height = .{ .fit = .{
+            .min = @max(bounds.min, minimum_height),
+            .max = bounds.max,
+        } },
+        else => {},
+    }
+
+    return declaration;
+}
+
+/// Layout's text measurement callback: measure with the widget's font.
+fn measureText(context: ?*anyopaque, content: []const u8, measure_key: u32) clay.Size {
+    const window: *Window = @ptrCast(@alignCast(context orelse return .{}));
+    if (window.measure_dc == null) return .{};
+    if (measure_key >= font_count) return .{};
+    const font = window.fonts[measure_key];
+    if (font == null) return .{};
+
+    // UTF-8 is never shorter than the UTF-16 it encodes, so this bound is
+    // enough for the stack path; a longer word takes the heap path instead of
+    // overflowing the buffer.
+    var buffer: [512]u16 = undefined;
+    if (content.len <= buffer.len) {
+        const length = std.unicode.utf8ToUtf16Le(&buffer, content) catch return .{};
+        return textExtent(window, font, buffer[0..length]);
+    }
+
+    const wide = std.unicode.utf8ToUtf16LeAllocZ(allocator, content) catch return .{};
+    defer allocator.free(wide);
+    return textExtent(window, font, wide);
+}
+
+fn textExtent(window: *Window, font: c.HFONT, text: []const u16) clay.Size {
+    _ = c.SelectObject(window.measure_dc, font);
+
+    var size: c.SIZE = .{ .cx = 0, .cy = 0 };
+    if (c.GetTextExtentPoint32W(window.measure_dc, text.ptr, @intCast(text.len), &size) == 0) return .{};
+
+    return .{
+        .width = @floatFromInt(size.cx),
+        .height = @floatFromInt(size.cy),
+    };
+}
 
 /// Create and show the window. The returned pointer is owned by the caller and
 /// must be released with `Window.deinit`.
@@ -135,8 +453,11 @@ pub fn create(options: Options) !*Window {
     ensureDpiAware();
 
     const self = try allocator.create(Window);
-    errdefer allocator.destroy(self);
-    self.* = .{};
+    self.* = .{ .engine = clay.Layout.init(allocator, measureText, self) };
+    errdefer {
+        self.engine.deinit();
+        allocator.destroy(self);
+    }
 
     // Translate the wanted client size into an outer window rect, then center
     // it on the primary monitor.
@@ -172,7 +493,9 @@ pub fn create(options: Options) !*Window {
     );
     if (hwnd == null) return error.WindowCreationFailed;
 
-    self.font = createFont();
+    self.fonts[@intFromEnum(label.Font.body)] = createFont(-18, c.FW_NORMAL);
+    self.fonts[@intFromEnum(label.Font.title)] = createFont(-30, c.FW_BOLD);
+    self.measure_dc = c.GetDC(null);
 
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
     _ = c.UpdateWindow(hwnd);
@@ -213,13 +536,13 @@ fn ensureDpiAware() void {
     dpi_aware = true;
 }
 
-fn createFont() c.HFONT {
+fn createFont(height: i32, weight: c_int) c.HFONT {
     return c.CreateFontW(
-        -20,
+        height,
         0,
         0,
         0,
-        c.FW_NORMAL,
+        weight,
         c.FALSE,
         c.FALSE,
         c.FALSE,
@@ -260,8 +583,14 @@ fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
 
     switch (message) {
         c.WM_SIZE => {
-            window.relayout();
+            // Can fail only on allocation failure; the previous layout stays
+            // applied, which is the least-bad outcome for a resize event.
+            window.relayout() catch {};
             return 0;
+        },
+        c.WM_CTLCOLORSTATIC => {
+            // Paint label backgrounds with the window brush so they blend in.
+            if (class_brush) |brush| return @bitCast(@intFromPtr(brush));
         },
         c.WM_COMMAND => {
             const notification: c_int = @intCast((wparam >> 16) & 0xffff);

@@ -4,12 +4,17 @@
 //! translation, and everything here is the subset of Win32 the launcher
 //! actually uses, behind a small surface API.
 //!
-//! Two rules keep the abstraction replaceable:
+//! Three rules keep the abstraction replaceable:
 //!
-//! * Widget handles are opaque (`Button` hides its `HWND`), so a widget can
-//!   gain extra state or move to custom painting without changing call sites.
-//! * Widgets are positioned with `geometry.Rect`. A layout engine (yoga) only
-//!   has to produce rects; it never leaks into launcher code.
+//! * Widget handles are opaque (`Button`, `Label` hide their `HWND`), so a
+//!   widget can gain extra state or move to custom painting without changing
+//!   call sites.
+//! * Layout is declared in `gui`'s own vocabulary (`Container`, `Sizing`,
+//!   `Padding`, ...) and never in engine types. `layout.zig` mirrors the `clay`
+//!   module one-to-one and converts, so launcher code has no dependency on the
+//!   layout engine and it can be swapped without touching call sites.
+//! * Widgets are positioned with whole-pixel `geometry.Rect`s produced by the
+//!   layout pass; nothing in the public surface knows how they are computed.
 //!
 //! GUI entry points must stay on the thread that created the window. Future
 //! I/O work runs off-thread and posts back to the window; see `ai-doc/launcher.md`.
@@ -19,7 +24,9 @@ const lib = @import("lib");
 const c = lib.win32.c;
 
 const geometry = @import("geometry.zig");
+const layout = @import("layout.zig");
 const widget = @import("button.zig");
+const label = @import("label.zig");
 const window = @import("window.zig");
 
 pub const Rect = geometry.Rect;
@@ -29,6 +36,21 @@ pub const Point = geometry.Point;
 pub const Button = widget.Button;
 pub const ButtonOptions = widget.Options;
 pub const Callback = widget.Callback;
+
+pub const Label = label.Label;
+pub const LabelOptions = label.Options;
+pub const Font = label.Font;
+
+pub const Container = layout.Container;
+pub const Sizing = layout.Sizing;
+pub const SizingAxis = layout.SizingAxis;
+pub const MinMax = layout.MinMax;
+pub const Padding = layout.Padding;
+pub const Direction = layout.Direction;
+pub const AlignX = layout.AlignX;
+pub const AlignY = layout.AlignY;
+pub const Alignment = layout.Alignment;
+pub const WrapMode = layout.WrapMode;
 
 pub const Window = window.Window;
 pub const WindowOptions = window.Options;

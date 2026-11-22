@@ -1,8 +1,8 @@
-//! Geometry vocabulary shared by the GUI layer and, later, the layout engine.
+//! Geometry vocabulary shared by the GUI layer and the layout engine.
 //!
 //! Widgets receive their bounds as a `Rect`; nothing in the public surface
-//! knows how those rects are produced. That is the seam for a yoga-backed
-//! layout pass: it computes rects, `gui` applies them.
+//! knows how those rects are produced. `gui/layout.zig` converts the engine's
+//! floating-point bounds to these whole pixels.
 
 /// Offset inside a parent, in pixels.
 pub const Point = struct {
