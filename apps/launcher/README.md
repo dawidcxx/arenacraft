@@ -42,15 +42,42 @@ nix-shell -p wineWow64Packages.stable \
 The test binaries are Windows PE as well, so they need the same executor.
 `zig build lib-test` runs the lib tests on their own.
 
-## Layout
+## What it does
 
-- `src/launcher/main.zig`: entry point.
+The window shows a single **Launch Game** button. It resolves `Wow.exe` next to
+the launcher's own executable (not the current working directory) and starts it
+with that directory as the child's working directory. The launcher closes once
+the game has started. If `Wow.exe` is missing or the process cannot be created,
+a message box explains why and the launcher stays open.
+
+## Modules
+
+- `src/launcher/main.zig`: entry point, window setup, launch callback.
+- `src/launcher/game.zig`: resolves and spawns `Wow.exe`.
+- `src/gui/`: scoped Win32 GUI layer, imported as `gui`.
+  - `root.zig`: public surface (`createWindow`, `run`, `showMessage`, types).
+  - `window.zig`: window class, message loop, placeholder layout pass.
+  - `button.zig`: button widget; the `HWND` stays internal.
+  - `geometry.zig`: `Rect`/`Size`/`Point`, the seam for a layout engine.
 - `src/lib/root.zig`: shared library, imported as `lib`.
 - `src/lib/win32.zig`: `windows.h` via `@cImport`; the module links libc so the
   MinGW-w64 headers and CRT resolve.
 - `installer/`: WiX source for `Arenacraft.msi` and its JScript validation
   action.
 - `scripts/changelog.sh`: release notes for the `launcher-release` workflow.
+
+The GUI surface deliberately hides widget handles and positions widgets with
+`Rect`, so a layout engine (yoga) can take over layout, and widgets can gain
+state or custom painting, without changing launcher code.
+
+## I/O
+
+`main` creates one `std.Io.Threaded` instance and passes it to the launch code.
+Zig 0.16 has no `Io.Evented` backend on Windows, so `Threaded` is the
+implementation: blocking syscalls run on its worker pool and
+`io.async`/`io.concurrent` give non-blocking work. Long-running work (asset
+downloads, patching) must not be awaited on the GUI thread; see
+`ai-doc/launcher.md` for the intended pattern.
 
 ## Release
 

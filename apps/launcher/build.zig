@@ -11,6 +11,7 @@ const windows_target_query: std.Target.Query = .{
 };
 
 var LIB_MOD: ?*std.Build.Module = null;
+var GUI_MOD: ?*std.Build.Module = null;
 var LIB_TEST_STEP: *std.Build.Step = undefined;
 
 pub fn build(b: *std.Build) !void {
@@ -27,13 +28,14 @@ pub fn build(b: *std.Build) !void {
     ) orelse false;
 
     try addLib(b, target, optimize);
+    try addGui(b, target, optimize);
     try addLauncher(b, target, optimize, console_window);
 
     const all_test = b.step("test", "Run all tests");
     all_test.dependOn(LIB_TEST_STEP);
 }
 
-/// Declares the shared `lib` module: Win32 bindings and launcher logic.
+/// Declares the shared `lib` module: the raw Win32 translation.
 fn addLib(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
@@ -58,7 +60,30 @@ fn addLib(
     LIB_TEST_STEP.dependOn(&run.step);
 }
 
-/// Declares the `launcher` executable on top of the `lib` module.
+/// Declares the `gui` module: the launcher's scoped Win32 GUI layer.
+fn addGui(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) !void {
+    const lib_mod = LIB_MOD orelse return error.MissingModule;
+
+    const mod = b.createModule(.{
+        .root_source_file = b.path("src/gui/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .imports = &.{
+            .{ .name = "lib", .module = lib_mod },
+        },
+    });
+    // Fonts and brushes are GDI; Zig's windows-gnu link line does not include
+    // gdi32 by default (unlike user32/kernel32).
+    mod.linkSystemLibrary("gdi32", .{ .use_pkg_config = .no });
+    GUI_MOD = mod;
+}
+
+/// Declares the `launcher` executable on top of the `lib` and `gui` modules.
 fn addLauncher(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
@@ -66,6 +91,7 @@ fn addLauncher(
     console_window: bool,
 ) !void {
     const lib_mod = LIB_MOD orelse return error.MissingModule;
+    const gui_mod = GUI_MOD orelse return error.MissingModule;
 
     const mod = b.createModule(.{
         .root_source_file = b.path("src/launcher/main.zig"),
@@ -74,6 +100,7 @@ fn addLauncher(
         .link_libc = true,
         .imports = &.{
             .{ .name = "lib", .module = lib_mod },
+            .{ .name = "gui", .module = gui_mod },
         },
     });
     const exe = b.addExecutable(.{
