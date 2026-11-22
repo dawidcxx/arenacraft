@@ -1,0 +1,14 @@
+.{
+    .name = .launcher,
+    .version = "0.0.0",
+    // Package identity; generated once and never changed afterwards.
+    .fingerprint = 0x7b9c35155ef8fae4,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "README.md",
+        "src",
+    },
+}
