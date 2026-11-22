@@ -113,6 +113,40 @@ pub const List = struct {
         }
     }
 
+    /// Point the realm at `index` at `host` instead and make it active. A
+    /// renamed built-in realm hides its old address (like `remove`), otherwise
+    /// `ensurePresets` would re-add it on the next start. Renaming onto a host
+    /// that is already in the list is refused rather than merged.
+    pub fn rename(
+        self: *List,
+        index: usize,
+        host: []const u8,
+    ) error{ NotFound, Duplicate, OutOfMemory }!void {
+        if (index >= self.hosts.items.len) return error.NotFound;
+
+        const old = self.hosts.items[index];
+        if (std.ascii.eqlIgnoreCase(old, host)) {
+            self.active = index;
+            self.has_active = true;
+            return;
+        }
+
+        for (self.hosts.items, 0..) |known, other| {
+            if (other != index and std.ascii.eqlIgnoreCase(known, host)) return error.Duplicate;
+        }
+
+        const copy = try self.allocator.dupe(u8, host);
+        errdefer self.allocator.free(copy);
+
+        if (isPreset(old)) try self.hide(old);
+        self.forgetHidden(host);
+
+        self.allocator.free(old);
+        self.hosts.items[index] = copy;
+        self.active = index;
+        self.has_active = true;
+    }
+
     /// Append the built-in realms that the file history does not contain yet,
     /// skipping the ones the player removed.
     pub fn ensurePresets(self: *List) !void {
@@ -623,6 +657,60 @@ test "the last realm cannot be removed" {
     _ = try list.setActive("127.0.0.1");
     try std.testing.expectError(error.LastRealm, list.remove(0));
     try std.testing.expectEqual(@as(usize, 1), list.hosts.items.len);
+}
+
+test "rename re-addresses a realm and makes it active" {
+    var list = List.init(std.testing.allocator);
+    defer list.deinit();
+
+    _ = try list.add("logon.arenacraft.fun");
+    _ = try list.add("logon.warmane.com");
+    _ = try list.setActive("logon.arenacraft.fun");
+
+    try list.rename(1, "127.0.0.1");
+    try std.testing.expectEqual(@as(usize, 1), list.active);
+    try std.testing.expectEqualStrings("127.0.0.1", list.activeHost());
+    try std.testing.expectEqualStrings("logon.arenacraft.fun", list.hosts.items[0]);
+    // The row was a built-in realm, so its old address is hidden.
+    try std.testing.expectEqual(@as(usize, 1), list.hidden.items.len);
+    try std.testing.expectEqualStrings("logon.warmane.com", list.hidden.items[0]);
+}
+
+test "rename refuses a host that is already in the list" {
+    var list = List.init(std.testing.allocator);
+    defer list.deinit();
+
+    _ = try list.add("logon.arenacraft.fun");
+    _ = try list.add("logon.warmane.com");
+
+    try std.testing.expectError(error.Duplicate, list.rename(0, "LOGON.WARMANE.COM"));
+    try std.testing.expectEqual(@as(usize, 2), list.hosts.items.len);
+}
+
+test "renaming a preset hides its old address across restarts" {
+    var list = List.init(std.testing.allocator);
+    defer list.deinit();
+
+    _ = try list.add("logon.arenacraft.fun");
+    _ = try list.add("logon.warmane.com");
+    _ = try list.setActive("logon.arenacraft.fun");
+
+    try list.rename(0, "logon.example.com");
+
+    const text = try list.render(std.testing.allocator);
+    defer std.testing.allocator.free(text);
+    try std.testing.expectEqualStrings(
+        "set realmlist logon.example.com\n" ++
+            "#set realmlist logon.warmane.com\n" ++
+            "#hidden logon.arenacraft.fun\n",
+        text,
+    );
+
+    var reread = try List.parse(std.testing.allocator, text);
+    defer reread.deinit();
+    try reread.ensurePresets();
+    try std.testing.expectEqual(@as(usize, 2), reread.hosts.items.len);
+    try std.testing.expectEqualStrings("logon.example.com", reread.activeHost());
 }
 
 test "validate accepts hosts and IPv4, rejects file syntax" {

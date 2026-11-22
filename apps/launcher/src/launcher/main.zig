@@ -41,6 +41,9 @@ const App = struct {
     client: realmlist.Client,
     realms: realmlist.List,
     view: View = .home,
+    /// True while the Add button has started a new realm: Save then appends
+    /// instead of editing the selected row.
+    editing_new: bool = false,
     /// Controls of the current view. `showView` destroys them, so each is null
     /// unless the view that owns it was just built.
     list: ?*gui.ListBox = null,
@@ -147,6 +150,7 @@ fn showView(app: *App, view: View) void {
     app.edit = null;
     app.realm_name = null;
     app.active_realm = null;
+    app.editing_new = false;
     app.view = view;
 
     buildUi(app) catch {
@@ -214,8 +218,8 @@ fn buildHome(app: *App) !void {
     try window.endContainer();
 }
 
-/// Realm switcher: remembered realms on the left, the address field on the
-/// right, Back at the bottom.
+/// Realm switcher: remembered realms with Add and Remove underneath, the
+/// selected realm's address with Save on the right, Back at the bottom.
 fn buildRealms(app: *App) !void {
     const window = app.window;
 
@@ -240,11 +244,22 @@ fn buildRealms(app: *App) !void {
             .height = .{ .grow = .{} },
         },
     });
+    try window.container(.{
+        .sizing = .{ .width = .{ .grow = .{} } },
+        .gap = 8,
+        .alignment = .{ .y = .center },
+    });
+    _ = try window.addButton(.{
+        .text = "Add",
+        .sizing = .{ .width = .{ .fixed = 70 }, .height = .{ .fixed = 28 } },
+        .onClick = .{ .function = onRealmAdd, .context = app },
+    });
     _ = try window.addButton(.{
         .text = "Remove",
         .sizing = .{ .width = .{ .fixed = 90 }, .height = .{ .fixed = 28 } },
         .onClick = .{ .function = onRealmRemove, .context = app },
     });
+    try window.endContainer();
     try window.endContainer();
 
     try window.container(.{
@@ -252,15 +267,26 @@ fn buildRealms(app: *App) !void {
         .gap = 8,
         .direction = .top_to_bottom,
     });
-    _ = try window.addLabel(.{ .text = "Address" });
+    _ = try window.addLabel(.{ .text = "Realm address" });
+    try window.container(.{
+        .sizing = .{ .width = .{ .grow = .{} } },
+        .gap = 8,
+        .alignment = .{ .y = .center },
+    });
     app.edit = try window.addEdit(.{
         .text = app.realms.activeHost(),
-        .onEnter = .{ .function = onRealmCommit, .context = app },
+        .onEnter = .{ .function = onRealmSave, .context = app },
         .sizing = .{
             .width = .{ .grow = .{} },
             .height = .{ .fixed = 26 },
         },
     });
+    _ = try window.addButton(.{
+        .text = "Save",
+        .sizing = .{ .width = .{ .fixed = 70 }, .height = .{ .fixed = 26 } },
+        .onClick = .{ .function = onRealmSave, .context = app },
+    });
+    try window.endContainer();
     app.realm_name = try window.addLabel(.{ .text = realmlist.displayName(app.realms.activeHost()) });
     try window.endContainer();
 
@@ -280,15 +306,15 @@ fn onOpenRealms(context: ?*anyopaque) void {
     showView(app, .realms);
 }
 
-/// Leaving the switcher applies whatever is in the address field first.
+/// Leaving the switcher keeps what was already saved; a draft address is only
+/// committed with Save (or Enter).
 fn onBack(context: ?*anyopaque) void {
     const app: *App = @ptrCast(@alignCast(context orelse return));
-    if (!applyRealm(app)) return;
     showView(app, .home);
 }
 
-/// The player picked a realm from the list: copy it to the address field and
-/// apply it.
+/// Picking a row makes it the active realm and loads its address into the
+/// field, ready to be edited and saved.
 fn onRealmSelect(context: ?*anyopaque) void {
     const app: *App = @ptrCast(@alignCast(context orelse return));
     const list = app.list orelse return;
@@ -297,14 +323,85 @@ fn onRealmSelect(context: ?*anyopaque) void {
     const index = app.window.listSelection(list) orelse return;
     if (index >= app.realms.hosts.items.len) return;
 
-    app.window.setEditText(edit, app.realms.hosts.items[index]) catch return;
-    _ = applyRealm(app);
+    const host = app.realms.hosts.items[index];
+    _ = app.realms.setActive(host) catch return;
+    app.editing_new = false;
+    app.window.setEditText(edit, host) catch return;
+
+    _ = writeRealms(app);
+    refreshRealmUi(app, .selection);
 }
 
-/// The player pressed Enter in the address field.
-fn onRealmCommit(context: ?*anyopaque) void {
+/// Start a new realm: clear the field and the list highlight, so Save adds a
+/// new entry instead of editing the selected one.
+fn onRealmAdd(context: ?*anyopaque) void {
     const app: *App = @ptrCast(@alignCast(context orelse return));
-    _ = applyRealm(app);
+
+    app.editing_new = true;
+    if (app.list) |list| app.window.clearListSelection(list);
+    if (app.edit) |edit| {
+        app.window.setEditText(edit, "") catch {};
+        app.window.focusEdit(edit);
+    }
+    if (app.realm_name) |label| app.window.setLabelText(label, "New realm") catch {};
+}
+
+/// Save: apply the address to the selected realm, or add it as a new realm
+/// when Add started a draft.
+fn onRealmSave(context: ?*anyopaque) void {
+    const app: *App = @ptrCast(@alignCast(context orelse return));
+    const edit = app.edit orelse return;
+
+    const text = app.window.editText(edit) catch {
+        gui.showMessage(.critical, window_title, "Not enough memory to read the address field.");
+        return;
+    };
+    defer allocator.free(text);
+
+    const host = realmlist.validate(text) orelse {
+        gui.showMessage(.warning, window_title, if (text.len == 0)
+            "Type the address of the realm you want to add."
+        else
+            "That is not a realm address.\n\n" ++
+                "Type a logon host such as logon.arenacraft.fun " ++
+                "(letters, digits, dots and dashes only).");
+        return;
+    };
+
+    // A highlighted row means the field is editing that realm; no row means
+    // Add started a new one.
+    const selected: ?usize = if (app.editing_new)
+        null
+    else if (app.list) |list|
+        app.window.listSelection(list)
+    else
+        null;
+
+    if (selected) |index| {
+        app.realms.rename(index, host) catch |err| switch (err) {
+            error.Duplicate => {
+                gui.showMessage(.warning, window_title, "That realm is already in the list.");
+                return;
+            },
+            error.NotFound => {
+                _ = app.realms.setActive(host) catch return;
+            },
+            error.OutOfMemory => {
+                gui.showMessage(.critical, window_title, "Not enough memory to save the realm.");
+                return;
+            },
+        };
+    } else {
+        _ = app.realms.setActive(host) catch {
+            gui.showMessage(.critical, window_title, "Not enough memory to remember the realm.");
+            return;
+        };
+    }
+
+    app.editing_new = false;
+    _ = writeRealms(app);
+    refreshRealmUi(app, .rows);
+    app.window.setEditText(edit, app.realms.activeHost()) catch {};
 }
 
 fn onLaunchGame(context: ?*anyopaque) void {
@@ -360,42 +457,10 @@ fn onRealmRemove(context: ?*anyopaque) void {
         },
     };
 
-    if (!writeRealms(app)) return;
+    _ = writeRealms(app);
+    app.editing_new = false;
     refreshRealmUi(app, .rows);
-}
-
-/// Read the address field, remember the host, write `realmlist.wtf`, and
-/// refresh the switcher. Returns false (after reporting why) when the address
-/// was rejected, which also cancels leaving the view.
-fn applyRealm(app: *App) bool {
-    const edit = app.edit orelse return true;
-
-    const previous_len = app.realms.hosts.items.len;
-
-    const text = app.window.editText(edit) catch {
-        gui.showMessage(.critical, window_title, "Not enough memory to read the address field.");
-        return false;
-    };
-    defer allocator.free(text);
-
-    const host = realmlist.validate(text) orelse {
-        gui.showMessage(.warning, window_title, "That is not a realm address.\n\n" ++
-            "Type a logon host such as logon.arenacraft.fun " ++
-            "(letters, digits, dots and dashes only).");
-        return false;
-    };
-
-    _ = app.realms.setActive(host) catch {
-        gui.showMessage(.critical, window_title, "Not enough memory to remember the realm.");
-        return false;
-    };
-    const added_host = app.realms.hosts.items.len != previous_len;
-
-    if (!writeRealms(app)) return false;
-    // Only a newly typed host changes the rows; rebuilding them from inside the
-    // list's selection notification would lose the highlight.
-    refreshRealmUi(app, if (added_host) .rows else .selection);
-    return true;
+    if (app.edit) |edit| app.window.setEditText(edit, app.realms.activeHost()) catch {};
 }
 
 /// Write the current realm list to every realmlist file. Reports the failure
@@ -416,11 +481,11 @@ fn writeRealms(app: *App) bool {
     return true;
 }
 
-/// Show the active realm in the controls of the current view.
+/// Show the active realm in the controls of the current view. The add field is
+/// cleared by its callback, not here.
 fn refreshRealmUi(app: *App, mode: Refresh) void {
     const host = app.realms.activeHost();
 
-    if (app.edit) |edit| app.window.setEditText(edit, host) catch {};
     if (app.list) |list| switch (mode) {
         .rows => app.window.setListItems(list, app.realms.hosts.items, app.realms.active) catch {},
         .selection => app.window.setListSelection(list, app.realms.active),

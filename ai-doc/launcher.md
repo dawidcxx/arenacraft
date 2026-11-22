@@ -140,12 +140,18 @@ state.
   and checking `realmlist.wtf`. With none present it picks `SET locale "xxYY"`
   from `WTF/Config.wtf`, else the first locale-shaped `Data` directory, else
   enUS; `write` creates the directories and the file.
-- Writes happen when a realm row is picked, when Enter is pressed in the address
-  field, and again before launching, so a host typed but not submitted still
-  reaches the client. A failed write aborts the launch: connecting to the wrong
-  realm is worse than not starting.
+- Writes happen when a realm row is picked, when Save stores an address, and
+  again before launching. A failed write aborts the launch: connecting to the
+  wrong realm is worse than not starting.
 - A host is validated as `[A-Za-z0-9.-]+` (no scheme, port or path); anything
   else cannot go in that field anyway.
+- Save re-points the selected realm at the typed address (`List.rename`). It
+  refuses a host that is already in the list instead of merging two rows.
+  Renaming a built-in realm hides its old address exactly like Remove, or
+  `ensurePresets` would resurrect it on the next start.
+- Add is a draft mode: it clears the field and the list highlight, and the next
+  Save appends the address as a new realm. Without that, a pre-filled field
+  invites typing over the active host and saving the concatenation.
 - Remove forgets the highlighted realm and rewrites the file. Custom hosts just
   disappear from the history; a built-in realm would be appended again by
   `ensurePresets` on the next start, so removing one writes a `#hidden <host>`
@@ -166,10 +172,10 @@ easier to reason about and to drive:
 
 - `gui/listbox.zig` wraps a `LISTBOX` (`LBS_NOTIFY`) and calls `onSelect` on
   `LBN_SELCHANGE`; `Window.listSelection` reads the picked row.
-- `gui/edit.zig` wraps an `EDIT`. The address is authoritative for launching, so
-  `Window.editText` is read right before writing; Enter is caught by a window
-  procedure subclass (`SetWindowLongPtrW(GWLP_WNDPROC)`) that forwards everything
-  but `VK_RETURN` to `CallWindowProcW`.
+- `gui/edit.zig` wraps an `EDIT`. The address field mirrors the selected realm
+  and Save commits it; Add clears the field and the highlight first. Enter is
+  caught by a window procedure subclass (`SetWindowLongPtrW(GWLP_WNDPROC)`) that
+  forwards everything but `VK_RETURN` to `CallWindowProcW`.
 - `Window.setListItems` repopulates after a typed host joins the list or a realm
   is removed. `LB_SETCURSEL` does not notify the parent, so reselecting cannot
   re-enter the selection callback. Do not call it from inside `LBN_SELCHANGE`:

@@ -65,22 +65,25 @@ written at startup, so a fresh installation gets its `realmlist.wtf` when the
 game is launched or a realm changes.
 
 The **realms** view (opened with **Change Realm**) lists the remembered realms
-with a **Remove** button, an editable **Address** field, and **Back**.
+with **Add** and **Remove** buttons, an editable **Realm address** field with
+**Save**, and **Back**.
 
 ### Realm switcher
 
 The list shows the realms the launcher knows: the built-in Arenacraft and
 Warmane entries plus every logon host already present in the client's
-`realmlist.wtf`, including commented-out ones. Picking a row copies its host
-into the address field and applies it immediately. The address field is also
-editable, so a new host name or IPv4 address can be typed and committed with
-Enter; **Back** applies whatever is in the field before returning home.
+`realmlist.wtf`, including commented-out ones. Picking a row makes that realm
+active and loads its address into the field.
 
-**Remove** forgets the highlighted realm. A custom host simply disappears from
-the history; a built-in realm is recorded in `realmlist.wtf` as a
-`#hidden <host>` comment (the client ignores comments) so it is not offered
-again on the next start. Typing a hidden host brings it back. The last remaining
-realm cannot be removed, because the client needs one to connect to.
+**Save** (or Enter) stores the address in the field against the selected realm,
+so a realm can be re-pointed at another host. **Add** clears the field and the
+selection for a new realm: type its address and press Save to append it. A host
+that is already in the list is refused rather than duplicated. **Remove**
+forgets the highlighted realm. A custom host simply disappears from the
+history; a built-in realm is recorded in `realmlist.wtf` as a `#hidden <host>`
+comment (the client ignores comments) so it is not offered again on the next
+start. Typing a hidden host brings it back. The last remaining realm cannot be
+removed, because the client needs one to connect to.
 
 A 3.3.5a client reads `Data/<locale>/realmlist.wtf`, so the launcher writes
 every `Data/*/realmlist.wtf` it finds (and a root `realmlist.wtf` for pre-1.9

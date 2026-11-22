@@ -404,6 +404,19 @@ pub const Window = struct {
         selectListItem(target, index);
     }
 
+    /// Drop the list highlight, so no row looks selected while a new realm is
+    /// being typed.
+    pub fn clearListSelection(self: *Window, target: *listbox.ListBox) void {
+        _ = self;
+        _ = c.SendMessageW(target.hwnd, c.LB_SETCURSEL, @bitCast(@as(isize, -1)), 0);
+    }
+
+    /// Give an edit field the keyboard focus, e.g. after Add clears it.
+    pub fn focusEdit(self: *Window, target: *edit.Edit) void {
+        _ = self;
+        _ = c.SetFocus(target.hwnd);
+    }
+
     /// Replace an edit's text and select it, so a typed replacement starts on
     /// the next keystroke.
     pub fn setEditText(self: *Window, target: *edit.Edit, text: []const u8) !void {
