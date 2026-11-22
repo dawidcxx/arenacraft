@@ -1,15 +1,12 @@
-//! Entry point: build the window layout, wire the buttons, pump messages.
+//! Entry point: the launcher's two views, the window and the callbacks.
 //!
-//! The launcher is a Windows GUI (subsystem) binary, so failures that happen
-//! before the window exists are reported with a message box instead of stderr.
+//! The window shows one view at a time: the home view (active realm, launch)
+//! and the realm switcher. `gui` records the layout tree and replays it on
+//! resize, so each view is a function that declares its controls; switching
+//! views destroys the previous controls and records the other tree.
 //!
-//! The window is declared once with the `gui` layout vocabulary and replayed by
-//! `gui` on every resize, so this file never deals with positions or sizes.
-//!
-//! The realm picker is the launcher's one piece of game state: the remembered
-//! realms are a plain list, the selected address is a text field, and the
-//! chosen host is written to the client's `realmlist.wtf` when a row is picked
-//! and again right before `Wow.exe` starts.
+//! The window is a Windows GUI (subsystem) binary, so failures before the
+//! window exists are reported with a message box instead of stderr.
 
 const std = @import("std");
 const gui = @import("gui");
@@ -22,6 +19,17 @@ const allocator = std.heap.smp_allocator;
 
 const window_title = "Arenacraft Launcher";
 
+/// Which view the window currently shows.
+const View = enum { home, realms };
+
+/// How much of the realm list to rebuild after the active realm changed.
+const Refresh = enum {
+    /// Only move the list highlight. Safe inside the list's own notification.
+    selection,
+    /// Replace the rows (a host was added or removed).
+    rows,
+};
+
 /// State shared with the widget callbacks. `gui.run` keeps the stack frame in
 /// `main` alive, so pointers into this struct stay valid until the window is
 /// destroyed.
@@ -32,10 +40,13 @@ const App = struct {
     install_dir: []const u8,
     client: realmlist.Client,
     realms: realmlist.List,
-    list: *gui.ListBox,
-    edit: *gui.Edit,
-    realm_name: *gui.Label,
-    status: *gui.Label,
+    view: View = .home,
+    /// Controls of the current view. `showView` destroys them, so each is null
+    /// unless the view that owns it was just built.
+    list: ?*gui.ListBox = null,
+    edit: ?*gui.Edit = null,
+    realm_name: ?*gui.Label = null,
+    active_realm: ?*gui.Label = null,
 };
 
 pub fn main() void {
@@ -103,7 +114,7 @@ pub fn main() void {
 
     const window = gui.createWindow(.{
         .title = window_title,
-        .size = .{ .width = 620, .height = 420 },
+        .size = .{ .width = 620, .height = 380 },
     }) catch |err| {
         var buffer: [256]u8 = undefined;
         const text = std.fmt.bufPrint(
@@ -123,27 +134,26 @@ pub fn main() void {
         .install_dir = install_dir,
         .client = client,
         .realms = realms,
-        .list = undefined,
-        .edit = undefined,
-        .realm_name = undefined,
-        .status = undefined,
     };
 
-    buildUi(&app) catch {
-        gui.showMessage(.critical, window_title, "Could not lay out the launcher window.");
-        return;
-    };
-
+    showView(&app, .home);
     gui.run();
 }
 
-/// Declare the window content. `gui` re-runs this tree on resize.
-///
-/// Layout: a padded column. The title and description size themselves to their
-/// text, the two panes share the remaining height (remembered realms with a
-/// Remove button on the left, address field and hints on the right), the status
-/// line names the file being written, a growing spacer absorbs the leftover, and
-/// the action row right-aligns its buttons.
+/// Replace the window content with `view`.
+fn showView(app: *App, view: View) void {
+    app.window.clear();
+    app.list = null;
+    app.edit = null;
+    app.realm_name = null;
+    app.active_realm = null;
+    app.view = view;
+
+    buildUi(app) catch {
+        gui.showMessage(.critical, window_title, "Could not lay out the launcher window.");
+    };
+}
+
 fn buildUi(app: *App) !void {
     const window = app.window;
 
@@ -151,34 +161,76 @@ fn buildUi(app: *App) !void {
 
     try window.container(.{
         .sizing = .{ .width = .{ .grow = .{} }, .height = .{ .grow = .{} } },
-        .padding = .all(24),
-        .gap = 16,
+        .padding = .all(20),
+        .gap = 14,
         .direction = .top_to_bottom,
     });
 
-    try window.container(.{ .gap = 12, .alignment = .{ .y = .center } });
+    switch (app.view) {
+        .home => try buildHome(app),
+        .realms => try buildRealms(app),
+    }
+
+    try window.endContainer();
+    try window.endLayout();
+}
+
+/// Home: the active realm sits in the bottom-left corner, the game actions on
+/// the right.
+fn buildHome(app: *App) !void {
+    const window = app.window;
+
     _ = try window.addLabel(.{ .text = "Arenacraft", .font = .title });
+    _ = try window.addLabel(.{ .text = "World of Warcraft 3.3.5a" });
+
+    // Spacer: pushes the bar to the bottom edge.
+    try window.container(.{ .sizing = .{ .height = .{ .grow = .{} } } });
     try window.endContainer();
 
-    _ = try window.addLabel(.{
-        .text = "World of Warcraft 3.3.5a arena server. Pick a realm, then launch the game. " ++
-            "The launcher rewrites the client's realmlist.wtf and keeps every realm you have " ++
-            "used in the list.",
-        .wrap = .words,
+    try window.container(.{
+        .sizing = .{ .width = .{ .grow = .{} } },
+        .gap = 10,
+        .alignment = .{ .y = .center },
     });
+    app.active_realm = try window.addLabel(.{ .text = app.realms.activeHost(), .wrap = .none });
+    _ = try window.addButton(.{
+        .text = "Change Realm",
+        .sizing = .{ .width = .{ .fixed = 120 }, .height = .{ .fixed = 30 } },
+        .onClick = .{ .function = onOpenRealms, .context = app },
+    });
+    // Spacer: the actions stay on the right edge.
+    try window.container(.{ .sizing = .{ .width = .{ .grow = .{} } } });
+    try window.endContainer();
+    _ = try window.addButton(.{
+        .text = "Launch Game",
+        .sizing = .{ .width = .{ .fixed = 140 }, .height = .{ .fixed = 30 } },
+        .onClick = .{ .function = onLaunchGame, .context = app },
+    });
+    _ = try window.addButton(.{
+        .text = "Quit",
+        .sizing = .{ .width = .{ .fixed = 70 }, .height = .{ .fixed = 30 } },
+        .onClick = .{ .function = onQuit, .context = app },
+    });
+    try window.endContainer();
+}
+
+/// Realm switcher: remembered realms on the left, the address field on the
+/// right, Back at the bottom.
+fn buildRealms(app: *App) !void {
+    const window = app.window;
+
+    _ = try window.addLabel(.{ .text = "Realms", .font = .title });
 
     try window.container(.{
         .sizing = .{ .width = .{ .grow = .{} }, .height = .{ .grow = .{} } },
         .gap = 16,
     });
 
-    // Left pane: every realm the launcher knows about.
     try window.container(.{
         .sizing = .{ .width = .{ .fixed = 240 }, .height = .{ .grow = .{} } },
-        .gap = 6,
+        .gap = 8,
         .direction = .top_to_bottom,
     });
-    _ = try window.addLabel(.{ .text = "Realms" });
     app.list = try window.addListBox(.{
         .items = app.realms.hosts.items,
         .selected = app.realms.active,
@@ -195,13 +247,12 @@ fn buildUi(app: *App) !void {
     });
     try window.endContainer();
 
-    // Right pane: the address that will be written, editable.
     try window.container(.{
         .sizing = .{ .width = .{ .grow = .{} }, .height = .{ .grow = .{} } },
-        .gap = 6,
+        .gap = 8,
         .direction = .top_to_bottom,
     });
-    _ = try window.addLabel(.{ .text = "Realm address" });
+    _ = try window.addLabel(.{ .text = "Address" });
     app.edit = try window.addEdit(.{
         .text = app.realms.activeHost(),
         .onEnter = .{ .function = onRealmCommit, .context = app },
@@ -211,57 +262,42 @@ fn buildUi(app: *App) !void {
         },
     });
     app.realm_name = try window.addLabel(.{ .text = realmlist.displayName(app.realms.activeHost()) });
-    _ = try window.addLabel(.{
-        .text = "Pick a realm on the left, or type a logon host such as " ++
-            "logon.arenacraft.fun and press Enter.",
-        .wrap = .words,
-    });
     try window.endContainer();
 
     try window.endContainer();
 
-    var status_buffer: [512]u8 = undefined;
-    const status_text = std.fmt.bufPrint(
-        &status_buffer,
-        "Writes {s}",
-        .{app.client.primary()},
-    ) catch "Writes realmlist.wtf";
-    app.status = try window.addLabel(.{ .text = status_text, .wrap = .none });
-
-    // Spacer: takes every pixel the content does not.
-    try window.container(.{ .sizing = .{ .height = .{ .grow = .{} } } });
-    try window.endContainer();
-
-    try window.container(.{
-        .sizing = .{ .width = .{ .grow = .{} } },
-        .gap = 10,
-        .alignment = .{ .x = .right },
-    });
+    try window.container(.{ .sizing = .{ .width = .{ .grow = .{} } } });
     _ = try window.addButton(.{
-        .text = "Launch Game",
-        .sizing = .{ .width = .{ .fixed = 170 }, .height = .{ .fixed = 34 } },
-        .onClick = .{ .function = onLaunchGame, .context = app },
-    });
-    _ = try window.addButton(.{
-        .text = "Quit",
-        .sizing = .{ .width = .{ .fixed = 90 }, .height = .{ .fixed = 34 } },
-        .onClick = .{ .function = onQuit, .context = app },
+        .text = "Back",
+        .sizing = .{ .width = .{ .fixed = 90 }, .height = .{ .fixed = 30 } },
+        .onClick = .{ .function = onBack, .context = app },
     });
     try window.endContainer();
-
-    try window.endContainer();
-
-    try window.endLayout();
 }
 
-/// The player picked a realm from the list: put it in the address field and
-/// apply it immediately.
+fn onOpenRealms(context: ?*anyopaque) void {
+    const app: *App = @ptrCast(@alignCast(context orelse return));
+    showView(app, .realms);
+}
+
+/// Leaving the switcher applies whatever is in the address field first.
+fn onBack(context: ?*anyopaque) void {
+    const app: *App = @ptrCast(@alignCast(context orelse return));
+    if (!applyRealm(app)) return;
+    showView(app, .home);
+}
+
+/// The player picked a realm from the list: copy it to the address field and
+/// apply it.
 fn onRealmSelect(context: ?*anyopaque) void {
     const app: *App = @ptrCast(@alignCast(context orelse return));
-    const index = app.window.listSelection(app.list) orelse return;
+    const list = app.list orelse return;
+    const edit = app.edit orelse return;
+
+    const index = app.window.listSelection(list) orelse return;
     if (index >= app.realms.hosts.items.len) return;
 
-    app.window.setEditText(app.edit, app.realms.hosts.items[index]) catch return;
+    app.window.setEditText(edit, app.realms.hosts.items[index]) catch return;
     _ = applyRealm(app);
 }
 
@@ -274,9 +310,9 @@ fn onRealmCommit(context: ?*anyopaque) void {
 fn onLaunchGame(context: ?*anyopaque) void {
     const app: *App = @ptrCast(@alignCast(context orelse return));
 
-    // A realm typed and not yet committed still has to reach realmlist.wtf
-    // before the client reads it.
-    if (!applyRealm(app)) return;
+    // Nothing is written at startup, so a fresh installation gets its file
+    // here even if the player never opened the switcher.
+    if (!writeRealms(app)) return;
 
     const outcome = game.launchWow(allocator, app.install_dir) catch {
         gui.showMessage(.critical, window_title, "Not enough memory to start the game.");
@@ -297,49 +333,13 @@ fn onQuit(context: ?*anyopaque) void {
     app.window.close();
 }
 
-/// Read the realm field, remember it, write `realmlist.wtf`, and refresh the
-/// UI. Returns false (after reporting why) when the realm was not applied.
-fn applyRealm(app: *App) bool {
-    const previous_len = app.realms.hosts.items.len;
-
-    const text = app.window.editText(app.edit) catch {
-        gui.showMessage(.critical, window_title, "Not enough memory to read the address field.");
-        return false;
-    };
-    defer allocator.free(text);
-
-    const host = realmlist.validate(text) orelse {
-        gui.showMessage(.warning, window_title, "That is not a realm address.\n\n" ++
-            "Pick a realm from the list or type a logon host such as " ++
-            "logon.arenacraft.fun (letters, digits, dots and dashes only).");
-        return false;
-    };
-
-    _ = app.realms.setActive(host) catch {
-        gui.showMessage(.critical, window_title, "Not enough memory to remember the realm.");
-        return false;
-    };
-    const added_host = app.realms.hosts.items.len != previous_len;
-
-    if (!writeRealms(app)) return false;
-    // Only a newly typed host changes the rows; rebuilding them from inside the
-    // list's selection notification would lose the highlight.
-    refreshRealmUi(app, if (added_host) .rows else .selection);
-
-    setStatus(app, "Saved {d} realm{s} to {s}", .{
-        app.realms.hosts.items.len,
-        if (app.realms.hosts.items.len == 1) "" else "s",
-        app.client.primary(),
-    });
-    return true;
-}
-
 /// The player pressed Remove: forget the highlighted realm. If it was the
 /// active one, the next remembered realm becomes active and is written.
 fn onRealmRemove(context: ?*anyopaque) void {
     const app: *App = @ptrCast(@alignCast(context orelse return));
+    const list = app.list orelse return;
 
-    const index = app.window.listSelection(app.list) orelse {
+    const index = app.window.listSelection(list) orelse {
         gui.showMessage(.warning, window_title, "Select the realm you want to remove first.");
         return;
     };
@@ -362,7 +362,40 @@ fn onRealmRemove(context: ?*anyopaque) void {
 
     if (!writeRealms(app)) return;
     refreshRealmUi(app, .rows);
-    setStatus(app, "Removed the realm; now using {s}", .{app.realms.activeHost()});
+}
+
+/// Read the address field, remember the host, write `realmlist.wtf`, and
+/// refresh the switcher. Returns false (after reporting why) when the address
+/// was rejected, which also cancels leaving the view.
+fn applyRealm(app: *App) bool {
+    const edit = app.edit orelse return true;
+
+    const previous_len = app.realms.hosts.items.len;
+
+    const text = app.window.editText(edit) catch {
+        gui.showMessage(.critical, window_title, "Not enough memory to read the address field.");
+        return false;
+    };
+    defer allocator.free(text);
+
+    const host = realmlist.validate(text) orelse {
+        gui.showMessage(.warning, window_title, "That is not a realm address.\n\n" ++
+            "Type a logon host such as logon.arenacraft.fun " ++
+            "(letters, digits, dots and dashes only).");
+        return false;
+    };
+
+    _ = app.realms.setActive(host) catch {
+        gui.showMessage(.critical, window_title, "Not enough memory to remember the realm.");
+        return false;
+    };
+    const added_host = app.realms.hosts.items.len != previous_len;
+
+    if (!writeRealms(app)) return false;
+    // Only a newly typed host changes the rows; rebuilding them from inside the
+    // list's selection notification would lose the highlight.
+    refreshRealmUi(app, if (added_host) .rows else .selection);
+    return true;
 }
 
 /// Write the current realm list to every realmlist file. Reports the failure
@@ -383,20 +416,15 @@ fn writeRealms(app: *App) bool {
     return true;
 }
 
-/// Show the active realm in the address field, the list and the friendly name.
-/// `.rows` rebuilds the list entries (after a host was added or removed);
-/// `.selection` only moves the highlight, which is safe during a list click.
-fn refreshRealmUi(app: *App, mode: enum { rows, selection }) void {
-    app.window.setEditText(app.edit, app.realms.activeHost()) catch {};
-    switch (mode) {
-        .rows => app.window.setListItems(app.list, app.realms.hosts.items, app.realms.active) catch {},
-        .selection => app.window.setListSelection(app.list, app.realms.active),
-    }
-    app.window.setLabelText(app.realm_name, realmlist.displayName(app.realms.activeHost())) catch {};
-}
+/// Show the active realm in the controls of the current view.
+fn refreshRealmUi(app: *App, mode: Refresh) void {
+    const host = app.realms.activeHost();
 
-fn setStatus(app: *App, comptime format: []const u8, args: anytype) void {
-    var buffer: [512]u8 = undefined;
-    const text = std.fmt.bufPrint(&buffer, format, args) catch return;
-    app.window.setLabelText(app.status, text) catch {};
+    if (app.edit) |edit| app.window.setEditText(edit, host) catch {};
+    if (app.list) |list| switch (mode) {
+        .rows => app.window.setListItems(list, app.realms.hosts.items, app.realms.active) catch {},
+        .selection => app.window.setListSelection(list, app.realms.active),
+    };
+    if (app.realm_name) |label| app.window.setLabelText(label, realmlist.displayName(host)) catch {};
+    if (app.active_realm) |label| app.window.setLabelText(label, host) catch {};
 }

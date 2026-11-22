@@ -459,16 +459,10 @@ pub const Window = struct {
     /// Destroy the window, its widgets and this allocation.
     pub fn deinit(self: *Window) void {
         self.close();
-        for (self.buttons.items) |widget| allocator.destroy(widget);
+        self.clear();
         self.buttons.deinit(allocator);
-        for (self.edits.items) |widget| allocator.destroy(widget);
         self.edits.deinit(allocator);
-        for (self.list_boxes.items) |widget| allocator.destroy(widget);
         self.list_boxes.deinit(allocator);
-        for (self.labels.items) |widget| {
-            allocator.free(widget.text);
-            allocator.destroy(widget);
-        }
         self.labels.deinit(allocator);
         self.plan.deinit(allocator);
         self.placements.deinit(allocator);
@@ -484,6 +478,43 @@ pub const Window = struct {
             self.measure_dc = null;
         }
         allocator.destroy(self);
+    }
+
+    /// Destroy every control and forget the recorded tree, keeping the window.
+    /// The caller records a new tree with `beginLayout`/`endLayout` afterwards;
+    /// the launcher uses this to switch views.
+    pub fn clear(self: *Window) void {
+        // When the native window is gone its children died with it; only the
+        // bookkeeping is left to free.
+        const destroy = self.hwnd != null;
+        for (self.buttons.items) |widget| {
+            if (destroy) _ = c.DestroyWindow(widget.hwnd);
+            allocator.destroy(widget);
+        }
+        self.buttons.clearRetainingCapacity();
+        for (self.edits.items) |widget| {
+            if (destroy) _ = c.DestroyWindow(widget.hwnd);
+            allocator.destroy(widget);
+        }
+        self.edits.clearRetainingCapacity();
+        for (self.list_boxes.items) |widget| {
+            if (destroy) _ = c.DestroyWindow(widget.hwnd);
+            allocator.destroy(widget);
+        }
+        self.list_boxes.clearRetainingCapacity();
+        for (self.labels.items) |widget| {
+            if (destroy) _ = c.DestroyWindow(widget.hwnd);
+            allocator.free(widget.text);
+            allocator.destroy(widget);
+        }
+        self.labels.clearRetainingCapacity();
+
+        self.plan.clearRetainingCapacity();
+        self.placements.clearRetainingCapacity();
+        self.recording = false;
+        self.ready = false;
+        self.depth = 0;
+        self.focus_assigned = false;
     }
 
     /// Re-run the recorded tree for the current client size.

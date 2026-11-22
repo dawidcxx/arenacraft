@@ -36,6 +36,19 @@ Never fabricate an `HWND` from an integer through `@ptrFromInt`: the translated
 handle types carry an alignment and Debug builds panic on unaligned values.
 Compare `@intFromPtr` instead.
 
+## Views
+
+The launcher has two views in one window: home and the realm switcher. A view
+is just a layout declaration, so switching is `Window.clear` (destroy every
+control, forget the tree) followed by recording the other view's tree. Widget
+pointers in `App` are only valid until the next switch, which is why they are
+optional and reset by `showView`.
+
+A callback may therefore destroy the control that raised it (e.g. `Change
+Realm`). That is safe because `windowProc` breaks out of the `WM_COMMAND` loop
+right after invoking the callback and never touches the freed widget again. Do
+not add work after the callback call in that loop.
+
 ## I/O
 
 One `std.Io.Threaded` instance is created in `main` and passed to callbacks.
@@ -162,7 +175,7 @@ easier to reason about and to drive:
   list and may free it after adding rows.
 
 `Window.setLabelText` replaces a label and re-runs the layout, because labels
-are sized to their text and the status line changes length.
+are sized to their text and the active realm label changes length.
 
 ## Icon
 

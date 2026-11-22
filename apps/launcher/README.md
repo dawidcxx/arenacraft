@@ -56,12 +56,16 @@ and commit it when the artwork changes.
 
 ## What it does
 
-The window declares a single-column layout: an **Arenacraft** title, a
-description that re-wraps when the window narrows, two panes (**Realms** list on
-the left, **Realm address** field and hints on the right), a status line naming
-the file being written, a spacer, and a bottom row with **Launch Game** and
-**Quit** buttons aligned to the right. Resize the window and everything adapts;
-there are no hardcoded widget positions.
+The window has two views, both declared with the layout vocabulary and re-wrapped
+on resize; there are no hardcoded widget positions.
+
+The **home** view shows the active logon host in the bottom-left corner, next to
+**Change Realm**, with **Launch Game** and **Quit** on the right. Nothing is
+written at startup, so a fresh installation gets its `realmlist.wtf` when the
+game is launched or a realm changes.
+
+The **realms** view (opened with **Change Realm**) lists the remembered realms
+with a **Remove** button, an editable **Address** field, and **Back**.
 
 ### Realm switcher
 
@@ -70,7 +74,7 @@ Warmane entries plus every logon host already present in the client's
 `realmlist.wtf`, including commented-out ones. Picking a row copies its host
 into the address field and applies it immediately. The address field is also
 editable, so a new host name or IPv4 address can be typed and committed with
-Enter (or by pressing Launch Game); the launcher trims it and updates the file.
+Enter; **Back** applies whatever is in the field before returning home.
 
 **Remove** forgets the highlighted realm. A custom host simply disappears from
 the history; a built-in realm is recorded in `realmlist.wtf` as a
@@ -94,17 +98,16 @@ written the launcher reports the path and error and leaves the game unstarted
 rather than connecting to the wrong realm; move the client somewhere the user
 can write to, or start the launcher as administrator.
 
-**Launch Game** applies the realm in the field first (a typed host may not have
-been committed), resolves `Wow.exe` next to the launcher's own executable (not
-the current working directory), and starts it with that directory as the
-child's working directory. The launcher closes once the game has started. If
-`Wow.exe` is missing or the process cannot be created, a message box explains
-why and the launcher stays open.
+**Launch Game** writes the current realm list, resolves `Wow.exe` next to the
+launcher's own executable (not the current working directory), and starts it
+with that directory as the child's working directory. The launcher closes once
+the game has started. If `Wow.exe` is missing or the process cannot be created,
+a message box explains why and the launcher stays open.
 
 ## Modules
 
-- `src/launcher/main.zig`: entry point, layout declaration, realm and launch
-  callbacks.
+- `src/launcher/main.zig`: entry point, the home and realms views, realm and
+  launch callbacks.
 - `src/launcher/game.zig`: spawns `Wow.exe` from the installation directory.
 - `src/launcher/install.zig`: resolves the game directory (the launcher's own).
 - `src/launcher/realmlist.zig`: realm list parsing/rendering and the
