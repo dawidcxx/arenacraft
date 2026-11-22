@@ -13,5 +13,10 @@ pub const c = @cImport({
     // every sane translation unit sets before including windows.h.
     @cDefine("WIN32_LEAN_AND_MEAN", "1");
     @cDefine("NOMINMAX", "1");
+    // MinGW's fortified string inlines (wcscat/wcscpy) translate into local
+    // declarations that Zig 0.16 rejects in ReleaseSafe ("unused local
+    // constant"). They are unused here and Zig has its own safety checks, so
+    // disable fortify to keep the C import valid in every optimize mode.
+    @cDefine("_FORTIFY_SOURCE", "0");
     @cInclude("windows.h");
 });
