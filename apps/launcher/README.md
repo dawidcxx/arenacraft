@@ -48,3 +48,21 @@ The test binaries are Windows PE as well, so they need the same executor.
 - `src/lib/root.zig`: shared library, imported as `lib`.
 - `src/lib/win32.zig`: `windows.h` via `@cImport`; the module links libc so the
   MinGW-w64 headers and CRT resolve.
+- `installer/`: WiX source for `Arenacraft.msi` and its JScript validation
+  action.
+- `scripts/changelog.sh`: release notes for the `launcher-release` workflow.
+
+## Release
+
+1. Create and push a tag named `launcher-x.y.z`.
+2. Run the `launcher-release` workflow with that tag.
+
+The workflow builds `Arenacraft.exe` and `Arenacraft.msi`, generates notes from
+the commits touching `apps/launcher` since the previous `launcher-*` tag, and
+publishes both files plus `SHA256SUMS`. Set `WINDOWS_SIGNING_PFX_BASE64` and
+`WINDOWS_SIGNING_PFX_PASSWORD` to Authenticode-sign the artifacts.
+
+The MSI defaults to the World of Warcraft directory registered by Blizzard,
+lets the user pick another one, and refuses to install unless `Wow.exe` and
+`Data\common.MPQ` are present. Desktop and Start menu shortcuts are optional
+features.

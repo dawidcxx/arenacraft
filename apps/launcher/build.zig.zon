@@ -9,6 +9,8 @@
         "build.zig",
         "build.zig.zon",
         "README.md",
+        "installer",
+        "scripts",
         "src",
     },
 }

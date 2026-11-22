@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="Arenacraft Launcher"
+           Manufacturer="Arenacraft"
+           Version="$(var.Version)"
+           UpgradeCode="FD4F78DF-0F00-47E3-88C3-E23A6DDBE2B9"
+           Scope="perMachine"
+           Language="1033"
+           ProductCode="*">
+
+    <!-- Same-version rebuilds are a supported flow (re-running a release for an
+         existing tag), so treat them as upgrades of the previous install. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of the Arenacraft Launcher is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <ui:WixUI Id="WixUI_Mondo" InstallDirectory="INSTALLDIR" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.InstallerDir)\License.rtf" />
+
+    <!-- Default the target to the client Blizzard registered, and let the
+         directory dialog override it. ValidateWowDir checks whatever the user
+         ends up picking. -->
+    <Property Id="WOWDIR">
+      <RegistrySearch Id="WowInstallPath"
+                      Root="HKLM"
+                      Key="SOFTWARE\Blizzard Entertainment\World of Warcraft"
+                      Name="InstallPath"
+                      Type="directory"
+                      Bitness="always32" />
+    </Property>
+    <SetProperty Id="INSTALLDIR" Value="[WOWDIR]" Before="CostFinalize"
+                 Sequence="both" Condition="NOT Installed AND WOWDIR AND NOT INSTALLDIR" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles6432Folder">
+        <Directory Id="INSTALLDIR" Name="World of Warcraft" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ArenacraftMenuFolder" Name="Arenacraft" />
+      </Directory>
+    </Directory>
+
+    <Component Id="LauncherComponent" Directory="INSTALLDIR" Guid="*">
+      <File Id="ArenacraftExe" Source="$(var.SourceDir)\Arenacraft.exe" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcutComponent" Directory="DesktopFolder" Guid="*">
+      <Shortcut Id="DesktopShortcut" Name="Arenacraft"
+                Target="[INSTALLDIR]Arenacraft.exe" WorkingDirectory="INSTALLDIR" />
+      <RegistryValue Root="HKLM" Key="Software\Arenacraft\Launcher"
+                     Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenuShortcutComponent" Directory="ArenacraftMenuFolder" Guid="*">
+      <Shortcut Id="StartMenuShortcut" Name="Arenacraft"
+                Target="[INSTALLDIR]Arenacraft.exe" WorkingDirectory="INSTALLDIR" />
+      <RemoveFolder Id="RemoveArenacraftMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKLM" Key="Software\Arenacraft\Launcher"
+                     Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Feature Id="LauncherFeature" Title="Arenacraft Launcher" Level="1" Absent="disallow">
+      <ComponentRef Id="LauncherComponent" />
+    </Feature>
+    <Feature Id="DesktopShortcutFeature" Title="Desktop shortcut" Level="1">
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+    <Feature Id="StartMenuShortcutFeature" Title="Start menu shortcut" Level="1">
+      <ComponentRef Id="StartMenuShortcutComponent" />
+    </Feature>
+
+    <Binary Id="WowCheckScript" SourceFile="$(var.InstallerDir)\wowcheck.js" />
+    <CustomAction Id="ValidateWowDir"
+                  BinaryRef="WowCheckScript"
+                  JScriptCall="ValidateWowDir"
+                  Execute="immediate"
+                  Return="check" />
+
+    <InstallExecuteSequence>
+      <!-- After CostFinalize (INSTALLDIR is resolved) but before
+           RemoveExistingProducts/InstallFiles: a rejected directory must not
+           uninstall the previous launcher. -->
+      <Custom Action="ValidateWowDir" After="CostFinalize" Condition="NOT Installed" />
+    </InstallExecuteSequence>
+
+  </Package>
+</Wix>

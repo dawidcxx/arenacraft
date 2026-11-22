@@ -1,0 +1,176 @@
+# Cut a launcher release from an existing launcher-x.y.z tag.
+#
+# Manual on purpose: the tag is the source of truth for the version, and it
+# must already exist. Re-running the workflow replaces the assets of an
+# existing release.
+name: launcher-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (launcher-x.y.z)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: launcher-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ inputs.tag }}
+      # Authenticode signing is optional; enable it by providing both secrets.
+      HAS_SIGNING: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 != '' }}
+    steps:
+      - name: Validate tag
+        shell: bash
+        run: |
+          if [[ ! "$TAG" =~ ^launcher-([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::tag '$TAG' must look like launcher-x.y.z"
+            exit 1
+          fi
+          version="${TAG#launcher-}"
+          IFS=. read -r major minor build <<< "$version"
+          # MSI ProductVersion limits; parse base 10 so leading zeros are fine.
+          if (( 10#$major > 255 || 10#$minor > 255 || 10#$build > 65535 )); then
+            echo "::error::MSI versions allow major<=255, minor<=255, build<=65535; got $version"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Verify checked out commit is the tag
+        shell: bash
+        run: |
+          git fetch --tags --force origin >/dev/null 2>&1 || true
+          tag_commit="$(git rev-parse --verify "refs/tags/$TAG^{commit}" 2>/dev/null || true)"
+          if [ -z "$tag_commit" ]; then
+            echo "::error::tag $TAG is not present in the repository"
+            exit 1
+          fi
+          if [ "$tag_commit" != "$(git rev-parse HEAD)" ]; then
+            echo "::error::$TAG does not point at the checked out commit"
+            exit 1
+          fi
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: "0.16.0"
+
+      - name: Build Arenacraft.exe
+        shell: bash
+        run: |
+          cd apps/launcher
+          zig build launcher -Doptimize=ReleaseFast
+          mkdir -p ../../dist
+          cp zig-out/bin/launcher.exe ../../dist/Arenacraft.exe
+
+      - name: Prepare signing certificate
+        if: env.HAS_SIGNING == 'true'
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+        run: |
+          [IO.File]::WriteAllBytes(
+            (Join-Path $env:RUNNER_TEMP 'signing.pfx'),
+            [Convert]::FromBase64String($env:PFX_BASE64))
+
+      - name: Sign Arenacraft.exe
+        if: env.HAS_SIGNING == 'true'
+        shell: pwsh
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          & signtool sign /fd SHA256 /f "$env:RUNNER_TEMP\signing.pfx" /p $env:PFX_PASSWORD `
+            /tr http://timestamp.digicert.com /td SHA256 dist/Arenacraft.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build Arenacraft.msi
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
+          dotnet tool install --global wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool update --global wix --version 5.0.2
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          wix extension add --global WixToolset.UI.wixext/5.0.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          wix build apps/launcher/installer/Arenacraft.wxs `
+            -arch x64 `
+            -ext WixToolset.UI.wixext `
+            -d Version=$env:VERSION `
+            -d SourceDir="$env:GITHUB_WORKSPACE\dist" `
+            -d InstallerDir="$env:GITHUB_WORKSPACE\apps\launcher\installer" `
+            -o dist/Arenacraft.msi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Sign Arenacraft.msi
+        if: env.HAS_SIGNING == 'true'
+        shell: pwsh
+        env:
+          PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          & signtool sign /fd SHA256 /f "$env:RUNNER_TEMP\signing.pfx" /p $env:PFX_PASSWORD `
+            /tr http://timestamp.digicert.com /td SHA256 dist/Arenacraft.msi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          @(
+            "$((Get-FileHash -Algorithm SHA256 dist/Arenacraft.exe).Hash.ToLower())  Arenacraft.exe"
+            "$((Get-FileHash -Algorithm SHA256 dist/Arenacraft.msi).Hash.ToLower())  Arenacraft.msi"
+          ) | Set-Content -Encoding ascii dist/SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        continue-on-error: true
+        with:
+          subject-path: |
+            dist/Arenacraft.exe
+            dist/Arenacraft.msi
+
+      - name: Generate release notes
+        shell: bash
+        run: |
+          bash apps/launcher/scripts/changelog.sh "$TAG" > release-notes.md
+          cat >> release-notes.md <<'EOF'
+
+          ## Installation
+
+          `Arenacraft.msi` installs into an existing World of Warcraft 3.3.5a
+          directory. It asks for the directory, verifies that `Wow.exe` and
+          `Data\common.MPQ` are there, and optionally creates desktop and Start
+          menu shortcuts.
+
+          `Arenacraft.exe` is the portable build: copy it next to `Wow.exe`.
+          EOF
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          assets=(dist/Arenacraft.exe dist/Arenacraft.msi dist/SHA256SUMS)
+          title="Arenacraft Launcher $VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            gh release edit "$TAG" --title "$title" --notes-file release-notes.md
+          else
+            gh release create "$TAG" "${assets[@]}" --verify-tag \
+              --title "$title" --notes-file release-notes.md
+          fi
