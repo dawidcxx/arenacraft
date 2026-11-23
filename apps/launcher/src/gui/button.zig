@@ -10,12 +10,7 @@ const c = lib.win32.c;
 
 const geometry = @import("geometry.zig");
 const layout = @import("layout.zig");
-
-/// Called on the GUI thread when the button is pressed.
-pub const Callback = struct {
-    function: *const fn (context: ?*anyopaque) void,
-    context: ?*anyopaque = null,
-};
+const Callback = @import("callback.zig").Callback;
 
 pub const Options = struct {
     text: []const u8,

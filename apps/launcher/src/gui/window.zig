@@ -10,6 +10,20 @@
 //! records the declarations in `plan`, and every re-layout replays that plan
 //! into the engine and applies the resulting rects to the controls in one
 //! `DeferWindowPos` batch.
+//!
+//! Out of memory panics here (`catch unreachable`), so only real failures
+//! (a destroyed window, a native control that cannot be created, a bad
+//! layout) appear in error sets.
+//!
+//! Every widget kind goes through the same three steps (see `addButton`):
+//! `createChild` makes the native control, the widget struct is allocated, and
+//! `track` registers it for dispatch and for the layout plan. Kind-specific
+//! behaviour lives in the `Control` switches below, not in per-kind lists.
+//!
+//! Background work is structured: `spawn` puts a task in the window's
+//! `Io.Group`, and destroying the window cancels the group and waits for it.
+//! Tasks reach the GUI thread through `Dispatcher.post` only (never a
+//! synchronous `SendMessage`, which would deadlock against that wait).
 
 const std = @import("std");
 const lib = @import("lib");
@@ -22,6 +36,9 @@ const button = @import("button.zig");
 const edit = @import("edit.zig");
 const label = @import("label.zig");
 const listbox = @import("listbox.zig");
+const Callback = @import("callback.zig").Callback;
+const text_util = @import("text.zig");
+
 const allocator = std.heap.smp_allocator;
 
 const class_name = "ArenacraftGuiWindow";
@@ -37,6 +54,9 @@ const idc_arrow = 32512;
 /// not translated, so the small integer is cast to a pointer directly.
 const icon_resource_id = 1;
 
+/// Private message that carries a heap-allocated `Callback` to the GUI thread.
+const wm_post: c.UINT = c.WM_APP;
+
 const font_count = 2;
 
 var class_registered = false;
@@ -47,37 +67,83 @@ var dpi_aware = false;
 var live_windows: usize = 0;
 
 pub const Options = struct {
+    /// Runs the window's background tasks; must outlive the window.
+    io: std.Io,
     title: []const u8 = "Arenacraft",
     /// Client-area size in pixels (at the system's primary DPI).
     size: geometry.Size = .{ .width = 640, .height = 400 },
+};
+
+/// A widget placed in the layout tree. The union is the single place that
+/// knows how each kind exposes its handle, bounds and cleanup.
+const Control = union(enum) {
+    button: *button.Button,
+    edit: *edit.Edit,
+    label: *label.Label,
+    list_box: *listbox.ListBox,
+
+    fn hwnd(self: Control) c.HWND {
+        return switch (self) {
+            inline else => |widget| widget.hwnd,
+        };
+    }
+
+    fn setRect(self: Control, rect: geometry.Rect) void {
+        switch (self) {
+            inline else => |widget| widget.setRect(rect),
+        }
+    }
+
+    /// Free the widget struct and whatever it owns. The native control is the
+    /// caller's business.
+    fn free(self: Control) void {
+        switch (self) {
+            .label => |widget| {
+                allocator.free(widget.text);
+                allocator.destroy(widget);
+            },
+            inline else => |widget| allocator.destroy(widget),
+        }
+    }
 };
 
 /// One step of the recorded layout tree, replayed on every layout pass.
 const Plan = union(enum) {
     open: layout.Container,
     close,
-    button: *button.Button,
-    edit: *edit.Edit,
-    label: *label.Label,
-    list_box: *listbox.ListBox,
+    control: Control,
 };
 
 const Placement = struct {
     node: clay.NodeId,
-    target: union(enum) {
-        button: *button.Button,
-        edit: *edit.Edit,
-        label: *label.Label,
-        list_box: *listbox.ListBox,
-    },
+    control: Control,
+};
+
+/// Handle for waking the GUI thread from a task. It is a plain value (the
+/// native handle), so it can be copied into a task. Posting to a destroyed
+/// window fails instead of crashing.
+pub const Dispatcher = struct {
+    hwnd: c.HWND,
+
+    /// Queue `callback` to run on the GUI thread, from any thread. The
+    /// callback's context must stay valid until it runs; a callback still
+    /// queued when the window is destroyed is dropped.
+    pub fn post(self: Dispatcher, callback: Callback) !void {
+        const job = allocator.create(Callback) catch unreachable;
+        job.* = callback;
+        if (c.PostMessageW(self.hwnd, wm_post, 0, @bitCast(@intFromPtr(job))) == 0) {
+            allocator.destroy(job);
+            return error.WindowDestroyed;
+        }
+    }
 };
 
 pub const Window = struct {
     hwnd: c.HWND = null,
-    buttons: std.ArrayListUnmanaged(*button.Button) = .empty,
-    edits: std.ArrayListUnmanaged(*edit.Edit) = .empty,
-    labels: std.ArrayListUnmanaged(*label.Label) = .empty,
-    list_boxes: std.ArrayListUnmanaged(*listbox.ListBox) = .empty,
+    io: std.Io,
+    /// Background tasks; cancelled and awaited when the window is destroyed.
+    tasks: std.Io.Group = .init,
+    controls: std.ArrayListUnmanaged(Control) = .empty,
     fonts: [font_count]c.HFONT = [_]c.HFONT{null} ** font_count,
     /// Screen DC used only to measure text; never drawn into.
     measure_dc: c.HDC = null,
@@ -93,6 +159,8 @@ pub const Window = struct {
     /// focusable control created inherits it, like a dialog's first tab stop.
     focus_assigned: bool = false,
 
+    // -- Layout recording ---------------------------------------------------
+
     /// Start recording a layout tree. Call `endLayout` after declaring it.
     pub fn beginLayout(self: *Window) !void {
         if (self.hwnd == null) return error.WindowDestroyed;
@@ -106,7 +174,7 @@ pub const Window = struct {
     /// Open a container. Pair with `endContainer`.
     pub fn container(self: *Window, style: layout.Container) !void {
         if (!self.recording) return error.LayoutNotStarted;
-        try self.plan.append(allocator, .{ .open = style });
+        self.plan.append(allocator, .{ .open = style }) catch unreachable;
         self.depth += 1;
     }
 
@@ -114,47 +182,48 @@ pub const Window = struct {
     pub fn endContainer(self: *Window) !void {
         if (!self.recording) return error.LayoutNotStarted;
         if (self.depth == 0) return error.UnbalancedLayout;
-        try self.plan.append(allocator, .close);
+        self.plan.append(allocator, .close) catch unreachable;
         self.depth -= 1;
     }
 
+    /// Empty element that soaks up the leftover space of the open container
+    /// along `axis` (`.left_to_right` for a row, `.top_to_bottom` for a column),
+    /// pushing the siblings after it to the far edge.
+    pub fn spacer(self: *Window, axis: layout.Direction) !void {
+        try self.container(.{ .sizing = switch (axis) {
+            .left_to_right => .grow_width,
+            .top_to_bottom => .grow_height,
+        } });
+        try self.endContainer();
+    }
+
+    /// Finish recording and apply the layout. The tree is replayed on resize.
+    pub fn endLayout(self: *Window) error{ LayoutNotStarted, UnbalancedLayout, InvalidPercent }!void {
+        if (!self.recording) return error.LayoutNotStarted;
+        const balanced = self.depth == 0;
+        self.recording = false;
+        self.depth = 0;
+        if (!balanced) return error.UnbalancedLayout;
+        self.ready = true;
+        try self.relayout();
+    }
+
+    // -- Widgets ------------------------------------------------------------
+
     /// Add a push button as a child of the currently open container.
     pub fn addButton(self: *Window, options: button.Options) !*button.Button {
-        if (self.hwnd == null) return error.WindowDestroyed;
-        if (!self.recording) return error.LayoutNotStarted;
+        try self.requireRecording();
 
-        const text = try allocator.dupeZ(u8, options.text);
-        defer allocator.free(text);
-
-        // Child controls take their id from the HMENU parameter; it is null
-        // here because notifications are routed by the child HWND in lParam.
-        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP | c.BS_PUSHBUTTON);
-        const child = c.CreateWindowExA(
-            0,
-            "BUTTON",
-            text.ptr,
-            style,
-            0,
-            0,
-            0,
-            0,
-            self.hwnd,
-            null,
-            c.GetModuleHandleA(null),
-            null,
+        const child = try self.createChild(
+            std.unicode.utf8ToUtf16LeStringLiteral("BUTTON"),
+            options.text,
+            c.WS_TABSTOP | c.BS_PUSHBUTTON,
+            .body,
         );
-        if (child == null) return error.ControlCreationFailed;
-
-        if (self.fonts[@intFromEnum(label.Font.body)] != null) {
-            _ = c.SendMessageA(child, c.WM_SETFONT, @intFromPtr(self.fonts[@intFromEnum(label.Font.body)]), c.TRUE);
-        }
 
         const measured = measureText(self, options.text, @intFromEnum(label.Font.body));
 
-        const widget = allocator.create(button.Button) catch |err| {
-            _ = c.DestroyWindow(child);
-            return err;
-        };
+        const widget = allocator.create(button.Button) catch unreachable;
         widget.* = .{
             .hwnd = child,
             .callback = options.onClick,
@@ -165,126 +234,54 @@ pub const Window = struct {
                 .height = layout.roundToInt(measured.height),
             },
         };
-
-        self.buttons.append(allocator, widget) catch |err| {
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
-        self.plan.append(allocator, .{ .button = widget }) catch |err| {
-            self.buttons.items.len -= 1;
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
+        self.track(.{ .button = widget });
 
         // A window with no text field or list still needs a first tab stop, so
         // the button takes the initial focus. When a field exists it already
         // owns the focus (see `addEdit`).
-        if (self.edits.items.len == 0 and self.list_boxes.items.len == 0) {
-            takeFocus(self, child);
-        }
+        if (!self.has(.edit) and !self.has(.list_box)) self.takeFocus(child);
         return widget;
     }
 
     /// Add a single-selection list as a child of the currently open container.
     /// `onSelect` fires when a row is picked; see `listbox.zig`.
     pub fn addListBox(self: *Window, options: listbox.Options) !*listbox.ListBox {
-        if (self.hwnd == null) return error.WindowDestroyed;
-        if (!self.recording) return error.LayoutNotStarted;
+        try self.requireRecording();
 
-        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP |
-            c.WS_VSCROLL | c.WS_BORDER | c.LBS_NOTIFY | c.LBS_NOINTEGRALHEIGHT);
-        const child = c.CreateWindowExW(
-            0,
+        const child = try self.createChild(
             std.unicode.utf8ToUtf16LeStringLiteral("LISTBOX"),
-            null,
-            style,
-            0,
-            0,
-            0,
-            0,
-            self.hwnd,
-            null,
-            c.GetModuleHandleA(null),
-            null,
+            "",
+            c.WS_TABSTOP | c.WS_VSCROLL | c.WS_BORDER | c.LBS_NOTIFY | c.LBS_NOINTEGRALHEIGHT,
+            .body,
         );
-        if (child == null) return error.ControlCreationFailed;
 
-        const font = self.fonts[@intFromEnum(label.Font.body)];
-        if (font != null) {
-            _ = c.SendMessageW(child, c.WM_SETFONT, @intFromPtr(font), c.TRUE);
-        }
-
-        const widget = allocator.create(listbox.ListBox) catch |err| {
-            _ = c.DestroyWindow(child);
-            return err;
-        };
+        const widget = allocator.create(listbox.ListBox) catch unreachable;
         widget.* = .{
             .hwnd = child,
             .callback = options.onSelect,
             .sizing = options.sizing,
         };
 
-        addListItems(widget, options.items) catch |err| {
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
-        if (options.selected) |index| {
-            selectListItem(widget, index);
-        }
+        addListItems(widget, options.items);
+        if (options.selected) |index| selectListItem(widget, index);
 
-        self.list_boxes.append(allocator, widget) catch |err| {
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
-        self.plan.append(allocator, .{ .list_box = widget }) catch |err| {
-            self.list_boxes.items.len -= 1;
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
+        self.track(.{ .list_box = widget });
         return widget;
     }
 
     /// Add a single-line text field as a child of the currently open container.
     /// `onEnter` fires when Enter is pressed; see `edit.zig`.
     pub fn addEdit(self: *Window, options: edit.Options) !*edit.Edit {
-        if (self.hwnd == null) return error.WindowDestroyed;
-        if (!self.recording) return error.LayoutNotStarted;
+        try self.requireRecording();
 
-        const text = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, options.text);
-        defer allocator.free(text);
-
-        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | c.WS_TABSTOP |
-            c.WS_BORDER | c.ES_LEFT | c.ES_AUTOHSCROLL);
-        const child = c.CreateWindowExW(
-            0,
+        const child = try self.createChild(
             std.unicode.utf8ToUtf16LeStringLiteral("EDIT"),
-            text.ptr,
-            style,
-            0,
-            0,
-            0,
-            0,
-            self.hwnd,
-            null,
-            c.GetModuleHandleA(null),
-            null,
+            options.text,
+            c.WS_TABSTOP | c.WS_BORDER | c.ES_LEFT | c.ES_AUTOHSCROLL,
+            .body,
         );
-        if (child == null) return error.ControlCreationFailed;
 
-        const font = self.fonts[@intFromEnum(label.Font.body)];
-        if (font != null) {
-            _ = c.SendMessageW(child, c.WM_SETFONT, @intFromPtr(font), c.TRUE);
-        }
-
-        const widget = allocator.create(edit.Edit) catch |err| {
-            _ = c.DestroyWindow(child);
-            return err;
-        };
+        const widget = allocator.create(edit.Edit) catch unreachable;
         widget.* = .{
             .hwnd = child,
             .callback = options.onEnter,
@@ -292,59 +289,24 @@ pub const Window = struct {
         };
         edit.install(widget);
 
-        self.edits.append(allocator, widget) catch |err| {
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
-        self.plan.append(allocator, .{ .edit = widget }) catch |err| {
-            self.edits.items.len -= 1;
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
-
-        takeFocus(self, child);
+        self.track(.{ .edit = widget });
+        self.takeFocus(child);
         return widget;
     }
 
     /// Add a static text label as a child of the currently open container.
     pub fn addLabel(self: *Window, options: label.Options) !*label.Label {
-        if (self.hwnd == null) return error.WindowDestroyed;
-        if (!self.recording) return error.LayoutNotStarted;
+        try self.requireRecording();
 
-        const text = try allocator.dupeZ(u8, options.text);
-
-        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | c.SS_LEFT);
-        const child = c.CreateWindowExA(
-            0,
-            "STATIC",
-            text.ptr,
-            style,
-            0,
-            0,
-            0,
-            0,
-            self.hwnd,
-            null,
-            c.GetModuleHandleA(null),
-            null,
+        const child = try self.createChild(
+            std.unicode.utf8ToUtf16LeStringLiteral("STATIC"),
+            options.text,
+            c.SS_LEFT,
+            options.font,
         );
-        if (child == null) {
-            allocator.free(text);
-            return error.ControlCreationFailed;
-        }
 
-        const font = self.fonts[@intFromEnum(options.font)];
-        if (font != null) {
-            _ = c.SendMessageA(child, c.WM_SETFONT, @intFromPtr(font), c.TRUE);
-        }
-
-        const widget = allocator.create(label.Label) catch |err| {
-            allocator.free(text);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
+        const text = allocator.dupeZ(u8, options.text) catch unreachable;
+        const widget = allocator.create(label.Label) catch unreachable;
         widget.* = .{
             .hwnd = child,
             .text = text,
@@ -352,22 +314,11 @@ pub const Window = struct {
             .wrap = options.wrap,
             .sizing = options.sizing,
         };
-
-        self.labels.append(allocator, widget) catch |err| {
-            allocator.free(text);
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
-        self.plan.append(allocator, .{ .label = widget }) catch |err| {
-            self.labels.items.len -= 1;
-            allocator.free(text);
-            allocator.destroy(widget);
-            _ = c.DestroyWindow(child);
-            return err;
-        };
+        self.track(.{ .label = widget });
         return widget;
     }
+
+    // -- Widget state -------------------------------------------------------
 
     /// Replace a list's rows and highlight `selected`. Used after a typed realm
     /// joins the remembered list. The native control copies the strings, so the
@@ -378,11 +329,11 @@ pub const Window = struct {
         target: *listbox.ListBox,
         items: []const []const u8,
         selected: usize,
-    ) !void {
+    ) void {
         _ = self;
         _ = c.SendMessageW(target.hwnd, c.LB_RESETCONTENT, 0, 0);
 
-        try addListItems(target, items);
+        addListItems(target, items);
         if (items.len > 0) {
             selectListItem(target, @min(selected, items.len - 1));
         }
@@ -419,9 +370,9 @@ pub const Window = struct {
 
     /// Replace an edit's text and select it, so a typed replacement starts on
     /// the next keystroke.
-    pub fn setEditText(self: *Window, target: *edit.Edit, text: []const u8) !void {
+    pub fn setEditText(self: *Window, target: *edit.Edit, text: []const u8) void {
         _ = self;
-        const wide = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, text);
+        const wide = text_util.toWide(allocator, text);
         defer allocator.free(wide);
 
         _ = c.SendMessageW(target.hwnd, c.WM_SETTEXT, 0, @bitCast(@intFromPtr(wide.ptr)));
@@ -430,36 +381,44 @@ pub const Window = struct {
 
     /// Current text of an edit field, allocated with the GUI allocator. The
     /// caller owns the result.
-    pub fn editText(self: *Window, target: *edit.Edit) ![]u8 {
+    pub fn editText(self: *Window, target: *edit.Edit) []u8 {
         _ = self;
         var wide: [1024]u16 = undefined;
         const length = c.GetWindowTextW(target.hwnd, &wide, wide.len);
-        if (length <= 0) return allocator.alloc(u8, 0);
-        return std.unicode.wtf16LeToWtf8Alloc(allocator, wide[0..@intCast(length)]);
+        if (length <= 0) return allocator.alloc(u8, 0) catch unreachable;
+        return std.unicode.wtf16LeToWtf8Alloc(allocator, wide[0..@intCast(length)]) catch unreachable;
     }
 
     /// Replace a label's text and re-run the layout, so a wider status line
     /// still fits the tree. The label keeps an owned copy of the string.
-    pub fn setLabelText(self: *Window, target: *label.Label, text: []const u8) !void {
-        const copy = try allocator.dupeZ(u8, text);
-        errdefer allocator.free(copy);
+    pub fn setLabelText(self: *Window, target: *label.Label, text: []const u8) void {
+        const copy = allocator.dupeZ(u8, text) catch unreachable;
+        const wide = text_util.toWide(allocator, text);
+        defer allocator.free(wide);
 
         allocator.free(target.text);
         target.text = copy;
-        _ = c.SetWindowTextA(target.hwnd, copy.ptr);
+        _ = c.SetWindowTextW(target.hwnd, wide.ptr);
 
-        try self.relayout();
+        // The tree was validated by `endLayout`, so replaying it cannot fail.
+        self.relayout() catch unreachable;
     }
 
-    /// Finish recording and apply the layout. The tree is replayed on resize.
-    pub fn endLayout(self: *Window) !void {
-        if (!self.recording) return error.LayoutNotStarted;
-        const balanced = self.depth == 0;
-        self.recording = false;
-        self.depth = 0;
-        if (!balanced) return error.UnbalancedLayout;
-        self.ready = true;
-        try self.relayout();
+    // -- Lifetime -----------------------------------------------------------
+
+    /// Run `function(args...)` on a worker thread. The window cancels it when
+    /// it is destroyed: the task stops at its next `Io` call with
+    /// `error.Canceled` (CPU-bound loops should call `io.checkCancel()`), so
+    /// it must not hold the GUI thread up. Report results with `dispatcher`.
+    /// `function` must return `void` or an error set coercible to
+    /// `Io.Cancelable!void`.
+    pub fn spawn(self: *Window, function: anytype, args: std.meta.ArgsTuple(@TypeOf(function))) !void {
+        try self.tasks.concurrent(self.io, function, args);
+    }
+
+    /// Handle tasks use to run code on the GUI thread.
+    pub fn dispatcher(self: *Window) Dispatcher {
+        return .{ .hwnd = self.hwnd };
     }
 
     /// Destroy the native window. Safe to call more than once.
@@ -473,10 +432,7 @@ pub const Window = struct {
     pub fn deinit(self: *Window) void {
         self.close();
         self.clear();
-        self.buttons.deinit(allocator);
-        self.edits.deinit(allocator);
-        self.list_boxes.deinit(allocator);
-        self.labels.deinit(allocator);
+        self.controls.deinit(allocator);
         self.plan.deinit(allocator);
         self.placements.deinit(allocator);
         self.engine.deinit();
@@ -500,27 +456,11 @@ pub const Window = struct {
         // When the native window is gone its children died with it; only the
         // bookkeeping is left to free.
         const destroy = self.hwnd != null;
-        for (self.buttons.items) |widget| {
-            if (destroy) _ = c.DestroyWindow(widget.hwnd);
-            allocator.destroy(widget);
+        for (self.controls.items) |control| {
+            if (destroy) _ = c.DestroyWindow(control.hwnd());
+            control.free();
         }
-        self.buttons.clearRetainingCapacity();
-        for (self.edits.items) |widget| {
-            if (destroy) _ = c.DestroyWindow(widget.hwnd);
-            allocator.destroy(widget);
-        }
-        self.edits.clearRetainingCapacity();
-        for (self.list_boxes.items) |widget| {
-            if (destroy) _ = c.DestroyWindow(widget.hwnd);
-            allocator.destroy(widget);
-        }
-        self.list_boxes.clearRetainingCapacity();
-        for (self.labels.items) |widget| {
-            if (destroy) _ = c.DestroyWindow(widget.hwnd);
-            allocator.free(widget.text);
-            allocator.destroy(widget);
-        }
-        self.labels.clearRetainingCapacity();
+        self.controls.clearRetainingCapacity();
 
         self.plan.clearRetainingCapacity();
         self.placements.clearRetainingCapacity();
@@ -530,18 +470,99 @@ pub const Window = struct {
         self.focus_assigned = false;
     }
 
+    // -- Internals ----------------------------------------------------------
+
+    /// Cancel and await every task, then drop callbacks they left queued.
+    /// Runs while the handle is still valid, so no task can post afterwards.
+    fn cancelTasks(self: *Window, hwnd: c.HWND) void {
+        self.tasks.cancel(self.io);
+
+        var message: c.MSG = undefined;
+        while (c.PeekMessageW(&message, hwnd, wm_post, wm_post, c.PM_REMOVE) != 0) {
+            const job: *Callback = @ptrFromInt(@as(usize, @bitCast(message.lParam)));
+            allocator.destroy(job);
+        }
+    }
+
+    fn requireRecording(self: *Window) error{ WindowDestroyed, LayoutNotStarted }!void {
+        if (self.hwnd == null) return error.WindowDestroyed;
+        if (!self.recording) return error.LayoutNotStarted;
+    }
+
+    /// Create a visible native child with the font of `font` applied.
+    /// `extra_style` is OR-ed onto `WS_CHILD | WS_VISIBLE`.
+    fn createChild(
+        self: *Window,
+        class: [*:0]const u16,
+        text: []const u8,
+        extra_style: anytype,
+        font: label.Font,
+    ) error{ControlCreationFailed}!c.HWND {
+        const wide = text_util.toWide(allocator, text);
+        defer allocator.free(wide);
+
+        // Child controls take their id from the HMENU parameter; it is null
+        // here because notifications are routed by the child HWND in lParam.
+        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | extra_style);
+        const child = c.CreateWindowExW(
+            0,
+            class,
+            wide.ptr,
+            style,
+            0,
+            0,
+            0,
+            0,
+            self.hwnd,
+            null,
+            c.GetModuleHandleA(null),
+            null,
+        );
+        if (child == null) return error.ControlCreationFailed;
+
+        const handle = self.fonts[@intFromEnum(font)];
+        if (handle != null) {
+            _ = c.SendMessageW(child, c.WM_SETFONT, @intFromPtr(handle), c.TRUE);
+        }
+        return child;
+    }
+
+    /// Register a widget for message dispatch and for the layout plan.
+    fn track(self: *Window, control: Control) void {
+        self.controls.append(allocator, control) catch unreachable;
+        self.plan.append(allocator, .{ .control = control }) catch unreachable;
+    }
+
+    fn has(self: *const Window, comptime kind: std.meta.Tag(Control)) bool {
+        for (self.controls.items) |control| {
+            if (control == kind) return true;
+        }
+        return false;
+    }
+
+    /// Hand the initial keyboard focus to `child`, unless an earlier focusable
+    /// control already took it.
+    fn takeFocus(self: *Window, child: c.HWND) void {
+        if (self.focus_assigned) return;
+        _ = c.SetFocus(child);
+        self.focus_assigned = true;
+    }
+
     /// Re-run the recorded tree for the current client size.
-    fn relayout(self: *Window) !void {
+    fn relayout(self: *Window) error{InvalidPercent}!void {
         const hwnd = self.hwnd orelse return;
         if (!self.ready) return;
 
         var client: c.RECT = undefined;
         if (c.GetClientRect(hwnd, &client) == 0) return;
 
-        try self.runPlan(.{
+        self.runPlan(.{
             .width = @floatFromInt(@max(0, client.right - client.left)),
             .height = @floatFromInt(@max(0, client.bottom - client.top)),
-        });
+        }) catch |err| switch (err) {
+            error.OutOfMemory => unreachable,
+            error.InvalidPercent => return error.InvalidPercent,
+        };
         self.applyPlacements();
     }
 
@@ -555,49 +576,48 @@ pub const Window = struct {
                     _ = try self.engine.open(.{ .layout = layout.toClayContainer(style) });
                 },
                 .close => try self.engine.close(),
-                .button => |widget| {
-                    const node = try self.engine.open(buttonDeclaration(widget));
-                    try self.engine.close();
-                    try self.placements.append(allocator, .{ .node = node, .target = .{ .button = widget } });
-                },
-                .edit => |widget| {
-                    const node = try self.engine.open(.{ .layout = .{
-                        .sizing = layout.toClaySizing(widget.sizing),
-                    } });
-                    try self.engine.close();
-                    try self.placements.append(allocator, .{ .node = node, .target = .{ .edit = widget } });
-                },
-                .list_box => |widget| {
-                    const node = try self.engine.open(.{ .layout = .{
-                        .sizing = layout.toClaySizing(widget.sizing),
-                    } });
-                    try self.engine.close();
-                    try self.placements.append(allocator, .{ .node = node, .target = .{ .list_box = widget } });
-                },
-                .label => |widget| {
-                    // The text sits inside a container so labels accept the same
-                    // sizing options as any other widget; a fit container
-                    // around a text element is exactly the text's size.
-                    //
-                    // STATIC wraps at word boundaries, and rounding the
-                    // container down by half a pixel is enough to push the last
-                    // word onto a second line that the one-line control clips,
-                    // so keep a pixel of slack on the right and bottom.
-                    const node = try self.engine.open(.{ .layout = .{
-                        .sizing = layout.toClaySizing(widget.sizing),
-                        .padding = .{ .right = 1, .bottom = 1 },
-                    } });
-                    _ = try self.engine.text(widget.text, .{
-                        .wrap = layout.toClayWrap(widget.wrap),
-                        .measure_key = @intFromEnum(widget.font),
-                    });
-                    try self.engine.close();
-                    try self.placements.append(allocator, .{ .node = node, .target = .{ .label = widget } });
+                .control => |control| {
+                    const node = try self.declare(control);
+                    self.placements.append(allocator, .{ .node = node, .control = control }) catch unreachable;
                 },
             }
         }
 
         try self.engine.compute();
+    }
+
+    /// Declare one control as a leaf of the engine tree.
+    fn declare(self: *Window, control: Control) !clay.NodeId {
+        const node = switch (control) {
+            .button => |widget| try self.engine.open(buttonDeclaration(widget)),
+            .edit => |widget| try self.engine.open(.{ .layout = .{
+                .sizing = layout.toClaySizing(widget.sizing),
+            } }),
+            .list_box => |widget| try self.engine.open(.{ .layout = .{
+                .sizing = layout.toClaySizing(widget.sizing),
+            } }),
+            .label => |widget| node: {
+                // The text sits inside a container so labels accept the same
+                // sizing options as any other widget; a fit container around a
+                // text element is exactly the text's size.
+                //
+                // STATIC wraps at word boundaries, and rounding the container
+                // down by half a pixel is enough to push the last word onto a
+                // second line that the one-line control clips, so keep a pixel
+                // of slack on the right and bottom.
+                const node = try self.engine.open(.{ .layout = .{
+                    .sizing = layout.toClaySizing(widget.sizing),
+                    .padding = .{ .right = 1, .bottom = 1 },
+                } });
+                _ = try self.engine.text(widget.text, .{
+                    .wrap = layout.toClayWrap(widget.wrap),
+                    .measure_key = @intFromEnum(widget.font),
+                });
+                break :node node;
+            },
+        };
+        try self.engine.close();
+        return node;
     }
 
     /// Move every control to its computed rect in one repaint.
@@ -609,26 +629,19 @@ pub const Window = struct {
             // Batching is an optimisation; without it, move one by one.
             for (self.placements.items) |placement| {
                 const rect = layout.toRect(self.engine.bounds(placement.node));
-                self.storeRect(placement, rect);
-                _ = c.MoveWindow(
-                    self.hwndOf(placement),
-                    rect.x,
-                    rect.y,
-                    rect.width,
-                    rect.height,
-                    c.TRUE,
-                );
+                placement.control.setRect(rect);
+                _ = c.MoveWindow(placement.control.hwnd(), rect.x, rect.y, rect.width, rect.height, c.TRUE);
             }
             return;
         }
 
         for (self.placements.items) |placement| {
             const rect = layout.toRect(self.engine.bounds(placement.node));
-            self.storeRect(placement, rect);
+            placement.control.setRect(rect);
 
             const next = c.DeferWindowPos(
                 handle,
-                self.hwndOf(placement),
+                placement.control.hwnd(),
                 null,
                 rect.x,
                 rect.y,
@@ -649,51 +662,39 @@ pub const Window = struct {
         // word-wrapped text can stay on screen until something else repaints
         // it (e.g. "Arenacraft" -> "New realm" shows just "New"). Labels are
         // cheap: repaint them in full after every layout pass.
-        for (self.placements.items) |placement| switch (placement.target) {
+        for (self.placements.items) |placement| switch (placement.control) {
             .label => |widget| _ = c.InvalidateRect(widget.hwnd, null, c.TRUE),
             else => {},
         };
     }
 
-    fn hwndOf(_: *Window, placement: Placement) c.HWND {
-        return switch (placement.target) {
-            .button => |widget| widget.hwnd,
-            .edit => |widget| widget.hwnd,
-            .label => |widget| widget.hwnd,
-            .list_box => |widget| widget.hwnd,
-        };
-    }
-
-    fn storeRect(_: *Window, placement: Placement, rect: geometry.Rect) void {
-        switch (placement.target) {
-            .button => |widget| widget.setRect(rect),
-            .edit => |widget| widget.setRect(rect),
-            .label => |widget| widget.setRect(rect),
-            .list_box => |widget| widget.setRect(rect),
+    /// Route a `WM_COMMAND` notification to the widget whose handle raised it.
+    /// The callback may destroy that widget (a view switch does), so nothing
+    /// touches the control list after it runs.
+    fn dispatchCommand(self: *Window, notification: c_int, child: usize) void {
+        for (self.controls.items) |control| {
+            if (@intFromPtr(control.hwnd()) != child) continue;
+            switch (control) {
+                .button => |widget| if (notification == c.BN_CLICKED) widget.callback.call(),
+                .list_box => |widget| if (notification == c.LBN_SELCHANGE) widget.callback.call(),
+                .edit, .label => {},
+            }
+            return;
         }
     }
 };
 
-/// Hand the initial keyboard focus to `child`, unless an earlier focusable
-/// control already took it.
-fn takeFocus(window: *Window, child: c.HWND) void {
-    if (window.focus_assigned) return;
-    _ = c.SetFocus(child);
-    window.focus_assigned = true;
+fn addListItems(target: *listbox.ListBox, items: []const []const u8) void {
+    for (items) |item| addListItem(target.hwnd, item);
 }
 
-fn addListItems(target: *listbox.ListBox, items: []const []const u8) !void {
-    for (items) |item| try addListItem(target.hwnd, item);
-}
-
-fn addListItem(hwnd: c.HWND, text: []const u8) !void {
-    const wide = try std.unicode.wtf8ToWtf16LeAllocZ(allocator, text);
+fn addListItem(hwnd: c.HWND, text: []const u8) void {
+    const wide = text_util.toWide(allocator, text);
     defer allocator.free(wide);
 
     const result = c.SendMessageW(hwnd, c.LB_ADDSTRING, 0, @bitCast(@intFromPtr(wide.ptr)));
-    if (result == @as(c.LRESULT, c.LB_ERR) or result == @as(c.LRESULT, c.LB_ERRSPACE)) {
-        return error.ControlCreationFailed;
-    }
+    // The native list ran out of memory.
+    if (result == @as(c.LRESULT, c.LB_ERR) or result == @as(c.LRESULT, c.LB_ERRSPACE)) unreachable;
 }
 
 fn selectListItem(target: *listbox.ListBox, index: usize) void {
@@ -772,7 +773,7 @@ pub fn create(options: Options) !*Window {
     try ensureClass();
 
     const self = try allocator.create(Window);
-    self.* = .{ .engine = clay.Layout.init(allocator, measureText, self) };
+    self.* = .{ .io = options.io, .engine = clay.Layout.init(allocator, measureText, self) };
     errdefer {
         self.engine.deinit();
         allocator.destroy(self);
@@ -948,28 +949,17 @@ fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
             // lParam carries the child HWND that raised the notification.
             // Compare integer values: fabricating an `HWND` from it would
             // trip the pointer alignment check in Debug builds.
-            const child: usize = @bitCast(lparam);
-
-            if (notification == c.BN_CLICKED) {
-                for (window.buttons.items) |widget| {
-                    if (@intFromPtr(widget.hwnd) != child) continue;
-                    widget.callback.function(widget.callback.context);
-                    break;
-                }
-            }
-
-            // Picking a row in the realm list applies it right away; the edit
-            // field is only committed by Enter or by the Launch button, so a
-            // half-typed address never triggers a validation dialog.
-            if (notification == c.LBN_SELCHANGE) {
-                for (window.list_boxes.items) |widget| {
-                    if (@intFromPtr(widget.hwnd) != child) continue;
-                    widget.callback.function(widget.callback.context);
-                    break;
-                }
-            }
+            window.dispatchCommand(notification, @bitCast(lparam));
             return 0;
         },
+        wm_post => {
+            const job: *Callback = @ptrFromInt(@as(usize, @bitCast(lparam)));
+            const callback = job.*;
+            allocator.destroy(job);
+            callback.call();
+            return 0;
+        },
+        c.WM_DESTROY => window.cancelTasks(hwnd),
         c.WM_NCDESTROY => {
             setUserData(hwnd, null);
             window.hwnd = null;

@@ -21,8 +21,20 @@ src/launcher app behaviour (realm selection, launch Wow.exe)
   - an opaque handle (no public `HWND`), so the implementation can change;
   - a `button.Options`/`Window.addButton` call that only exposes what the
     launcher needs.
-- `launcher` never calls `gui`/`lib` from a worker thread, and never imports
-  `clay`.
+- `launcher` never calls `gui`/`lib` from a worker thread (except
+  `Dispatcher.post`), and never imports `clay`.
+- Launcher code layout: `main.zig` (startup), `app.zig` (`App`, view switching,
+  `alert`), `home_view.zig`, `realms_view.zig` (one file per view: its `build`
+  and callbacks).
+- Out of memory panics (`catch unreachable`) in `gui` and in the launcher app
+  layer (`main`, `app`, views), so their error sets only carry real failures
+  and call sites stay free of OOM branches. `realmlist.zig`, `game.zig`,
+  `clay` and `lib` still propagate it. `gui/text.zig` treats invalid WTF-8 as a
+  bug the same way.
+- Widget callbacks are bound with `.bind(context_ptr, fn(*T) void)`
+  (`gui/callback.zig`); never write `@ptrCast(@alignCast(...))` at call sites.
+- Window internals keep one `controls` list of a `Control` union; adding a
+  widget kind means a new union arm, not a new list/loop.
 
 ## GUI thread
 
@@ -62,9 +74,9 @@ pointers in `App` are only valid until the next switch, which is why they are
 optional and reset by `showView`.
 
 A callback may therefore destroy the control that raised it (e.g. `Change
-Realm`). That is safe because `windowProc` breaks out of the `WM_COMMAND` loop
+Realm`). That is safe because `Window.dispatchCommand` returns
 right after invoking the callback and never touches the freed widget again. Do
-not add work after the callback call in that loop.
+not add work after the callback call there.
 
 ## I/O
 
@@ -79,8 +91,17 @@ Rules for future work (downloads, patching):
 - Run the blocking operation with `io.concurrent(...)`/`io.async(...)`; collect
   the result in the worker, then `PostMessage` a custom `WM_APP+n` message to
   the window. The GUI thread applies the result and updates widgets.
-- Anything the `gui` layer adds for this should keep the marshalling inside
-  `gui` (a `Window.post` style primitive), not in launcher code.
+- Tasks are structured: `Window.spawn(fn, args)` runs on the window's
+  `Io.Group` (`concurrent`, so never inline on the GUI thread). `WM_DESTROY`
+  cancels the group and waits for it, then drops callbacks still queued, so
+  workers cannot outlive the window. Cancellation is cooperative: a task stops
+  at its next `Io` call (`error.Canceled`); CPU-bound loops call
+  `io.checkCancel()`.
+- Results go back through `Window.dispatcher()`, a copyable `Dispatcher`:
+  `dispatcher.post(.bind(ctx, fn))` runs `fn` on the GUI thread (private
+  `WM_APP` message carrying a heap `Callback`). Tasks must only use `post`,
+  never `SendMessage` (the cancel wait on the GUI thread would deadlock). The
+  context must stay valid until the callback runs.
 
 ## Layout
 

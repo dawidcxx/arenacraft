@@ -14,12 +14,7 @@ const c = lib.win32.c;
 
 const geometry = @import("geometry.zig");
 const layout = @import("layout.zig");
-
-/// Called on the GUI thread when Enter is pressed in the field.
-pub const Callback = struct {
-    function: *const fn (context: ?*anyopaque) void,
-    context: ?*anyopaque = null,
-};
+const Callback = @import("callback.zig").Callback;
 
 pub const Options = struct {
     text: []const u8 = "",
@@ -59,7 +54,7 @@ fn editProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM) c
 
     const self: *Edit = @ptrFromInt(@as(usize, @intCast(raw)));
     if (message == c.WM_KEYDOWN and wparam == c.VK_RETURN) {
-        self.callback.function(self.callback.context);
+        self.callback.call();
         return 0;
     }
     return c.CallWindowProcW(self.previous_proc, hwnd, message, wparam, lparam);

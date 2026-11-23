@@ -35,6 +35,24 @@ pub const SizingAxis = union(enum) {
 pub const Sizing = struct {
     width: SizingAxis = .{ .fit = .{} },
     height: SizingAxis = .{ .fit = .{} },
+
+    pub const grow_both: Sizing = .{ .width = .{ .grow = .{} }, .height = .{ .grow = .{} } };
+    pub const grow_width: Sizing = .{ .width = .{ .grow = .{} } };
+    pub const grow_height: Sizing = .{ .height = .{ .grow = .{} } };
+
+    pub fn fixed(width: f32, height: f32) Sizing {
+        return .{ .width = .{ .fixed = width }, .height = .{ .fixed = height } };
+    }
+
+    /// Fixed width, grows to fill the remaining height.
+    pub fn fixedWidth(width: f32) Sizing {
+        return .{ .width = .{ .fixed = width }, .height = .{ .grow = .{} } };
+    }
+
+    /// Grows to fill the width, fixed height.
+    pub fn fixedHeight(height: f32) Sizing {
+        return .{ .width = .{ .grow = .{} }, .height = .{ .fixed = height } };
+    }
 };
 
 pub const Padding = struct {

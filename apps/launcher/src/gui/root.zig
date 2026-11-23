@@ -25,19 +25,21 @@ const c = lib.win32.c;
 
 const geometry = @import("geometry.zig");
 const layout = @import("layout.zig");
-const widget = @import("button.zig");
+const button_widget = @import("button.zig");
 const edit_widget = @import("edit.zig");
 const label = @import("label.zig");
 const listbox_widget = @import("listbox.zig");
+const text_util = @import("text.zig");
 const window = @import("window.zig");
 
 pub const Rect = geometry.Rect;
 pub const Size = geometry.Size;
 pub const Point = geometry.Point;
 
-pub const Button = widget.Button;
-pub const ButtonOptions = widget.Options;
-pub const Callback = widget.Callback;
+pub const Callback = @import("callback.zig").Callback;
+
+pub const Button = button_widget.Button;
+pub const ButtonOptions = button_widget.Options;
 
 pub const Edit = edit_widget.Edit;
 pub const EditOptions = edit_widget.Options;
@@ -61,6 +63,7 @@ pub const Alignment = layout.Alignment;
 pub const WrapMode = layout.WrapMode;
 
 pub const Window = window.Window;
+pub const Dispatcher = window.Dispatcher;
 pub const WindowOptions = window.Options;
 pub const createWindow = window.create;
 pub const run = window.run;
@@ -83,9 +86,9 @@ pub fn showMessage(kind: MessageKind, title: []const u8, text: []const u8) void 
     };
 
     // Error text can embed paths read from the OS, which are WTF-8.
-    const title_w = std.unicode.wtf8ToWtf16LeAllocZ(allocator, title) catch return;
+    const title_w = text_util.toWide(allocator, title);
     defer allocator.free(title_w);
-    const text_w = std.unicode.wtf8ToWtf16LeAllocZ(allocator, text) catch return;
+    const text_w = text_util.toWide(allocator, text);
     defer allocator.free(text_w);
 
     _ = c.MessageBoxW(null, text_w.ptr, title_w.ptr, flags);
