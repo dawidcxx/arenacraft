@@ -15,7 +15,7 @@ const BuildCommons = @import("./BuildCommons.zig");
 const unknown_revision = "Unknown";
 
 fn runGit(b: *Build, args: []const []const u8) ?[]const u8 {
-    const root = b.pathFromRoot(".");
+    const root = b.root.joinString(b.allocator, ".") catch @panic("OOM");
 
     var argv: std.ArrayListUnmanaged([]const u8) = .empty;
     defer argv.deinit(b.allocator);
@@ -61,7 +61,7 @@ fn revisionValue(b: *Build, env_names: []const []const u8, git_args: []const []c
 pub const Src = struct {
     pub const core_cflags = [_][]const u8{
         "-std=c++23",
-        // zig 0.16 clang defaults:
+        // zig 0.17 clang defaults:
         // - fmt 11's operator"" _a fallback shim is deprecation-errored
         // - newer asio deprecates basic_deadline_timer/null_buffers, which the
         //   AC DeadlineTimer/Socket wrappers inherit/use

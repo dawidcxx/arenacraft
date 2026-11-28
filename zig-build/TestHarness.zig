@@ -89,7 +89,7 @@ pub const TestHarness = struct {
         // `zig build run-<module>-test [-- <doctest args>]`
         const run = bl.addRunArtifact(exe);
         run.step.dependOn(&install.step);
-        if (bl.args) |args| run.addArgs(args);
+        run.addPassthruArgs();
 
         const run_step = bl.step(
             try std.fmt.allocPrint(graph.gpa, "run-{s}-test", .{name}),

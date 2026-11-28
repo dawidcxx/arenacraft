@@ -15,8 +15,8 @@
 # one-time development operation done by scripts/seed_db).
 
 ARG UBUNTU_VERSION=22.04
-# keep in sync with flake.nix's zig (host-libc detection is 0.16 behaviour)
-ARG ZIG_VERSION=0.16.0
+# keep in sync with flake.nix's zig (host-libc detection is version sensitive)
+ARG ZIG_VERSION=0.17.1
 
 # --- builder ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS builder

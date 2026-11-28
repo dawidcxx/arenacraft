@@ -642,12 +642,15 @@ fn boostIncludeDirUsed(include_dir: Build.Module.IncludeDir, owner: *Build, io: 
         .path, .path_system, .path_after => |lp| lp,
         else => return true,
     };
-    switch (lazy_path) {
-        .src_path, .dependency, .cwd_relative => {},
+    // zig 0.17 removed LazyPath.getPath3; the statically-known variants can be
+    // resolved by hand from the owning build root, everything else (generated
+    // paths, ...) cannot be probed at configure time and passes through.
+    const cache_path: Build.Cache.Path = switch (lazy_path) {
+        .src_path => |sp| sp.owner.root.join(owner.graph.arena, sp.sub_path) catch return true,
+        .dependency => |dep| dep.dependency.builder.root.join(owner.graph.arena, dep.sub_path) catch return true,
+        .cwd_relative => |p| .{ .root_dir = .cwd(), .sub_path = p },
         else => return true,
-    }
-
-    const cache_path = lazy_path.getPath3(owner, null);
+    };
     var inc_dir = cache_path.root_dir.handle.openDir(io, cache_path.subPathOrDot(), .{ .iterate = true }) catch return false;
     defer inc_dir.close(io);
     var boost_dir = inc_dir.openDir(io, "boost", .{ .iterate = true }) catch return false;

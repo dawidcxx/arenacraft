@@ -68,7 +68,7 @@ const icon_resource_id = 1;
 /// Private message that carries a heap-allocated `Callback` to the GUI thread.
 const wm_post: c.UINT = c.WM_APP;
 
-const font_count = @typeInfo(label.Font).@"enum".fields.len;
+const font_count = @typeInfo(label.Font).@"enum".field_names.len;
 
 var class_registered = false;
 var class_brush: c.HBRUSH = null;
@@ -162,7 +162,7 @@ pub const Window = struct {
     /// Background tasks; cancelled and awaited when the window is destroyed.
     tasks: std.Io.Group = .init,
     controls: std.ArrayListUnmanaged(Control) = .empty,
-    fonts: [font_count]c.HFONT = [_]c.HFONT{null} ** font_count,
+    fonts: [font_count]c.HFONT = @splat(null),
     /// Screen DC used only to measure text; never drawn into.
     measure_dc: c.HDC = null,
 
@@ -245,7 +245,7 @@ pub const Window = struct {
             .body,
         );
 
-        const measured = measureText(self, options.text, @intFromEnum(label.Font.body));
+        const measured = measureText(self, options.text, @backingInt(label.Font.body));
 
         const widget = allocator.create(button.Button) catch unreachable;
         widget.* = .{
@@ -340,7 +340,7 @@ pub const Window = struct {
             options.font,
         );
 
-        const text = allocator.dupeZ(u8, options.text) catch unreachable;
+        const text = allocator.dupeSentinel(u8, options.text, 0) catch unreachable;
         const widget = allocator.create(label.Label) catch unreachable;
         widget.* = .{
             .hwnd = child,
@@ -427,7 +427,7 @@ pub const Window = struct {
     /// Replace a label's text and re-run the layout, so a wider status line
     /// still fits the tree. The label keeps an owned copy of the string.
     pub fn setLabelText(self: *Window, target: *label.Label, text: []const u8) void {
-        const copy = allocator.dupeZ(u8, text) catch unreachable;
+        const copy = allocator.dupeSentinel(u8, text, 0) catch unreachable;
         const wide = text_util.toWide(allocator, text);
         defer allocator.free(wide);
 
@@ -557,7 +557,7 @@ pub const Window = struct {
             null,
         ) orelse @panic("gui: could not create a native child control");
 
-        const handle = self.fonts[@intFromEnum(font)];
+        const handle = self.fonts[@backingInt(font)];
         if (handle != null) {
             _ = c.SendMessageW(child, c.WM_SETFONT, @intFromPtr(handle), c.TRUE);
         }
@@ -647,7 +647,7 @@ pub const Window = struct {
                 } });
                 _ = try self.engine.text(widget.text, .{
                     .wrap = layout.toClayWrap(widget.wrap),
-                    .measure_key = @intFromEnum(widget.font),
+                    .measure_key = @backingInt(widget.font),
                 });
                 break :node node;
             },
@@ -846,7 +846,7 @@ pub fn create(options: Options) !*Window {
     const x = @divTrunc(c.GetSystemMetrics(c.SM_CXSCREEN) - outer_width, 2);
     const y = @divTrunc(c.GetSystemMetrics(c.SM_CYSCREEN) - outer_height, 2);
 
-    const title = try allocator.dupeZ(u8, options.title);
+    const title = try allocator.dupeSentinel(u8, options.title, 0);
     defer allocator.free(title);
 
     const hwnd = c.CreateWindowExA(
@@ -864,11 +864,11 @@ pub fn create(options: Options) !*Window {
         self,
     );
     if (hwnd == null) return error.WindowCreationFailed;
-    self.fonts[@intFromEnum(label.Font.body)] = createFont(-18, c.FW_NORMAL);
-    self.fonts[@intFromEnum(label.Font.small)] = createFont(-16, c.FW_NORMAL);
-    self.fonts[@intFromEnum(label.Font.small_bold)] = createFont(-16, c.FW_BOLD);
+    self.fonts[@backingInt(label.Font.body)] = createFont(-18, c.FW_NORMAL);
+    self.fonts[@backingInt(label.Font.small)] = createFont(-16, c.FW_NORMAL);
+    self.fonts[@backingInt(label.Font.small_bold)] = createFont(-16, c.FW_BOLD);
     // Sized so "Arenacraft Launcher" stays on one line in the minimum window.
-    self.fonts[@intFromEnum(label.Font.title)] = createFont(-28, c.FW_BOLD);
+    self.fonts[@backingInt(label.Font.title)] = createFont(-28, c.FW_BOLD);
     self.measure_dc = c.GetDC(null);
 
     _ = c.ShowWindow(hwnd, c.SW_SHOW);

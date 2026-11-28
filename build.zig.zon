@@ -2,10 +2,11 @@
     .name = .arenacraft,
     .version = "0.15.1",
     .fingerprint = 0xb1ae146a3c6c899c,
+    .minimum_zig_version = "0.17.1",
     .dependencies = .{
         .boost = .{
-            .url = "git+https://github.com/allyourcodebase/boost-libraries-zig#ca6044962f4e8766d0649d02e0872b24b4f16052",
-            .hash = "boost_libraries-1.91.0-frkKHEOEAQDImUU6X9JkdW0lPZxvGmDMy8csmGOCitd7",
+            .url = "git+https://github.com/allyourcodebase/boost-libraries-zig#8d3cafe563034a3359aa03eef1491bd494c579e8",
+            .hash = "boost_libraries-1.91.0-frkKHDiFAQDlcGYw5pnkAZPkGkUM6mn7zveHdWqjdN3-",
         },
     },
     .paths = .{""},

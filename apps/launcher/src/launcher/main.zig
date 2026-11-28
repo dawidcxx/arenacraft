@@ -18,7 +18,7 @@ pub fn main() void {
     // Single I/O instance for the process. `Io.Threaded` runs blocking
     // syscalls on its worker pool; `io.async`/`io.concurrent` let future work
     // (asset downloads, patching) stay off the GUI thread. Windows has no
-    // `Io.Evented` backend in Zig 0.16, so Threaded is the implementation.
+    // `Io.Evented` backend in Zig 0.17, so Threaded is the implementation.
     var threaded: std.Io.Threaded = .init(allocator, .{});
     defer threaded.deinit();
     const io = threaded.io();

@@ -13,6 +13,12 @@ zig build launcher        # zig-out/bin/launcher.exe
 zig build                 # same thing
 ```
 
+`windows.h` is not imported with `@cImport` (removed in Zig 0.17): `build.zig`
+runs the official [translate-c](https://codeberg.org/ziglang/translate-c)
+package to emit the `c` module from a small stub header. The translator is a
+build tool, so it is compiled for the host (even when cross-compiling to
+Windows) and cached after the first build.
+
 The PE uses the GUI subsystem by default. `-Dconsole-window=true` switches to
 the console subsystem, which is the only way to see `std.log` on Windows; wine
 forwards stdout/stderr to the launching terminal either way.
@@ -168,7 +174,7 @@ to compile instead of silently doing nothing.
 ## I/O
 
 `main` creates one `std.Io.Threaded` instance and passes it to the launch code.
-Zig 0.16 has no `Io.Evented` backend on Windows, so `Threaded` is the
+Zig 0.17 has no `Io.Evented` backend on Windows, so `Threaded` is the
 implementation: blocking syscalls run on its worker pool and
 `io.async`/`io.concurrent` give non-blocking work. Long-running work (asset
 downloads, patching) must not be awaited on the GUI thread; see

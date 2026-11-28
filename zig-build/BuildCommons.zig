@@ -6,7 +6,7 @@ const Src = @import("./Src.zig").Src;
 const TestHarness = @import("./TestHarness.zig").TestHarness;
 const cpp = @import("./cppkit-zig/build.zig");
 
-// zig 0.16 ships a ubsan runtime that aborts in Debug; the legacy codebase
+// zig ships a ubsan runtime that aborts in Debug; the legacy codebase
 // (loadlib/mpq readers etc.) contains deliberate unaligned access patterns
 pub const no_ubsan = "-fno-sanitize=undefined";
 
@@ -49,6 +49,14 @@ pub const AcGraph = struct {
             std.log.err("missing build environment variable CPATH; run inside `nix develop` or the Dockerfile builder stage", .{});
             return error.MissingBuildEnvironment;
         }
+
+        // This build script introspects the working tree while configuring:
+        // Src.zig queries each module's `*.cpp` files and the flat include
+        // trees, and reads the git revision. zig 0.17 caches the configure
+        // output, and a cached hit would silently keep a stale source list or
+        // revision, so opt out of the configure cache. Configuring is cheap
+        // (~tens of ms); the maker still caches every compile step normally.
+        b.graph.poisonCache();
 
         const target = b.standardTargetOptions(.{});
         const optimize = b.standardOptimizeOption(.{});
@@ -190,7 +198,9 @@ pub const AcGraph = struct {
         // `zig build run-ac [-- <args>]` - build and run, forwarding args
         const run = bl.addRunArtifact(exe);
         run.step.dependOn(&install.step);
-        if (bl.args) |args| run.addArgs(args);
+        // forwards `zig build run-ac -- <args>` without observing them at
+        // configure time (zig 0.17 passthru args)
+        run.addPassthruArgs();
 
         const run_step = bl.step("run-ac", "Build and run the ac master executable");
         run_step.dependOn(&run.step);

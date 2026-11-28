@@ -36,7 +36,7 @@ template <typename T> using is_enum_v = std::enable_if_t<std::is_enum_v<T>>;
 
 template <typename T> using is_non_string_view_v = std::enable_if_t<!std::is_base_of_v<std::string_view, T>>;
 
-// zig 0.16 ships libc++ whose <chrono> hardcodes long long reps, while on linux
+// zig ships libc++ whose <chrono> hardcodes long long reps, while on linux
 // int64_t is long (on apple they coincide). map the stray types onto the typedefs
 // that have SetValidData instantiations in PreparedStatement.cpp, so call sites
 // can never instantiate a specialization the database lib does not provide.
