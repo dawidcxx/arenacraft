@@ -182,6 +182,7 @@ pub const Deps = struct {
         var sources = cpp.querySources(alloc, io, "deps/utf8cpp/utf8", .{
             .extensions = cpp.Exts.JUST_H,
             .recursive = false,
+            .build = b,
         });
 
         // uses std::string_view (C++17), incompatible with the c++11 set
@@ -226,6 +227,7 @@ pub const Deps = struct {
         var sources = cpp.querySources(alloc, io, "deps/argon2", .{
             .extensions = cpp.Exts.JUST_C,
             .recursive = true,
+            .build = b,
         });
 
         // mirrors deps/argon2/CMakeLists.txt: pick the implementation
@@ -273,6 +275,7 @@ pub const Deps = struct {
         var sources = cpp.querySources(alloc, io, "deps/recastnavigation/Detour/Source", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = false,
+            .build = b,
         });
 
         module.addCSourceFiles(.{
@@ -317,6 +320,7 @@ pub const Deps = struct {
         var sources = cpp.querySources(alloc, io, "deps/fmt/src", .{
             .extensions = cpp.Exts.JUST_CC,
             .recursive = false,
+            .build = b,
         });
 
         sources.filterOut("fmt.cc");
@@ -385,6 +389,7 @@ pub const Deps = struct {
         var sources = cpp.querySources(alloc, io, "deps/libmpq/libmpq", .{
             .extensions = cpp.Exts.JUST_C,
             .recursive = false,
+            .build = b,
         });
 
         module.addCSourceFiles(.{
@@ -401,6 +406,7 @@ pub const Deps = struct {
         var bz_sources = cpp.querySources(alloc, io, "deps/bzip2", .{
             .extensions = cpp.Exts.JUST_C,
             .recursive = false,
+            .build = b,
         });
         module.addCSourceFiles(.{
             .files = bz_sources.get(),
@@ -440,6 +446,7 @@ pub const Deps = struct {
         var sources = cpp.querySources(alloc, io, "deps/recastnavigation/Recast/Source", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = false,
+            .build = b,
         });
 
         module.addCSourceFiles(.{
@@ -579,6 +586,7 @@ pub const Deps = struct {
         var sources = cpp.querySources(alloc, io, "deps/gsoap", .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = false,
+            .build = b,
         });
 
         module.addCSourceFiles(.{

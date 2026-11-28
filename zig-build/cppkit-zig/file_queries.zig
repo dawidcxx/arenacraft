@@ -2,6 +2,7 @@
 // may leak memory
 
 const std = @import("std");
+const Build = std.Build;
 
 pub const Ext = []const []const u8;
 pub const JUST_CPP: Ext = &[_][]const u8{".cpp"};
@@ -12,6 +13,10 @@ pub const JUST_H: Ext = &[_][]const u8{".h"};
 pub const SourceQueryOptions = struct {
     extensions: Ext,
     recursive: bool = false,
+    /// When set, every directory visited by the scan is registered as a
+    /// configure dependency, so a cached configuration is invalidated when the
+    /// set of source files in it changes.
+    build: ?*Build = null,
 };
 
 pub fn querySources(
@@ -24,12 +29,13 @@ pub fn querySources(
     out.ensureTotalCapacity(gpa, 128) catch {
         @panic("OOM");
     };
+    // build paths relative to the working directory, so strip a leading "./"
+    const clean_dir = if (std.mem.startsWith(u8, dir, "./")) dir[2..] else dir;
+    if (options.build) |b| trackDir(b, clean_dir);
     const target_dir = std.Io.Dir.cwd().openDir(io, dir, .{ .iterate = true }) catch |e| {
         std.debug.panic("Failed to openDir(), reason='{}'", .{e});
     };
     defer target_dir.close(io);
-    // build paths relative to the working directory, so strip a leading "./"
-    const clean_dir = if (std.mem.startsWith(u8, dir, "./")) dir[2..] else dir;
     internalScanFilesRecursive(gpa, io, target_dir, clean_dir, &out, options) catch |e| {
         std.debug.panic("Failed to query sources recursively, reason='{}'", .{e});
     };
@@ -162,6 +168,7 @@ fn internalScanFilesRecursive(
         defer gpa.free(entry_path);
 
         if (entry.kind == .directory and options.recursive) {
+            if (options.build) |b| trackDir(b, entry_path);
             const child_dir = try curr.openDir(io, entry.name, .{ .iterate = true });
             defer child_dir.close(io);
             try internalScanFilesRecursive(gpa, io, child_dir, entry_path, output, options);
@@ -175,6 +182,19 @@ fn internalScanFilesRecursive(
             }
         }
     }
+}
+
+/// Register one directory the configure logic has read, so a cached
+/// configuration is only reused while its entries are unchanged. Non-recursive
+/// by design: every visited directory is registered on its own. Metadata-only
+/// (the directory mtime) is enough: it changes on create/delete/rename, which
+/// is exactly what can alter a source or include directory listing - and it is
+/// a single stat instead of re-hashing every entry on every build. This
+/// assumes timestamps are finer-grained than the gap between two builds
+/// (true for ext4/APFS/NTFS, not for FAT or some network mounts).
+fn trackDir(b: *Build, path: []const u8) void {
+    const lazy = if (std.fs.path.isAbsolute(path)) b.graph.cwdRelativePath(path) else b.path(path);
+    b.dependOnDirectoryMetadata(lazy);
 }
 
 fn internalMatchGlob(pattern: []const u8, text: []const u8) bool {

@@ -10,7 +10,7 @@ const Build = std.Build;
 /// Add `dir` and every subdirectory of it as include paths.
 pub fn addFlatIncludes(b: *Build, dir_path: []const u8, module: *Build.Module) !void {
     var dirs: std.ArrayListUnmanaged([]const u8) = .empty;
-    try collectDirsRecursive(b.allocator, b.graph.io, dir_path, &dirs);
+    try collectDirsRecursive(b, b.graph.io, dir_path, &dirs);
 
     // deterministic include order, shallow dirs first - this also makes
     // same-named headers resolve like the CMake build did (e.g.
@@ -28,11 +28,16 @@ pub fn addFlatIncludes(b: *Build, dir_path: []const u8, module: *Build.Module) !
 }
 
 fn collectDirsRecursive(
-    gpa: std.mem.Allocator,
+    b: *Build,
     io: std.Io,
     dir_path: []const u8,
     out: *std.ArrayListUnmanaged([]const u8),
 ) !void {
+    // The include path set is derived from the directory listing, so a cached
+    // configuration must be invalidated when subdirectories appear/disappear.
+    // Directory mtime changes on create/delete/rename (see file_queries.zig).
+    b.dependOnDirectoryMetadata(b.path(dir_path));
+
     const dir = std.Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true }) catch |e| {
         std.debug.panic("Failed to openDir() '{s}', reason='{}'", .{ dir_path, e });
     };
@@ -41,8 +46,8 @@ fn collectDirsRecursive(
     var it = dir.iterate();
     while (try it.next(io)) |entry| {
         if (entry.kind != .directory) continue;
-        const child = try std.fs.path.join(gpa, &.{ dir_path, entry.name });
-        try out.append(gpa, child);
-        try collectDirsRecursive(gpa, io, child, out);
+        const child = try std.fs.path.join(b.allocator, &.{ dir_path, entry.name });
+        try out.append(b.allocator, child);
+        try collectDirsRecursive(b, io, child, out);
     }
 }

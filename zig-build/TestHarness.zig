@@ -61,6 +61,7 @@ pub const TestHarness = struct {
         var tests = cpp.querySources(graph.gpa, graph.io, src_dir, .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
+            .build = bl,
         });
         tests.filterToGlob("*_test.cpp");
         module.addCSourceFiles(.{

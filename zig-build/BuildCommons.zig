@@ -18,6 +18,10 @@ pub const AcGraph = struct {
     gpa: std.mem.Allocator,
     io: std.Io,
 
+    /// Keep zig's configure cache enabled and track the files/directories the
+    /// configure logic reads (`-Dpure-configure`).
+    pure_configure: bool = false,
+
     deps: Deps = .{},
     src: Src = .{},
     tests: TestHarness = .{},
@@ -52,11 +56,16 @@ pub const AcGraph = struct {
 
         // This build script introspects the working tree while configuring:
         // Src.zig queries each module's `*.cpp` files and the flat include
-        // trees, and reads the git revision. zig 0.17 caches the configure
-        // output, and a cached hit would silently keep a stale source list or
-        // revision, so opt out of the configure cache. Configuring is cheap
-        // (~tens of ms); the maker still caches every compile step normally.
-        b.graph.poisonCache();
+        // trees, and reads the git revision. Zig 0.17 caches the configure
+        // output. Two modes:
+        //  * default: opt out of the configure cache (`poisonCache`) - always
+        //    correct, at the cost of re-running configure on every invocation.
+        //  * `-Dpure-configure`: keep the cache and register the exact files
+        //    and directories read during configure as dependencies; any change
+        //    to them (new/removed source, new subdirectory for the flat
+        //    includes, new commit/branch) invalidates the cached configuration.
+        self.pure_configure = b.option(bool, "pure-configure", "Keep the configure cache and track its inputs") orelse false;
+        if (!self.pure_configure) b.graph.poisonCache();
 
         const target = b.standardTargetOptions(.{});
         const optimize = b.standardOptimizeOption(.{});

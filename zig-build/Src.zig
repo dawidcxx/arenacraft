@@ -43,19 +43,99 @@ fn runGit(b: *Build, args: []const []const u8) ?[]const u8 {
     return b.dupe(trimmed);
 }
 
-/// Reads a revision value from the build environment first (Docker passes the
-/// commit in through build args, where .git is not part of the context), then
-/// falls back to git in the source checkout. Missing or broken values become
-/// "Unknown" rather than failing the build.
-fn revisionValue(b: *Build, env_names: []const []const u8, git_args: []const []const u8) []const u8 {
+/// Reads a revision value from a `-D` override first (those are part of zig's
+/// configure cache key), then the build environment (Docker's legacy path,
+/// which has to poison the configure cache), then git in the source checkout.
+/// Missing or broken values become "Unknown" rather than failing the build.
+const RevisionValue = struct {
+    value: []const u8,
+    from_env: bool,
+};
+
+fn revisionValue(
+    b: *Build,
+    option_name: []const u8,
+    option_description: []const u8,
+    env_names: []const []const u8,
+    git_args: []const []const u8,
+) RevisionValue {
+    if (b.option([]const u8, option_name, option_description)) |value| {
+        const trimmed = std.mem.trim(u8, value, " \t\r\n");
+        if (trimmed.len != 0) return .{ .value = b.dupe(trimmed), .from_env = false };
+    }
+
     for (env_names) |name| {
         if (b.graph.environ_map.get(name)) |value| {
             const trimmed = std.mem.trim(u8, value, " \t\r\n");
-            if (trimmed.len != 0) return b.dupe(trimmed);
+            if (trimmed.len != 0) return .{ .value = b.dupe(trimmed), .from_env = true };
         }
     }
 
-    return runGit(b, git_args) orelse unknown_revision;
+    return .{ .value = runGit(b, git_args) orelse unknown_revision, .from_env = false };
+}
+
+/// Register the git files the revision is derived from as configure
+/// dependencies (`-Dpure-configure`). HEAD, the loose ref it points at, the
+/// parent ref directories (entry sets) and packed-refs cover every
+/// commit/checkout/pack operation that can change `git rev-parse HEAD`'s
+/// output. Missing paths cannot be tracked (zig fails configure when a
+/// registered path does not exist), so they are skipped - deleting a tracked
+/// path still forces a reconfigure, and the parent directory entry set catches
+/// a packed ref turning loose again. Any git failure falls back to poisoning
+/// the cache, so an unusual layout can never serve a stale revision.
+fn trackGitRevision(b: *Build) void {
+    const root = b.root.joinString(b.allocator, ".") catch @panic("OOM");
+
+    const out = runGit(b, &.{
+        "rev-parse",
+        "--absolute-git-dir",
+        "--git-common-dir",
+        "--git-path",
+        "HEAD",
+        "--git-path",
+        "packed-refs",
+    }) orelse return b.graph.poisonCache();
+
+    var lines = std.mem.splitScalar(u8, out, '\n');
+    const git_dir = lines.next() orelse return b.graph.poisonCache();
+    const common_dir = lines.next() orelse return b.graph.poisonCache();
+    const head = lines.next() orelse return b.graph.poisonCache();
+    const packed_refs = lines.next() orelse return b.graph.poisonCache();
+    if (git_dir.len == 0 or common_dir.len == 0 or head.len == 0) return b.graph.poisonCache();
+
+    const common_abs = resolvePath(b, root, common_dir);
+    trackExistingFile(b, resolvePath(b, root, head));
+    trackExistingFile(b, resolvePath(b, root, packed_refs));
+
+    const ref = runGit(b, &.{ "symbolic-ref", "-q", "HEAD" }) orelse return;
+    if (!std.mem.startsWith(u8, ref, "refs/")) return;
+
+    const loose_ref = std.fs.path.join(b.allocator, &.{ common_abs, ref }) catch @panic("OOM");
+    trackExistingFile(b, loose_ref);
+
+    var dir: ?[]const u8 = std.fs.path.dirname(loose_ref);
+    while (dir) |d| : (dir = std.fs.path.dirname(d)) {
+        if (d.len <= common_abs.len) break;
+        trackExistingDir(b, d);
+    }
+}
+
+fn resolvePath(b: *Build, root: []const u8, path: []const u8) []const u8 {
+    if (path.len == 0 or std.fs.path.isAbsolute(path)) return path;
+    return std.fs.path.join(b.allocator, &.{ root, path }) catch @panic("OOM");
+}
+
+fn trackExistingFile(b: *Build, abs_path: []const u8) void {
+    const stat = std.Io.Dir.cwd().statFile(b.graph.io, abs_path, .{}) catch return;
+    if (stat.kind != .file) return;
+    b.dependOnFileContents(b.graph.cwdRelativePath(abs_path));
+}
+
+fn trackExistingDir(b: *Build, abs_path: []const u8) void {
+    const stat = std.Io.Dir.cwd().statFile(b.graph.io, abs_path, .{}) catch return;
+    // a ref path component may itself be a file (e.g. a ref named like a dir)
+    if (stat.kind != .directory) return;
+    b.dependOnDirectoryMetadata(b.graph.cwdRelativePath(abs_path));
 }
 
 pub const Src = struct {
@@ -120,10 +200,11 @@ pub const Src = struct {
     /// Query a module's `.cpp` sources, excluding unit-test translation units:
     /// the `Tests.cpp` entrypoint and co-located `*_test.cpp` files belong to
     /// the test harness (TestHarness.zig), never to the module library.
-    fn queryModuleSources(self: *Self, dir: []const u8) cpp.SourceSet {
+    fn queryModuleSources(self: *Self, b: *Build, dir: []const u8) cpp.SourceSet {
         var sources = cpp.querySources(self.back_reference.gpa, self.back_reference.io, dir, .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
+            .build = b,
         });
         sources.filterOutByGlob("*/Tests.cpp");
         sources.filterOutByGlob("*_test.cpp");
@@ -218,15 +299,50 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/common", module);
 
-        const git_hash = revisionValue(b, &.{ "GIT_COMMIT", "ARENACRAFT_GIT_COMMIT" }, &.{ "rev-parse", "HEAD" });
-        const git_branch = revisionValue(b, &.{ "GIT_BRANCH", "ARENACRAFT_GIT_BRANCH" }, &.{ "rev-parse", "--abbrev-ref", "HEAD" });
-        const git_date = revisionValue(b, &.{ "GIT_DATE", "ARENACRAFT_GIT_DATE" }, &.{ "show", "-s", "--format=%cI", "HEAD" });
+        const git_hash = revisionValue(
+            b,
+            "git-commit",
+            "Commit hash for revision.h (overrides GIT_* env)",
+            &.{ "GIT_COMMIT", "ARENACRAFT_GIT_COMMIT" },
+            &.{ "rev-parse", "HEAD" },
+        );
+        const git_branch = revisionValue(
+            b,
+            "git-branch",
+            "Branch name for revision.h (overrides GIT_* env)",
+            &.{ "GIT_BRANCH", "ARENACRAFT_GIT_BRANCH" },
+            &.{ "rev-parse", "--abbrev-ref", "HEAD" },
+        );
+        const git_date = revisionValue(
+            b,
+            "git-date",
+            "Commit date for revision.h (overrides GIT_* env)",
+            &.{ "GIT_DATE", "ARENACRAFT_GIT_DATE" },
+            &.{ "show", "-s", "--format=%cI", "HEAD" },
+        );
+
+        if (git_hash.from_env or git_branch.from_env or git_date.from_env) {
+            // Environment variables are not part of zig's configure cache key.
+            // Poisoning keeps these values out of the cache, but it cannot
+            // reject a configuration cached by an earlier build (that hit
+            // happens before this code runs); anything outside git should pass
+            // -Dgit-commit/-Dgit-branch/-Dgit-date, which are part of the key.
+            if (self.back_reference.pure_configure) {
+                std.log.warn(
+                    "-Dpure-configure with GIT_* revision env is unsafe; pass -Dgit-commit/-Dgit-branch/-Dgit-date",
+                    .{},
+                );
+            }
+            b.graph.poisonCache();
+        } else if (self.back_reference.pure_configure) {
+            trackGitRevision(b);
+        }
 
         const revision_header = std.Build.Step.ConfigHeader.create(b, .{});
         revision_header.include_path = "revision.h";
-        revision_header.addValue("_HASH", []const u8, git_hash);
-        revision_header.addValue("_DATE", []const u8, git_date);
-        revision_header.addValue("_BRANCH", []const u8, git_branch);
+        revision_header.addValue("_HASH", []const u8, git_hash.value);
+        revision_header.addValue("_DATE", []const u8, git_date.value);
+        revision_header.addValue("_BRANCH", []const u8, git_branch.value);
         revision_header.addValue("_CMAKE_COMMAND", []const u8, "zig build");
         revision_header.addValue("_CMAKE_VERSION", []const u8, "0.16.0");
         revision_header.addValue("_CMAKE_HOST_SYSTEM", []const u8, "nix");
@@ -266,7 +382,7 @@ pub const Src = struct {
         // the CMake CollectIncludeDirectories behavior
         try cpp.addFlatIncludes(b, "src/common", module);
 
-        var sources = self.queryModuleSources("src/common");
+        var sources = self.queryModuleSources(b, "src/common");
         sources.filterOut("GitRevision.cpp");
 
         module.addCSourceFiles(.{
@@ -316,7 +432,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/database", module);
 
-        var sources = self.queryModuleSources("src/database");
+        var sources = self.queryModuleSources(b, "src/database");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -361,7 +477,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/shared", module);
 
-        var sources = self.queryModuleSources("src/shared");
+        var sources = self.queryModuleSources(b, "src/shared");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -406,7 +522,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/auth", module);
 
-        var sources = self.queryModuleSources("src/auth");
+        var sources = self.queryModuleSources(b, "src/auth");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -445,7 +561,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/tools", module);
 
-        var sources = self.queryModuleSources("src/tools");
+        var sources = self.queryModuleSources(b, "src/tools");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -487,7 +603,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/game", module);
 
-        var sources = self.queryModuleSources("src/game");
+        var sources = self.queryModuleSources(b, "src/game");
 
         module.addCSourceFiles(.{
             .files = sources.get(),
@@ -534,7 +650,7 @@ pub const Src = struct {
 
         try cpp.addFlatIncludes(b, "src/worldserver", module);
 
-        var sources = self.queryModuleSources("src/worldserver");
+        var sources = self.queryModuleSources(b, "src/worldserver");
 
         module.addCSourceFiles(.{
             .files = sources.get(),

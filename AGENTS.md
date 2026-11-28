@@ -33,10 +33,15 @@ patch the code path instead when the rule is ours.
   `Dockerfile` `ZIG_VERSION` in sync when bumping).
 - `zig build ac` — debug. `-Doptimize=ReleaseFast ac` for actual play.
 - The source revision is generated into `revision.h` at configure time from git
-  (or `GIT_COMMIT`/`GIT_BRANCH`/`GIT_DATE`, used by the Docker build). It is
+  or, outside a checkout (Docker), from `-Dgit-commit`/`-Dgit-branch`/
+  `-Dgit-date`. Prefer the `-D` options over `GIT_COMMIT`/`GIT_BRANCH`/
+  `GIT_DATE`: `-D` is part of zig's configure cache key, env is not. It is
   exposed via `GitRevision`, `--version`, the startup banner and `.server info`.
-  Because of that (and the configure-time source scan) the build script opts out
-  of zig 0.17's configure cache via `Graph.poisonCache`.
+- `zig build` re-runs the configure script on every invocation (it scans `src/`
+  and reads the revision, which zig's configure cache cannot see).
+  `-Dpure-configure` opts into the cache by registering those inputs as
+  dependencies; builds outside git then have to use the `-Dgit-*` options
+  above, because env-provided revisions cannot be tracked by the cache.
 - `zig build run-ac [-- <args>]` — build + run `ac`, forwarding args.
 - `zig build test-build` — dep/link smoke test.
 - CI: `.github/workflows/image.yml` builds the image on pull requests (cache
