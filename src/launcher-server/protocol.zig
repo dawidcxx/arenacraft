@@ -35,6 +35,8 @@ pub const Command = enum {
     ping,
     echo,
     get_file,
+    get_patch,
+    get_manifest,
 };
 
 pub const Request = struct {
@@ -127,7 +129,13 @@ pub const GetFilePayload = struct {
     path: []const u8,
 };
 
-pub const GetFileResponse = struct {
+/// `get_patch`/`get_manifest`: `"D"`, `"R"`, `"patch-D"` or `"patch-R"`.
+pub const PatchPayload = struct {
+    name: []const u8,
+};
+
+/// Every body reply (file, patch archive, manifest) uses the same header.
+pub const SizePayload = struct {
     size: u64,
 };
 

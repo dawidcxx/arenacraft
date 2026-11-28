@@ -183,10 +183,7 @@ bool ConfigMgr::LoadAppConfigs(bool isReload /*= false*/)
   return true;
 }
 
-bool ConfigMgr::Reload()
-{
-  return LoadAppConfigs(true);
-}
+bool ConfigMgr::Reload() { return LoadAppConfigs(true); }
 
 std::optional<std::size_t> ConfigMgr::ApplyEnvFile(std::string const& path)
 {
@@ -367,23 +364,50 @@ std::string ConfigMgr::GetExecutableDir()
   buffer[len] = '\0';
 #endif
 
-  std::error_code ec;
+  std::error_code             ec;
   std::filesystem::path const exePath = std::filesystem::weakly_canonical(buffer, ec);
   return exePath.parent_path().generic_string() + "/";
 }
 
-// Data directory resolved relative to the executable ("data" means
-// <exe dir>/data). Absolute paths are used as-is.
-std::string const ConfigMgr::GetDataPath()
+namespace
 {
-  std::string dataPath = GetOption<std::string>("DataDir", "data");
+// `lexically_normal` keeps a trailing separator (`/srv/data/`); that makes
+// `filename()` empty and `parent_path()` return `/srv/data` instead of `/srv`.
+// Dropping the trailing separator keeps sibling derivation correct.
+std::filesystem::path NormalizePath(std::filesystem::path path)
+{
+  path = path.lexically_normal();
+  if (path.filename().empty())
+    path = path.parent_path();
+  return path;
+}
+} // namespace
 
-  std::error_code ec;
-  std::filesystem::path const path(dataPath);
-  if (!path.is_absolute())
-    dataPath = std::filesystem::weakly_canonical(GetExecutableDir() + dataPath, ec).generic_string();
+// Paths like DataDir and AssetsDir are resolved relative to the executable
+// ("data" means <exe dir>/data). Absolute paths are used as-is.
+std::string ConfigMgr::ResolvePath(std::string const& path)
+{
+  std::error_code             ec;
+  std::filesystem::path const resolved(path);
+  if (resolved.is_absolute())
+    return NormalizePath(resolved).generic_string();
 
-  return dataPath;
+  return NormalizePath(std::filesystem::weakly_canonical(GetExecutableDir() + path, ec)).generic_string();
+}
+
+std::string const ConfigMgr::GetDataPath() { return ResolvePath(GetOption<std::string>("DataDir", "data")); }
+
+std::string const ConfigMgr::GetAssetsPath()
+{
+  // Default to an `assets` sibling of the resolved data directory, so the
+  // usual repo layout (AC_DATA_DIR=../../data) also finds ../../assets
+  // without a second variable. An explicit AssetsDir still wins.
+  std::string const configured = GetOption<std::string>("AssetsDir", "");
+  if (!configured.empty())
+    return ResolvePath(configured);
+
+  std::filesystem::path const dataDir = NormalizePath(std::filesystem::path(GetDataPath()));
+  return (dataDir.parent_path() / "assets").generic_string();
 }
 
 void ConfigMgr::Configure() {}

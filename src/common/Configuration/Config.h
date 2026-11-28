@@ -50,6 +50,11 @@ public:
   std::optional<std::size_t> ApplyEnvFile(std::string const& path);
 
   std::string const GetDataPath();
+  std::string const GetAssetsPath();
+
+  /// Resolves a relative path against the executable directory, matching how
+  /// DataDir/AssetsDir are treated. Absolute paths are returned unchanged.
+  static std::string ResolvePath(std::string const& path);
 
   /// Directory containing the running executable - all relative dir/file
   /// options (DataDir, LogsDir, PidFile, ...) resolve against it at runtime.

@@ -723,6 +723,9 @@ pub const Src = struct {
             .root_source_file = b.path("src/launcher-server/tests.zig"),
             .link_libc = true,
         });
+        // MPQ payloads are compressed with system zlib (mpq.zig). The `ac`
+        // executable already links it; the standalone test binary needs it too.
+        test_module.linkSystemLibrary("zlib", .{});
         const tests = b.addTest(.{ .root_module = test_module });
         const test_run = b.addRunArtifact(tests);
         self.launcher_server.test_run = test_run;

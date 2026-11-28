@@ -61,7 +61,9 @@ patch the code path instead when the rule is ours.
   header.
 - Single unified binary `ac`; subcommands: `ac worldserver`, `ac authserver`,
   `ac launcher-server` (Zig TCP RPC server, `--port`/`--root`, default port
-  5815; see `ai-doc/launcher-server.md`), `ac db-update`, `ac map_extractor`,
+  5815; builds `patch-D.mpq` from `AC_DATA_DIR`/dbc and `patch-R.mpq` from
+  `AC_ASSETS_DIR`; see `ai-doc/launcher-server.md`), `ac db-update`,
+  `ac map_extractor`,
   `ac vmap4_extractor`, `ac vmap4_assembler`, `ac mmaps_generator`.
 - Services: `podman compose up -d db valkey` (mysql 8.0 + valkey).
 - Config is env-only, no .conf files: `./.env` auto-loaded (template

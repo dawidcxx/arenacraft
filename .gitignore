@@ -124,3 +124,8 @@ zig-pkg
 /*.log
 
 /ac
+
+# launcher resource tree: patch-R.mpq is built from this at server startup.
+# Everything except the checked-in sample is local content.
+/assets/*
+!/assets/foo.txt

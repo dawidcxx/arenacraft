@@ -6,6 +6,7 @@
  * LauncherServer.h / main.zig.
  */
 
+#include "Config.h"
 #include "LauncherServer.h"
 
 #include <argparse/argparse.hpp>
@@ -19,6 +20,8 @@ namespace
 constexpr std::uint16_t DefaultPort = 5815;
 
 static_assert(offsetof(LauncherServerConfig, root) == sizeof(void*), "layout must match Config in main.zig");
+static_assert(offsetof(LauncherServerConfig, data_dir) == sizeof(void*) * 2, "layout must match Config in main.zig");
+static_assert(offsetof(LauncherServerConfig, assets_dir) == sizeof(void*) * 3, "layout must match Config in main.zig");
 } // namespace
 
 int launcher_server_main(int argc, char** argv)
@@ -32,6 +35,9 @@ int launcher_server_main(int argc, char** argv)
   parser.add_argument("--root")
       .help("directory exposed by the get_file command (file serving is disabled when unset)")
       .default_value(std::string(""));
+  parser.add_argument("-e", "--env-file")
+      .help("load environment variables from a KEY=VALUE file (default: ./.env if present)")
+      .default_value(std::string(""));
 
   try
   {
@@ -44,6 +50,24 @@ int launcher_server_main(int argc, char** argv)
     return 1;
   }
 
+  std::string const envFile = parser.get<std::string>("--env-file");
+  if (!envFile.empty())
+  {
+    if (!sConfigMgr->ApplyEnvFile(envFile))
+    {
+      std::cerr << "Failed to open env file '" << envFile << "'" << std::endl;
+      return 1;
+    }
+  }
+  else
+  {
+    sConfigMgr->ApplyEnvFile(".env");
+  }
+
+  sConfigMgr->Configure();
+  if (!sConfigMgr->LoadAppConfigs())
+    return 1;
+
   LauncherServerConfig config{};
   config.port = parser.get<std::uint16_t>("--port");
   if (config.port == 0)
@@ -54,6 +78,13 @@ int launcher_server_main(int argc, char** argv)
 
   std::string const root = parser.get<std::string>("--root");
   config.root            = root.empty() ? nullptr : root.c_str();
+
+  // Patch inputs are configured by AC_DATA_DIR / AC_ASSETS_DIR only; keeping
+  // them off the CLI avoids two code paths with different defaults.
+  std::string const dataDir   = sConfigMgr->GetDataPath();
+  std::string const assetsDir = sConfigMgr->GetAssetsPath();
+  config.data_dir             = dataDir.c_str();
+  config.assets_dir           = assetsDir.c_str();
 
   return launcherServerRun(&config);
 }

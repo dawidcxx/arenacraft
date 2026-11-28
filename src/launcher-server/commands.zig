@@ -6,12 +6,16 @@
 
 const std = @import("std");
 
+const patches_mod = @import("patches.zig");
 const protocol = @import("protocol.zig");
 
 pub const Context = struct {
     /// Directory exposed by `get_file`, opened once at startup. `null` means
     /// file serving is disabled (`--root` was not passed).
     root: ?std.Io.Dir,
+    /// Archives built once at startup and served from memory. `null` only in
+    /// unit tests that do not build a `Patches` instance.
+    patches: ?*const patches_mod.Patches = null,
 };
 
 pub const Failure = struct {
@@ -19,17 +23,23 @@ pub const Failure = struct {
     message: []const u8,
 };
 
-pub const FileBody = struct {
+pub const Body = union(enum) {
     file: std.Io.File,
+    /// Owned by the long-lived `Patches`, not by the request arena.
+    memory: []const u8,
+};
+
+pub const BodyResponse = struct {
+    body: Body,
     size: u64,
 };
 
 /// What a command handler can return. `session.zig` turns this into one wire
-/// frame, including the file body when present.
+/// frame, including the body when present.
 pub const Response = union(enum) {
     ping: protocol.PongPayload,
     echo: protocol.EchoResponse,
-    file: FileBody,
+    body: BodyResponse,
     failure: Failure,
 };
 
@@ -43,6 +53,8 @@ pub fn handle(
         .ping => .{ .ping = .{} },
         .echo => echo(request, allocator),
         .get_file => getFile(ctx, io, request, allocator),
+        .get_patch => getPatch(ctx, request, allocator),
+        .get_manifest => getManifest(ctx, request, allocator),
     };
 }
 
@@ -79,7 +91,58 @@ fn getFile(
         return .{ .failure = openFailure(err) };
     };
 
-    return .{ .file = .{ .file = file, .size = stat.size } };
+    return bodyResponse(.{ .file = file }, stat.size);
+}
+
+fn getPatch(
+    ctx: Context,
+    request: protocol.Request,
+    allocator: std.mem.Allocator,
+) Response {
+    return switch (resolveArchive(ctx, request, allocator)) {
+        .archive => |archive| bodyResponse(.{ .memory = archive.bytes }, archive.bytes.len),
+        .response => |response| response,
+    };
+}
+
+fn getManifest(
+    ctx: Context,
+    request: protocol.Request,
+    allocator: std.mem.Allocator,
+) Response {
+    return switch (resolveArchive(ctx, request, allocator)) {
+        .archive => |archive| bodyResponse(.{ .memory = archive.manifest }, archive.manifest.len),
+        .response => |response| response,
+    };
+}
+
+const ResolvedArchive = union(enum) {
+    archive: *const patches_mod.Archive,
+    response: Response,
+};
+
+fn resolveArchive(
+    ctx: Context,
+    request: protocol.Request,
+    allocator: std.mem.Allocator,
+) ResolvedArchive {
+    const patches = ctx.patches orelse return .{ .response = failure(
+        "patches_disabled",
+        "launcher-server has no patch archives (start it with the data and assets directories)",
+    ) };
+
+    const payload = protocol.parsePayload(protocol.PatchPayload, allocator, request.payload) catch |err| {
+        return .{ .response = invalidPayload("expected {\"name\": \"D\" or \"R\"}", err) };
+    };
+    const archive = patches.byName(payload.name) orelse return .{ .response = failure(
+        "unknown_patch",
+        "patch name must be D, R, patch-D or patch-R",
+    ) };
+    return .{ .archive = archive };
+}
+
+fn bodyResponse(body: Body, size: u64) Response {
+    return .{ .body = .{ .body = body, .size = size } };
 }
 
 fn failure(code: []const u8, message: []const u8) Response {

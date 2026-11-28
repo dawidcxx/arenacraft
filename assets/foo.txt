@@ -1,0 +1,6 @@
+Arenacraft launcher resource tree.
+
+This file is checked in so `ac launcher-server` always has at least one input
+for patch-R.mpq and its checksum manifest (patch-R.sum.txt). Drop other client
+resources below assets/; they are ignored by git and packed into patch-R.mpq
+on startup.

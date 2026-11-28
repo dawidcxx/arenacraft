@@ -8,6 +8,7 @@
 const std = @import("std");
 
 const commands = @import("commands.zig");
+const patches_mod = @import("patches.zig");
 const protocol = @import("protocol.zig");
 const Session = @import("session.zig").Session;
 
@@ -17,10 +18,17 @@ pub const Config = extern struct {
     port: u16,
     /// NUL-terminated directory exposed by `get_file`, or null to disable it.
     root: ?[*:0]const u8,
+    /// NUL-terminated `DataDir` (the directory containing `dbc/`).
+    data_dir: ?[*:0]const u8,
+    /// NUL-terminated directory whose tree becomes `patch-R.mpq`.
+    assets_dir: ?[*:0]const u8,
 };
 
 comptime {
-    std.debug.assert(@offsetOf(Config, "root") == @alignOf(usize));
+    const pointer = @alignOf(usize);
+    std.debug.assert(@offsetOf(Config, "root") == pointer);
+    std.debug.assert(@offsetOf(Config, "data_dir") == pointer * 2);
+    std.debug.assert(@offsetOf(Config, "assets_dir") == pointer * 3);
 }
 
 /// std.Io.Threaded allocates its task/thread bookkeeping from here from worker
@@ -34,7 +42,12 @@ const allocator = std.heap.smp_allocator;
 /// `std.Io.Threaded` reports the same error for OOM/thread-spawn failures.
 const max_clients = 1024;
 
-fn handleClient(io: std.Io, stream: std.Io.net.Stream, root: ?std.Io.Dir) std.Io.Cancelable!void {
+fn handleClient(
+    io: std.Io,
+    stream: std.Io.net.Stream,
+    root: ?std.Io.Dir,
+    patches: *const patches_mod.Patches,
+) std.Io.Cancelable!void {
     defer stream.close(io);
 
     var read_buffer: [protocol.max_header_len]u8 = undefined;
@@ -53,7 +66,7 @@ fn handleClient(io: std.Io, stream: std.Io.net.Stream, root: ?std.Io.Dir) std.Io
             return;
         } orelse return;
 
-        const response = commands.handle(.{ .root = root }, io, request, session.allocator());
+        const response = commands.handle(.{ .root = root, .patches = patches }, io, request, session.allocator());
         session.reply(request, response) catch {
             if (writer.err) |write_err| if (write_err == error.Canceled) return error.Canceled;
             // A partial response can no longer be framed reliably.
@@ -83,6 +96,14 @@ fn serve(config: Config) !void {
     defer if (root_dir) |dir| dir.close(io);
     if (root_dir == null) std.log.info("launcher-server file serving disabled (pass --root)", .{});
 
+    const data_dir = if (config.data_dir) |path| std.mem.span(path) else return error.MissingDataDir;
+    const assets_dir = if (config.assets_dir) |path| std.mem.span(path) else return error.MissingAssetsDir;
+    var patches = try patches_mod.Patches.init(io, allocator, .{
+        .data_dir = data_dir,
+        .assets_dir = assets_dir,
+    });
+    defer patches.deinit();
+
     const address: std.Io.net.IpAddress = .{ .ip4 = .unspecified(config.port) };
     // On POSIX this sets SO_REUSEADDR *and* SO_REUSEPORT. SO_REUSEADDR lets a
     // restart bind immediately while old connections sit in TIME_WAIT; the
@@ -110,7 +131,7 @@ fn serve(config: Config) !void {
         // server can no longer hold up its end, so fail loudly instead of
         // silently dropping the connection. At this point nothing was spawned,
         // so there is no group state to unwind.
-        group.concurrent(io, handleClient, .{ io, stream, root_dir }) catch |err| switch (err) {
+        group.concurrent(io, handleClient, .{ io, stream, root_dir, &patches }) catch |err| switch (err) {
             error.ConcurrencyUnavailable => @panic("launcher-server: unable to spawn a client task"),
         };
     }

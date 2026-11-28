@@ -2,8 +2,9 @@
  * C ABI between the `ac` router's C++ argument parsing and the Zig
  * launcher-server implementation (main.zig).
  *
- * Keep the struct layout in sync with `Config` in main.zig (`root` is a
- * NUL-terminated path or null; it follows a naturally aligned pointer).
+ * Keep the struct layout in sync with `Config` in main.zig. `root`,
+ * `data_dir` and `assets_dir` are NUL-terminated paths; the pointers follow
+ * the port and are naturally aligned.
  */
 
 #pragma once
@@ -20,6 +21,8 @@ extern "C"
   {
     std::uint16_t port;
     char const*   root;
+    char const*   data_dir;
+    char const*   assets_dir;
   };
 
   int launcherServerRun(struct LauncherServerConfig const* config);

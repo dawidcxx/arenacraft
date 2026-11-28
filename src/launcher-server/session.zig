@@ -99,19 +99,32 @@ pub const Session = struct {
                 std.debug.assert(request.cmd == .echo);
                 try self.send(request, payload, 0);
             },
-            .file => |body| {
-                std.debug.assert(request.cmd == .get_file);
-                defer body.file.close(self.io);
+            .body => |body| {
+                std.debug.assert(request.cmd == .get_file or
+                    request.cmd == .get_patch or
+                    request.cmd == .get_manifest);
+                defer switch (body.body) {
+                    .file => |file| file.close(self.io),
+                    .memory => {},
+                };
                 try protocol.writeHeader(
                     self.writer,
                     request.id,
                     request.cmd,
-                    protocol.GetFileResponse{ .size = body.size },
+                    protocol.SizePayload{ .size = body.size },
                     body.size,
                 );
-                var buffer: [16 * 1024]u8 = undefined;
-                var file_reader = body.file.reader(self.io, &buffer);
-                try file_reader.interface.streamExact64(self.writer, body.size);
+                switch (body.body) {
+                    .file => |file| {
+                        var buffer: [16 * 1024]u8 = undefined;
+                        var file_reader = file.reader(self.io, &buffer);
+                        try file_reader.interface.streamExact64(self.writer, body.size);
+                    },
+                    .memory => |bytes| {
+                        std.debug.assert(bytes.len == body.size);
+                        try self.writer.writeAll(bytes);
+                    },
+                }
                 try self.writer.flush();
             },
             .failure => |failure| {
@@ -168,6 +181,27 @@ test "session skips unknown commands and rejects request bodies" {
     );
 }
 
+test "session streams an in-memory body" {
+    var reader = std.Io.Reader.fixed("{\"id\":5,\"cmd\":\"get_manifest\",\"payload\":{\"name\":\"D\"}}\n");
+    var out: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer out.deinit();
+
+    var session = Session.init(std.testing.io, &reader, &out.writer, std.testing.allocator);
+    defer session.deinit();
+
+    const request = (try session.next()).?;
+    try session.reply(request, .{ .body = .{
+        .body = .{ .memory = "hash  path\n" },
+        .size = "hash  path\n".len,
+    } });
+
+    try std.testing.expectEqualStrings(
+        "{\"id\":5,\"cmd\":\"get_manifest\",\"ok\":true,\"payload\":{\"size\":11},\"body_len\":11}\n" ++
+            "hash  path\n",
+        out.written(),
+    );
+}
+
 test "unknown command with a body does not desynchronize the stream" {
     var reader = std.Io.Reader.fixed("{\"id\":9,\"cmd\":\"nope\",\"body_len\":3}\nabc\n");
     var out: std.Io.Writer.Allocating = .init(std.testing.allocator);
@@ -191,7 +225,10 @@ test "fuzz session with zig's fuzzer" {
             "{\"cmd\":\"ping\"}\n",
             "{\"id\":1,\"cmd\":\"echo\",\"payload\":{\"text\":\"hello\"}}\n",
             "{\"id\":2,\"cmd\":\"get_file\",\"payload\":{\"path\":\"addons/a.zip\"}}\n",
-            "{\"id\":3,\"cmd\":\"ping\",\"body_len\":1}\n",
+            "{\"id\":3,\"cmd\":\"get_patch\",\"payload\":{\"name\":\"D\"}}\n",
+            "{\"id\":4,\"cmd\":\"get_manifest\",\"payload\":{\"name\":\"patch-R\"}}\n",
+            "{\"id\":5,\"cmd\":\"get_patch\",\"payload\":{\"name\":42}}\n",
+            "{\"id\":6,\"cmd\":\"ping\",\"body_len\":1}\n",
             "not json\n",
             "{\"cmd\":\"nope\"}\n",
             "{\"cmd\":\"nope\",\"body_len\":3}\n",

@@ -3,6 +3,8 @@
 //! command and session logic, not the listener.
 
 test {
+    _ = @import("mpq.zig");
+    _ = @import("patches.zig");
     _ = @import("protocol.zig");
     _ = @import("commands.zig");
     _ = @import("session.zig");
