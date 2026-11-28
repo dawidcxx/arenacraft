@@ -14,8 +14,14 @@ const geometry = @import("geometry.zig");
 const layout = @import("layout.zig");
 
 pub const Font = enum(u32) {
+    /// Default control text.
     body = 0,
-    title = 1,
+    /// Secondary detail text, used for the realm footer and the tagline.
+    small = 1,
+    /// Emphasised secondary text (the realm host in the footer).
+    small_bold = 2,
+    /// Window and view titles.
+    title = 3,
 };
 
 pub const Options = struct {

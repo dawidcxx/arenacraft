@@ -345,53 +345,77 @@ test "begin resets the previous frame" {
     try std.testing.expectEqual(@as(usize, 1), layout.nodes().len);
 }
 
-test "launcher-shaped layout" {
+test "launcher home column" {
     var layout = clay.Layout.init(std.testing.allocator, measure, null);
     defer layout.deinit();
 
-    try layout.begin(.{ .width = 400, .height = 300 });
+    // The launcher's default client size.
+    try layout.begin(.{ .width = 360, .height = 520 });
     _ = try layout.open(.{ .layout = .{
         .sizing = .{ .width = growAxis(), .height = growAxis() },
-        .padding = .all(24),
-        .child_gap = 16,
+        .padding = .all(20),
+        .child_gap = 14,
         .direction = .top_to_bottom,
     } });
 
-    // Header: a title, left aligned.
-    _ = try layout.open(.{ .layout = .{ .child_gap = 10, .child_alignment = .{ .y = .center } } });
-    _ = try layout.text("Title", .{});
+    // Header, centred over the column.
+    const header = try layout.open(.{ .layout = .{
+        .sizing = .{ .width = growAxis() },
+        .child_gap = 2,
+        .direction = .top_to_bottom,
+        .child_alignment = .{ .x = .center },
+    } });
+    const title = try layout.text("Arenacraft Launcher", .{ .wrap = .none });
+    const tagline = try layout.text("WHERE THE CHALLENGE BEGINS", .{ .wrap = .none });
     try layout.close();
-
-    _ = try layout.text("Hello", .{ .wrap = .words });
 
     // Spacer that pushes the actions to the bottom.
-    _ = try layout.open(.{ .layout = .{ .sizing = .{ .height = growAxis() } } });
+    const spacer = try layout.open(.{ .layout = .{ .sizing = .{ .height = growAxis() } } });
     try layout.close();
 
-    // Actions, right aligned.
-    _ = try layout.open(.{ .layout = .{
+    // Three full-width, equally tall actions.
+    const actions = try layout.open(.{ .layout = .{
+        .sizing = .{ .width = growAxis() },
         .child_gap = 10,
-        .child_alignment = .{ .x = .right },
+        .direction = .top_to_bottom,
     } });
-    _ = try layout.open(.{ .layout = .{ .sizing = boxed(60, 30) } });
+    const launch = try layout.open(.{ .layout = .{ .sizing = .{ .width = growAxis(), .height = fixed(48) } } });
     try layout.close();
-    _ = try layout.open(.{ .layout = .{ .sizing = boxed(120, 30) } });
+    const change_realm = try layout.open(.{ .layout = .{ .sizing = .{ .width = growAxis(), .height = fixed(48) } } });
     try layout.close();
+    const quit = try layout.open(.{ .layout = .{ .sizing = .{ .width = growAxis(), .height = fixed(48) } } });
+    try layout.close();
+    try layout.close();
+
+    // Footer: the realm, small and left aligned on the bottom edge.
+    const footer = try layout.open(.{ .layout = .{
+        .sizing = .{ .width = growAxis() },
+        .child_gap = 4,
+        .child_alignment = .{ .y = .center },
+    } });
+    const realm_caption = try layout.text("realm:", .{ .wrap = .none });
+    const realm_host = try layout.text("logon.arenacraft.fun", .{ .wrap = .none });
     try layout.close();
 
     try layout.close();
     try layout.compute();
 
-    const nodes = layout.nodes();
+    // Header wraps the centred title and tagline.
+    try expectRect(.{ .x = 20, .y = 20, .width = 320, .height = 42 }, layout.bounds(header));
+    try expectRect(.{ .x = 85, .y = 20, .width = 190, .height = 20 }, layout.bounds(title));
+    try expectRect(.{ .x = 50, .y = 42, .width = 260, .height = 20 }, layout.bounds(tagline));
 
-    // column fills the layout and pads everything by 24.
-    try expectRect(.{ .x = 0, .y = 0, .width = 400, .height = 300 }, nodes[1].bounds);
-    try expectRect(.{ .x = 24, .y = 24, .width = 50, .height = 20 }, nodes[2].bounds); // header row
-    try expectRect(.{ .x = 24, .y = 60, .width = 50, .height = 20 }, nodes[4].bounds); // description
-    // The spacer absorbs the remaining 134px between description and actions.
-    try expectRect(.{ .x = 24, .y = 96, .width = 0, .height = 134 }, nodes[5].bounds);
-    // Actions sit on the bottom padding, right aligned inside their row.
-    try expectRect(.{ .x = 24, .y = 246, .width = 190, .height = 30 }, nodes[6].bounds);
-    try expectRect(.{ .x = 24, .y = 246, .width = 60, .height = 30 }, nodes[7].bounds);
-    try expectRect(.{ .x = 94, .y = 246, .width = 120, .height = 30 }, nodes[8].bounds);
+    // The spacer absorbs the 212px between the header and the actions.
+    try expectRect(.{ .x = 20, .y = 76, .width = 0, .height = 212 }, layout.bounds(spacer));
+
+    // The actions stretch across the column and end above the footer.
+    try expectRect(.{ .x = 20, .y = 302, .width = 320, .height = 164 }, layout.bounds(actions));
+    try expectRect(.{ .x = 20, .y = 302, .width = 320, .height = 48 }, layout.bounds(launch));
+    try expectRect(.{ .x = 20, .y = 360, .width = 320, .height = 48 }, layout.bounds(change_realm));
+    try expectRect(.{ .x = 20, .y = 418, .width = 320, .height = 48 }, layout.bounds(quit));
+
+    // The realm sits on the bottom-left padding edge.
+    try expectRect(.{ .x = 20, .y = 480, .width = 320, .height = 20 }, layout.bounds(footer));
+    try expectRect(.{ .x = 20, .y = 480, .width = 60, .height = 20 }, layout.bounds(realm_caption));
+    try expectRect(.{ .x = 84, .y = 480, .width = 200, .height = 20 }, layout.bounds(realm_host));
 }

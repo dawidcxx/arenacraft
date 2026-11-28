@@ -9,10 +9,10 @@
 //!     #set realmlist logon.warmane.com
 //!     #set realmlist 62.83.16.59
 //!
-//! The launcher treats those lines as its realm list. Switching realms rewrites
-//! every realmlist file of the installation with the selected host active and
-//! keeps every host it has seen as a commented-out line, so the player can go
-//! back without retyping an address.
+//! The launcher treats those lines as its realm list. Committing an edited list
+//! (the switcher's Apply) rewrites every realmlist file of the installation with
+//! the selected host active and keeps every host it has seen as a commented-out
+//! line, so the player can go back without retyping an address.
 //!
 //! Everything here is plain `std` (no Win32), which is why the module has its
 //! own native test target in `build.zig`.
@@ -61,6 +61,28 @@ pub const List = struct {
         for (self.hidden.items) |host| self.allocator.free(host);
         self.hidden.deinit(self.allocator);
         self.* = undefined;
+    }
+
+    /// Deep copy, including the hidden markers and the active index. The realm
+    /// switcher edits a clone and only adopts it on Apply, so Cancel cannot
+    /// leave half-applied state behind.
+    pub fn clone(self: *const List) !List {
+        var copy = List.init(self.allocator);
+        errdefer copy.deinit();
+
+        try copy.hosts.ensureTotalCapacity(self.allocator, self.hosts.items.len);
+        for (self.hosts.items) |host| {
+            copy.hosts.appendAssumeCapacity(try self.allocator.dupe(u8, host));
+        }
+
+        try copy.hidden.ensureTotalCapacity(self.allocator, self.hidden.items.len);
+        for (self.hidden.items) |host| {
+            copy.hidden.appendAssumeCapacity(try self.allocator.dupe(u8, host));
+        }
+
+        copy.active = self.active;
+        copy.has_active = self.has_active;
+        return copy;
     }
 
     /// Remember a host, ignoring case, and return its index.
@@ -711,6 +733,32 @@ test "renaming a preset hides its old address across restarts" {
     try reread.ensurePresets();
     try std.testing.expectEqual(@as(usize, 2), reread.hosts.items.len);
     try std.testing.expectEqualStrings("logon.example.com", reread.activeHost());
+}
+
+test "clone is independent of the committed list" {
+    var original = List.init(std.testing.allocator);
+    defer original.deinit();
+
+    _ = try original.add("logon.arenacraft.fun");
+    _ = try original.add("logon.warmane.com");
+    _ = try original.setActive("logon.warmane.com");
+    try original.hide("old.example.com");
+
+    var copy = try original.clone();
+    defer copy.deinit();
+
+    try std.testing.expectEqual(@as(usize, 2), copy.hosts.items.len);
+    try std.testing.expectEqual(@as(usize, 1), copy.hidden.items.len);
+    try std.testing.expectEqualStrings("logon.warmane.com", copy.activeHost());
+
+    // Editing the draft must not touch the committed list.
+    _ = try copy.setActive("logon.arenacraft.fun");
+    _ = try copy.remove(1);
+    try copy.hide("another.example.com");
+
+    try std.testing.expectEqual(@as(usize, 2), original.hosts.items.len);
+    try std.testing.expectEqualStrings("logon.warmane.com", original.activeHost());
+    try std.testing.expectEqual(@as(usize, 1), original.hidden.items.len);
 }
 
 test "validate accepts hosts and IPv4, rejects file syntax" {

@@ -11,9 +11,11 @@
 //! into the engine and applies the resulting rects to the controls in one
 //! `DeferWindowPos` batch.
 //!
-//! Out of memory panics here (`catch unreachable`), so only real failures
-//! (a destroyed window, a native control that cannot be created, a bad
-//! layout) appear in error sets.
+//! Declaration calls are infallible: `container`, the `add*` methods and
+//! `endLayout` assert their invariants in debug builds and panic on a failed
+//! native control, so view code never carries layout or control-creation
+//! errors. `create` (window creation) and `spawn` (starting a task) still
+//! return errors.
 //!
 //! Every widget kind goes through the same three steps (see `addButton`):
 //! `createChild` makes the native control, the widget struct is allocated, and
@@ -46,6 +48,15 @@ const class_name = "ArenacraftGuiWindow";
 /// Neutral background behind the widgets.
 const background_color: c.COLORREF = 0x00f0f0f0;
 
+/// Top-level window style: a normal resizable window that clips its children.
+const window_style: c.DWORD = @intCast(c.WS_OVERLAPPEDWINDOW | c.WS_CLIPCHILDREN);
+
+/// Face used by every control. Tahoma ships with every supported Windows and
+/// is bundled by Wine; Segoe UI is not, and a substituted face can render with
+/// different metrics than the measuring code assumed. Only the normal and bold
+/// weights are requested so GDI never has to synthesise an in-between weight.
+const font_face = std.unicode.utf8ToUtf16LeStringLiteral("Tahoma");
+
 /// `IDC_ARROW`, spelled out because MinGW expresses it through
 /// `MAKEINTRESOURCE`, which `@cImport` cannot translate.
 const idc_arrow = 32512;
@@ -57,7 +68,7 @@ const icon_resource_id = 1;
 /// Private message that carries a heap-allocated `Callback` to the GUI thread.
 const wm_post: c.UINT = c.WM_APP;
 
-const font_count = 2;
+const font_count = @typeInfo(label.Font).@"enum".fields.len;
 
 var class_registered = false;
 var class_brush: c.HBRUSH = null;
@@ -70,8 +81,13 @@ pub const Options = struct {
     /// Runs the window's background tasks; must outlive the window.
     io: std.Io,
     title: []const u8 = "Arenacraft",
-    /// Client-area size in pixels (at the system's primary DPI).
-    size: geometry.Size = .{ .width = 640, .height = 400 },
+    /// Initial client-area size in pixels (at the system's primary DPI). The
+    /// launcher passes its own compact, phone-shaped size; this is only a
+    /// fallback.
+    size: geometry.Size = .{ .width = 360, .height = 520 },
+    /// Optional minimum client-area size. The player cannot drag the window
+    /// below it; the compact column needs a floor to stay readable.
+    min_size: ?geometry.Size = null,
 };
 
 /// A widget placed in the layout tree. The union is the single place that
@@ -141,6 +157,8 @@ pub const Dispatcher = struct {
 pub const Window = struct {
     hwnd: c.HWND = null,
     io: std.Io,
+    /// Minimum client size enforced through `WM_GETMINMAXINFO`, if any.
+    min_size: ?geometry.Size = null,
     /// Background tasks; cancelled and awaited when the window is destroyed.
     tasks: std.Io.Group = .init,
     controls: std.ArrayListUnmanaged(Control) = .empty,
@@ -162,9 +180,12 @@ pub const Window = struct {
     // -- Layout recording ---------------------------------------------------
 
     /// Start recording a layout tree. Call `endLayout` after declaring it.
-    pub fn beginLayout(self: *Window) !void {
-        if (self.hwnd == null) return error.WindowDestroyed;
-        if (self.recording) return error.LayoutAlreadyStarted;
+    /// Infallible so the two can bracket a tree with `defer`: a missing window
+    /// or an already-recording tree is a programmer error, not a runtime
+    /// failure.
+    pub fn beginLayout(self: *Window) void {
+        std.debug.assert(self.hwnd != null);
+        std.debug.assert(!self.recording);
         self.plan.clearRetainingCapacity();
         self.placements.clearRetainingCapacity();
         self.depth = 0;
@@ -172,16 +193,16 @@ pub const Window = struct {
     }
 
     /// Open a container. Pair with `endContainer`.
-    pub fn container(self: *Window, style: layout.Container) !void {
-        if (!self.recording) return error.LayoutNotStarted;
+    pub fn container(self: *Window, style: layout.Container) void {
+        self.assertRecording();
         self.plan.append(allocator, .{ .open = style }) catch unreachable;
         self.depth += 1;
     }
 
     /// Close the most recent container opened with `container`.
-    pub fn endContainer(self: *Window) !void {
-        if (!self.recording) return error.LayoutNotStarted;
-        if (self.depth == 0) return error.UnbalancedLayout;
+    pub fn endContainer(self: *Window) void {
+        self.assertRecording();
+        std.debug.assert(self.depth > 0);
         self.plan.append(allocator, .close) catch unreachable;
         self.depth -= 1;
     }
@@ -189,32 +210,35 @@ pub const Window = struct {
     /// Empty element that soaks up the leftover space of the open container
     /// along `axis` (`.left_to_right` for a row, `.top_to_bottom` for a column),
     /// pushing the siblings after it to the far edge.
-    pub fn spacer(self: *Window, axis: layout.Direction) !void {
-        try self.container(.{ .sizing = switch (axis) {
+    pub fn spacer(self: *Window, axis: layout.Direction) void {
+        self.container(.{ .sizing = switch (axis) {
             .left_to_right => .grow_width,
             .top_to_bottom => .grow_height,
         } });
-        try self.endContainer();
+        self.endContainer();
     }
 
     /// Finish recording and apply the layout. The tree is replayed on resize.
-    pub fn endLayout(self: *Window) error{ LayoutNotStarted, UnbalancedLayout, InvalidPercent }!void {
-        if (!self.recording) return error.LayoutNotStarted;
-        const balanced = self.depth == 0;
+    /// Infallible like the declarations: leaving the bracket without closing
+    /// every container is a bug, so debug builds stop here instead of applying
+    /// a half-built tree.
+    pub fn endLayout(self: *Window) void {
+        std.debug.assert(self.recording);
+        std.debug.assert(self.depth == 0);
         self.recording = false;
-        self.depth = 0;
-        if (!balanced) return error.UnbalancedLayout;
         self.ready = true;
-        try self.relayout();
+        // A percent axis outside 0..1 is a declaration bug, not a recoverable
+        // runtime failure.
+        self.relayout() catch unreachable;
     }
 
     // -- Widgets ------------------------------------------------------------
 
     /// Add a push button as a child of the currently open container.
-    pub fn addButton(self: *Window, options: button.Options) !*button.Button {
-        try self.requireRecording();
+    pub fn addButton(self: *Window, options: button.Options) *button.Button {
+        self.assertRecording();
 
-        const child = try self.createChild(
+        const child = self.createChild(
             std.unicode.utf8ToUtf16LeStringLiteral("BUTTON"),
             options.text,
             c.WS_TABSTOP | c.BS_PUSHBUTTON,
@@ -245,10 +269,10 @@ pub const Window = struct {
 
     /// Add a single-selection list as a child of the currently open container.
     /// `onSelect` fires when a row is picked; see `listbox.zig`.
-    pub fn addListBox(self: *Window, options: listbox.Options) !*listbox.ListBox {
-        try self.requireRecording();
+    pub fn addListBox(self: *Window, options: listbox.Options) *listbox.ListBox {
+        self.assertRecording();
 
-        const child = try self.createChild(
+        const child = self.createChild(
             std.unicode.utf8ToUtf16LeStringLiteral("LISTBOX"),
             "",
             c.WS_TABSTOP | c.WS_VSCROLL | c.WS_BORDER | c.LBS_NOTIFY | c.LBS_NOINTEGRALHEIGHT,
@@ -271,10 +295,10 @@ pub const Window = struct {
 
     /// Add a single-line text field as a child of the currently open container.
     /// `onEnter` fires when Enter is pressed; see `edit.zig`.
-    pub fn addEdit(self: *Window, options: edit.Options) !*edit.Edit {
-        try self.requireRecording();
+    pub fn addEdit(self: *Window, options: edit.Options) *edit.Edit {
+        self.assertRecording();
 
-        const child = try self.createChild(
+        const child = self.createChild(
             std.unicode.utf8ToUtf16LeStringLiteral("EDIT"),
             options.text,
             c.WS_TABSTOP | c.WS_BORDER | c.ES_LEFT | c.ES_AUTOHSCROLL,
@@ -295,13 +319,24 @@ pub const Window = struct {
     }
 
     /// Add a static text label as a child of the currently open container.
-    pub fn addLabel(self: *Window, options: label.Options) !*label.Label {
-        try self.requireRecording();
+    pub fn addLabel(self: *Window, options: label.Options) *label.Label {
+        self.assertRecording();
 
-        const child = try self.createChild(
+        // A native STATIC wraps at word boundaries with `SS_LEFT`. For a
+        // single-line label that is a trap: if the measured width is a pixel
+        // short, the last word moves to a second line that the one-line control
+        // clips, so the label looks truncated ("Arenacraft Launcher" renders as
+        // "Arenacraft"). `.wrap = .none` therefore has to disable wrapping in
+        // the control too. `SS_NOPREFIX` keeps a literal `&` in the text.
+        const static_style: c.DWORD = @intCast(c.SS_NOPREFIX | switch (options.wrap) {
+            .none => c.SS_LEFTNOWORDWRAP,
+            .words, .newlines => c.SS_LEFT,
+        });
+
+        const child = self.createChild(
             std.unicode.utf8ToUtf16LeStringLiteral("STATIC"),
             options.text,
-            c.SS_LEFT,
+            static_style,
             options.font,
         );
 
@@ -484,9 +519,12 @@ pub const Window = struct {
         }
     }
 
-    fn requireRecording(self: *Window) error{ WindowDestroyed, LayoutNotStarted }!void {
-        if (self.hwnd == null) return error.WindowDestroyed;
-        if (!self.recording) return error.LayoutNotStarted;
+    /// Invariants every declaration has: the window is alive and a tree is
+    /// being recorded. Violating them is a bug in the caller, not a runtime
+    /// condition, so debug builds stop here instead of returning an error.
+    fn assertRecording(self: *const Window) void {
+        std.debug.assert(self.hwnd != null);
+        std.debug.assert(self.recording);
     }
 
     /// Create a visible native child with the font of `font` applied.
@@ -497,13 +535,13 @@ pub const Window = struct {
         text: []const u8,
         extra_style: anytype,
         font: label.Font,
-    ) error{ControlCreationFailed}!c.HWND {
+    ) c.HWND {
         const wide = text_util.toWide(allocator, text);
         defer allocator.free(wide);
 
         // Child controls take their id from the HMENU parameter; it is null
         // here because notifications are routed by the child HWND in lParam.
-        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | extra_style);
+        const style: c.DWORD = @intCast(c.WS_CHILD | c.WS_VISIBLE | @as(c_long, @intCast(extra_style)));
         const child = c.CreateWindowExW(
             0,
             class,
@@ -517,8 +555,7 @@ pub const Window = struct {
             null,
             c.GetModuleHandleA(null),
             null,
-        );
-        if (child == null) return error.ControlCreationFailed;
+        ) orelse @panic("gui: could not create a native child control");
 
         const handle = self.fonts[@intFromEnum(font)];
         if (handle != null) {
@@ -597,17 +634,16 @@ pub const Window = struct {
                 .sizing = layout.toClaySizing(widget.sizing),
             } }),
             .label => |widget| node: {
-                // The text sits inside a container so labels accept the same
-                // sizing options as any other widget; a fit container around a
-                // text element is exactly the text's size.
-                //
-                // STATIC wraps at word boundaries, and rounding the container
-                // down by half a pixel is enough to push the last word onto a
-                // second line that the one-line control clips, so keep a pixel
-                // of slack on the right and bottom.
+                // A STATIC clips its text at the control's right edge, and
+                // `GetTextExtentPoint32W` reports glyph advances without the
+                // final glyph's overhang. Leave room for that, and a little
+                // more for uppercase text: its glyphs sit tighter against the
+                // advance edge, so a cap-height label loses the most pixels.
+                // Bottom slack covers the descender/rounding edge.
+                const right_slack: f32 = if (isUppercase(widget.text)) 8 else 4;
                 const node = try self.engine.open(.{ .layout = .{
                     .sizing = layout.toClaySizing(widget.sizing),
-                    .padding = .{ .right = 1, .bottom = 1 },
+                    .padding = .{ .right = right_slack, .bottom = 2 },
                 } });
                 _ = try self.engine.text(widget.text, .{
                     .wrap = layout.toClayWrap(widget.wrap),
@@ -701,6 +737,18 @@ fn selectListItem(target: *listbox.ListBox, index: usize) void {
     _ = c.SendMessageW(target.hwnd, c.LB_SETCURSEL, @intCast(index), 0);
 }
 
+/// True when `text` is set in caps: it has at least one ASCII letter and no
+/// lowercase letters. Such a label needs more right-side clip room; see
+/// `declare`.
+fn isUppercase(text: []const u8) bool {
+    var has_upper = false;
+    for (text) |byte| {
+        if (std.ascii.isLower(byte)) return false;
+        if (std.ascii.isUpper(byte)) has_upper = true;
+    }
+    return has_upper;
+}
+
 /// Give `.fit` buttons a minimum size derived from their measured label, so the
 /// native control always has room for its text.
 fn buttonDeclaration(widget: *button.Button) clay.Declaration {
@@ -773,7 +821,11 @@ pub fn create(options: Options) !*Window {
     try ensureClass();
 
     const self = try allocator.create(Window);
-    self.* = .{ .io = options.io, .engine = clay.Layout.init(allocator, measureText, self) };
+    self.* = .{
+        .io = options.io,
+        .min_size = options.min_size,
+        .engine = clay.Layout.init(allocator, measureText, self),
+    };
     errdefer {
         self.engine.deinit();
         allocator.destroy(self);
@@ -787,7 +839,7 @@ pub fn create(options: Options) !*Window {
         .right = options.size.width,
         .bottom = options.size.height,
     };
-    const style: c.DWORD = @intCast(c.WS_OVERLAPPEDWINDOW | c.WS_CLIPCHILDREN);
+    const style: c.DWORD = window_style;
     _ = c.AdjustWindowRect(&rect, style, c.FALSE);
     const outer_width = rect.right - rect.left;
     const outer_height = rect.bottom - rect.top;
@@ -813,7 +865,10 @@ pub fn create(options: Options) !*Window {
     );
     if (hwnd == null) return error.WindowCreationFailed;
     self.fonts[@intFromEnum(label.Font.body)] = createFont(-18, c.FW_NORMAL);
-    self.fonts[@intFromEnum(label.Font.title)] = createFont(-30, c.FW_BOLD);
+    self.fonts[@intFromEnum(label.Font.small)] = createFont(-16, c.FW_NORMAL);
+    self.fonts[@intFromEnum(label.Font.small_bold)] = createFont(-16, c.FW_BOLD);
+    // Sized so "Arenacraft Launcher" stays on one line in the minimum window.
+    self.fonts[@intFromEnum(label.Font.title)] = createFont(-28, c.FW_BOLD);
     self.measure_dc = c.GetDC(null);
 
     _ = c.ShowWindow(hwnd, c.SW_SHOW);
@@ -900,7 +955,7 @@ fn createFont(height: i32, weight: c_int) c.HFONT {
         c.CLIP_DEFAULT_PRECIS,
         c.CLEARTYPE_QUALITY,
         c.DEFAULT_PITCH,
-        std.unicode.utf8ToUtf16LeStringLiteral("Segoe UI"),
+        font_face,
     );
 }
 
@@ -934,6 +989,24 @@ fn windowProc(hwnd: c.HWND, message: c.UINT, wparam: c.WPARAM, lparam: c.LPARAM)
         return c.DefWindowProcA(hwnd, message, wparam, lparam);
 
     switch (message) {
+        c.WM_GETMINMAXINFO => {
+            // Keep the compact column readable: translate the minimum client
+            // size into the outer window size (caption and borders included).
+            if (window.min_size) |minimum| {
+                var rect = c.RECT{
+                    .left = 0,
+                    .top = 0,
+                    .right = minimum.width,
+                    .bottom = minimum.height,
+                };
+                _ = c.AdjustWindowRect(&rect, window_style, c.FALSE);
+
+                const info: *c.MINMAXINFO = @ptrFromInt(@as(usize, @bitCast(lparam)));
+                info.ptMinTrackSize.x = rect.right - rect.left;
+                info.ptMinTrackSize.y = rect.bottom - rect.top;
+                return 0;
+            }
+        },
         c.WM_SIZE => {
             // Can fail only on allocation failure; the previous layout stays
             // applied, which is the least-bad outcome for a resize event.

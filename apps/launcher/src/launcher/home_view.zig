@@ -1,5 +1,10 @@
-//! Home view: the active realm sits in the bottom-left corner, the game
-//! actions on the right.
+//! Home view: a compact, mobile-style column. The title and tagline sit at the
+//! top, the game actions are full-width buttons stacked above the bottom edge,
+//! and the realm the launch will use sits in the bottom-left corner as small
+//! secondary text.
+//!
+//! The window is narrow on purpose: every action is a single column, so the
+//! player never has to scan a row of differently sized buttons.
 
 const gui = @import("gui");
 
@@ -8,37 +13,62 @@ const game = @import("game.zig");
 
 const App = app_mod.App;
 
-pub fn build(app: *App) !void {
+/// Height of the action buttons. Generous enough to read as a phone launcher
+/// button instead of a dialog control.
+const action_height = 48;
+
+pub fn build(app: *App) void {
     const window = app.window;
 
-    _ = try window.addLabel(.{ .text = "Arenacraft", .font = .title });
-    _ = try window.addLabel(.{ .text = "World of Warcraft 3.3.5a" });
+    // Header: the product name and a tagline picked for this start.
+    window.container(.{
+        .sizing = .grow_width,
+        .gap = 2,
+        .direction = .top_to_bottom,
+        .alignment = .{ .x = .center },
+    });
+    _ = window.addLabel(.{ .text = "Arenacraft Launcher", .font = .title, .wrap = .none });
+    _ = window.addLabel(.{ .text = app.tagline, .font = .small, .wrap = .none });
+    window.endContainer();
 
-    try window.spacer(.top_to_bottom);
+    // Keep the actions on the bottom edge, like a phone's home screen.
+    window.spacer(.top_to_bottom);
 
-    try window.container(.{
+    // Actions, stacked vertically and sharing the full width.
+    window.container(.{
         .sizing = .grow_width,
         .gap = 10,
-        .alignment = .{ .y = .center },
+        .direction = .top_to_bottom,
     });
-    _ = try window.addLabel(.{ .text = app.realms.activeHost(), .wrap = .none });
-    _ = try window.addButton(.{
-        .text = "Change Realm",
-        .sizing = .fixed(120, 30),
-        .onClick = .bind(app, onChangeRealm),
-    });
-    try window.spacer(.left_to_right);
-    _ = try window.addButton(.{
+    _ = window.addButton(.{
         .text = "Launch Game",
-        .sizing = .fixed(140, 30),
+        .sizing = .fixedHeight(action_height),
         .onClick = .bind(app, onLaunch),
     });
-    _ = try window.addButton(.{
+    _ = window.addButton(.{
+        .text = "Change Realm",
+        .sizing = .fixedHeight(action_height),
+        .onClick = .bind(app, onChangeRealm),
+    });
+    _ = window.addButton(.{
         .text = "Quit",
-        .sizing = .fixed(70, 30),
+        .sizing = .fixedHeight(action_height),
         .onClick = .bind(app, onQuit),
     });
-    try window.endContainer();
+    window.endContainer();
+
+    // Footer: the realm the launch will connect to, small and left aligned.
+    // Both labels use `.wrap = .none`, so a long address is clipped instead of
+    // breaking onto a second line.
+    window.container(.{
+        .sizing = .grow_width,
+        .gap = 4,
+        .direction = .left_to_right,
+        .alignment = .{ .y = .center },
+    });
+    _ = window.addLabel(.{ .text = "realm:", .font = .small, .wrap = .none });
+    _ = window.addLabel(.{ .text = app.realms.activeHost(), .font = .small_bold, .wrap = .none });
+    window.endContainer();
 }
 
 fn onChangeRealm(app: *App) void {

@@ -26,11 +26,17 @@ src/launcher app behaviour (realm selection, launch Wow.exe)
 - Launcher code layout: `main.zig` (startup), `app.zig` (`App`, view switching,
   `alert`), `home_view.zig`, `realms_view.zig` (one file per view: its `build`
   and callbacks).
+- Widget and container declarations are infallible: `beginLayout`/`endLayout`,
+  `container`/`endContainer`, `spacer` and the `add*` methods assert their
+  invariants in debug builds and panic when a native control cannot be created.
+  Views therefore declare their tree without any `try`. `createWindow` still
+  returns errors (reported with a message box before the window exists), as does
+  `spawn` when a task cannot be started.
 - Out of memory panics (`catch unreachable`) in `gui` and in the launcher app
-  layer (`main`, `app`, views), so their error sets only carry real failures
-  and call sites stay free of OOM branches. `realmlist.zig`, `game.zig`,
-  `clay` and `lib` still propagate it. `gui/text.zig` treats invalid WTF-8 as a
-  bug the same way.
+  layer (`main`, `app`, views), so their error sets only carry real failures and
+  call sites stay free of OOM branches. `realmlist.zig`, `game.zig`, `clay` and
+  `lib` still propagate it. `gui/text.zig` treats invalid WTF-8 as a bug the
+  same way.
 - Widget callbacks are bound with `.bind(context_ptr, fn(*T) void)`
   (`gui/callback.zig`); never write `@ptrCast(@alignCast(...))` at call sites.
 - Window internals keep one `controls` list of a `Control` union; adding a
@@ -53,17 +59,23 @@ to `DefWindowProcA` instead of returning `TRUE` itself. Returning early skips
 the default proc, which is what applies the title passed to `CreateWindowExA`;
 the window then has an empty caption even though the title was supplied.
 
-Labels are native `STATIC` controls. Two things keep their text intact when
-`setLabelText` changes it:
+Labels are native `STATIC` controls. Three things keep their text intact:
 
 - `applyPlacements` invalidates every label after a layout pass. When a static
   grows, it repaints only the strip it gained, so the previous (slightly
   narrower) paint survives: changing "Arenacraft" to "New realm" showed just
   "New" until a resize repainted the whole control. `setLabelText` alone is not
   enough; the invalidation has to happen after the control has been resized.
-- Label containers reserve one pixel of right and bottom padding. `STATIC`
-  wraps at word boundaries, and rounding the measured text width down is enough
-  to push the last word to a second line that the one-line control clips.
+- `.wrap = .none` creates the control with `SS_LEFTNOWORDWRAP`. A plain
+  `SS_LEFT` static word-wraps, so a label whose measured width was a pixel
+  short moved its last word to a second line that the one-line control clipped:
+  "Arenacraft Launcher" rendered as "Arenacraft". The `wrap` option now selects
+  the native style as well as the engine mode.
+- Label containers reserve right and bottom slack. A `STATIC` clips at its
+  right edge, and the measured advance does not include the last glyph's
+  overhang; uppercase glyphs sit tighter against the advance edge, so caps
+  labels get 8px of right slack and everything else 4px. Bottom slack covers
+  descenders and rounding between the measuring DC and the control's DC.
 
 ## Views
 
@@ -72,6 +84,28 @@ is just a layout declaration, so switching is `Window.clear` (destroy every
 control, forget the tree) followed by recording the other view's tree. Widget
 pointers in `App` are only valid until the next switch, which is why they are
 optional and reset by `showView`.
+
+Both views are single columns sized for a phone-shaped window: `main` asks for
+360x520 and a 320x460 minimum, enforced by the window through
+`WM_GETMINMAXINFO`. Actions are full-width buttons stacked vertically, one per
+row; do not turn them back into a wide row of fixed-size buttons. The home
+view keeps the realm as a small bottom-left footer (`realm:` plus the host,
+one line, no wrapping), not as a headline above the actions.
+
+- `gui/label.zig` defines the fonts (`body`, `small`, `small_bold`, `title`);
+  `window.zig` creates one GDI font per enum value and derives the array size
+  from the enum, so a new arm cannot index past it. The title size keeps
+  "Arenacraft Launcher" on one line in the minimum window.
+- Every control uses Tahoma: it ships with every supported Windows and is
+  bundled by Wine, so the face that renders is the one that was measured.
+  Request only normal and bold weights; GDI synthesises weights a face does not
+  have, which looks chunky at the sizes used here. Avoid Segoe UI, which Wine
+  may substitute.
+- Home taglines are the `taglines` constant in `app.zig`, chosen once per
+  process by `pickTagline(io)` into `App.tagline`. `buildUi` runs again on every view switch, so picking at
+  build time would reshuffle the line when the realm switcher closes. Entries
+  are stored uppercase: the native `STATIC` has no letter-spacing, and caps
+  give the tagline a badge look below the title.
 
 A callback may therefore destroy the control that raised it (e.g. `Change
 Realm`). That is safe because `Window.dispatchCommand` returns
@@ -125,7 +159,10 @@ The engine is immediate-mode but a Win32 window only hears about resizes through
 
 - `Window.beginLayout` starts recording. `container`/`endContainer`/`addButton`/
   `addLabel`/`addListBox`/`addEdit` append to `Window.plan`; `endLayout`
-  computes and applies.
+  computes and applies. Both are infallible, so a view pairs them with
+  `window.beginLayout(); defer window.endLayout();`; an early return leaves the
+  containers open and trips an assertion in debug builds instead of applying a
+  half-built tree.
 - Every layout pass (`WM_SIZE`, and the initial `endLayout`) resets the engine's
   per-frame arena, replays `plan`, computes, and moves all controls in a single
   `DeferWindowPos` batch. There is no per-widget `MoveWindow` in the common case.
@@ -173,24 +210,35 @@ state.
   and checking `realmlist.wtf`. With none present it picks `SET locale "xxYY"`
   from `WTF/Config.wtf`, else the first locale-shaped `Data` directory, else
   enUS; `write` creates the directories and the file.
-- Writes happen when a realm row is picked, when Save stores an address, and
-  again before launching. A failed write aborts the launch: connecting to the
-  wrong realm is worse than not starting.
+- The switcher edits a deep copy of the committed list (`List.clone`, held in
+  `App.draft`). Picking a row, editing the address, Add and Remove only touch
+  that copy. Apply validates, writes the copy and then adopts it
+  (`App.commitDraft`); Cancel, leaving the view or closing the window drops the
+  draft. This is what makes Cancel honest: nothing in `realmlist.wtf` has
+  changed yet.
+- Writes happen when Apply commits the draft, and again before launching. A
+  failed write aborts the launch: connecting to the wrong realm is worse than
+  not starting.
 - A host is validated as `[A-Za-z0-9.-]+` (no scheme, port or path); anything
   else cannot go in that field anyway.
-- Save re-points the selected realm at the typed address (`List.rename`). It
-  refuses a host that is already in the list instead of merging two rows.
-  Renaming a built-in realm hides its old address exactly like Remove, or
-  `ensurePresets` would resurrect it on the next start.
+- Apply re-points the selected realm at the typed address (`List.rename`) and
+  returns to the home view. It refuses a host that is already in the list
+  instead of merging two rows. Renaming a built-in realm hides its old address
+  exactly like Remove, or `ensurePresets` would resurrect it on the next start.
+  A failed write (read-only install) keeps the switcher open with the draft
+  intact for a retry or Cancel.
+- Cancel drops the draft, including row picks, renames and removals made since
+  the switcher opened; the committed list was never mutated.
 - Add is a draft mode: it clears the field and the list highlight, and the next
-  Save appends the address as a new realm. Without that, a pre-filled field
+  Apply appends the address as a new realm. Without that, a pre-filled field
   invites typing over the active host and saving the concatenation.
-- Remove forgets the highlighted realm and rewrites the file. Custom hosts just
+- Remove forgets the highlighted realm in the draft. Custom hosts just
   disappear from the history; a built-in realm would be appended again by
-  `ensurePresets` on the next start, so removing one writes a `#hidden <host>`
-  line. That is an ordinary comment for the client, and `parse`/`Client.load`
-  merge it back so the preset stays gone. Typing the host again clears the
-  marker. The last realm cannot be removed: the client needs one.
+  `ensurePresets` on the next start, so committing a removal writes a
+  `#hidden <host>` line. That is an ordinary comment for the client, and
+  `parse`/`Client.load` merge it back so the preset stays gone. Typing the host
+  again clears the marker. The last realm cannot be removed: the client needs
+  one.
 - The file is rewritten unconditionally (line endings become `\n`), which also
   normalizes hand-edited duplicates away.
 - The MSI is per-machine and may install into Program Files; a non-elevated
@@ -206,7 +254,7 @@ easier to reason about and to drive:
 - `gui/listbox.zig` wraps a `LISTBOX` (`LBS_NOTIFY`) and calls `onSelect` on
   `LBN_SELCHANGE`; `Window.listSelection` reads the picked row.
 - `gui/edit.zig` wraps an `EDIT`. The address field mirrors the selected realm
-  and Save commits it; Add clears the field and the highlight first. Enter is
+  and Apply commits it; Add clears the field and the highlight first. Enter is
   caught by a window procedure subclass (`SetWindowLongPtrW(GWLP_WNDPROC)`) that
   forwards everything but `VK_RETURN` to `CallWindowProcW`.
 - `Window.setListItems` repopulates after a typed host joins the list or a realm

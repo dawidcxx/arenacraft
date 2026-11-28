@@ -18,37 +18,96 @@ pub const title = "Arenacraft Launcher";
 /// Which view the window currently shows.
 pub const View = enum { home, realms };
 
+/// Taglines shown under the launcher title, picked once per start. They are
+/// stored uppercase because the native `STATIC` has no letter-spacing control;
+/// full caps give the line a badge look that separates it from the title.
+pub const taglines = [_][]const u8{
+    "WHERE THE CHALLENGE BEGINS",
+    "WOTLK+ FOREVER ANNIVERSARY",
+};
+
+/// Choose the tagline for this process. The layout is rebuilt on every view
+/// switch, so the choice is made once here and kept in `App` instead of being
+/// re-rolled every time the realm switcher closes.
+pub fn pickTagline(io: std.Io) []const u8 {
+    var bytes: [2]u8 = undefined;
+    io.random(&bytes);
+    const value = std.mem.readInt(u16, &bytes, .little);
+    return taglines[value % taglines.len];
+}
+
 /// State shared with the widget callbacks. `gui.run` keeps the stack frame in
 /// `main` alive, so pointers into this struct stay valid until the window is
-/// destroyed.
+/// destroyed. The client and the committed realm list are borrowed from `main`;
+/// the switcher's draft is owned here.
 pub const App = struct {
     io: std.Io,
     window: *gui.Window,
     /// Game directory, owned by `main`.
     install_dir: []const u8,
-    client: realmlist.Client,
-    realms: realmlist.List,
+    /// Borrowed from `main`; owns the resolved realmlist paths.
+    client: *realmlist.Client,
+    /// Borrowed from `main`; the committed list Launch Game writes.
+    realms: *realmlist.List,
     view: View = .home,
+    /// Tagline under the title, chosen once per start by `pickTagline`.
+    tagline: []const u8,
     /// Controls of the realm view; reset by `showView` since the switch
     /// destroys them.
     switcher: realms_view.State = .{},
+    /// Editable copy of `realms` while the switcher is open. Row picks,
+    /// renames and removals only touch this draft; Apply writes it and adopts
+    /// it, while Cancel or closing the window drops it.
+    draft: ?realmlist.List = null,
 
     /// Replace the window content with `view`.
     pub fn showView(self: *App, view: View) void {
         self.window.clear();
+        self.discardDraft();
         self.switcher = .{};
         self.view = view;
 
-        self.buildUi() catch {
-            alert(.critical, "Could not lay out the launcher window.", .{});
-        };
+        // The switcher must not mutate the committed list while the player is
+        // still deciding, so it starts from a deep copy.
+        if (view == .realms) self.draft = self.realms.clone() catch unreachable;
+
+        self.buildUi();
     }
 
-    fn buildUi(self: *App) !void {
+    /// Drop the uncommitted draft. Called when leaving the switcher and when
+    /// the process tears down with the switcher still open.
+    pub fn deinit(self: *App) void {
+        self.discardDraft();
+    }
+
+    fn discardDraft(self: *App) void {
+        if (self.draft) |*list| {
+            list.deinit();
+            self.draft = null;
+        }
+    }
+
+    /// Write the draft to every realmlist file, then adopt it as the committed
+    /// list. Returns false (after the write alert) and keeps the draft in place
+    /// when the write fails, so the player can retry or cancel.
+    pub fn commitDraft(self: *App) bool {
+        const draft = if (self.draft) |*list| list else return false;
+        if (!self.writeList(draft)) return false;
+
+        const committed = self.draft.?;
+        self.draft = null;
+        self.realms.deinit();
+        self.realms.* = committed;
+        return true;
+    }
+
+    fn buildUi(self: *App) void {
         const window = self.window;
 
-        try window.beginLayout();
-        try window.container(.{
+        window.beginLayout();
+        defer window.endLayout();
+
+        window.container(.{
             .sizing = .grow_both,
             .padding = .all(20),
             .gap = 14,
@@ -56,19 +115,22 @@ pub const App = struct {
         });
 
         switch (self.view) {
-            .home => try home_view.build(self),
-            .realms => try realms_view.build(self),
+            .home => home_view.build(self),
+            .realms => realms_view.build(self),
         }
 
-        try window.endContainer();
-        try window.endLayout();
+        window.endContainer();
     }
 
-    /// Write the current realm list to every realmlist file. Reports the
-    /// failure (usually a read-only game directory) and returns false when
-    /// nothing changed.
+    /// Write the committed realm list to every realmlist file.
     pub fn writeRealms(self: *App) bool {
-        self.client.write(self.io, &self.realms) catch |err| {
+        return self.writeList(self.realms);
+    }
+
+    /// Write `list` to every realmlist file. Reports the failure (usually a
+    /// read-only game directory) and returns false when nothing was written.
+    fn writeList(self: *App, list: *const realmlist.List) bool {
+        self.client.write(self.io, list) catch |err| {
             if (err == error.OutOfMemory) unreachable;
             alert(
                 .critical,

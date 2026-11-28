@@ -56,34 +56,51 @@ and commit it when the artwork changes.
 
 ## What it does
 
-The window has two views, both declared with the layout vocabulary and re-wrapped
-on resize; there are no hardcoded widget positions.
+The window is a compact, phone-shaped column (360x520 by default), not a wide
+dialog. Both views are declared with the layout vocabulary and re-wrapped on
+resize; there are no hardcoded widget positions.
 
-The **home** view shows the active logon host in the bottom-left corner, next to
-**Change Realm**, with **Launch Game** and **Quit** on the right. Nothing is
-written at startup, so a fresh installation gets its `realmlist.wtf` when the
-game is launched or a realm changes.
+The **home** view shows **Arenacraft Launcher** with a tagline picked at random
+from a small list at each start, then full-width **Launch Game**,
+**Change Realm** and **Quit** buttons down the column, like a phone home
+screen: one action per row, no side-by-side buttons. The realm the launch will
+use sits in the bottom-left corner as small secondary text (`realm: host`, with
+the host in semibold), so it stays visible without competing with the actions.
+Nothing is written at startup, so a fresh installation gets its `realmlist.wtf`
+when the game is launched or a realm changes.
 
-The **realms** view (opened with **Change Realm**) lists the remembered realms
-with **Add** and **Remove** buttons, an editable **Realm address** field with
-**Save**, and **Back**.
+Taglines live in the `taglines` constant in `src/launcher/app.zig`; add an
+entry there. The one chosen for the current process is `App.tagline`.
+They are stored uppercase because the native label has no letter-spacing, and
+the choice is made once per process so switching views does not reshuffle the
+line under the title.
+
+The **realms** view (opened with **Change Realm**) fills the top with the
+remembered realm list, then **Add**/**Remove** underneath, an editable
+**Realm address** field with the selected realm's name, and full-width
+**Apply** and **Cancel** buttons at the bottom. Apply commits every pending
+edit (realm pick, address, additions and removals) and returns to the home
+view; Cancel drops the draft and leaves the committed list untouched.
 
 ### Realm switcher
 
 The list shows the realms the launcher knows: the built-in Arenacraft and
 Warmane entries plus every logon host already present in the client's
-`realmlist.wtf`, including commented-out ones. Picking a row makes that realm
-active and loads its address into the field.
+`realmlist.wtf`, including commented-out ones. The switcher edits a **draft
+copy** of the list: picking a row, typing an address, adding and removing only
+change that copy, and `realmlist.wtf` is not touched until Apply.
 
-**Save** (or Enter) stores the address in the field against the selected realm,
-so a realm can be re-pointed at another host. **Add** clears the field and the
-selection for a new realm: type its address and press Save to append it. A host
-that is already in the list is refused rather than duplicated. **Remove**
-forgets the highlighted realm. A custom host simply disappears from the
-history; a built-in realm is recorded in `realmlist.wtf` as a `#hidden <host>`
-comment (the client ignores comments) so it is not offered again on the next
-start. Typing a hidden host brings it back. The last remaining realm cannot be
-removed, because the client needs one to connect to.
+**Apply** (or Enter) validates the address, writes the whole edited list and
+returns to the home view. It re-points the selected realm at the typed address,
+or appends the typed host as a new realm after **Add**. A host that is already
+in the list is refused rather than duplicated. **Cancel** drops the draft and
+returns home with the committed list exactly as it was, including any row picks
+or removals made during the visit. **Remove** forgets the highlighted realm in
+the draft: a custom host simply disappears from the history; a built-in realm
+is recorded in `realmlist.wtf` as a `#hidden <host>` comment (the client ignores
+comments) so it is not offered again on the next start. Typing a hidden host
+brings it back. The last remaining realm cannot be removed, because the client
+needs one to connect to.
 
 A 3.3.5a client reads `Data/<locale>/realmlist.wtf`, so the launcher writes
 every `Data/*/realmlist.wtf` it finds (and a root `realmlist.wtf` for pre-1.9
@@ -91,7 +108,7 @@ installations). With none present it creates the one for the locale in
 `WTF/Config.wtf`, falling back to `Data/enUS/realmlist.wtf`. The active realm is
 the first `set realmlist` line; every other remembered realm stays as a
 `#set realmlist` line, which is also the format the launcher reads back at
-startup. A typed realm joins the list, so the list grows with the player's
+startup. A typed realm joins the list on Apply, so the list grows with the player's
 history. Invalid input (scheme, port, spaces, path separators) is rejected with
 a message box.
 
@@ -109,8 +126,11 @@ a message box explains why and the launcher stays open.
 
 ## Modules
 
-- `src/launcher/main.zig`: entry point, the home and realms views, realm and
-  launch callbacks.
+- `src/launcher/main.zig`: entry point and window setup.
+- `src/launcher/app.zig`: shared `App` state, view switching, taglines, message
+  boxes.
+- `src/launcher/home_view.zig`: home view and the launch/quit callbacks.
+- `src/launcher/realms_view.zig`: realm switcher and its callbacks.
 - `src/launcher/game.zig`: spawns `Wow.exe` from the installation directory.
 - `src/launcher/install.zig`: resolves the game directory (the launcher's own).
 - `src/launcher/realmlist.zig`: realm list parsing/rendering and the

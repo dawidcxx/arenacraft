@@ -57,7 +57,8 @@ pub fn main() void {
     const window = gui.createWindow(.{
         .io = io,
         .title = app_mod.title,
-        .size = .{ .width = 640, .height = 480 },
+        .size = .{ .width = 360, .height = 520 },
+        .min_size = .{ .width = 320, .height = 460 },
     }) catch |err| {
         if (err == error.OutOfMemory) unreachable;
         alert(.critical, "Could not create the launcher window ({s}).", .{@errorName(err)});
@@ -65,14 +66,19 @@ pub fn main() void {
     };
     defer window.deinit();
 
-    // `window` outlives the callbacks: `gui.run` keeps this stack frame alive.
+    // `window`, `client` and `realms` outlive the callbacks: `gui.run` keeps
+    // this stack frame alive. The app borrows them; `main` still owns them and
+    // deinits them below in reverse order.
     var app = app_mod.App{
         .io = io,
         .window = window,
         .install_dir = install_dir,
-        .client = client,
-        .realms = realms,
+        .client = &client,
+        .realms = &realms,
+        .tagline = app_mod.pickTagline(io),
     };
+    // The switcher's uncommitted draft is owned by the app, not by `main`.
+    defer app.deinit();
 
     app.showView(.home);
     gui.run();
