@@ -45,16 +45,23 @@ pub const CompileCommands = struct {
     ///
     /// NOTE: must be called after all targets have been created and had their
     /// include paths / source files configured, otherwise they will be missed.
+    ///
+    /// NOTE: generation happens during the configure phase and walks the whole
+    /// graph, so callers should gate this behind an explicit opt-in option
+    /// rather than always paying for it.
     pub fn addCompileCommandsStep(self: *CompileCommands, b: *std.Build) void {
+        const top_level_step = b.step("compile-commands", "Build compile_commands.json file from marked targets");
+
         const json = generateCompileCommands(self, b) catch |err| {
-            std.log.warn("compile-commands: generation failed: {}", .{err});
+            // Fail the requested step instead of dropping it, so the error is
+            // attributed to `zig build compile-commands`.
+            top_level_step.dependOn(&b.addFail(b.fmt("compile-commands: generation failed: {}", .{err})).step);
             return;
         };
 
         const update = b.addUpdateSourceFiles();
         update.addBytesToSource(json, "compile_commands.json");
 
-        const top_level_step = b.step("compile-commands", "Build compile_commands.json file from marked targets");
         top_level_step.dependOn(&update.step);
     }
 };

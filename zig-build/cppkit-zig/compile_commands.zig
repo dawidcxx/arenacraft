@@ -19,6 +19,9 @@ pub fn addCompileCommands(target: *std.Build.Step.Compile) void {
 ///
 /// NOTE: must be called after all targets have been created and had their
 /// include paths / source files configured, otherwise they will be missed.
+///
+/// NOTE: the graph walk runs during the configure phase, so callers should
+/// gate this behind an opt-in build option instead of registering it always.
 pub fn addCompileCommandsStep(b: *std.Build) void {
     global.addCompileCommandsStep(b);
 }
