@@ -60,8 +60,9 @@ patch the code path instead when the rule is ours.
   the cache (the generated `revision.h`) are skipped — clangd may flag that one
   header.
 - Single unified binary `ac`; subcommands: `ac worldserver`, `ac authserver`,
-  `ac db-update`, `ac map_extractor`, `ac vmap4_extractor`, `ac vmap4_assembler`,
-  `ac mmaps_generator`.
+  `ac launcher-server` (Zig TCP RPC server, `--port`/`--root`, default port
+  5815; see `ai-doc/launcher-server.md`), `ac db-update`, `ac map_extractor`,
+  `ac vmap4_extractor`, `ac vmap4_assembler`, `ac mmaps_generator`.
 - Services: `podman compose up -d db valkey` (mysql 8.0 + valkey).
 - Config is env-only, no .conf files: `./.env` auto-loaded (template
   `.env.example`); `AC_DATA_DIR` resolves relative to the binary.
@@ -80,6 +81,11 @@ patch the code path instead when the rule is ours.
 - `zig build test` — build + run every enabled module's tests.
 - Per module: `zig build <module>-test-build` (build + install the executable)
   and `zig build run-<module>-test [-- <doctest args>]` (build + run).
+- The launcher server is Zig, not doctest: `zig build launcher-server-test`
+  runs its protocol/path/session tests (also included in `zig build test`).
+  `zig build launcher-server-test -Doptimize=ReleaseSafe --fuzz=<n>` runs Zig's
+  built-in coverage-guided fuzzer (ReleaseSafe: Debug emits no coverage in
+  0.17.1).
 - To enable a new module: add a `Tests.cpp` entrypoint, register it in the
   `Target` enum (`TestHarness.zig`) and in `AcGraph.buildUnitTests`.
 

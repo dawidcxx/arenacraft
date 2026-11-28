@@ -193,6 +193,14 @@ pub const Src = struct {
         library: *Build.Step.Compile = undefined,
     } = .{},
 
+    /// Zig server behind `ac launcher-server`; its C++ CLI glue is compiled
+    /// into the `ac` router itself (BuildCommons.createAcModule).
+    launcher_server: struct {
+        module: *Build.Module = undefined,
+        library: *Build.Step.Compile = undefined,
+        test_run: ?*Build.Step.Run = null,
+    } = .{},
+
     back_reference: *AcGraph = undefined,
 
     const Self = @This();
@@ -220,6 +228,7 @@ pub const Src = struct {
         try self.buildTools(b);
         try self.buildGame(b);
         try self.buildWorldserver(b);
+        try self.buildLauncherServer(b);
     }
 
     //
@@ -276,6 +285,11 @@ pub const Src = struct {
         mod.linkLibrary(self.worldserver.library);
         try cpp.addFlatIncludes(b, "src/worldserver", mod);
         try self.linkGame(b, mod);
+    }
+
+    pub fn linkLauncherServer(self: *Self, b: *Build, mod: *Build.Module) !void {
+        _ = b;
+        mod.linkLibrary(self.launcher_server.library);
     }
 
     //
@@ -676,5 +690,50 @@ pub const Src = struct {
             .root_module = module,
             .linkage = .static,
         });
+    }
+
+    /// Zig-only module (`src/launcher-server/main.zig`). Kept out of the `ac`
+    /// root module because a Zig root source would bring in Zig's `main` and
+    /// startup code; the server exports a C ABI function instead and the `ac`
+    /// router keeps its C++ `main`.
+    fn buildLauncherServer(self: *Self, build_request: BuildRequest) !void {
+        const b = build_request[0];
+        const target = build_request[1];
+        const optimize = build_request[2];
+
+        const module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("src/launcher-server/main.zig"),
+            .link_libc = true,
+        });
+
+        self.launcher_server.module = module;
+        self.launcher_server.library = b.addLibrary(.{
+            .name = "launcher-server",
+            .root_module = module,
+            .linkage = .static,
+        });
+
+        // Pure protocol/command tests (no listener); wired into `zig build test`
+        // and exposed on its own as `zig build launcher-server-test`.
+        const test_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .root_source_file = b.path("src/launcher-server/tests.zig"),
+            .link_libc = true,
+        });
+        const tests = b.addTest(.{ .root_module = test_module });
+        const test_run = b.addRunArtifact(tests);
+        self.launcher_server.test_run = test_run;
+
+        // `zig build launcher-server-test -Doptimize=ReleaseSafe --fuzz=<limit>`
+        // runs the built-in fuzzer: the build runner recompiles this test
+        // binary with `-ffuzz`. Do NOT set `Module.fuzz = true` here - that
+        // makes the preliminary non-fuzz test run call into an uninitialized
+        // libFuzzer. Debug is not usable for fuzzing on zig 0.17.1 (empty
+        // coverage); use ReleaseSafe.
+        const test_step = b.step("launcher-server-test", "Run the launcher-server protocol tests (`--fuzz=<limit>` for fuzzing)");
+        test_step.dependOn(&test_run.step);
     }
 };

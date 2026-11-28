@@ -86,11 +86,13 @@ pub const AcGraph = struct {
         const common_run = try self.tests.build(b, .common);
         const database_run = try self.tests.build(b, .database);
         const game_run = try self.tests.build(b, .game);
+        const launcher_server_run = self.src.launcher_server.test_run orelse return error.MissingLauncherServerTests;
 
         const test_step = bl.step("test", "Build and run all unit tests");
         test_step.dependOn(common_run);
         test_step.dependOn(database_run);
         test_step.dependOn(game_run);
+        test_step.dependOn(&launcher_server_run.step);
     }
 
     fn buildDeps(self: *Self, b: BuildRequest) !void {
@@ -155,12 +157,21 @@ pub const AcGraph = struct {
             .link_libcpp = true,
         });
 
-        // co-located with subcommands.h
+        // co-located with subcommands.h, plus the launcher-server C ABI header
         module.addIncludePath(bl.path("src/ac"));
+        module.addIncludePath(bl.path("src/launcher-server"));
 
         module.addCSourceFiles(.{
             .root = bl.path("src/ac"),
             .files = &.{ "main.cpp", "db_update.cpp" },
+            .language = .cpp,
+            .flags = &Src.core_cflags,
+        });
+
+        // C++ half of `ac launcher-server`: parses --port and calls into the
+        // Zig library through the C ABI in LauncherServer.h.
+        module.addCSourceFile(.{
+            .file = bl.path("src/launcher-server/Cli.cpp"),
             .language = .cpp,
             .flags = &Src.core_cflags,
         });
@@ -172,6 +183,7 @@ pub const AcGraph = struct {
         try src.linkWorldserver(bl, module);
         try src.linkAuth(bl, module);
         try src.linkTools(bl, module);
+        try src.linkLauncherServer(bl, module);
         // revision data is built separately so it never invalidates common
         try src.linkRevision(bl, module);
         deps.linkArgparse(module);
