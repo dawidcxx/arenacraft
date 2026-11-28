@@ -6,7 +6,7 @@ const Src = @import("./Src.zig").Src;
 const TestHarness = @import("./TestHarness.zig").TestHarness;
 const cpp = @import("./cppkit-zig/build.zig");
 
-// zig 0.16 ships a ubsan runtime that aborts in Debug; the legacy codebase
+// zig ships a ubsan runtime that aborts in Debug; the legacy codebase
 // (loadlib/mpq readers etc.) contains deliberate unaligned access patterns
 pub const no_ubsan = "-fno-sanitize=undefined";
 
@@ -17,6 +17,10 @@ pub const BuildRequest = struct { *Build, Build.ResolvedTarget, std.builtin.Opti
 pub const AcGraph = struct {
     gpa: std.mem.Allocator,
     io: std.Io,
+
+    /// Keep zig's configure cache enabled and track the files/directories the
+    /// configure logic reads (`-Dpure-configure`).
+    pure_configure: bool = false,
 
     deps: Deps = .{},
     src: Src = .{},
@@ -49,6 +53,19 @@ pub const AcGraph = struct {
             std.log.err("missing build environment variable CPATH; run inside `nix develop` or the Dockerfile builder stage", .{});
             return error.MissingBuildEnvironment;
         }
+
+        // This build script introspects the working tree while configuring:
+        // Src.zig queries each module's `*.cpp` files and the flat include
+        // trees, and reads the git revision. Zig 0.17 caches the configure
+        // output. Two modes:
+        //  * default: opt out of the configure cache (`poisonCache`) - always
+        //    correct, at the cost of re-running configure on every invocation.
+        //  * `-Dpure-configure`: keep the cache and register the exact files
+        //    and directories read during configure as dependencies; any change
+        //    to them (new/removed source, new subdirectory for the flat
+        //    includes, new commit/branch) invalidates the cached configuration.
+        self.pure_configure = b.option(bool, "pure-configure", "Keep the configure cache and track its inputs") orelse false;
+        if (!self.pure_configure) b.graph.poisonCache();
 
         const target = b.standardTargetOptions(.{});
         const optimize = b.standardOptimizeOption(.{});
@@ -190,7 +207,9 @@ pub const AcGraph = struct {
         // `zig build run-ac [-- <args>]` - build and run, forwarding args
         const run = bl.addRunArtifact(exe);
         run.step.dependOn(&install.step);
-        if (bl.args) |args| run.addArgs(args);
+        // forwards `zig build run-ac -- <args>` without observing them at
+        // configure time (zig 0.17 passthru args)
+        run.addPassthruArgs();
 
         const run_step = bl.step("run-ac", "Build and run the ac master executable");
         run_step.dependOn(&run.step);

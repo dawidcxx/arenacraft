@@ -47,7 +47,7 @@
           default = pkgs.mkShell.override { stdenv = pkgs.clangStdenv; } {
             nativeBuildInputs = with pkgs; [
               # Dev tools
-              zig_0_16 # keep in sync with Dockerfile ZIG_VERSION (libc detection)
+              zig_0_17 # keep in sync with Dockerfile ZIG_VERSION (libc detection)
               zls
               pkg-config # zig uses this for .linkSystemLibrary()
               clang-tools

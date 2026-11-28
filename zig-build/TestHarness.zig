@@ -61,6 +61,7 @@ pub const TestHarness = struct {
         var tests = cpp.querySources(graph.gpa, graph.io, src_dir, .{
             .extensions = cpp.Exts.JUST_CPP,
             .recursive = true,
+            .build = bl,
         });
         tests.filterToGlob("*_test.cpp");
         module.addCSourceFiles(.{
@@ -89,7 +90,7 @@ pub const TestHarness = struct {
         // `zig build run-<module>-test [-- <doctest args>]`
         const run = bl.addRunArtifact(exe);
         run.step.dependOn(&install.step);
-        if (bl.args) |args| run.addArgs(args);
+        run.addPassthruArgs();
 
         const run_step = bl.step(
             try std.fmt.allocPrint(graph.gpa, "run-{s}-test", .{name}),

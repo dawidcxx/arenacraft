@@ -6,6 +6,12 @@
 //! created and tested in isolation. The process wide instance that backs the
 //! public API is instantiated in the parent module (./compile_commands.zig).
 //!
+//! zig 0.17 removed user defined `makeFn` steps: the whole build graph is
+//! serialized into a configuration and executed by a separate maker process.
+//! The generator therefore runs during the configure phase (walking the graph
+//! is pure) and hands the resulting file to an `UpdateSourceFiles` step, which
+//! is the declarative way to write generated content into the source tree.
+//!
 //! NOTE: leaking memory is fine here, the build graph is short lived and the
 //! build system allocator is meant to be used this way.
 
@@ -39,55 +45,24 @@ pub const CompileCommands = struct {
     ///
     /// NOTE: must be called after all targets have been created and had their
     /// include paths / source files configured, otherwise they will be missed.
+    ///
+    /// NOTE: generation happens during the configure phase and walks the whole
+    /// graph, so callers should gate this behind an explicit opt-in option
+    /// rather than always paying for it.
     pub fn addCompileCommandsStep(self: *CompileCommands, b: *std.Build) void {
-        const cc_step = CompileCommandsStep.create(b, self);
-
-        // Wire dependencies on every LazyPath that generation resolves at make
-        // time (generated config headers, emitted include trees, generated
-        // sources), so all of them exist by the time the step runs.
-        self.wireLazyPathDependencies(&cc_step.step);
-
         const top_level_step = b.step("compile-commands", "Build compile_commands.json file from marked targets");
-        top_level_step.dependOn(&cc_step.step);
-    }
 
-    fn wireLazyPathDependencies(self: *CompileCommands, cc_step: *std.Build.Step) void {
-        var visited: std.AutoHashMapUnmanaged(*std.Build.Step.Compile, void) = .empty;
-        for (self.targets) |maybe_target| {
-            const target = maybe_target orelse continue;
-            walkStep(&target.step, .{ .wiring = cc_step }, &visited) catch |err| {
-                std.log.warn("compile-commands: failed to wire lazy path dependencies: {}", .{err});
-            };
-        }
-    }
-};
-
-/// Heap allocated so the make function can recover the owning state through
-/// the step pointer via @fieldParentPtr.
-const CompileCommandsStep = struct {
-    step: std.Build.Step,
-    state: *CompileCommands,
-
-    fn create(b: *std.Build, state: *CompileCommands) *CompileCommandsStep {
-        const self = b.allocator.create(CompileCommandsStep) catch {
-            @panic("OOM");
+        const json = generateCompileCommands(self, b) catch |err| {
+            // Fail the requested step instead of dropping it, so the error is
+            // attributed to `zig build compile-commands`.
+            top_level_step.dependOn(&b.addFail(b.fmt("compile-commands: generation failed: {}", .{err})).step);
+            return;
         };
-        self.* = .{
-            .step = std.Build.Step.init(.{
-                .id = .custom,
-                .name = "compile-commands/step",
-                .owner = b,
-                .makeFn = make,
-            }),
-            .state = state,
-        };
-        return self;
-    }
 
-    fn make(step: *std.Build.Step, make_options: std.Build.Step.MakeOptions) anyerror!void {
-        _ = make_options;
-        const self: *CompileCommandsStep = @fieldParentPtr("step", step);
-        try generateCompileCommands(self.state, step.owner);
+        const update = b.addUpdateSourceFiles();
+        update.addBytesToSource(json, "compile_commands.json");
+
+        top_level_step.dependOn(&update.step);
     }
 };
 
@@ -95,17 +70,16 @@ const CompileCommandsStep = struct {
 // OUTPUT
 //
 
-fn generateCompileCommands(state: *CompileCommands, b: *std.Build) !void {
+fn generateCompileCommands(state: *CompileCommands, b: *std.Build) ![]const u8 {
     const alloc = b.allocator;
 
     var db = CompileCommandsDb.init(alloc);
-    var pkg_config_cache: std.StringHashMapUnmanaged([]const []const u8) = .empty;
     var visited: std.AutoHashMapUnmanaged(*std.Build.Step.Compile, void) = .empty;
 
-    var gather = Gather{ .db = &db, .pkg_config_cache = &pkg_config_cache };
+    var gather = Gather{ .db = &db };
     for (state.targets) |maybe_target| {
         const target = maybe_target orelse continue;
-        try walkStep(&target.step, .{ .gather = &gather }, &visited);
+        try walkStep(&target.step, &gather, &visited);
     }
 
     // deterministic ordering so the output is stable across runs
@@ -114,14 +88,17 @@ fn generateCompileCommands(state: *CompileCommands, b: *std.Build) !void {
     while (db_it.next()) |cc| try entries.append(alloc, cc.*);
     std.mem.sort(*CompileCommand, entries.items, {}, CompileCommand.lessThan);
 
-    const output_root = b.graph.global_cache_root.path orelse (b.cache_root.path orelse "zig-cache");
+    // The `output` field is cosmetic for clangd; generated artifacts live in
+    // the cache (not resolvable at configure time), so point it at the build
+    // root instead of the previous cache directory.
+    const output_root = try b.root.joinString(alloc, ".");
 
     var json_writer = std.Io.Writer.Allocating.init(alloc);
     defer json_writer.deinit();
 
     var stringify = std.json.Stringify{
         .writer = &json_writer.writer,
-        .options = .{ .emit_null_optional_fields = true, .whitespace = .indent_2 },
+        .options = .{ .whitespace = .indent_2 },
     };
     try stringify.beginArray();
     for (entries.items) |cc| {
@@ -129,52 +106,38 @@ fn generateCompileCommands(state: *CompileCommands, b: *std.Build) !void {
     }
     try stringify.endArray();
 
-    const json_string: []const u8 = try json_writer.toOwnedSlice();
-    defer alloc.free(json_string);
-
-    const compile_commands_file = try b.build_root.handle.createFile(b.graph.io, "compile_commands.json", .{});
-    defer compile_commands_file.close(b.graph.io);
-    try compile_commands_file.writeStreamingAll(b.graph.io, json_string);
+    var list = json_writer.toArrayList();
+    return list.toOwnedSlice(alloc);
 }
 
 //
 // TRAVERSAL
 //
 
-const WalkMode = union(enum) {
-    /// add step dependencies on every LazyPath that will be resolved later
-    wiring: *std.Build.Step,
-    /// resolve everything into compile command entries
-    gather: *Gather,
-};
-
 const Gather = struct {
     db: *CompileCommandsDb,
-    pkg_config_cache: *std.StringHashMapUnmanaged([]const []const u8),
 };
 
 /// Walks the build graph starting from all marked targets, visiting every
 /// compile step that is reachable either through generic step dependencies or
-/// by being linked into another compile step. Both walk modes traverse the
-/// exact same set of steps on purpose, so the wiring phase is guaranteed to
-/// have wired everything the gather phase later resolves.
+/// by being linked into another compile step.
 fn walkStep(
     step: *std.Build.Step,
-    mode: WalkMode,
+    gather: *Gather,
     visited: *std.AutoHashMapUnmanaged(*std.Build.Step.Compile, void),
 ) anyerror!void {
     if (step.cast(std.Build.Step.Compile)) |compile_step| {
-        try walkCompileStep(compile_step, mode, visited);
+        try walkCompileStep(compile_step, gather, visited);
         return;
     }
     for (step.dependencies.items) |dependency| {
-        try walkStep(dependency, mode, visited);
+        try walkStep(dependency, gather, visited);
     }
 }
 
 fn walkCompileStep(
     step: *std.Build.Step.Compile,
-    mode: WalkMode,
+    gather: *Gather,
     visited: *std.AutoHashMapUnmanaged(*std.Build.Step.Compile, void),
 ) anyerror!void {
     const gop = try visited.getOrPut(step.step.owner.allocator, step);
@@ -182,32 +145,13 @@ fn walkCompileStep(
 
     const graph_modules = step.root_module.getGraph().modules;
 
-    switch (mode) {
-        .wiring => |cc_step| {
-            for (graph_modules) |mod| {
-                for (mod.include_dirs.items) |include_dir| switch (include_dir) {
-                    .path => |lp| lp.addStepDependencies(cc_step),
-                    .path_system => |lp| lp.addStepDependencies(cc_step),
-                    .path_after => |lp| lp.addStepDependencies(cc_step),
-                    .config_header_step => |ch| ch.getOutputDir().addStepDependencies(cc_step),
-                    .other_step => |comp| comp.getEmittedIncludeTree().addStepDependencies(cc_step),
-                    .framework_path, .framework_path_system, .embed_path => {},
-                };
-                for (mod.link_objects.items) |link_object| switch (link_object) {
-                    .c_source_file => |csf| csf.file.addStepDependencies(cc_step),
-                    .c_source_files => |csfs| csfs.root.addStepDependencies(cc_step),
-                    else => {},
-                };
-            }
-        },
-        .gather => |gather| try gatherCompileStep(step, gather),
-    }
+    try gatherCompileStep(step, gather);
 
     for (step.step.dependencies.items) |dependency| {
-        try walkStep(dependency, mode, visited);
+        try walkStep(dependency, gather, visited);
     }
     for (graph_modules) |mod| for (mod.link_objects.items) |link_object| switch (link_object) {
-        .other_step => |other| try walkCompileStep(other, mode, visited),
+        .other_step => |other| try walkCompileStep(other, gather, visited),
         else => {},
     };
 }
@@ -218,7 +162,6 @@ fn walkCompileStep(
 
 fn gatherCompileStep(step: *std.Build.Step.Compile, gather: *Gather) !void {
     const b = step.step.owner;
-    const asking = &step.step;
     const alloc = b.allocator;
     const graph_modules = step.root_module.getGraph().modules;
 
@@ -227,24 +170,21 @@ fn gatherCompileStep(step: *std.Build.Step.Compile, gather: *Gather) !void {
     for (graph_modules) |mod| {
         try appendModuleFlags(b, mod, &shared);
         for (mod.include_dirs.items) |include_dir| {
-            try appendIncludeDir(b, include_dir, asking, &shared, false);
+            try appendIncludeDir(b, include_dir, &shared);
         }
         for (mod.link_objects.items) |link_object| switch (link_object) {
             .system_lib => |system_lib| {
-                try appendSystemLibFlags(b, asking, system_lib, gather.pkg_config_cache, &shared);
+                try appendSystemLibFlags(b, system_lib, &shared);
             },
             else => {},
         };
     }
 
-    if (b.sysroot) |sysroot| {
-        try shared.append(alloc, "--sysroot");
-        try shared.append(alloc, sysroot);
-    }
-    for (b.search_prefixes.items) |search_prefix| {
-        try shared.append(alloc, "-I");
-        try shared.append(alloc, try std.fs.path.resolve(alloc, &.{ b.graph.cache.cwd, search_prefix, "include" }));
-    }
+    // zig 0.17 dropped the global `--sysroot` build option; sysroots are now
+    // modeled through the resolved target/query instead.
+    // `Build.search_prefixes` was removed in zig 0.17 (it lives on the graph
+    // now and observing it poisons the configure cache); the nix shell reaches
+    // the same headers through CPATH, mirrored by appendEnvIncludes below.
 
     if (step.pie) |pie| try shared.append(alloc, if (pie) "-fPIE" else "-fno-PIE");
     if (step.lto) |lto| switch (lto) {
@@ -258,7 +198,7 @@ fn gatherCompileStep(step: *std.Build.Step.Compile, gather: *Gather) !void {
     // The public compile relevant surface of linked compile steps flows into
     // this step's flags, so its sources can resolve the dependency's headers.
     for (graph_modules) |mod| for (mod.link_objects.items) |link_object| switch (link_object) {
-        .other_step => |other| try appendPublicFlags(b, other, asking, gather.pkg_config_cache, &shared),
+        .other_step => |other| try appendPublicFlags(b, other, &shared),
         else => {},
     };
 
@@ -268,14 +208,14 @@ fn gatherCompileStep(step: *std.Build.Step.Compile, gather: *Gather) !void {
 
     for (graph_modules) |mod| for (mod.link_objects.items) |link_object| switch (link_object) {
         .c_source_file => |csf| {
-            const file_abs = try lazyPathAbsolute(b, csf.file, asking);
+            const file_abs = (try lazyPathAbsolute(b, csf.file)) orelse continue;
             var all_flags: std.ArrayListUnmanaged([]const u8) = .empty;
             try all_flags.appendSlice(alloc, shared.items);
             try all_flags.appendSlice(alloc, csf.flags);
             try gather.db.update(file_abs, all_flags.items);
         },
         .c_source_files => |csfs| {
-            const root_abs = try lazyPathAbsolute(b, csfs.root, asking);
+            const root_abs = (try lazyPathAbsolute(b, csfs.root)) orelse continue;
             for (csfs.files) |file| {
                 const file_abs = try std.fs.path.resolve(alloc, &.{ root_abs, file });
                 var all_flags: std.ArrayListUnmanaged([]const u8) = .empty;
@@ -330,21 +270,16 @@ fn appendModuleFlags(
 fn appendIncludeDir(
     b: *std.Build,
     include_dir: std.Build.Module.IncludeDir,
-    asking: *std.Build.Step,
     out: *std.ArrayListUnmanaged([]const u8),
-    warn_on_skip: bool,
 ) !void {
     switch (include_dir) {
-        .path => |lp| try appendIncludeFlag(b, "-I", lp, asking, out),
-        .path_system => |lp| try appendIncludeFlag(b, "-isystem", lp, asking, out),
-        .path_after => |lp| try appendIncludeFlag(b, "-idirafter", lp, asking, out),
-        .config_header_step => |ch| try appendIncludeFlag(b, "-I", ch.getOutputDir(), asking, out),
-        .other_step => |comp| try appendIncludeFlag(b, "-I", comp.getEmittedIncludeTree(), asking, out),
-        .framework_path, .framework_path_system, .embed_path => {
-            if (warn_on_skip) {
-                std.log.warn("compile-commands: include directive '{s}' has no clangd equivalent, skipping", .{@tagName(include_dir)});
-            }
-        },
+        .path => |lp| try appendIncludeFlag(b, "-I", lp, out),
+        .path_system => |lp| try appendIncludeFlag(b, "-isystem", lp, out),
+        .path_after => |lp| try appendIncludeFlag(b, "-idirafter", lp, out),
+        // generated include trees only exist in the cache, which is not known
+        // during the configure phase (see the note at the top of this file)
+        .config_header_step, .other_step => {},
+        .framework_path, .framework_path_system, .embed_path => {},
     }
 }
 
@@ -352,11 +287,11 @@ fn appendIncludeFlag(
     b: *std.Build,
     flag: []const u8,
     lazy_path: std.Build.LazyPath,
-    asking: *std.Build.Step,
     out: *std.ArrayListUnmanaged([]const u8),
 ) !void {
+    const path = (try lazyPathAbsolute(b, lazy_path)) orelse return;
     try out.append(b.allocator, flag);
-    try out.append(b.allocator, try lazyPathAbsolute(b, lazy_path, asking));
+    try out.append(b.allocator, path);
 }
 
 /// The compiler honours the CPATH environment variable for include search, but
@@ -379,82 +314,62 @@ fn appendEnvIncludes(b: *std.Build, out: *std.ArrayListUnmanaged([]const u8)) !v
 fn appendPublicFlags(
     b: *std.Build,
     dep: *std.Build.Step.Compile,
-    asking: *std.Build.Step,
-    pkg_config_cache: *std.StringHashMapUnmanaged([]const []const u8),
     out: *std.ArrayListUnmanaged([]const u8),
 ) !void {
     for (dep.root_module.getGraph().modules) |mod| {
         try out.appendSlice(b.allocator, mod.c_macros.items);
         for (mod.include_dirs.items) |include_dir| {
-            try appendIncludeDir(b, include_dir, asking, out, false);
+            try appendIncludeDir(b, include_dir, out);
         }
         for (mod.link_objects.items) |link_object| switch (link_object) {
             .system_lib => |system_lib| {
-                try appendSystemLibFlags(b, asking, system_lib, pkg_config_cache, out);
+                try appendSystemLibFlags(b, system_lib, out);
             },
             else => {},
         };
     }
 }
 
-/// Ask pkg-config for the real flags of a system library, falling back to a
-/// plain -l flag when it is unavailable. This is what pulls in the actual
-/// include paths of nix provided libraries.
+/// Emit the plain link flag of a system library. Include paths of system
+/// libraries come in through CPATH (nix dev shell) and are mirrored by
+/// appendEnvIncludes; pkg-config probing is not available at configure time in
+/// zig 0.17, so there is nothing else to resolve here.
 fn appendSystemLibFlags(
     b: *std.Build,
-    asking: *std.Build.Step,
     system_lib: std.Build.Module.SystemLib,
-    cache: *std.StringHashMapUnmanaged([]const []const u8),
     out: *std.ArrayListUnmanaged([]const u8),
 ) !void {
-    const alloc = b.allocator;
-
-    if (cache.get(system_lib.name)) |cached_flags| {
-        try out.appendSlice(alloc, cached_flags);
-        return;
-    }
-
-    switch (system_lib.use_pkg_config) {
-        .no => try out.append(alloc, try std.fmt.allocPrint(alloc, "-l{s}", .{system_lib.name})),
-        .yes, .force => {
-            if (std.Build.Step.Compile.runPkgConfig(asking, system_lib.name)) |result| {
-                var all_flags: std.ArrayListUnmanaged([]const u8) = .empty;
-                // split "-I<dir>" into two tokens so they deduplicate against
-                // the "-I" + path pairs emitted for module include dirs
-                for (result.cflags) |cflag| {
-                    if (std.mem.startsWith(u8, cflag, "-I") and cflag.len > "-I".len) {
-                        try all_flags.append(alloc, "-I");
-                        try all_flags.append(alloc, cflag["-I".len..]);
-                    } else {
-                        try all_flags.append(alloc, cflag);
-                    }
-                }
-                try all_flags.appendSlice(alloc, result.libs);
-                const flags_slice = try all_flags.toOwnedSlice(alloc);
-                try cache.put(alloc, try alloc.dupe(u8, system_lib.name), flags_slice);
-                try out.appendSlice(alloc, flags_slice);
-            } else |err| switch (err) {
-                error.PkgConfigInvalidOutput,
-                error.PkgConfigCrashed,
-                error.PkgConfigFailed,
-                error.PkgConfigNotInstalled,
-                error.PackageNotFound,
-                => {
-                    std.log.warn("compile-commands: pkg-config failed for '{s}' ({}), falling back to -l flag", .{ system_lib.name, err });
-                    try out.append(alloc, try std.fmt.allocPrint(alloc, "-l{s}", .{system_lib.name}));
-                },
-                else => |e| return e,
-            }
-        },
-    }
+    try out.append(b.allocator, try std.fmt.allocPrint(b.allocator, "-l{s}", .{system_lib.name}));
 }
 
+/// Resolve a LazyPath to an absolute path during the configure phase, or null
+/// when its location is only known at make time (generated files, cache
+/// relative paths).
 fn lazyPathAbsolute(
     b: *std.Build,
     lazy_path: std.Build.LazyPath,
-    asking: *std.Build.Step,
-) ![]const u8 {
-    const as_string = try lazy_path.getPath3(b, asking).toString(b.allocator);
+) !?[]const u8 {
+    const alloc = b.allocator;
+    const path: std.Build.Cache.Path = switch (lazy_path) {
+        .src_path => |sp| try sp.owner.root.join(alloc, sp.sub_path),
+        .dependency => |dep| try dep.dependency.builder.root.join(alloc, dep.sub_path),
+        .cwd_relative => |p| .{ .root_dir = .cwd(), .sub_path = p },
+        .relative => |rel| switch (rel.base) {
+            .cwd => .{ .root_dir = .cwd(), .sub_path = rel.sub_path },
+            .build_root => .{ .root_dir = .cwd(), .sub_path = try b.root.root_dir.join(alloc, &.{ b.root.sub_path, rel.sub_path }) },
+            // cache / install / deployed / zig prefix paths: unknown here
+            else => return null,
+        },
+        .generated => return null,
+    };
+
+    const as_string = try path.root_dir.join(alloc, &.{path.subPathOrDot()});
     if (std.fs.path.isAbsolute(as_string)) return as_string;
-    return std.fs.path.resolve(b.allocator, &.{ b.graph.cache.cwd, as_string });
+    return try std.fs.path.resolve(alloc, &.{ try configureCwd(b), as_string });
+}
+
+/// Working directory of the configure process (zig 0.17 removed
+/// `Build.Graph.cache`); used to anchor relative paths.
+fn configureCwd(b: *std.Build) ![]const u8 {
+    return std.process.currentPathAlloc(b.graph.io, b.allocator);
 }

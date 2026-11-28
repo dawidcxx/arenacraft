@@ -1,4 +1,5 @@
 const std = @import("std");
+const Translator = @import("translate_c").Translator;
 
 /// The launcher is a Windows client by definition, so every module and build
 /// step below assumes `x86_64-windows-gnu`. There is deliberately no
@@ -52,17 +53,48 @@ fn addLib(
         .root_source_file = b.path("src/lib/root.zig"),
         .target = target,
         .optimize = optimize,
-        // win32.zig @cImports windows.h: that needs the MinGW-w64 headers and
-        // the C runtime Zig bundles for `-windows-gnu`.
+        // windows.h needs the MinGW-w64 headers and the C runtime Zig bundles
+        // for `-windows-gnu`.
         .link_libc = true,
     });
+
+    // `@cImport` was removed in Zig 0.17; windows.h is translated by the
+    // official translate-c package instead and imported as the `c` module.
+    // The translator itself runs on the host (it is a build tool), so it is
+    // built for the host while emitting bindings for the windows target. It is
+    // built in Debug on purpose: ReleaseSafe spends ~2min compiling its C
+    // parser (aro) to save a second or two of translation, and the generated
+    // bindings do not depend on how the tool itself was optimized.
+    const translate_c = b.dependency("translate_c", .{
+        .target = b.resolveTargetQuery(.{}),
+        .optimize = .Debug,
+    });
+    const win32_c: Translator = .init(translate_c, .{
+        .name = "win32_c",
+        .c_source_file = b.addWriteFiles().add("win32_c.h",
+            // Skip the kitchen sink: lean headers + no min/max macros, the two
+            // defines every sane translation unit sets before including
+            // windows.h. MinGW's fortified string inlines (wcscat/wcscpy)
+            // translate into local declarations that Zig rejects in
+            // ReleaseSafe ("unused local constant"); they are unused here and
+            // Zig has its own safety checks, so fortify stays off in every
+            // optimize mode.
+            \\#define WIN32_LEAN_AND_MEAN 1
+            \\#define NOMINMAX 1
+            \\#define _FORTIFY_SOURCE 0
+            \\#include <windows.h>
+            \\
+        ),
+        .target = target,
+        .optimize = optimize,
+    });
+    mod.addImport("c", win32_c.mod);
     LIB_MOD = mod;
 
     const tst = b.addTest(.{ .root_module = mod });
     const run = b.addRunArtifact(tst);
-    if (b.args) |args| {
-        run.addArgs(args);
-    }
+    // forwards `zig build <step> -- <args>` at make time (zig 0.17)
+    run.addPassthruArgs();
     LIB_TEST_STEP = b.step("lib-test", "Run lib tests");
     LIB_TEST_STEP.dependOn(&run.step);
 }
@@ -89,9 +121,8 @@ fn addClay(
     });
     const tst = b.addTest(.{ .root_module = host_mod });
     const run = b.addRunArtifact(tst);
-    if (b.args) |args| {
-        run.addArgs(args);
-    }
+    // forwards `zig build <step> -- <args>` at make time (zig 0.17)
+    run.addPassthruArgs();
     CLAY_TEST_STEP = b.step("clay-test", "Run the clay layout tests (native)");
     CLAY_TEST_STEP.dependOn(&run.step);
 }
@@ -110,9 +141,8 @@ fn addRealmlistTests(
 
     const tst = b.addTest(.{ .root_module = mod });
     const run = b.addRunArtifact(tst);
-    if (b.args) |args| {
-        run.addArgs(args);
-    }
+    // forwards `zig build <step> -- <args>` at make time (zig 0.17)
+    run.addPassthruArgs();
     REALMLIST_TEST_STEP = b.step("realmlist-test", "Run the realmlist tests (native)");
     REALMLIST_TEST_STEP.dependOn(&run.step);
 }
@@ -179,9 +209,8 @@ fn addLauncher(
 
     const run = b.addRunArtifact(exe);
     run.step.dependOn(&install.step);
-    if (b.args) |args| {
-        run.addArgs(args);
-    }
+    // forwards `zig build <step> -- <args>` at make time (zig 0.17)
+    run.addPassthruArgs();
     // The artifact is a foreign (PE) binary for a non-Windows host: let Zig
     // deal with it. `zig build run-launcher -fwine` runs it through wine
     // (found on PATH, WINEDEBUG silenced), otherwise a host binfmt handler can

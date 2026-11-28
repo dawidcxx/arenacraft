@@ -115,7 +115,7 @@ not add work after the callback call there.
 ## I/O
 
 One `std.Io.Threaded` instance is created in `main` and passed to callbacks.
-Zig 0.16 has no `Io.Evented`/fiber backend for Windows, so `Threaded` is the
+Zig 0.17 has no `Io.Evented`/fiber backend for Windows, so `Threaded` is the
 implementation: blocking syscalls run on its worker pool.
 
 Rules for future work (downloads, patching):

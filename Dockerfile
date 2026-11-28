@@ -15,13 +15,15 @@
 # one-time development operation done by scripts/seed_db).
 
 ARG UBUNTU_VERSION=22.04
-# keep in sync with flake.nix's zig (host-libc detection is 0.16 behaviour)
-ARG ZIG_VERSION=0.16.0
+# keep in sync with flake.nix's zig (host-libc detection is version sensitive)
+ARG ZIG_VERSION=0.17.1
 
 # --- builder ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS builder
 ARG ZIG_VERSION
-# passed by scripts/deploy (the Docker build context does not include .git)
+# passed by scripts/deploy (the Docker build context does not include .git).
+# Handed to zig as -D options rather than ENV: -D participates in zig's
+# configure cache key, environment variables do not (see zig-build/Src.zig).
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ARG GIT_DATE=unknown
@@ -64,10 +66,6 @@ COPY zig-build zig-build
 COPY src src
 COPY deps deps
 
-ENV GIT_COMMIT=${GIT_COMMIT}
-ENV GIT_BRANCH=${GIT_BRANCH}
-ENV GIT_DATE=${GIT_DATE}
-
 # The three caches are owned by buildah/podman, not by the host checkout: the
 # explicit ids give them a stable, project-scoped key so a nix host's
 # .zig-cache can never be reused by this ubuntu build (and vice versa). On a
@@ -78,7 +76,9 @@ ENV GIT_DATE=${GIT_DATE}
 RUN --mount=type=cache,id=arenacraft-zig-cache,target=/app/.zig-cache \
     --mount=type=cache,id=arenacraft-zig-pkg,target=/app/zig-pkg \
     --mount=type=cache,id=arenacraft-zig-global,target=/root/.cache/zig \
-    zig build -j"$(nproc)" -Doptimize=ReleaseFast -Dcpu=znver5 ac
+    zig build -j"$(nproc)" -Doptimize=ReleaseFast -Dcpu=znver5 \
+        -Dgit-commit="${GIT_COMMIT}" -Dgit-branch="${GIT_BRANCH}" -Dgit-date="${GIT_DATE}" \
+        ac
 
 # --- runtime ---------------------------------------------------------------
 FROM docker.io/library/ubuntu:${UBUNTU_VERSION} AS runtime

@@ -3,8 +3,13 @@
     .version = "0.0.0",
     // Package identity; generated once and never changed afterwards.
     .fingerprint = 0x7b9c35155ef8fae4,
-    .minimum_zig_version = "0.16.0",
-    .dependencies = .{},
+    .minimum_zig_version = "0.17.1",
+    .dependencies = .{
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c#cfac21f3199b2b02ce3fd7db652aa456421fe4ab",
+            .hash = "translate_c-2.0.2-Q_BUWvBNBwDnyehSiuAJmdFcMYHYGA-Jc3KiYdrV2Dqx",
+        },
+    },
     .paths = .{
         "AppIcon.jpeg",
         "AppIcon.ico",
