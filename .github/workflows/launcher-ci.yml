@@ -1,0 +1,58 @@
+# Build the launcher on pull requests.
+#
+# `launcher-release` is manual-only (cut from a tag), so without this nothing
+# exercises `apps/launcher/build.zig` until a release is cut — a zig upgrade
+# that breaks the Windows build would only be discovered there.
+#
+# Both legs build `launcher.exe`. `ubuntu-24.04` cross-compiles the PE (zig
+# bundles the MinGW toolchain); `windows-latest` builds it natively, which is
+# the only configuration where the translate-c translator is compiled for the
+# release host. No wine is involved on either leg: `lib-test` targets the
+# Windows binary and stays out, while the `clay` and `realmlist` suites build
+# for the host and run natively on both.
+name: launcher-ci
+
+on:
+  pull_request:
+    paths:
+      - 'apps/launcher/**'
+      - '.github/workflows/launcher-ci.yml'
+  push:
+    branches: [local]
+    paths:
+      - 'apps/launcher/**'
+      - '.github/workflows/launcher-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: launcher-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/launcher
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keep in sync with apps/launcher/build.zig.zon's minimum_zig_version and
+      # with the version pinned in launcher-release.yml.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: "0.17.1"
+
+      - name: Build launcher.exe (ReleaseSafe)
+        run: zig build launcher -Doptimize=ReleaseSafe
+
+      - name: Run native tests
+        run: zig build clay-test realmlist-test

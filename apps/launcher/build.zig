@@ -61,10 +61,13 @@ fn addLib(
     // `@cImport` was removed in Zig 0.17; windows.h is translated by the
     // official translate-c package instead and imported as the `c` module.
     // The translator itself runs on the host (it is a build tool), so it is
-    // built for the host while emitting bindings for the windows target.
+    // built for the host while emitting bindings for the windows target. It is
+    // built in Debug on purpose: ReleaseSafe spends ~2min compiling its C
+    // parser (aro) to save a second or two of translation, and the generated
+    // bindings do not depend on how the tool itself was optimized.
     const translate_c = b.dependency("translate_c", .{
         .target = b.resolveTargetQuery(.{}),
-        .optimize = optimize,
+        .optimize = .Debug,
     });
     const win32_c: Translator = .init(translate_c, .{
         .name = "win32_c",

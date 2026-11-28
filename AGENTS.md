@@ -42,6 +42,9 @@ patch the code path instead when the rule is ours.
 - CI: `.github/workflows/image.yml` builds the image on pull requests (cache
   warm-up, no push) and publishes `ghcr.io/dawidcxx/arenacraft:local` on pushes
   to `local`, pruning older GHCR versions;
+  `.github/workflows/launcher-ci.yml` builds `apps/launcher` (Windows PE; cross
+  compiled on Linux, native on Windows) and runs its host-native test suites on
+  PRs touching it;
   `.github/workflows/api-image.yml` publishes `ghcr.io/dawidcxx/arenacraft-api:latest`;
   `.github/workflows/ac-bot-image.yml` publishes `ghcr.io/dawidcxx/arenacraft-bot:latest`;
   `.github/workflows/ac-bot-deploy.yml` is the manual (local-only) deployment hook for it.
